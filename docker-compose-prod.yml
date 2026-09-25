@@ -2,6 +2,9 @@
 # SSL is terminated by Caddy (automatic Let's Encrypt) in front of the web container (nginx serving the
 # SPA and proxying /api to the API). The API and database are not exposed directly.
 # Usage: docker compose --env-file .env.prod -f docker-compose-prod.yml up --build -d
+# Fixed project name: containers, network and volumes are prefixed "roll6" whatever the folder is called.
+name: roll6
+
 services:
   api:
     build:

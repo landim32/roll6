@@ -2,6 +2,9 @@
 # Usage: docker compose up --build -d   (reads .env)
 # Frontend: http://localhost:${WEB_PORT} (nginx proxies /api to the api service; no CORS needed).
 # API/Swagger directly: http://localhost:${APP_PORT}/swagger
+# Fixed project name: containers, network and volumes are prefixed "roll6" whatever the folder is called.
+name: roll6
+
 services:
   api:
     build:
