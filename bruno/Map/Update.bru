@@ -1,0 +1,26 @@
+meta {
+  name: Update
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/map/{{mapId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Masmorra 1 - Entrada",
+    "status": 1
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  status: 1 = Active, 2 = Archived. Deleting is done with DELETE.
+}

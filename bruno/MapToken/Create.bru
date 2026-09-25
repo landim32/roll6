@@ -1,0 +1,45 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/maptoken
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "mapId": {{mapId}},
+    "tokenId": {{tokenId}},
+    "name": null,
+    "tokenType": 3,
+    "sheet": "## Goblin\n- CA 15\n- Ataque +4",
+    "life": 7,
+    "energy": 0,
+    "status": null,
+    "move": 6,
+    "x": 0,
+    "y": 0,
+    "look": 1
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("mapTokenId", res.body.mapTokenId);
+  }
+}
+
+docs {
+  tokenType: 1 Character, 2 Npc, 3 Enemy, 4 Object. Empty name copies the token name.
+  x/y = column/row of the map model grid (odd columns shifted half a hex down).
+  look = hex side the token faces, clockwise from the top: 0 top, 1 top-right, 2 bottom-right,
+  3 bottom, 4 bottom-left, 5 top-left (null → 0).
+}

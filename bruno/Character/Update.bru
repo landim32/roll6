@@ -1,0 +1,27 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/character/{{characterId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Thorin",
+    "sheet": "## Thorin\n- Anão guerreiro\n- Nível 3",
+    "life": 21,
+    "energy": 10,
+    "status": "Envenenado",
+    "move": 5,
+    "image": "{{imageFileName}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

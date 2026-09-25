@@ -1,0 +1,15 @@
+meta {
+  name: Get by id
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/token/{{tokenId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}

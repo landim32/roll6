@@ -1,0 +1,7 @@
+# Replace app.example.com with the production domain (its DNS must point to the server
+# before the first deploy so Caddy can issue the Let's Encrypt certificate).
+# The web container serves the SPA and proxies /api to the API container.
+app.example.com {
+    encode gzip
+    reverse_proxy web:80
+}

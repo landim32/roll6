@@ -1,0 +1,19 @@
+meta {
+  name: Delete
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/campaign/{{campaignIdToDelete}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Returns 409 while the campaign has Active or Archived maps.
+}

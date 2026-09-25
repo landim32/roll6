@@ -1,0 +1,21 @@
+meta {
+  name: List
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/token?page=1&pageSize=20&search=
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 20
+  search: 
+}
+
+assert {
+  res.status: eq 200
+}

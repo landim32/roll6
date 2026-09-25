@@ -1,0 +1,254 @@
+{
+  "common": {
+    "appName": "SimpleTabletopMap",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "close": "Fechar",
+    "save": "Salvar",
+    "search": "Buscar",
+    "loading": "Carregando...",
+    "empty": "Nada encontrado.",
+    "previous": "Anterior",
+    "next": "Próxima",
+    "page": "Página {{page}} de {{total}}",
+    "unknownError": "Não foi possível concluir a operação."
+  },
+  "login": {
+    "signInTab": "Entrar",
+    "signUpTab": "Criar conta",
+    "name": "Nome",
+    "email": "E-mail",
+    "password": "Senha",
+    "passwordHint": "Mínimo de 8 caracteres.",
+    "signIn": "Entrar",
+    "signUp": "Criar conta",
+    "required": "Preencha todos os campos.",
+    "shortPassword": "A senha deve ter no mínimo 8 caracteres."
+  },
+  "menu": {
+    "currentCampaign": "Campanha atual",
+    "chooseCampaign": "Escolher campanha",
+    "currentMap": "Mapa atual",
+    "unnamedMap": "Mapa sem nome",
+    "saveMap": "Salvar mapa",
+    "readOnly": "Somente leitura"
+  },
+  "userMenu": {
+    "label": "Menu do usuário",
+    "edit": "Editar",
+    "changePassword": "Trocar senha",
+    "logout": "Sair"
+  },
+  "character": {
+    "current": "Personagem atual",
+    "none": "Nenhum personagem",
+    "gm": "Mestre (GM)",
+    "manage": "Gerenciar Personagens",
+    "select": "Selecionar Personagem",
+    "include": "Incluir Personagem",
+    "owner": "Dono: {{name}}"
+  },
+  "characterStatus": {
+    "invited": "Convidado",
+    "requestedAccess": "Acesso solicitado",
+    "approved": "Aprovado",
+    "denied": "Recusado",
+    "none": "Fora da campanha"
+  },
+  "selectCharacter": {
+    "title": "Selecionar Personagem",
+    "request": "Solicitar acesso",
+    "accept": "Aceitar",
+    "decline": "Recusar",
+    "waiting": "Aguardando o mestre",
+    "waitInvite": "Aguarde um convite do mestre",
+    "use": "Usar",
+    "current": "Atual",
+    "empty": "Você ainda não tem personagens."
+  },
+  "manage": {
+    "title": "Gerenciar Personagens",
+    "campaignTab": "Personagens na Campanha",
+    "inviteTab": "Convidar Personagens",
+    "approve": "Aprovar",
+    "deny": "Declinar",
+    "remove": "Excluir",
+    "removeTitle": "Remover da campanha",
+    "removeMessage": "Remover {{name}} da campanha? O personagem continua existindo para {{owner}}.",
+    "invite": "Convidar",
+    "search": "Buscar personagens",
+    "emptyCampaign": "Nenhum personagem na campanha.",
+    "emptySearch": "Nenhum personagem encontrado."
+  },
+  "characterForm": {
+    "title": "Incluir Personagem",
+    "name": "Nome",
+    "image": "Imagem (opcional)",
+    "life": "Vida",
+    "energy": "Energia",
+    "move": "Movimento",
+    "status": "Estado",
+    "sheet": "Ficha",
+    "errors": {
+      "nameRequired": "Informe o nome do personagem.",
+      "nameTooLong": "O nome deve ter no máximo 260 caracteres.",
+      "notInteger": "Vida, energia e movimento devem ser números inteiros.",
+      "negative": "Vida, energia e movimento não podem ser negativos.",
+      "statusTooLong": "O estado deve ter no máximo 260 caracteres.",
+      "sheetTooLong": "A ficha deve ter no máximo 20.000 caracteres.",
+      "aboveTotal": "O valor atual não pode passar do total.",
+      "vitalsNotInteger": "Vida e energia atuais devem ser números inteiros."
+    },
+    "dataTab": "Dados",
+    "sheetTab": "Ficha",
+    "zoom": "Zoom",
+    "removeImage": "Remover imagem",
+    "cropHint": "Arraste a imagem para enquadrar e use o zoom (ou a roda do mouse). O recorte é salvo quadrado.",
+    "sheetHint": "A ficha aceita Markdown: títulos (#), **negrito**, listas e tabelas.",
+    "editTitle": "Editar Personagem",
+    "campaignSection": "Nesta campanha",
+    "currentLife": "Vida atual",
+    "currentEnergy": "Energia atual",
+    "changeImage": "Trocar imagem",
+    "vitalsHint": "Podem ficar em zero ou negativos (personagem caído), mas não passar do total."
+  },
+  "notifications": {
+    "label": "Notificações",
+    "empty": "Nenhuma notificação",
+    "invite": "{{campaign}} (mestre {{owner}}) convidou {{character}}",
+    "accept": "Aceitar",
+    "decline": "Recusar"
+  },
+  "party": {
+    "title": "Personagens ({{count}})",
+    "collapse": "Recolher",
+    "expand": "Mostrar personagens",
+    "edit": "Editar {{name}}",
+    "fallen": "Caído",
+    "life": "Vida",
+    "energy": "Energia",
+    "vital": "{{label}} {{current}} de {{total}}"
+  },
+  "profile": {
+    "title": "Editar usuário",
+    "name": "Nome",
+    "email": "E-mail",
+    "errors": {
+      "required": "Informe o nome.",
+      "tooLong": "O nome deve ter no máximo 260 caracteres."
+    }
+  },
+  "password": {
+    "title": "Trocar senha",
+    "current": "Senha atual",
+    "new": "Nova senha",
+    "confirm": "Confirmar nova senha",
+    "errors": {
+      "required": "Preencha todos os campos.",
+      "tooShort": "A nova senha deve ter no mínimo {{min}} caracteres.",
+      "mismatch": "As senhas não conferem."
+    }
+  },
+  "map": {
+    "zoomIn": "Aproximar",
+    "zoomOut": "Afastar",
+    "image": "Imagem",
+    "resize": "Ajustar imagem",
+    "zoom": "Zoom {{value}}%",
+    "unsaved": "Não salvo"
+  },
+  "campaign": {
+    "title": "Campanhas",
+    "mineTab": "Minhas campanhas",
+    "searchTab": "Buscar campanhas",
+    "newTab": "Nova campanha",
+    "name": "Nome da campanha",
+    "open": "Campanha aberta (qualquer personagem pode entrar)",
+    "owner": "Dono",
+    "openBadge": "Aberta",
+    "closedBadge": "Fechada",
+    "searchPlaceholder": "Nome da campanha",
+    "create": "Criar campanha",
+    "current": "Atual"
+  },
+  "mapModal": {
+    "title": "Mapas",
+    "campaignTab": "Mapas da campanha",
+    "mineTab": "Meus mapas",
+    "searchTab": "Buscar mapas",
+    "noCampaign": "Escolha uma campanha para ver os mapas dela.",
+    "searchPlaceholder": "Nome ou descrição",
+    "newMap": "Novo mapa",
+    "grid": "Grid {{cols}} × {{rows}}"
+  },
+  "image": {
+    "title": "Imagem do cenário",
+    "uploadTab": "Enviar imagem",
+    "libraryTab": "Buscar mapas",
+    "file": "Arquivo (PNG, JPEG ou WebP, até 10 MB)",
+    "upload": "Enviar",
+    "invalidType": "Formato não suportado. Use PNG, JPEG ou WebP.",
+    "tooLarge": "A imagem deve ter no máximo 10 MB.",
+    "noFile": "Escolha um arquivo.",
+    "noImage": "Este mapa não tem imagem."
+  },
+  "grid": {
+    "title": "Tamanho do mapa",
+    "footer": "Grid {{cols}} × {{rows}}",
+    "columns": "Colunas",
+    "rows": "Linhas",
+    "range": "Colunas e linhas devem estar entre 1 e 500.",
+    "hexSize": "Hexágono {{size}} px"
+  },
+  "save": {
+    "title": "Salvar mapa",
+    "copyTitle": "Salvar cópia do mapa",
+    "copyHint": "Este mapa é de outro usuário. Será criada uma cópia em seu nome.",
+    "name": "Nome do mapa",
+    "description": "Descrição",
+    "nameRequired": "Informe o nome do mapa."
+  },
+  "unsaved": {
+    "title": "Alterações não salvas",
+    "message": "O mapa atual tem alterações não salvas. Deseja salvar antes de continuar?",
+    "save": "Salvar",
+    "discard": "Descartar",
+    "cancel": "Cancelar"
+  },
+  "toast": {
+    "welcome": "Bem-vindo, {{name}}!",
+    "accountCreated": "Conta criada. Bem-vindo, {{name}}!",
+    "loggedOut": "Você saiu do sistema.",
+    "sessionExpired": "Sua sessão expirou. Entre novamente.",
+    "campaignSelected": "Campanha \"{{name}}\" selecionada.",
+    "campaignCreated": "Campanha \"{{name}}\" criada.",
+    "mapLoaded": "Mapa \"{{name}}\" carregado.",
+    "newMap": "Novo mapa iniciado.",
+    "imageUploaded": "Imagem enviada.",
+    "imageReused": "Imagem de \"{{name}}\" aplicada.",
+    "gridChanged": "Grid alterada para {{cols}} × {{rows}}.",
+    "resizeOn": "Ajuste da imagem ligado: arraste a imagem ou o canto.",
+    "resizeOff": "Ajuste da imagem desligado.",
+    "mapSaved": "Mapa \"{{name}}\" salvo.",
+    "mapCopied": "Cópia \"{{name}}\" criada.",
+    "mapAddedToCampaign": "Mapa adicionado à campanha \"{{name}}\".",
+    "changesDiscarded": "Alterações descartadas.",
+    "readOnly": "Você não pode alterar este mapa.",
+    "profileSaved": "Nome atualizado.",
+    "passwordChanged": "Senha alterada.",
+    "accessRequested": "Acesso solicitado para {{name}}.",
+    "accessApproved": "{{name}} entrou na campanha.",
+    "inviteAccepted": "Convite aceito: {{name}} está em {{campaign}}.",
+    "inviteDeclined": "Convite recusado.",
+    "characterSelected": "Jogando com {{name}}.",
+    "requestApproved": "{{name}} foi aprovado.",
+    "requestDenied": "O pedido de {{name}} foi recusado.",
+    "characterRemoved": "{{name}} foi removido da campanha.",
+    "characterInvited": "{{name}} foi convidado.",
+    "characterCreated": "{{name}} criado.",
+    "characterCreatedApproved": "{{name}} criado e incluído na campanha.",
+    "characterCreatedRequested": "{{name}} criado. Aguardando aprovação do mestre.",
+    "characterRequestFailed": "{{name}} criado, mas o pedido de acesso falhou: {{error}}. Tente em Selecionar Personagem.",
+    "characterUpdated": "{{name}} atualizado."
+  }
+}

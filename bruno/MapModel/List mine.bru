@@ -1,0 +1,25 @@
+meta {
+  name: List mine
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/mapmodel?mine=true&page=1&pageSize=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  mine: true
+  page: 1
+  pageSize: 20
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Only the map models owned by the logged user ("Meus mapas" in the frontend).
+}

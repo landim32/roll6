@@ -1,0 +1,15 @@
+meta {
+  name: List tokens
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/map/{{mapId}}/token
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}

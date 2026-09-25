@@ -1,0 +1,27 @@
+meta {
+  name: Update vitals
+  type: http
+  seq: 17
+}
+
+put {
+  url: {{baseUrl}}/api/campaigncharacter/{{inviteId}}/vitals
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "currentLife": 1,
+    "currentEnergy": 0
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Current life/energy of an approved character in the campaign (character owner or campaign master).
+  Never above the character's totals; may be zero or negative (fallen).
+}

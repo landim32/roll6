@@ -1,0 +1,29 @@
+meta {
+  name: Create (to delete)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/mapmodel
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Modelo descartável",
+    "description": null,
+    "image": null
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("mapModelIdToDelete", res.body.mapModelId);
+  }
+}

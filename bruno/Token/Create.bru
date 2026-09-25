@@ -1,0 +1,40 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/token
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Goblin",
+    "description": "Goblin com lança",
+    "upSpace": 1,
+    "downSpace": 2,
+    "upImage": "{{imageFileName}}",
+    "downImage": "{{imageFileName}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("tokenId", res.body.tokenId);
+  }
+}
+
+docs {
+  `upSpace` null → 1.
+  `downSpace`:
+  - informed → stored as sent (>= 0);
+  - null with `downImage` → 2;
+  - null without `downImage` → null (token without down state).
+}

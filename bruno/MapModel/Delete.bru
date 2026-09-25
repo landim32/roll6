@@ -1,0 +1,19 @@
+meta {
+  name: Delete
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/mapmodel/{{mapModelIdToDelete}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Returns 409 when the map model is used by any map.
+}

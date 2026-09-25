@@ -1,0 +1,21 @@
+meta {
+  name: Rename
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/user/name
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Ana Maria"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

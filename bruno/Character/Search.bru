@@ -1,0 +1,25 @@
+meta {
+  name: Search
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/character/search?page=1&pageSize=20&search=a
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 20
+  search: a
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Characters of every user (public fields only: name, image, owner) for the master's invite search.
+}

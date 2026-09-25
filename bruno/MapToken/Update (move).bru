@@ -1,0 +1,31 @@
+meta {
+  name: Update (move)
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/maptoken/{{mapTokenId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Goblin 1",
+    "tokenType": 3,
+    "sheet": "## Goblin\n- CA 15\n- Ataque +4",
+    "life": 4,
+    "energy": 0,
+    "status": "Ferido",
+    "move": 6,
+    "x": 2,
+    "y": 0,
+    "look": 5
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.look: eq 5
+}

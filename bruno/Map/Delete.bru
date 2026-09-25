@@ -1,0 +1,19 @@
+meta {
+  name: Delete
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/map/{{mapIdToDelete}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Soft delete: status becomes 3 (Deleted).
+}

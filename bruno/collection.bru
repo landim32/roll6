@@ -1,0 +1,28 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000
+  email: rodrigo@emagine.com.br
+  password: eaa69cpxy2
+  newPassword: Eaa69cpxy2++
+}
+
+docs {
+  # SimpleTabletopMap API
+  
+  Requests inherit Bearer auth from the collection; `User/Login` stores `token`.
+  Create requests store ids (`mapModelId`, `campaignId`, `mapId`, `tokenId`, `mapTokenId`,
+  `characterId`, `imageFileName`) as runtime variables used by the following requests.
+  
+  Running the whole collection in order (Runner) works end to end: each folder creates an
+  extra record just to exercise its DELETE, so the records used by later folders survive.
+  `User/Register` creates a new user with a random e-mail on every run.
+  
+  `Image/Upload` needs S3 (DigitalOcean Spaces) credentials configured on the API.
+}

@@ -1,0 +1,19 @@
+meta {
+  name: List characters
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/character
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Master: every participation. Approved participant: only approved ones. Others: 403.
+}

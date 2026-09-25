@@ -1,0 +1,20 @@
+meta {
+  name: Accept invite
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/campaigncharacter/{{inviteId}}/accept
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq 3
+}
+
+docs {
+  Only the character owner.
+}
