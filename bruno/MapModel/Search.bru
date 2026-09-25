@@ -1,0 +1,21 @@
+meta {
+  name: Search
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/mapmodel?page=1&pageSize=20&search=masm
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 20
+  search: masm
+}
+
+assert {
+  res.status: eq 200
+}

@@ -1,0 +1,29 @@
+meta {
+  name: Invite (to decline)
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/campaigncharacter/invite
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "campaignId": {{closedCampaignId}},
+    "characterId": {{thirdCharacterId}}
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.status: eq 1
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("declineId", res.body.campaignCharacterId);
+  }
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Delete
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/api/token/{{tokenIdToDelete}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Only the owner; returns 409 when the token is used in any map.
+}

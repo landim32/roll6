@@ -1,0 +1,33 @@
+meta {
+  name: Create (to delete)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/character
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Personagem descartável",
+    "sheet": "## Thorin\n- Anão guerreiro\n- Nível 3",
+    "life": 28,
+    "energy": 10,
+    "status": null,
+    "move": 5,
+    "image": null
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("characterIdToDelete", res.body.characterId);
+  }
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Update
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/api/token/{{tokenId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Goblin",
+    "description": "Goblin com arco",
+    "upSpace": 1,
+    "downSpace": 2,
+    "upImage": "{{imageFileName}}",
+    "downImage": "{{imageFileName}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

@@ -1,0 +1,25 @@
+meta {
+  name: List mine
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/campaign?mine=true&page=1&pageSize=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  mine: true
+  page: 1
+  pageSize: 20
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Only the campaigns where the logged user is the master ("Minhas campanhas" in the frontend).
+}

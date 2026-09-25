@@ -1,0 +1,20 @@
+meta {
+  name: Deny request
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/campaigncharacter/{{deniedId}}/deny
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq 4
+}
+
+docs {
+  Only the master. The player cannot request again; only a new invite reopens.
+}

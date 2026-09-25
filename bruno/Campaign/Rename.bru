@@ -1,0 +1,21 @@
+meta {
+  name: Rename
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/name
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "A Maldição de Strahd (revisada)"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

@@ -1,0 +1,440 @@
+/* SimpleTabletopMap — dark theme only (Bootstrap 5.3 data-bs-theme="dark" on <html>). */
+:root {
+  --stm-bg: #111317;
+  --stm-surface: #1b1e24;
+  --stm-surface-2: #242830;
+  --stm-border: #343a46;
+  --stm-accent: #d4a24c;
+  --stm-grid-line: rgba(230, 230, 240, 0.35);
+  --stm-menu-height: 56px;
+  --stm-footer-height: 32px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--stm-bg);
+}
+
+/* ---------- login ---------- */
+.stm-login {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.stm-login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--stm-surface);
+  border: 1px solid var(--stm-border);
+  border-radius: 0.75rem;
+  padding: 2rem;
+}
+
+.stm-brand {
+  color: var(--stm-accent);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- main layout ---------- */
+.stm-main {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.stm-menu {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--stm-menu-height);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1rem;
+  background: rgba(27, 30, 36, 0.92);
+  border-bottom: 1px solid var(--stm-border);
+  backdrop-filter: blur(4px);
+}
+
+.stm-menu .stm-fake-select {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.stm-fake-select {
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.stm-fake-select small {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.stm-map {
+  position: absolute;
+  inset: 0;
+  /* <svg> is a replaced element: inset alone does not stretch it (it would stay 300 × 150). */
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.stm-map.stm-panning {
+  cursor: grabbing;
+}
+
+.stm-map .stm-grid {
+  fill: none;
+  stroke: var(--stm-grid-line);
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1;
+}
+
+.stm-map .stm-resize-frame {
+  fill: transparent;
+  stroke: var(--stm-accent);
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
+}
+
+.stm-map .stm-resize-handle {
+  fill: var(--stm-accent);
+  stroke: #000;
+  vector-effect: non-scaling-stroke;
+  cursor: nwse-resize;
+}
+
+.stm-controls {
+  position: absolute;
+  right: 1rem;
+  bottom: calc(var(--stm-footer-height) + 1rem);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stm-controls .btn {
+  width: 48px;
+  height: 48px;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.stm-footer {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: var(--stm-footer-height);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1rem;
+  font-size: 0.85rem;
+  background: rgba(27, 30, 36, 0.92);
+  border-top: 1px solid var(--stm-border);
+}
+
+.stm-footer .btn-link {
+  padding: 0;
+  font-size: inherit;
+  text-decoration: none;
+}
+
+/* ---------- modal (Radix Dialog styled as Bootstrap) ---------- */
+.stm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.stm-modal-content {
+  position: fixed;
+  z-index: 1055;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 2rem);
+  max-width: 560px;
+  max-height: calc(100% - 2rem);
+  display: flex;
+  flex-direction: column;
+  /* Bootstrap's .modal-* classes read these variables from the .modal wrapper, which Radix doesn't use. */
+  --bs-modal-bg: var(--stm-surface);
+  --bs-modal-border-color: var(--stm-border);
+  --bs-modal-border-width: 1px;
+  --bs-modal-border-radius: 0.5rem;
+  --bs-modal-inner-border-radius: calc(0.5rem - 1px);
+  --bs-modal-padding: 1rem;
+  --bs-modal-header-padding: 1rem 1rem;
+  --bs-modal-header-border-color: var(--stm-border);
+  --bs-modal-header-border-width: 1px;
+  --bs-modal-footer-gap: 0.5rem;
+  --bs-modal-footer-border-color: var(--stm-border);
+  --bs-modal-footer-border-width: 1px;
+  --bs-modal-box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
+  box-shadow: var(--bs-modal-box-shadow);
+}
+
+.stm-modal-content.stm-modal-lg {
+  max-width: 800px;
+}
+
+.stm-modal-content .modal-body {
+  overflow-y: auto;
+}
+
+.stm-list .list-group-item {
+  cursor: pointer;
+}
+
+.stm-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  background: var(--stm-surface-2);
+}
+
+/* ---------- user menu (Radix Dropdown styled as Bootstrap) ---------- */
+.stm-user-trigger {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stm-user-menu {
+  position: static; /* Radix positions its wrapper */
+  z-index: 1040; /* above the map and menu, below the modal overlay (1050) */
+  min-width: 180px;
+}
+
+.stm-user-menu .dropdown-item {
+  cursor: pointer;
+  outline: none;
+}
+
+.stm-user-menu .dropdown-item[data-highlighted] {
+  color: var(--bs-dropdown-link-hover-color);
+  background-color: var(--bs-dropdown-link-hover-bg);
+}
+
+/* ---------- characters ---------- */
+.stm-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bs-secondary-bg);
+  color: var(--bs-body-color);
+  font-weight: 600;
+}
+
+.stm-character-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.stm-character-row .stm-character-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.stm-character-row .stm-character-text > * {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stm-character-row .stm-character-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+
+
+.stm-user-menu .dropdown-item[data-disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ---------- notifications ---------- */
+.stm-bell {
+  position: relative;
+}
+
+.stm-bell .badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  font-size: 0.65rem;
+}
+
+.stm-notifications {
+  width: 340px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.stm-notification {
+  padding: 0.5rem 1rem;
+}
+
+.stm-notification + .stm-notification {
+  border-top: 1px solid var(--bs-border-color);
+}
+
+/* ---------- character form: image crop + markdown sheet ---------- */
+.stm-cropper {
+  position: relative; /* react-easy-crop fills its positioned parent */
+  height: 280px;
+  border-radius: var(--bs-border-radius);
+  overflow: hidden;
+  background: #000;
+}
+
+.stm-markdown .w-md-editor {
+  --color-canvas-default: var(--bs-body-bg);
+  background-color: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  box-shadow: none;
+}
+
+.stm-markdown .w-md-editor-toolbar {
+  background-color: var(--bs-tertiary-bg);
+  border-bottom-color: var(--bs-border-color);
+}
+
+.stm-markdown .wmde-markdown {
+  background-color: transparent; /* same surface as the editor */
+}
+
+/* ---------- party panel (approved characters of the campaign) ---------- */
+.stm-party {
+  position: absolute;
+  top: calc(var(--stm-menu-height) + 8px);
+  left: 8px;
+  z-index: 5; /* above the map, below the menu (10) and the modals */
+  width: 220px;
+  max-height: calc(100% - var(--stm-menu-height) - var(--stm-footer-height) - 16px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(var(--bs-body-bg-rgb), 0.88);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  font-size: 0.8rem;
+}
+
+.stm-party header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--bs-border-color);
+  font-weight: 600;
+}
+
+.stm-party ul {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+}
+
+.stm-party-card {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--bs-border-radius-sm);
+}
+
+.stm-party-card.is-current {
+  border-color: var(--bs-primary);
+}
+
+.stm-party-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.stm-party-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+}
+
+.stm-party-name > span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stm-party-name .badge {
+  font-size: 0.6rem;
+}
+
+.stm-party-fallen .stm-avatar {
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+
+.stm-vital {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.stm-vital .progress {
+  flex: 1;
+  height: 6px;
+}
+
+.stm-vital small {
+  min-width: 3.2em;
+  text-align: right;
+  font-size: 0.65rem;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.stm-party-collapsed {
+  width: 28px;
+  padding: 8px 0;
+  align-items: center;
+  color: var(--bs-body-color);
+  cursor: pointer;
+}
+
+.stm-party-collapsed span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}

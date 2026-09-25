@@ -1,0 +1,21 @@
+meta {
+  name: Search
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/token?page=1&pageSize=20&search=gob
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 20
+  search: gob
+}
+
+assert {
+  res.status: eq 200
+}

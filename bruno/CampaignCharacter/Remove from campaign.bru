@@ -1,0 +1,19 @@
+meta {
+  name: Remove from campaign
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{baseUrl}}/api/campaigncharacter/{{inviteId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Master only: removes the character from the campaign; the character itself is kept.
+}

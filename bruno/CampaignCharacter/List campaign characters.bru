@@ -1,0 +1,20 @@
+meta {
+  name: List campaign characters
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/api/campaign/{{closedCampaignId}}/character
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.length: eq 3
+}
+
+docs {
+  The master sees approved, invited-then-approved and declined characters.
+}

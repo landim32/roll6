@@ -1,0 +1,23 @@
+meta {
+  name: List my participations
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/api/campaigncharacter/mine?campaignId={{closedCampaignId}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  campaignId: {{closedCampaignId}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Participations (any status) of the logged user's characters in the campaign.
+}

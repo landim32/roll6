@@ -1,0 +1,20 @@
+meta {
+  name: Approve request
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/campaigncharacter/{{requestId}}/approve
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq 3
+}
+
+docs {
+  Only the master.
+}

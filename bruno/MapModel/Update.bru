@@ -1,0 +1,30 @@
+meta {
+  name: Update
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/mapmodel/{{mapModelId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Masmorra",
+    "description": "Masmorra úmida com quatro salas",
+    "image": "{{imageFileName}}",
+    "gridWidth": 10,
+    "gridHeight": 8,
+    "imageWidth": 1600,
+    "imageHeight": 1400,
+    "imageTop": 40,
+    "imageLeft": 25
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.hexSize: isNumber
+}

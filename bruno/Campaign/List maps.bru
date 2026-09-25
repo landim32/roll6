@@ -1,0 +1,24 @@
+meta {
+  name: List maps
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/map?page=1&pageSize=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 20
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Maps with status Deleted are not listed.
+}

@@ -1,0 +1,19 @@
+meta {
+  name: List invites
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/campaigncharacter/invites
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Pending invites of the logged user's characters.
+}

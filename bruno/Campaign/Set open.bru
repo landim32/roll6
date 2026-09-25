@@ -1,0 +1,26 @@
+meta {
+  name: Set open
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/open
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "open": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.open: eq true
+}
+
+docs {
+  Only the master. Open campaigns approve access requests immediately.
+}
