@@ -65,20 +65,20 @@ specs/008-campaign-characters-ui/
 
 ```text
 backend/
-├── SimpleTabletopMap.DTO/Character/CharacterSearchInfo.cs            # novo
-├── SimpleTabletopMap.Infra.Interfaces/Repository/
+├── Roll6.DTO/Character/CharacterSearchInfo.cs            # novo
+├── Roll6.Infra.Interfaces/Repository/
 │   ├── ICharacterRepository.cs            # + ListPagedAsync
 │   └── ICampaignCharacterRepository.cs    # + ListByCampaignAndUserAsync, DeleteAsync
-├── SimpleTabletopMap.Infra/Repository/
+├── Roll6.Infra/Repository/
 │   ├── CharacterRepository.cs
 │   └── CampaignCharacterRepository.cs
-├── SimpleTabletopMap.Domain/
+├── Roll6.Domain/
 │   ├── Models/CampaignCharacter.cs        # RequestAccess(autoApprove)
 │   └── Services/                          # CharacterService.SearchAsync; CampaignCharacterService.ListMineAsync, RemoveAsync, RequestAccess do mestre
-├── SimpleTabletopMap.API/Controllers/
+├── Roll6.API/Controllers/
 │   ├── CharacterController.cs             # GET search
 │   └── CampaignCharacterController.cs     # GET mine, DELETE {id}
-└── SimpleTabletopMap.Tests/Domain/Services/
+└── Roll6.Tests/Domain/Services/
     ├── CharacterServiceTests.cs           # novo
     └── CampaignCharacterServiceTests.cs   # + casos
 

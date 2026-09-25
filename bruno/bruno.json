@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "name": "SimpleTabletopMap",
+  "name": "Roll6",
   "type": "collection",
   "ignore": [
     "node_modules",

@@ -12,20 +12,20 @@
 
 ## Configuração
 
-`backend/SimpleTabletopMap.API/appsettings.Development.json` (não versionar segredos reais):
+`backend/Roll6.API/appsettings.Development.json` (não versionar segredos reais):
 
 ```json
 {
   "ConnectionStrings": {
-    "SimpleTabletopMapContext": "Host=localhost;Port=5432;Database=simple_tabletop_map;Username=postgres;Password=postgres"
+    "Roll6Context": "Host=localhost;Port=5432;Database=roll6;Username=postgres;Password=postgres"
   },
   "Jwt": {
     "Secret": "troque-por-um-segredo-com-pelo-menos-64-caracteres-.....................",
-    "Issuer": "SimpleTabletopMap",
+    "Issuer": "Roll6",
     "ExpirationHours": 24
   },
   "S3": {
-    "BucketName": "simple-tabletop-map",
+    "BucketName": "roll6",
     "Region": "us-east-1",
     "ServiceUrl": null,
     "UrlExpirationMinutes": 60
@@ -33,7 +33,7 @@
 }
 ```
 
-Equivalentes em variáveis de ambiente: `ConnectionStrings__SimpleTabletopMapContext`,
+Equivalentes em variáveis de ambiente: `ConnectionStrings__Roll6Context`,
 `ASPNETCORE_ENVIRONMENT`, `Jwt__Secret`, `S3__BucketName`, `S3__Region`, `S3__ServiceUrl`.
 Credenciais AWS pelas variáveis padrão (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) ou
 perfil AWS.
@@ -42,9 +42,9 @@ perfil AWS.
 
 ```bash
 cd backend
-dotnet build SimpleTabletopMap.sln
-dotnet ef database update --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API
-dotnet run --project SimpleTabletopMap.API
+dotnet build Roll6.sln
+dotnet ef database update --project Roll6.Infra --startup-project Roll6.API
+dotnet run --project Roll6.API
 ```
 
 Swagger: `https://localhost:{porta}/swagger` (botão **Authorize** aceita `Bearer {token}`).
@@ -52,7 +52,7 @@ Swagger: `https://localhost:{porta}/swagger` (botão **Authorize** aceita `Beare
 Nova migração (após alterar o DbContext):
 
 ```bash
-dotnet ef migrations add NomeDaMigracao --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API
+dotnet ef migrations add NomeDaMigracao --project Roll6.Infra --startup-project Roll6.API
 ```
 
 ## Testes

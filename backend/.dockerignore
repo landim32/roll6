@@ -3,5 +3,5 @@
 **/TestResults/
 **/.vs/
 **/*.user
-SimpleTabletopMap.Tests/
+Roll6.Tests/
 **/appsettings.Development.json

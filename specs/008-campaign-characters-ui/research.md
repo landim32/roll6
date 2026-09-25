@@ -58,7 +58,7 @@ A feature 005 criou `CampaignCharacter` com convite/pedido/aprovação, mas falt
 
 ## R5. Persistência da escolha
 
-- **Decision**: localStorage `simple-tabletop-map:character` com um objeto
+- **Decision**: localStorage `roll6:character` com um objeto
   `{ [campaignId]: 'gm' | characterId }`; lido ao trocar de campanha e resolvido por `resolveSelection`.
   Removido no `logout()` junto com as outras chaves.
 - **Rationale**: FR-004 (por campanha, neste navegador); é preferência de UI, não dado de servidor.

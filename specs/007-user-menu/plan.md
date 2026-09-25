@@ -18,7 +18,7 @@ formulário de senha é uma função pura testada com Vitest. **Sem mudanças no
 **Language/Version**: TypeScript 5 + React 18 (frontend apenas)
 **Primary Dependencies**: Vite 6, Bootstrap 5.3 (tema escuro), i18next, sonner, `@radix-ui/react-dialog`
 (já no projeto) + `@radix-ui/react-dropdown-menu` (novo, research R1)
-**Storage**: sessão em localStorage `simple-tabletop-map:auth` (já existente); nada novo no banco
+**Storage**: sessão em localStorage `roll6:auth` (já existente); nada novo no banco
 **Testing**: Vitest (`lib/`), `tsc`, lint, verificação manual/Playwright pelo quickstart
 **Target Platform**: navegadores desktop atuais
 **Project Type**: web app (SPA em `frontend/` + API .NET existente em `backend/`)

@@ -8,13 +8,13 @@ import type { UserTokenInfo } from '../types/auth';
 export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:5119').replace(/\/$/, '');
 
 /** localStorage key of the session (token only in localStorage, never cookies). */
-export const AUTH_STORAGE_KEY = 'simple-tabletop-map:auth';
+export const AUTH_STORAGE_KEY = 'roll6:auth';
 
 /** localStorage key of the current campaign id. */
-export const CAMPAIGN_STORAGE_KEY = 'simple-tabletop-map:campaign';
+export const CAMPAIGN_STORAGE_KEY = 'roll6:campaign';
 
 /** localStorage key of the chosen character per campaign ({ [campaignId]: 'gm' | characterId }). */
-export const CHARACTER_STORAGE_KEY = 'simple-tabletop-map:character';
+export const CHARACTER_STORAGE_KEY = 'roll6:character';
 
 /** Reads the stored session, or null. */
 export const readStoredSession = (): UserTokenInfo | null => {

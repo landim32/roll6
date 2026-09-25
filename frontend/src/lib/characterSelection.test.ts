@@ -102,7 +102,7 @@ describe('stored selections', () => {
   });
 
   it('ignores unreadable data', () => {
-    localStorage.setItem('simple-tabletop-map:character', '{broken');
+    localStorage.setItem('roll6:character', '{broken');
     expect(readStoredSelections()).toEqual({});
   });
 });

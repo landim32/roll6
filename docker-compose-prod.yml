@@ -7,26 +7,26 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: simple-tabletop-map-api
+    container_name: roll6-api
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__SimpleTabletopMapContext: ${CONNECTION_STRING}
+      ConnectionStrings__Roll6Context: ${CONNECTION_STRING}
       Jwt__Secret: ${JWT_SECRET}
-      S3__Folder: ${S3_FOLDER:-simple-tabletop}
+      S3__Folder: ${S3_FOLDER:-roll6}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     depends_on:
       db:
         condition: service_healthy
     networks:
-      - simple-tabletop-map-network
-      - simple-tabletop-map-external
+      - roll6-network
+      - roll6-external
 
   db:
     image: postgres:17-alpine
-    container_name: simple-tabletop-map-db
+    container_name: roll6-db
     restart: unless-stopped
     # No port exposed externally — only reachable from the internal network.
     environment:
@@ -41,7 +41,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - simple-tabletop-map-network
+      - roll6-network
 
   web:
     build:
@@ -49,17 +49,17 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ""
-    container_name: simple-tabletop-map-web
+    container_name: roll6-web
     restart: unless-stopped
     # Not exposed: only Caddy reaches it.
     depends_on:
       - api
     networks:
-      - simple-tabletop-map-network
+      - roll6-network
 
   caddy:
     image: caddy:2-alpine
-    container_name: simple-tabletop-map-caddy
+    container_name: roll6-caddy
     restart: unless-stopped
     ports:
       - "80:80"
@@ -71,8 +71,8 @@ services:
     depends_on:
       - web
     networks:
-      - simple-tabletop-map-network
-      - simple-tabletop-map-external
+      - roll6-network
+      - roll6-external
 
 volumes:
   postgres_data:
@@ -80,7 +80,7 @@ volumes:
   caddy_config:
 
 networks:
-  simple-tabletop-map-network:
+  roll6-network:
     driver: bridge
-  simple-tabletop-map-external:
+  roll6-external:
     external: true

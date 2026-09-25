@@ -30,5 +30,5 @@ Sem mudanças no banco nem nos DTOs do backend. Só tipos do frontend que espelh
 
 ## Sessão
 
-`updateName` grava `{ ...session, user: userInfoRetornado }` em `simple-tabletop-map:auth` e no estado
+`updateName` grava `{ ...session, user: userInfoRetornado }` em `roll6:auth` e no estado
 do `AuthContext`; `token` e `expiresAt` não mudam. `changePassword` não altera a sessão.

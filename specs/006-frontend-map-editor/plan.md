@@ -80,10 +80,10 @@ frontend/
     └── pages/                   LoginPage, MainPage
 
 backend/ (ajuste)
-├── SimpleTabletopMap.Infra.Interfaces/Repository/  ICampaignRepository, IMapModelRepository (+ ownerUserId?)
-├── SimpleTabletopMap.Infra/Repository/             CampaignRepository, MapModelRepository
-├── SimpleTabletopMap.Domain/Services/              CampaignService, MapModelService (repasse de mine)
-└── SimpleTabletopMap.API/Controllers/              CampaignController, MapModelController ([FromQuery] bool mine)
+├── Roll6.Infra.Interfaces/Repository/  ICampaignRepository, IMapModelRepository (+ ownerUserId?)
+├── Roll6.Infra/Repository/             CampaignRepository, MapModelRepository
+├── Roll6.Domain/Services/              CampaignService, MapModelService (repasse de mine)
+└── Roll6.API/Controllers/              CampaignController, MapModelController ([FromQuery] bool mine)
 ```
 
 **Structure Decision**: aplicação web com `frontend/` ao lado de `backend/`, como reservado no

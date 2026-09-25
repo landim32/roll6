@@ -5,7 +5,7 @@
 ## Pré-requisitos
 
 - Node 22+ e npm.
-- Backend rodando (`cd backend && dotnet run --project SimpleTabletopMap.API`), banco com as
+- Backend rodando (`cd backend && dotnet run --project Roll6.API`), banco com as
   migrações aplicadas e credenciais do Spaces para o upload de imagem.
 
 ## Configuração

@@ -152,7 +152,7 @@ Regras: listar, incluir, alterar e excluir só pelo dono do mapa; mapa Deleted n
 operações; valores são cópias independentes do token da biblioteca. Vários tokens podem ocupar
 o mesmo hexágono (sem regra de colisão nesta feature).
 
-## DTOs (SimpleTabletopMap.DTO)
+## DTOs (Roll6.DTO)
 
 Todas as propriedades com `[JsonPropertyName("camelCase")]`. Imagens saem como
 `{campo}` (nome do arquivo) + `{campo}Url` (presigned URL).

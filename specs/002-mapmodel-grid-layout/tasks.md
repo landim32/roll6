@@ -14,8 +14,8 @@ frontend).
 
 - **[P]**: pode rodar em paralelo (arquivos diferentes, sem dependência pendente)
 - **[Story]**: user story da spec (US1, US2)
-- `DTO/`, `Domain/`, `Infra/` abreviam `backend/SimpleTabletopMap.DTO/`,
-  `backend/SimpleTabletopMap.Domain/`, `backend/SimpleTabletopMap.Infra/`.
+- `DTO/`, `Domain/`, `Infra/` abreviam `backend/Roll6.DTO/`,
+  `backend/Roll6.Domain/`, `backend/Roll6.Infra/`.
 
 ## Regras válidas para todas as tarefas
 
@@ -37,8 +37,8 @@ Nenhuma tarefa: a solução, as dependências e os ambientes já existem (featur
 **Purpose**: colunas novas no banco e propriedades no model, usadas pelas duas stories.
 
 - [X] T001 Adicionar ao model `MapModel` as propriedades `GridWidth` e `GridHeight` (int, padrão 20), `ImageWidth` e `ImageHeight` (int?), `ImageTop` e `ImageLeft` (int, padrão 0), com constantes `DEFAULT_GRID_SIZE = 20`, `MAX_GRID_SIZE = 500`, `MAX_IMAGE_SIZE = 20000`, em `Domain/Models/MapModel.cs`
-- [X] T002 Configurar as colunas `grid_width`, `grid_height` (default 20), `image_width`, `image_height` (nullable) e `image_top`, `image_left` (default 0) na entidade `MapModel`, com `HasSentinel(int.MinValue)` nas colunas com default, em `Infra/Context/SimpleTabletopMapContext.cs`
-- [X] T003 Gerar a migração `AddMapModelGridLayout` em `Infra/Migrations/` (`dotnet ef migrations add AddMapModelGridLayout --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API`, rodando em `backend/`) e conferir que o SQL tem `DEFAULT 20` e `DEFAULT 0` para os modelos existentes
+- [X] T002 Configurar as colunas `grid_width`, `grid_height` (default 20), `image_width`, `image_height` (nullable) e `image_top`, `image_left` (default 0) na entidade `MapModel`, com `HasSentinel(int.MinValue)` nas colunas com default, em `Infra/Context/Roll6Context.cs`
+- [X] T003 Gerar a migração `AddMapModelGridLayout` em `Infra/Migrations/` (`dotnet ef migrations add AddMapModelGridLayout --project Roll6.Infra --startup-project Roll6.API`, rodando em `backend/`) e conferir que o SQL tem `DEFAULT 20` e `DEFAULT 0` para os modelos existentes
 
 **Checkpoint**: solução compila; `dotnet ef migrations has-pending-model-changes` não acusa mudanças.
 
@@ -81,9 +81,9 @@ Nenhuma tarefa: a solução, as dependências e os ambientes já existem (featur
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [X] T017 [P] Testes de `HexGrid` (grid 10 × 8 em 1600 × 1400 → 95.093; grid 1 × 8 → 101.0363; limitado pela largura; arredondamento em 4 casas; entradas inválidas lançam) em `backend/SimpleTabletopMap.Tests/Domain/Grid/HexGridTests.cs`
-- [X] T018 [P] Testes de `MapModel.UpdateGrid`/`UpdateImageLayout`/`HexSize` (padrões, limites 1..500 e 1..20000, exibição só com um lado, recorte negativo ou ≥ exibição, `HexSize` null sem exibição, recorte reduz a área visível) em `backend/SimpleTabletopMap.Tests/Domain/Models/MapModelLayoutTests.cs`
-- [X] T019 [P] Acrescentar a `MapModelServiceTests` casos de create sem campos novos (padrões) e update com layout completo (`HexSize` 95.093) em `backend/SimpleTabletopMap.Tests/Domain/Services/MapModelServiceTests.cs`
+- [X] T017 [P] Testes de `HexGrid` (grid 10 × 8 em 1600 × 1400 → 95.093; grid 1 × 8 → 101.0363; limitado pela largura; arredondamento em 4 casas; entradas inválidas lançam) em `backend/Roll6.Tests/Domain/Grid/HexGridTests.cs`
+- [X] T018 [P] Testes de `MapModel.UpdateGrid`/`UpdateImageLayout`/`HexSize` (padrões, limites 1..500 e 1..20000, exibição só com um lado, recorte negativo ou ≥ exibição, `HexSize` null sem exibição, recorte reduz a área visível) em `backend/Roll6.Tests/Domain/Models/MapModelLayoutTests.cs`
+- [X] T019 [P] Acrescentar a `MapModelServiceTests` casos de create sem campos novos (padrões) e update com layout completo (`HexSize` 95.093) em `backend/Roll6.Tests/Domain/Services/MapModelServiceTests.cs`
 - [X] T020 Atualizar a tabela `map_models` e os DTOs em `specs/001-backend-core-entities/data-model.md` e `specs/001-backend-core-entities/contracts/api.md` com uma referência à feature 002
 - [ ] T021 Rodar `dotnet build` e `dotnet test` em `backend/` e o roteiro de `specs/002-mapmodel-grid-layout/quickstart.md` (itens que dependem de banco ficam pendentes se não houver PostgreSQL) — ⚠️ parcial: build sem avisos, 76/76 testes e validações 400 via API conferidos; itens 1–3 e 6 do roteiro aguardam banco (o PostgreSQL local recusou a senha de `appsettings.Development.json`)
 

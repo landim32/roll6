@@ -6,7 +6,7 @@
 
 ```bash
 cd backend
-dotnet ef database update --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API
+dotnet ef database update --project Roll6.Infra --startup-project Roll6.API
 ```
 
 Aplica `MakeTokenDownSpaceOptional`. Em homolog/produção a migração roda na inicialização.

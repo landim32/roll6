@@ -11,7 +11,7 @@ interface PartyPanelProps {
 }
 
 /** localStorage key of the collapsed state ("1" = collapsed). */
-const COLLAPSED_KEY = 'simple-tabletop-map:party-collapsed';
+const COLLAPSED_KEY = 'roll6:party-collapsed';
 
 const readCollapsed = (): boolean => {
   try {

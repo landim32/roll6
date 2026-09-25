@@ -2,8 +2,8 @@
 
 ```bash
 cd backend
-dotnet ef migrations add AddCampaignCharacterVitals --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API
-dotnet ef database update --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API   # banco de dev
+dotnet ef migrations add AddCampaignCharacterVitals --project Roll6.Infra --startup-project Roll6.API
+dotnet ef database update --project Roll6.Infra --startup-project Roll6.API   # banco de dev
 dotnet test
 cd ../frontend && npm test -- vitals && npm run lint && npm run build
 ```

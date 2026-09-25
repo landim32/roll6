@@ -1,6 +1,6 @@
 # Quickstart: Submenu do Usuário
 
-Pré-requisitos: API em Development (`dotnet run --project SimpleTabletopMap.API`, porta 5119) e
+Pré-requisitos: API em Development (`dotnet run --project Roll6.API`, porta 5119) e
 `npm run dev` em `frontend/` (proxy `/api` → `VITE_API_PROXY`).
 
 ```bash

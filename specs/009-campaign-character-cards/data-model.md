@@ -44,4 +44,4 @@ totalLife, totalEnergy)`.
   `canEdit(member)` = `isMaster || member.characterOwnerId === userId`, `getCharacter(id)`,
   `updateCharacter(id, data)`, `updateVitals(campaignCharacterId, data)`.
 - `lib/vitals.ts`: `vitalPercent`, `isFallen`, `validateVitals` → `'notInteger' | 'aboveTotal' | null`.
-- localStorage `simple-tabletop-map:party-collapsed` = `"1"` quando recolhido.
+- localStorage `roll6:party-collapsed` = `"1"` quando recolhido.

@@ -18,7 +18,7 @@ jobs:
         script: |
           set -e
 
-          DEPLOY_DIR="/opt/simple-tabletop-map"
+          DEPLOY_DIR="/opt/roll6"
           REPO_URL="https://github.com/${{ github.repository }}.git"
           BRANCH="main"
 
@@ -44,14 +44,14 @@ jobs:
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          S3_FOLDER=${{ vars.S3_FOLDER || 'simple-tabletop' }}
+          S3_FOLDER=${{ vars.S3_FOLDER || 'roll6' }}
           ENVEOF
 
           # Remove leading whitespace from .env.prod
           sed -i 's/^[[:space:]]*//' .env.prod
 
           # Create external network if it doesn't exist
-          docker network inspect simple-tabletop-map-external >/dev/null 2>&1 || docker network create simple-tabletop-map-external
+          docker network inspect roll6-external >/dev/null 2>&1 || docker network create roll6-external
 
           # Deploy with docker compose (migrations are applied by the API on startup)
           docker compose --env-file .env.prod -f docker-compose-prod.yml down

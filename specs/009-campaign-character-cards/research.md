@@ -77,6 +77,6 @@
     negativas, ≤ total). Salvar = `PUT /api/character/{id}` → `PUT …/vitals` → `refreshParty`.
   - Layout: painel absoluto à esquerda, `top: calc(var(--stm-menu-height) + 8px)`, `bottom:
     calc(var(--stm-footer-height) + 8px)`, largura 220 px, rolagem interna; recolhido = aba de 28 px.
-    Estado recolhido em localStorage `simple-tabletop-map:party-collapsed` (try/catch).
+    Estado recolhido em localStorage `roll6:party-collapsed` (try/catch).
 - **Rationale**: reaproveita o modal da 008 (spec: "abre o modal do cadastro do personagem") e o
   padrão de estado existente.

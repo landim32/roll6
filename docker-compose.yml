@@ -7,25 +7,25 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: simple-tabletop-map-api
+    container_name: roll6-api
     ports:
       - "${APP_PORT:-5000}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ConnectionStrings__SimpleTabletopMapContext: ${CONNECTION_STRING}
+      ConnectionStrings__Roll6Context: ${CONNECTION_STRING}
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       S3__BucketName: ${S3_BUCKET_NAME}
       S3__Region: ${S3_REGION}
       S3__ServiceUrl: ${S3_SERVICE_URL}
-      S3__Folder: ${S3_FOLDER:-simple-tabletop}
+      S3__Folder: ${S3_FOLDER:-roll6}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     depends_on:
       db:
         condition: service_healthy
     networks:
-      - simple-tabletop-map-network
+      - roll6-network
 
   web:
     build:
@@ -33,17 +33,17 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ""
-    container_name: simple-tabletop-map-web
+    container_name: roll6-web
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:
       - api
     networks:
-      - simple-tabletop-map-network
+      - roll6-network
 
   db:
     image: postgres:17-alpine
-    container_name: simple-tabletop-map-db
+    container_name: roll6-db
     ports:
       - "${DB_PORT:-5432}:5432"
     environment:
@@ -58,11 +58,11 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - simple-tabletop-map-network
+      - roll6-network
 
 volumes:
   postgres_data:
 
 networks:
-  simple-tabletop-map-network:
+  roll6-network:
     driver: bridge

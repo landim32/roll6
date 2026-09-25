@@ -57,7 +57,7 @@ Approved/Denied (mestre aprova/recusa); convite sobre Denied → Invited; convit
 
 ### Persistência local
 
-`simple-tabletop-map:character` = `{ "<campaignId>": "gm" | <characterId> }`; apagado no logout.
+`roll6:character` = `{ "<campaignId>": "gm" | <characterId> }`; apagado no logout.
 
 ### Validação do cadastro (`lib/characterForm.ts`)
 
