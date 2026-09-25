@@ -16,7 +16,7 @@ conforme o Princípio VII emendado (constituição v4.0.0). Detalhes em [researc
 **Language/Version**: C# 12 / .NET 8.0
 **Primary Dependencies**: ASP.NET Core 8 Web API, EF Core 9 + Npgsql (sem dependências novas)
 **Storage**: PostgreSQL — `map_tokens`: `q`/`r` → `x`/`y` (com conversão), nova coluna `look`
-**Testing**: xUnit + Moq + FluentAssertions (`SimpleTabletopMap.Tests`)
+**Testing**: xUnit + Moq + FluentAssertions (`Roll6.Tests`)
 **Target Platform**: Linux server (produção) / Windows (desenvolvimento)
 **Project Type**: web-service (backend)
 **Performance Goals**: sem impacto
@@ -59,15 +59,15 @@ specs/004-maptoken-position-look/
 
 ```text
 backend/
-├── SimpleTabletopMap.DTO/MapToken/          MapTokenInfo, MapTokenInsertInfo, MapTokenUpdateInfo (x, y, look)
-├── SimpleTabletopMap.Domain/
+├── Roll6.DTO/MapToken/          MapTokenInfo, MapTokenInsertInfo, MapTokenUpdateInfo (x, y, look)
+├── Roll6.Domain/
 │   ├── Grid/HexGrid.cs                      + OffsetToAxial / AxialToOffset
 │   ├── Models/MapToken.cs                   X, Y, Look + validação
 │   └── Services/MapTokenService.cs          repasse e mapeamento dos campos
-├── SimpleTabletopMap.Infra/
-│   ├── Context/SimpleTabletopMapContext.cs  colunas x, y, look
+├── Roll6.Infra/
+│   ├── Context/Roll6Context.cs  colunas x, y, look
 │   └── Migrations/                          MapTokenPositionXY (rename + UPDATE), AddMapTokenLook
-└── SimpleTabletopMap.Tests/Domain/          Grid/HexGridTests, Services/MapTokenServiceTests
+└── Roll6.Tests/Domain/          Grid/HexGridTests, Services/MapTokenServiceTests
 
 bruno/MapToken/                              Create / Update (move) / Create (to delete)
 ```

@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Roll6.Domain\Roll6.Domain.csproj" />
+    <ProjectReference Include="..\Roll6.Infra\Roll6.Infra.csproj" />
+    <ProjectReference Include="..\Roll6.DTO\Roll6.DTO.csproj" />
+    <ProjectReference Include="..\Roll6.Infra.Interfaces\Roll6.Infra.Interfaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.31" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

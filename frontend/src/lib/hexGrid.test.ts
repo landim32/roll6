@@ -3,7 +3,7 @@ import {
   axialToOffset, gridPath, gridPixelSize, HEX_SIZE, hexCenter, hexCorners, offsetToAxial,
 } from './hexGrid';
 
-// Reference values shared with backend/SimpleTabletopMap.Tests/Domain/Grid/HexGridTests.cs.
+// Reference values shared with backend/Roll6.Tests/Domain/Grid/HexGridTests.cs.
 describe('hex size', () => {
   it('is fixed at 40 like the backend', () => {
     expect(HEX_SIZE).toBe(40);

@@ -17,7 +17,7 @@ Detalhes em [research.md](./research.md), [data-model.md](./data-model.md) e
 **Language/Version**: C# 12 / .NET 8.0 (sem mudança)
 **Primary Dependencies**: as da feature 001 (EF Core 9 + Npgsql); nenhuma nova
 **Storage**: PostgreSQL — 6 colunas novas em `map_models`
-**Testing**: xUnit + Moq + FluentAssertions (`SimpleTabletopMap.Tests`)
+**Testing**: xUnit + Moq + FluentAssertions (`Roll6.Tests`)
 **Target Platform**: Linux server (produção) / Windows (desenvolvimento)
 **Project Type**: web-service (backend)
 **Performance Goals**: cálculo de `hexSize` O(1) por item; sem impacto mensurável nas listagens
@@ -60,17 +60,17 @@ specs/002-mapmodel-grid-layout/
 
 ```text
 backend/
-├── SimpleTabletopMap.DTO/
+├── Roll6.DTO/
 │   ├── MapModel/        MapModelInfo, MapModelInsertInfo (+ campos de grid/imagem, hexSize)
 │   └── Map/             MapInfo (+ campos de grid/imagem do modelo, hexSize)
-├── SimpleTabletopMap.Domain/
+├── Roll6.Domain/
 │   ├── Grid/            HexGrid (novo, puro, flat-top)
 │   ├── Models/          MapModel (+ propriedades, UpdateGrid, UpdateImageLayout, HexSize)
 │   └── Services/        MapModelService, MapService (mapeamento dos campos novos)
-├── SimpleTabletopMap.Infra/
-│   ├── Context/         SimpleTabletopMapContext (+ 6 colunas, HasSentinel)
+├── Roll6.Infra/
+│   ├── Context/         Roll6Context (+ 6 colunas, HasSentinel)
 │   └── Migrations/      AddMapModelGridLayout
-└── SimpleTabletopMap.Tests/
+└── Roll6.Tests/
     └── Domain/          Grid/HexGridTests, Models/MapModelLayoutTests, Services/MapModelServiceTests
 
 bruno/MapModel/   Create/Update com os campos novos

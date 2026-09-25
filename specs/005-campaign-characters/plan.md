@@ -16,7 +16,7 @@ da campanha, dos mapas e dos tokens dos mapas; escrita continua só do mestre. D
 **Language/Version**: C# 12 / .NET 8.0
 **Primary Dependencies**: ASP.NET Core 8 Web API, EF Core 9 + Npgsql (sem dependências novas)
 **Storage**: PostgreSQL — `campaigns.open`, nova tabela `campaign_characters`
-**Testing**: xUnit + Moq + FluentAssertions (`SimpleTabletopMap.Tests`)
+**Testing**: xUnit + Moq + FluentAssertions (`Roll6.Tests`)
 **Target Platform**: Linux server (produção) / Windows (desenvolvimento)
 **Project Type**: web-service (backend)
 **Performance Goals**: listagens paginadas com nomes de dono em uma consulta extra por página
@@ -59,24 +59,24 @@ specs/005-campaign-characters/
 
 ```text
 backend/
-├── SimpleTabletopMap.DTO/
+├── Roll6.DTO/
 │   ├── Campaign/            CampaignInfo (+ open, ownerName), CampaignInsertInfo (+ open?), CampaignOpenInfo
 │   └── CampaignCharacter/   CampaignCharacterInfo, CampaignCharacterRequestInfo
-├── SimpleTabletopMap.Infra.Interfaces/Repository/
+├── Roll6.Infra.Interfaces/Repository/
 │   ├── ICampaignCharacterRepository.cs (novo)
 │   └── ICampaignRepository, IUserRepository, ICharacterRepository (métodos novos)
-├── SimpleTabletopMap.Domain/
+├── Roll6.Domain/
 │   ├── Enums/CampaignCharacterStatus.cs
 │   ├── Models/CampaignCharacter.cs, Campaign.cs (+ Open)
 │   ├── Interfaces/ICampaignCharacterService.cs
 │   └── Services/CampaignCharacterService.cs, CampaignService, CharacterService, MapService, MapTokenService
-├── SimpleTabletopMap.Infra/
-│   ├── Context/SimpleTabletopMapContext.cs (campaigns.open, campaign_characters)
+├── Roll6.Infra/
+│   ├── Context/Roll6Context.cs (campaigns.open, campaign_characters)
 │   ├── Repository/CampaignCharacterRepository.cs + métodos novos
 │   └── Migrations/AddCampaignOpenAndCharacters
-├── SimpleTabletopMap.Application/Startup.cs
-├── SimpleTabletopMap.API/Controllers/CampaignCharacterController.cs, CampaignController.cs
-└── SimpleTabletopMap.Tests/Domain/  Models/CampaignCharacterTests, Services/CampaignCharacterServiceTests, …
+├── Roll6.Application/Startup.cs
+├── Roll6.API/Controllers/CampaignCharacterController.cs, CampaignController.cs
+└── Roll6.Tests/Domain/  Models/CampaignCharacterTests, Services/CampaignCharacterServiceTests, …
 
 bruno/Campaign/, bruno/CampaignCharacter/ (nova pasta)
 ```

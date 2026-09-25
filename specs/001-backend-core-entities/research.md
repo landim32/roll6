@@ -31,7 +31,7 @@ autenticação e imagens são implementados pelo próprio sistema).
 
 - **Decision**: `AWSSDK.S3`. Upload por `POST /api/image` (multipart), que valida tipo
   (PNG, JPEG, WebP, conferindo também a assinatura dos primeiros bytes) e tamanho (≤ 10 MB),
-  grava em `{S3:Folder}/{guid}.{ext}` (pasta configurável, padrão `simple-tabletop`) e retorna `{ fileName, url }`. As entidades guardam apenas o
+  grava em `{S3:Folder}/{guid}.{ext}` (pasta configurável, padrão `roll6`) e retorna `{ fileName, url }`. As entidades guardam apenas o
   `fileName` (`varchar(260)`). As respostas trazem a URL gerada como *presigned GET URL*
   (validade configurável, padrão 60 min). `S3:ServiceUrl` aponta para o provedor compatível — o projeto usa **DigitalOcean Spaces** (`https://{região}.digitaloceanspaces.com`, `S3:Region` = `us-east-1`, `S3:ForcePathStyle` = false; `true` só para MinIO). Com endpoint customizado, o cliente usa checksums só quando exigidos e desliga o upload chunked.
 - **Rationale**: upload separado mantém os endpoints das entidades em JSON puro; presigned
@@ -110,7 +110,7 @@ autenticação e imagens são implementados pelo próprio sistema).
 
 ## R10. Testes
 
-- **Decision**: projeto `SimpleTabletopMap.Tests` com xUnit, Moq e FluentAssertions, cobrindo
+- **Decision**: projeto `Roll6.Tests` com xUnit, Moq e FluentAssertions, cobrindo
   os Domain services (dono, numeração de mapas, bloqueios de exclusão, validações, troca de
   senha). Criado pela skill `dotnet-test`.
 - **Rationale**: as regras de negócio vivem nos services e podem ser testadas sem banco.

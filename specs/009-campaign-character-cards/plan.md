@@ -37,7 +37,7 @@ polling com aba oculta
 
 | # | Princípio | Como o plano atende | Status |
 |---|---|---|---|
-| I | Skills obrigatórias | Colunas/migration/DTO/serviço pela `dotnet-architecture` (Fluent API inline no `SimpleTabletopMapContext`, `dotnet ef migrations add`); frontend estende Types → Services → `CharacterContext` pelo padrão `react-architecture` | ✅ |
+| I | Skills obrigatórias | Colunas/migration/DTO/serviço pela `dotnet-architecture` (Fluent API inline no `Roll6Context`, `dotnet ef migrations add`); frontend estende Types → Services → `CharacterContext` pelo padrão `react-architecture` | ✅ |
 | II | Stack fixa | Nenhuma dependência nova; Context API; Fetch | ✅ |
 | III | Casing de diretórios | Arquivos nas pastas existentes (`Contexts/`, `Services/`, `types/`, `components/map/`) | ✅ |
 | IV | Convenções de código | PascalCase/_camelCase/file-scoped; `interface`, arrow functions, sem `enum` | ✅ |
@@ -68,20 +68,20 @@ specs/009-campaign-character-cards/
 
 ```text
 backend/
-├── SimpleTabletopMap.DTO/CampaignCharacter/
+├── Roll6.DTO/CampaignCharacter/
 │   ├── CampaignCharacterInfo.cs            # + currentLife, currentEnergy, totalLife, totalEnergy
 │   └── CampaignCharacterVitalsInfo.cs      # novo
-├── SimpleTabletopMap.Domain/
+├── Roll6.Domain/
 │   ├── Models/Character.cs                 # life/energy ≥ 0 (totais)
 │   ├── Models/CampaignCharacter.cs         # CurrentLife/CurrentEnergy, totais nas criações/aprovações, SetVitals
 │   └── Services/CharacterService.cs, CampaignCharacterService.cs
-├── SimpleTabletopMap.Infra.Interfaces/Repository/ICampaignCharacterRepository.cs  # + IsApprovedInCampaignOfAsync, ClampVitalsAsync
-├── SimpleTabletopMap.Infra/
-│   ├── Context/SimpleTabletopMapContext.cs # colunas novas
+├── Roll6.Infra.Interfaces/Repository/ICampaignCharacterRepository.cs  # + IsApprovedInCampaignOfAsync, ClampVitalsAsync
+├── Roll6.Infra/
+│   ├── Context/Roll6Context.cs # colunas novas
 │   ├── Repository/CampaignCharacterRepository.cs
 │   └── Migrations/<ts>_AddCampaignCharacterVitals.cs
-├── SimpleTabletopMap.API/Controllers/CampaignCharacterController.cs  # PUT {id}/vitals
-└── SimpleTabletopMap.Tests/Domain/…        # modelo + services
+├── Roll6.API/Controllers/CampaignCharacterController.cs  # PUT {id}/vitals
+└── Roll6.Tests/Domain/…        # modelo + services
 
 bruno/CampaignCharacter/Update vitals.bru
 

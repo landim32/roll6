@@ -15,7 +15,7 @@ Detalhes em [research.md](./research.md), [data-model.md](./data-model.md) e
 **Language/Version**: C# 12 / .NET 8.0
 **Primary Dependencies**: ASP.NET Core 8 Web API, EF Core 9 + Npgsql (sem dependências novas)
 **Storage**: PostgreSQL — `tokens.down_space` passa a anulável
-**Testing**: xUnit + Moq + FluentAssertions (`SimpleTabletopMap.Tests`)
+**Testing**: xUnit + Moq + FluentAssertions (`Roll6.Tests`)
 **Target Platform**: Linux server (produção) / Windows (desenvolvimento)
 **Project Type**: web-service (backend)
 **Performance Goals**: sem impacto
@@ -57,11 +57,11 @@ specs/003-token-optional-down/
 
 ```text
 backend/
-├── SimpleTabletopMap.DTO/Token/TokenInfo.cs                 downSpace int?
-├── SimpleTabletopMap.Domain/Models/Token.cs                 DownSpace int? + regra do padrão
-├── SimpleTabletopMap.Infra/Context/SimpleTabletopMapContext.cs   down_space anulável, sem default
-├── SimpleTabletopMap.Infra/Migrations/                      MakeTokenDownSpaceOptional
-└── SimpleTabletopMap.Tests/Domain/Services/TokenLibraryServiceTests.cs
+├── Roll6.DTO/Token/TokenInfo.cs                 downSpace int?
+├── Roll6.Domain/Models/Token.cs                 DownSpace int? + regra do padrão
+├── Roll6.Infra/Context/Roll6Context.cs   down_space anulável, sem default
+├── Roll6.Infra/Migrations/                      MakeTokenDownSpaceOptional
+└── Roll6.Tests/Domain/Services/TokenLibraryServiceTests.cs
 
 bruno/Token/                                                 Create/Update: exemplos com e sem estado deitado
 ```

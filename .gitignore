@@ -13,7 +13,7 @@ TestResults/
 .env.local
 
 # Local backend settings with secrets (copy appsettings.Template.json)
-backend/SimpleTabletopMap.API/appsettings.Development.json
+backend/Roll6.API/appsettings.Development.json
 
 # SSL certificates
 nginx/certs/

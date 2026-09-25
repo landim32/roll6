@@ -14,7 +14,7 @@ Pré-requisitos e configuração: iguais a `specs/001-backend-core-entities/quic
 
 ```bash
 cd backend
-dotnet ef database update --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API
+dotnet ef database update --project Roll6.Infra --startup-project Roll6.API
 ```
 
 (Em homolog/produção a migração `AddMapModelGridLayout` é aplicada na inicialização.)

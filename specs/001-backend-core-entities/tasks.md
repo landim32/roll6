@@ -15,11 +15,11 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 - **[P]**: pode rodar em paralelo (arquivos diferentes, sem dependência pendente)
 - **[Story]**: user story da spec (US1..US6)
 - Raiz do código: `backend/`. Abaixo, `DTO/`, `Domain/` etc. abreviam
-  `backend/SimpleTabletopMap.DTO/`, `backend/SimpleTabletopMap.Domain/` etc.
+  `backend/Roll6.DTO/`, `backend/Roll6.Domain/` etc.
 
 ## Regras válidas para todas as tarefas
 
-- Namespaces file-scoped `SimpleTabletopMap.<Projeto>.<Pasta>`; campos privados `_camelCase`.
+- Namespaces file-scoped `Roll6.<Projeto>.<Pasta>`; campos privados `_camelCase`.
 - Todo DTO com `[JsonPropertyName("camelCase")]` em cada propriedade.
 - Tabelas/colunas conforme `data-model.md`: snake_case, PK `{entidade}_id` identity com
   constraint `{tabela}_pkey`, FK `fk_{pai}_{filho}` com `DeleteBehavior.ClientSetNull`,
@@ -42,11 +42,11 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 
 **Purpose**: criar a solução e os projetos.
 
-- [X] T001 Criar `backend/SimpleTabletopMap.sln` e os projetos net8.0: classlibs `SimpleTabletopMap.DTO`, `SimpleTabletopMap.Infra.Interfaces`, `SimpleTabletopMap.Domain`, `SimpleTabletopMap.Infra`, `SimpleTabletopMap.Application`; `webapi` (controllers, sem minimal APIs) `SimpleTabletopMap.API`; `xunit` `SimpleTabletopMap.Tests`; adicionar todos à solução e apagar arquivos de exemplo (`Class1.cs`, `WeatherForecast*`)
+- [X] T001 Criar `backend/Roll6.sln` e os projetos net8.0: classlibs `Roll6.DTO`, `Roll6.Infra.Interfaces`, `Roll6.Domain`, `Roll6.Infra`, `Roll6.Application`; `webapi` (controllers, sem minimal APIs) `Roll6.API`; `xunit` `Roll6.Tests`; adicionar todos à solução e apagar arquivos de exemplo (`Class1.cs`, `WeatherForecast*`)
 - [X] T002 Configurar referências entre projetos em `backend/*/*.csproj`: API → Application; Application → Domain, Infra, DTO, Infra.Interfaces; Infra → Domain, Infra.Interfaces; Domain → Infra.Interfaces, DTO; Infra.Interfaces → DTO; Tests → Domain, DTO, Infra.Interfaces
 - [X] T003 Adicionar pacotes NuGet: Infra ← `Microsoft.EntityFrameworkCore` 9.*, `Npgsql.EntityFrameworkCore.PostgreSQL` 9.*, `Microsoft.EntityFrameworkCore.Design` 9.*, `AWSSDK.S3`, `Microsoft.Extensions.Identity.Core` 8.*, `System.IdentityModel.Tokens.Jwt`; Application ← `Microsoft.AspNetCore.Authentication.JwtBearer` 8.*; API ← `Swashbuckle.AspNetCore` 8.*, `Microsoft.EntityFrameworkCore.Design` 9.*; Tests ← `Moq`, `FluentAssertions`
-- [X] T004 [P] Criar `.gitignore` na raiz do repositório para .NET (`bin/`, `obj/`, `.vs/`, `*.user`, `backend/SimpleTabletopMap.API/appsettings.Development.json`)
-- [X] T005 [P] Criar `backend/SimpleTabletopMap.API/appsettings.json` (seções `ConnectionStrings:SimpleTabletopMapContext`, `Jwt` {Secret, Issuer, ExpirationHours: 24}, `S3` {BucketName, Region, ServiceUrl: null, UrlExpirationMinutes: 60} com valores vazios) e `appsettings.Development.json` com valores locais, conforme `quickstart.md`
+- [X] T004 [P] Criar `.gitignore` na raiz do repositório para .NET (`bin/`, `obj/`, `.vs/`, `*.user`, `backend/Roll6.API/appsettings.Development.json`)
+- [X] T005 [P] Criar `backend/Roll6.API/appsettings.json` (seções `ConnectionStrings:Roll6Context`, `Jwt` {Secret, Issuer, ExpirationHours: 24}, `S3` {BucketName, Region, ServiceUrl: null, UrlExpirationMinutes: 60} com valores vazios) e `appsettings.Development.json` com valores locais, conforme `quickstart.md`
 
 ---
 
@@ -64,19 +64,19 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 - [X] T011 [P] Criar model `User` (UserId, Name, Email, PasswordHash, CreatedAt, UpdatedAt; métodos `Rename(string)` validando 1–260 caracteres e `SetEmail(string)` que normaliza para minúsculas e valida formato) em `Domain/Models/User.cs`
 - [X] T012 [P] Criar `IUserRepository<TModel>` (GetByIdAsync, GetByEmailAsync, InsertAsync, UpdateAsync) em `Infra.Interfaces/Repository/IUserRepository.cs`
 - [X] T013 [P] Criar `IPasswordHasherService` (Hash, Verify) e `ITokenService` (`(string Token, DateTime ExpiresAt) Create(long userId, string name, string email)`) em `Domain/Interfaces/IPasswordHasherService.cs` e `Domain/Interfaces/ITokenService.cs`
-- [X] T014 Criar `SimpleTabletopMapContext` com `DbSet<User> Users` e configuração Fluent da tabela `users` (user_id identity, `users_pkey`, name varchar(260), email varchar(260) com índice único `ix_users_email`, password_hash varchar(500), created_at com default `now()`, updated_at) em `Infra/Context/SimpleTabletopMapContext.cs`
+- [X] T014 Criar `Roll6Context` com `DbSet<User> Users` e configuração Fluent da tabela `users` (user_id identity, `users_pkey`, name varchar(260), email varchar(260) com índice único `ix_users_email`, password_hash varchar(500), created_at com default `now()`, updated_at) em `Infra/Context/Roll6Context.cs`
 - [X] T015 Implementar `UserRepository` em `Infra/Repository/UserRepository.cs`
 - [X] T016 [P] Implementar `PasswordHasherService` usando `PasswordHasher<User>` (Verify aceita `SuccessRehashNeeded`) em `Infra/AppServices/PasswordHasherService.cs`
 - [X] T017 [P] Implementar `JwtTokenService` (HS256 com `JwtSettings.Secret`, claims `sub`, `name`, `email`, expiração `ExpirationHours`) em `Infra/AppServices/JwtTokenService.cs`
 - [X] T018 [P] Implementar `S3ImageStorageAppService` com `AmazonS3Client` (usa `ServiceUrl` + `ForcePathStyle` quando informado; `PutObjectAsync`; `GetPreSignedURL` com validade `UrlExpirationMinutes`; `GetUrl(null)` → null) em `Infra/AppServices/S3ImageStorageAppService.cs`
 - [X] T019 [P] Criar `ImageUploadInfo` (fileName, url) em `DTO/Image/ImageUploadInfo.cs`
 - [X] T020 Criar `IImageService` e `ImageService` (aceita só `image/png`, `image/jpeg`, `image/webp`, confere os bytes iniciais de cada formato, rejeita arquivo vazio ou > 10 MB com `DomainValidationException`, chama `IImageStorageAppService`) em `Domain/Interfaces/IImageService.cs` e `Domain/Services/ImageService.cs`
-- [X] T021 Criar `Startup.ConfigureServices(this IServiceCollection, IConfiguration)`: `AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true)`, `AddDbContext` com `UseNpgsql(ConnectionStrings:SimpleTabletopMapContext)`, `Configure<JwtSettings>`/`Configure<S3Settings>`, registro de `UserRepository`, `PasswordHasherService`, `JwtTokenService`, `S3ImageStorageAppService`, `ImageService`, e `AddAuthentication(JwtBearerDefaults).AddJwtBearer` validando issuer, assinatura e expiração, em `Application/Startup.cs`
+- [X] T021 Criar `Startup.ConfigureServices(this IServiceCollection, IConfiguration)`: `AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true)`, `AddDbContext` com `UseNpgsql(ConnectionStrings:Roll6Context)`, `Configure<JwtSettings>`/`Configure<S3Settings>`, registro de `UserRepository`, `PasswordHasherService`, `JwtTokenService`, `S3ImageStorageAppService`, `ImageService`, e `AddAuthentication(JwtBearerDefaults).AddJwtBearer` validando issuer, assinatura e expiração, em `Application/Startup.cs`
 - [X] T022 [P] Criar `ClaimsPrincipalExtensions.GetUserId()` (lê `sub`/`NameIdentifier`, lança `UnauthorizedAccessException` se ausente) em `API/Extensions/ClaimsPrincipalExtensions.cs`
 - [X] T023 Criar `ApiControllerBase : ControllerBase` com `protected IActionResult HandleException(Exception ex)`: `DomainValidationException` → `ValidationProblem(ModelStateDictionary com Errors)`; `UnauthorizedAccessException` → `Problem(statusCode: 403)`; `KeyNotFoundException` → `Problem(statusCode: 404)`; `ConflictException` → `Problem(statusCode: 409)`; demais → `StatusCode(500, ex.Message)`, em `API/Controllers/ApiControllerBase.cs`
 - [X] T024 Configurar `Program.cs`: `builder.Services.ConfigureServices(builder.Configuration)`, controllers, Swagger com esquema Bearer, CORS `AllowAnyOrigin` somente em Development, ordem CORS → `UseAuthentication` → `UseAuthorization` → `MapControllers`, em `API/Program.cs`
 - [X] T025 Criar `ImageController` (`POST /api/image`, multipart `IFormFile file`, `[Authorize]`, `[RequestSizeLimit(11_000_000)]`, devolve `ImageUploadInfo`) em `API/Controllers/ImageController.cs`
-- [X] T026 Gerar a migração inicial `InitialUsers` em `Infra/Migrations/` (`dotnet ef migrations add InitialUsers --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API`) e aplicá-la com `dotnet ef database update`
+- [X] T026 Gerar a migração inicial `InitialUsers` em `Infra/Migrations/` (`dotnet ef migrations add InitialUsers --project Roll6.Infra --startup-project Roll6.API`) e aplicá-la com `dotnet ef database update`
 
 **Checkpoint**: a solução compila, a API sobe com Swagger, a tabela `users` existe e o upload de imagem funciona com token válido.
 
@@ -107,7 +107,7 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 - [X] T032 [P] [US2] Criar DTOs `MapModelInfo` (mapModelId, userId, name, description, image, imageUrl, createdAt, changedAt) e `MapModelInsertInfo` (name, description, image) em `DTO/MapModel/`
 - [X] T033 [P] [US2] Criar model `MapModel` (MapModelId, UserId, Name, Description, Image, CreatedAt, ChangedAt; método `Update(name, description, image)` que valida e atualiza `ChangedAt`) em `Domain/Models/MapModel.cs`
 - [X] T034 [P] [US2] Criar `IMapModelRepository<TModel>` (GetByIdAsync, ListPagedAsync(search, skip, take) → `(List<TModel> Items, int TotalCount)`, InsertAsync, UpdateAsync, DeleteAsync) em `Infra.Interfaces/Repository/IMapModelRepository.cs`
-- [X] T035 [US2] Adicionar `DbSet<MapModel>` e configuração da tabela `map_models` (name varchar(260), description varchar(2000), image varchar(260), created_at, changed_at, FK `fk_user_map_model`) em `Infra/Context/SimpleTabletopMapContext.cs`
+- [X] T035 [US2] Adicionar `DbSet<MapModel>` e configuração da tabela `map_models` (name varchar(260), description varchar(2000), image varchar(260), created_at, changed_at, FK `fk_user_map_model`) em `Infra/Context/Roll6Context.cs`
 - [X] T036 [US2] Implementar `MapModelRepository` (busca ILike em name/description, ordenação por name e id) em `Infra/Repository/MapModelRepository.cs`
 - [X] T037 [US2] Criar `IMapModelService` e `MapModelService` (list/search de todos, get, create com dono = userId, update/delete só dono, `imageUrl` via storage) em `Domain/Interfaces/IMapModelService.cs` e `Domain/Services/MapModelService.cs`
 - [X] T038 [US2] Criar `MapModelController` (`GET /api/mapmodel?page&pageSize&search`, `GET /{id}`, `POST`, `PUT /{id}`, `DELETE /{id}`) em `API/Controllers/MapModelController.cs`
@@ -131,7 +131,7 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 - [X] T043 [P] [US3] Criar model `Map` (MapId, CampaignId, MapModelId, UserId, Sequence, Name, Status, CreatedAt, UpdatedAt; `Update(name, status)` aceitando só Active/Archived; `MarkDeleted()`; qualquer alteração em mapa Deleted lança `KeyNotFoundException`) em `Domain/Models/Map.cs`
 - [X] T044 [P] [US3] Criar `ICampaignRepository<TModel>` (GetByIdAsync, ListByUserPagedAsync, InsertAsync, UpdateAsync, DeleteAsync) em `Infra.Interfaces/Repository/ICampaignRepository.cs`
 - [X] T045 [P] [US3] Criar `IMapRepository<TModel>` (GetByIdAsync, ListByCampaignPagedAsync excluindo Deleted, InsertWithNextSequenceAsync(model, mapModelName), UpdateAsync, CountNotDeletedByCampaignAsync, ListDeletedIdsByCampaignAsync, DeleteRangeAsync(ids), ExistsByMapModelAsync) em `Infra.Interfaces/Repository/IMapRepository.cs`
-- [X] T046 [US3] Adicionar `DbSet<Campaign>`, `DbSet<Map>` e configuração das tabelas `campaigns` e `maps` (FKs `fk_user_campaign`, `fk_campaign_map`, `fk_map_model_map`, `fk_user_map`; status integer default 1; índice único `ix_maps_campaign_model_sequence`) em `Infra/Context/SimpleTabletopMapContext.cs`
+- [X] T046 [US3] Adicionar `DbSet<Campaign>`, `DbSet<Map>` e configuração das tabelas `campaigns` e `maps` (FKs `fk_user_campaign`, `fk_campaign_map`, `fk_map_model_map`, `fk_user_map`; status integer default 1; índice único `ix_maps_campaign_model_sequence`) em `Infra/Context/Roll6Context.cs`
 - [X] T047 [US3] Implementar `CampaignRepository` em `Infra/Repository/CampaignRepository.cs`
 - [X] T048 [US3] Implementar `MapRepository`; `InsertWithNextSequenceAsync` calcula `max(sequence)+1` para (campaign_id, map_model_id) em todos os status, define `Name = "{mapModelName} {sequence}"`, e em violação de unicidade (`PostgresException` 23505) recalcula e tenta uma vez; em `Infra/Repository/MapRepository.cs`
 - [X] T049 [US3] Criar `ICampaignService` e `CampaignService` (lista paginada só do usuário, get/rename/delete só dono; delete com mapas não excluídos → `ConflictException`; senão remove os mapas Deleted e a campanha em uma transação) em `Domain/Interfaces/ICampaignService.cs` e `Domain/Services/CampaignService.cs`
@@ -154,7 +154,7 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 - [X] T055 [P] [US4] Criar DTOs `TokenInfo` (tokenId, userId, name, description, upSpace, downSpace, upImage, upImageUrl, downImage, downImageUrl, createdAt, updatedAt) e `TokenInsertInfo` (name, description, `int? upSpace`, `int? downSpace`, upImage, downImage) em `DTO/Token/`
 - [X] T056 [P] [US4] Criar model `Token` (defaults UpSpace=1, DownSpace=2; `Update(...)` validando nome e espaços ≥ 0) em `Domain/Models/Token.cs`
 - [X] T057 [P] [US4] Criar `ITokenRepository<TModel>` (GetByIdAsync, ListPagedAsync(search, skip, take), InsertAsync, UpdateAsync, DeleteAsync) em `Infra.Interfaces/Repository/ITokenRepository.cs`
-- [X] T058 [US4] Adicionar `DbSet<Token>` e configuração da tabela `tokens` (up_space default 1, down_space default 2, description varchar(2000), up_image/down_image varchar(260), FK `fk_user_token`) em `Infra/Context/SimpleTabletopMapContext.cs`
+- [X] T058 [US4] Adicionar `DbSet<Token>` e configuração da tabela `tokens` (up_space default 1, down_space default 2, description varchar(2000), up_image/down_image varchar(260), FK `fk_user_token`) em `Infra/Context/Roll6Context.cs`
 - [X] T059 [US4] Implementar `TokenRepository` em `Infra/Repository/TokenRepository.cs`
 - [X] T060 [US4] Criar `ITokenLibraryService` e `TokenLibraryService` (nome evita conflito com `ITokenService` de JWT; list/search de todos, create com defaults quando upSpace/downSpace são null, update/delete só dono, URLs das duas imagens) em `Domain/Interfaces/ITokenLibraryService.cs` e `Domain/Services/TokenLibraryService.cs`
 - [X] T061 [US4] Criar `TokenController` (`GET /api/token?page&pageSize&search`, `GET /{id}`, `POST`, `PUT /{id}`, `DELETE /{id}`) em `API/Controllers/TokenController.cs`
@@ -175,7 +175,7 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 - [X] T063 [P] [US5] Criar DTOs `MapTokenInfo` (mapTokenId, mapId, tokenId, tokenName, upImageUrl, downImageUrl, name, tokenType, sheet, life, energy, status, move, q, r, createdAt, updatedAt), `MapTokenInsertInfo` (mapId, tokenId, name?, tokenType, sheet, life, energy, status, move, q, r) e `MapTokenUpdateInfo` (name, tokenType, sheet, life, energy, status, move, q, r) em `DTO/MapToken/`
 - [X] T064 [P] [US5] Criar model `MapToken` (campos do data-model; `Update(...)` valida nome, tipo válido e move ≥ 0; `MoveTo(int q, int r)`; nunca guarda `s`) em `Domain/Models/MapToken.cs`
 - [X] T065 [P] [US5] Criar `IMapTokenRepository<TModel>` (GetByIdAsync, ListByMapAsync com o Token carregado, InsertAsync, UpdateAsync, DeleteAsync, ExistsByTokenAsync, DeleteByMapIdsAsync) em `Infra.Interfaces/Repository/IMapTokenRepository.cs`
-- [X] T066 [US5] Adicionar `DbSet<MapToken>` e configuração da tabela `map_tokens` (token_type integer, sheet varchar(20000), status varchar(260), q/r integer default 0, FKs `fk_map_map_token` e `fk_token_map_token`) em `Infra/Context/SimpleTabletopMapContext.cs`
+- [X] T066 [US5] Adicionar `DbSet<MapToken>` e configuração da tabela `map_tokens` (token_type integer, sheet varchar(20000), status varchar(260), q/r integer default 0, FKs `fk_map_map_token` e `fk_token_map_token`) em `Infra/Context/Roll6Context.cs`
 - [X] T067 [US5] Implementar `MapTokenRepository` em `Infra/Repository/MapTokenRepository.cs`
 - [X] T068 [US5] Criar `IMapTokenService` e `MapTokenService` (todas as operações exigem que o usuário seja dono do mapa e que o mapa não esteja Deleted; include copia o nome do Token quando `name` vem vazio; valores independentes do token da biblioteca) em `Domain/Interfaces/IMapTokenService.cs` e `Domain/Services/MapTokenService.cs`
 - [X] T069 [US5] Bloquear a exclusão de Token usado em mapas (`IMapTokenRepository.ExistsByTokenAsync` → `ConflictException`) em `Domain/Services/TokenLibraryService.cs`
@@ -197,7 +197,7 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 - [X] T074 [P] [US6] Criar DTOs `CharacterInfo` (characterId, userId, name, sheet, life, energy, status, move, image, imageUrl, createdAt, updatedAt) e `CharacterInsertInfo` (name, sheet, life, energy, status, move, image) em `DTO/Character/`
 - [X] T075 [P] [US6] Criar model `Character` (`Update(...)` valida nome e move ≥ 0; vida e energia aceitam negativos) em `Domain/Models/Character.cs`
 - [X] T076 [P] [US6] Criar `ICharacterRepository<TModel>` (GetByIdAsync, ListByUserAsync, InsertAsync, UpdateAsync, DeleteAsync) em `Infra.Interfaces/Repository/ICharacterRepository.cs`
-- [X] T077 [US6] Adicionar `DbSet<Character>` e configuração da tabela `characters` (sheet varchar(20000), status varchar(260), image varchar(260), FK `fk_user_character`) em `Infra/Context/SimpleTabletopMapContext.cs`
+- [X] T077 [US6] Adicionar `DbSet<Character>` e configuração da tabela `characters` (sheet varchar(20000), status varchar(260), image varchar(260), FK `fk_user_character`) em `Infra/Context/Roll6Context.cs`
 - [X] T078 [US6] Implementar `CharacterRepository` em `Infra/Repository/CharacterRepository.cs`
 - [X] T079 [US6] Criar `ICharacterService` e `CharacterService` (lista só do usuário, get/update/delete só dono, `imageUrl`) em `Domain/Interfaces/ICharacterService.cs` e `Domain/Services/CharacterService.cs`
 - [X] T080 [US6] Criar `CharacterController` (`GET /api/character`, `GET /{id}`, `POST`, `PUT /{id}`, `DELETE /{id}`) em `API/Controllers/CharacterController.cs`
@@ -209,11 +209,11 @@ DTO → Infra.Interfaces → Domain → Infra → Application.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [X] T082 [P] Testes de `UserService` (e-mail duplicado, senha curta, login inválido, troca com senha atual errada, rename não altera e-mail) em `backend/SimpleTabletopMap.Tests/Domain/Services/UserServiceTests.cs`
-- [X] T083 [P] Testes de `MapService` (numeração "Masmorra 1/2", status só Active/Archived, mapa Deleted → 404, não dono → 403) em `backend/SimpleTabletopMap.Tests/Domain/Services/MapServiceTests.cs`
-- [X] T084 [P] Testes de `CampaignService` (exclusão bloqueada com mapa ativo; limpeza de mapas Deleted) em `backend/SimpleTabletopMap.Tests/Domain/Services/CampaignServiceTests.cs`
-- [X] T085 [P] Testes de `TokenLibraryService` e `MapModelService` (defaults 1/2, exclusão bloqueada em uso, não dono → 403) em `backend/SimpleTabletopMap.Tests/Domain/Services/TokenLibraryServiceTests.cs` e `MapModelServiceTests.cs`
-- [X] T086 [P] Testes de `MapTokenService` e `ImageService` (não dono do mapa → 403, nome copiado do token, arquivo não imagem/maior que 10 MB → 400) em `backend/SimpleTabletopMap.Tests/Domain/Services/MapTokenServiceTests.cs` e `ImageServiceTests.cs`
+- [X] T082 [P] Testes de `UserService` (e-mail duplicado, senha curta, login inválido, troca com senha atual errada, rename não altera e-mail) em `backend/Roll6.Tests/Domain/Services/UserServiceTests.cs`
+- [X] T083 [P] Testes de `MapService` (numeração "Masmorra 1/2", status só Active/Archived, mapa Deleted → 404, não dono → 403) em `backend/Roll6.Tests/Domain/Services/MapServiceTests.cs`
+- [X] T084 [P] Testes de `CampaignService` (exclusão bloqueada com mapa ativo; limpeza de mapas Deleted) em `backend/Roll6.Tests/Domain/Services/CampaignServiceTests.cs`
+- [X] T085 [P] Testes de `TokenLibraryService` e `MapModelService` (defaults 1/2, exclusão bloqueada em uso, não dono → 403) em `backend/Roll6.Tests/Domain/Services/TokenLibraryServiceTests.cs` e `MapModelServiceTests.cs`
+- [X] T086 [P] Testes de `MapTokenService` e `ImageService` (não dono do mapa → 403, nome copiado do token, arquivo não imagem/maior que 10 MB → 400) em `backend/Roll6.Tests/Domain/Services/MapTokenServiceTests.cs` e `ImageServiceTests.cs`
 - [X] T087 Revisar o SQL gerado (`dotnet ef migrations script`) contra `data-model.md`: nomes snake_case, `*_pkey`, `fk_*`, nenhum `ON DELETE CASCADE`, `timestamp without time zone`
 - [X] T088 Atualizar a seção "Project status" e os comandos em `CLAUDE.md` para refletir que o backend existe
 - [ ] T089 Executar o roteiro de validação manual de `specs/001-backend-core-entities/quickstart.md` — ⚠️ pendente: exige PostgreSQL e bucket S3, indisponíveis na máquina de desenvolvimento (smoke test sem banco feito: Swagger, 401 sem token, 400 de validação, 500 sem banco)
@@ -241,7 +241,7 @@ Setup → Foundational → US1 ─┬─ US2 ── US3 ─┐
 ### Within Each User Story
 
 - DTOs, model e interface de repositório ([P]) → DbContext → repositório → service → controller → registro no Startup + migração.
-- `SimpleTabletopMapContext.cs`, `Startup.cs` e as migrações são compartilhados: tarefas que os alteram em stories diferentes NÃO rodam em paralelo.
+- `Roll6Context.cs`, `Startup.cs` e as migrações são compartilhados: tarefas que os alteram em stories diferentes NÃO rodam em paralelo.
 
 ### Parallel Opportunities
 
@@ -289,5 +289,5 @@ Task: "T045 Criar IMapRepository em Infra.Interfaces/Repository/"
 - ⚠️ As migrações (`InitialUsers`, `AddMapModels`, `AddCampaignsAndMaps`, `AddTokens`, `AddMapTokens`, `AddCharacters`) foram geradas, mas não aplicadas: não há PostgreSQL acessível no ambiente de desenvolvimento. Rodar `dotnet ef database update` ao configurar o banco.
 
 - Commit ao fim de cada tarefa ou grupo lógico.
-- Cada migração usa `--project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API`, rodando em `backend/`.
+- Cada migração usa `--project Roll6.Infra --startup-project Roll6.API`, rodando em `backend/`.
 - Não usar Docker localmente (constituição).

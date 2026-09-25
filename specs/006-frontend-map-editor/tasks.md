@@ -13,7 +13,7 @@ ficam na fase final, junto com o teste do filtro `mine` no backend.
 
 - **[P]**: pode rodar em paralelo (arquivos diferentes, sem dependência pendente)
 - **[Story]**: user story da spec (US1..US5)
-- `F/` abrevia `frontend/src/`; `B/` abrevia `backend/SimpleTabletopMap.`
+- `F/` abrevia `frontend/src/`; `B/` abrevia `backend/Roll6.`
 
 ## Regras válidas para todas as tarefas
 
@@ -38,7 +38,7 @@ ficam na fase final, junto com o teste do filtro `mine` no backend.
 - [X] T001 Criar o projeto com `npm create vite@6 frontend -- --template react-ts` na raiz, remover o conteúdo de exemplo (`App.css`, logos, contador) e fixar React 18 (`react@18`, `react-dom@18`, `@types/react@18`, `@types/react-dom@18`) em `frontend/package.json`
 - [X] T002 Instalar dependências: `react-router-dom@6`, `bootstrap@5.3`, `i18next@25`, `react-i18next`, `sonner`, `@radix-ui/react-dialog`; dev: `vitest`, e scripts `dev`, `build`, `lint`, `test` (`vitest run`) em `frontend/package.json`
 - [X] T003 [P] Configurar `frontend/vite.config.ts` (porta 5173, `test: { environment: 'node' }`), `frontend/.env.example` (`VITE_API_URL=http://localhost:5119`) e `frontend/.gitignore` (`node_modules/`, `dist/`, `.env.local`, `.env`)
-- [X] T004 [P] `frontend/index.html` com `<html lang="pt-BR" data-bs-theme="dark">` e título "SimpleTabletopMap"; `F/styles/app.css` com variáveis `--stm-*`, layout em tela cheia (menu no topo, mapa no meio, rodapé) e estilos dos controles do mapa
+- [X] T004 [P] `frontend/index.html` com `<html lang="pt-BR" data-bs-theme="dark">` e título "Roll6"; `F/styles/app.css` com variáveis `--stm-*`, layout em tela cheia (menu no topo, mapa no meio, rodapé) e estilos dos controles do mapa
 - [X] T005 [P] Configurar i18next em `F/i18n/index.ts` (idioma `pt-BR`, sem detecção) com `F/i18n/locales/pt-BR.json` inicial (chaves `common.*`, `login.*`, `menu.*`, `map.*`, `campaign.*`, `mapModal.*`, `image.*`, `grid.*`, `save.*`, `toast.*`)
 - [X] T006 `F/main.tsx` importando `bootstrap/dist/css/bootstrap.min.css`, `./styles/app.css` e `./i18n`; `F/App.tsx` com `BrowserRouter`, rotas `/login` e `/` e `<Toaster theme="dark" position="bottom-left" richColors />`
 
@@ -51,7 +51,7 @@ ficam na fase final, junto com o teste do filtro `mine` no backend.
 **Purpose**: base de API, componentes de UI, geometria e o filtro `mine` no backend.
 
 - [X] T007 [P] Tipos `PagedList<T>` e `ProblemDetails` em `F/types/common.ts`
-- [X] T008 [P] `F/Services/apiHelpers.ts`: `API_URL` (de `VITE_API_URL`), `AUTH_STORAGE_KEY = 'simple-tabletop-map:auth'`, `getHeaders(authenticated, json = true)` (lê o token do storage), `readError(response)` (converte `ProblemDetails` em mensagem) e `toQuery(params)`
+- [X] T008 [P] `F/Services/apiHelpers.ts`: `API_URL` (de `VITE_API_URL`), `AUTH_STORAGE_KEY = 'roll6:auth'`, `getHeaders(authenticated, json = true)` (lê o token do storage), `readError(response)` (converte `ProblemDetails` em mensagem) e `toQuery(params)`
 - [X] T009 [P] `F/components/ui/Modal.tsx` (Radix Dialog: `Modal`, `ModalContent` com título, corpo e rodapé usando `modal-content`/`modal-header`/`modal-body`/`modal-footer` do Bootstrap, overlay escuro) (`ConfirmModal` não foi criado: o único diálogo de confirmação é o `UnsavedChangesModal`, com três opções)
 - [X] T010 [P] `F/components/ui/Tabs.tsx` (abas controladas com `nav nav-tabs`), `F/components/ui/FakeSelect.tsx` (botão com aparência de `form-select` que exibe um rótulo e dispara `onClick`) e `F/components/ui/PagedListView.tsx` (lista com carregando/vazio e botões anterior/próxima)
 - [X] T011 [P] `F/lib/hexGrid.ts` espelho de `B/Domain/Grid/HexGrid.cs`: `calculateHexSize` (mesma fórmula e arredondamento a 4 casas), `offsetToAxial`, `axialToOffset`, `hexCenter(x, y, size)`, `hexCorners(cx, cy, size)` e `gridPath(cols, rows, size)` (um `d` de `<path>` com todos os hexágonos), com comentário citando a Red Blob Games e o arquivo C# espelhado
@@ -103,7 +103,7 @@ ficam na fase final, junto com o teste do filtro `mine` no backend.
 
 - [X] T025 [P] [US3] Tipos `CampaignInfo`, `CampaignInsertInfo` em `F/types/campaign.ts`
 - [X] T026 [US3] `CampaignService` (`list({ page, pageSize, search, mine })`, `getById`, `create`) em `F/Services/campaignService.ts`
-- [X] T027 [US3] `CampaignContext` (`currentCampaign` com id em `simple-tabletop-map:campaign`, recarregado da API ao iniciar; `isMaster`; `selectCampaign`, `createCampaign`, `listMine`, `search`) e hook `useCampaign`, em `F/Contexts/CampaignContext.tsx` e `F/hooks/useCampaign.ts`; registrar o provider em `F/main.tsx` entre `AuthProvider` e `MapEditorProvider`
+- [X] T027 [US3] `CampaignContext` (`currentCampaign` com id em `roll6:campaign`, recarregado da API ao iniciar; `isMaster`; `selectCampaign`, `createCampaign`, `listMine`, `search`) e hook `useCampaign`, em `F/Contexts/CampaignContext.tsx` e `F/hooks/useCampaign.ts`; registrar o provider em `F/main.tsx` entre `AuthProvider` e `MapEditorProvider`
 - [X] T028 [US3] `CampaignModal` com abas "Minhas campanhas" (`mine=true`), "Buscar campanhas" (campo de busca; colunas nome, dono, aberta/fechada) e "Nova campanha" (nome, checkbox aberta) — escolher/criar define a atual, fecha o modal e mostra toast — em `F/components/modals/CampaignModal.tsx`
 - [X] T029 [US3] `FakeSelect` "Campanha atual" (rótulo = nome da campanha ou "Escolher campanha") abrindo o `CampaignModal`, em `F/components/menu/TopMenu.tsx`
 
@@ -150,10 +150,10 @@ ficam na fase final, junto com o teste do filtro `mine` no backend.
 
 - [X] T043 [P] Testes Vitest de `hexGrid.ts` com os valores de referência do backend (95.093; 101.0363; 32.7869; conversões (3, 1)↔(3, 2), (2, −1)↔(2, 0), (−3, 2)↔(−3, 0); `hexCenter` e largura/altura da grid batendo com `calculateHexSize`) em `F/lib/hexGrid.test.ts`
 - [X] T044 [P] Testes Vitest de `draft.ts` (`isSameDraft`, `draftFromMapModel`, rascunho vazio) em `F/lib/draft.test.ts`
-- [X] T045 [P] Testes xUnit do filtro `mine` (`ownerUserId` repassado ao repositório) em `backend/SimpleTabletopMap.Tests/Domain/Services/CampaignServiceTests.cs` e `MapModelServiceTests.cs`
+- [X] T045 [P] Testes xUnit do filtro `mine` (`ownerUserId` repassado ao repositório) em `backend/Roll6.Tests/Domain/Services/CampaignServiceTests.cs` e `MapModelServiceTests.cs`
 - [X] T046 [P] Bruno: requests `Campaign/List mine.bru` e `MapModel/List mine.bru` com `mine=true`
 - [X] T047 [P] Atualizar `CLAUDE.md` (seção de frontend: comandos `npm run dev/build/lint/test`, pastas com casing da constituição, contexts e fluxo de salvar) e registrar `mine=true` em `specs/001-backend-core-entities/contracts/api.md`
-- [ ] T048 Rodar `npm run lint`, `npm test`, `npm run build` em `frontend/` e `dotnet build`/`dotnet test` em `backend/`; subir backend + `npm run dev` e seguir `specs/006-frontend-map-editor/quickstart.md` — ⚠️ parcial: lint/test/build e backend OK; roteiro no navegador (Chrome headless) 21/22 — upload de imagem e ajuste da imagem pendentes porque o bucket `simple-tabletop-map-dev` não existe no Spaces
+- [ ] T048 Rodar `npm run lint`, `npm test`, `npm run build` em `frontend/` e `dotnet build`/`dotnet test` em `backend/`; subir backend + `npm run dev` e seguir `specs/006-frontend-map-editor/quickstart.md` — ⚠️ parcial: lint/test/build e backend OK; roteiro no navegador (Chrome headless) 21/22 — upload de imagem e ajuste da imagem pendentes porque o bucket `roll6-dev` não existe no Spaces
 
 ---
 

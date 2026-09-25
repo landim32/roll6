@@ -92,8 +92,8 @@ O restante da skill `react-architecture` é seguido: Types → Service (classe c
 ## R8. Sessão, estado e rotas
 
 - **Decision**: `AuthContext` guarda `{ token, expiresAt, user }` em `localStorage`
-  (`simple-tabletop-map:auth`, Princípio VI); `onUnauthorized` dos services faz logout + toast.
-  Campanha atual em `localStorage` (`simple-tabletop-map:campaign`). React Router 6: `/login` e `/`
+  (`roll6:auth`, Princípio VI); `onUnauthorized` dos services faz logout + toast.
+  Campanha atual em `localStorage` (`roll6:campaign`). React Router 6: `/login` e `/`
   (protegida). Context API apenas (sem libs de estado).
 
 ## R9. Textos

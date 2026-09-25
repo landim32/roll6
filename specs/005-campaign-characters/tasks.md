@@ -13,7 +13,7 @@
 - **[P]**: pode rodar em paralelo (arquivos diferentes, sem dependência pendente)
 - **[Story]**: user story da spec (US1..US6)
 - `DTO/`, `Infra.Interfaces/`, `Domain/`, `Infra/`, `Application/`, `API/` abreviam
-  `backend/SimpleTabletopMap.<Projeto>/`.
+  `backend/Roll6.<Projeto>/`.
 
 ## Regras válidas para todas as tarefas
 
@@ -41,7 +41,7 @@ Nenhuma tarefa: solução e dependências já existem.
 - [X] T004 [P] Criar DTOs `CampaignCharacterInfo` (campaignCharacterId, campaignId, campaignName, campaignOwnerName, characterId, characterName, characterImageUrl, characterOwnerId, characterOwnerName, status, createdAt, updatedAt) e `CampaignCharacterRequestInfo` (campaignId, characterId) em `DTO/CampaignCharacter/`
 - [X] T005 [P] Criar `ICampaignCharacterRepository<TModel>` (GetByIdAsync, GetAsync(campaignId, characterId), ListByCampaignAsync(campaignId, bool approvedOnly), ListInvitesByUserAsync(userId), HasApprovedCharacterAsync(campaignId, userId), InsertAsync, UpdateAsync, DeleteByCampaignAsync, DeleteByCharacterAsync) em `Infra.Interfaces/Repository/ICampaignCharacterRepository.cs`
 - [X] T006 [P] Adicionar `ListByIdsAsync(IEnumerable<long> ids)` a `IUserRepository` e `ICharacterRepository` (interfaces em `Infra.Interfaces/Repository/`) e implementar em `Infra/Repository/UserRepository.cs` e `Infra/Repository/CharacterRepository.cs`
-- [X] T007 Configurar no DbContext a coluna `campaigns.open` (`boolean`, `HasDefaultValue(false)`) e a tabela `campaign_characters` (PK `campaign_characters_pkey`, `campaign_character_id` identity, FKs `fk_campaign_campaign_character`/`fk_character_campaign_character` com `ClientSetNull`, `status` integer via `HasConversion<int>()`, timestamps, índice único `ix_campaign_characters_campaign_character`) em `Infra/Context/SimpleTabletopMapContext.cs`
+- [X] T007 Configurar no DbContext a coluna `campaigns.open` (`boolean`, `HasDefaultValue(false)`) e a tabela `campaign_characters` (PK `campaign_characters_pkey`, `campaign_character_id` identity, FKs `fk_campaign_campaign_character`/`fk_character_campaign_character` com `ClientSetNull`, `status` integer via `HasConversion<int>()`, timestamps, índice único `ix_campaign_characters_campaign_character`) em `Infra/Context/Roll6Context.cs`
 - [X] T008 Implementar `CampaignCharacterRepository` (`ListInvitesByUserAsync` e `HasApprovedCharacterAsync` fazem join com `characters` por `user_id`; `DeleteBy*` com `ExecuteDeleteAsync`) em `Infra/Repository/CampaignCharacterRepository.cs`
 - [X] T009 Gerar a migração `AddCampaignOpenAndCharacters` em `Infra/Migrations/` e conferir: `open boolean NOT NULL DEFAULT false`, tabela e índice únicos, FKs sem cascade
 - [X] T010 Criar `ICampaignCharacterService` (métodos de todas as stories: RequestAccessAsync, ApproveRequestAsync, DenyRequestAsync, InviteAsync, AcceptInviteAsync, DeclineInviteAsync, ListInvitesAsync, ListByCampaignAsync) e `CampaignCharacterService` com o construtor (repositórios de CampaignCharacter, Campaign, Character, User e `IImageStorageAppService`), helpers `GetCampaignAsync`, `GetCharacterAsync`, `GetParticipationAsync` e `MapToDtoAsync` (preenche nomes de campanha, mestre, personagem, dono e `characterImageUrl`); métodos ainda não implementados lançam `NotImplementedException`, em `Domain/Interfaces/ICampaignCharacterService.cs` e `Domain/Services/CampaignCharacterService.cs`
@@ -140,9 +140,9 @@ Nenhuma tarefa: solução e dependências já existem.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [X] T033 [P] Testes do model `CampaignCharacter` (todas as transições válidas e inválidas da tabela do data-model) em `backend/SimpleTabletopMap.Tests/Domain/Models/CampaignCharacterTests.cs`
-- [X] T034 [P] Testes de `CampaignCharacterService` (permissões de mestre/dono, pedido em aberta/fechada, convite sobre pedido pendente, listagem por papel, convites do usuário) em `backend/SimpleTabletopMap.Tests/Domain/Services/CampaignCharacterServiceTests.cs`
-- [X] T035 [P] Atualizar `CampaignServiceTests` (listagem de todas com `OwnerName`, leitura por não dono, `SetOpenAsync` só do mestre, exclusão remove participações) e `MapServiceTests`/`MapTokenServiceTests` (leitura por participante aprovado, escrita recusada) em `backend/SimpleTabletopMap.Tests/Domain/Services/`
+- [X] T033 [P] Testes do model `CampaignCharacter` (todas as transições válidas e inválidas da tabela do data-model) em `backend/Roll6.Tests/Domain/Models/CampaignCharacterTests.cs`
+- [X] T034 [P] Testes de `CampaignCharacterService` (permissões de mestre/dono, pedido em aberta/fechada, convite sobre pedido pendente, listagem por papel, convites do usuário) em `backend/Roll6.Tests/Domain/Services/CampaignCharacterServiceTests.cs`
+- [X] T035 [P] Atualizar `CampaignServiceTests` (listagem de todas com `OwnerName`, leitura por não dono, `SetOpenAsync` só do mestre, exclusão remove participações) e `MapServiceTests`/`MapTokenServiceTests` (leitura por participante aprovado, escrita recusada) em `backend/Roll6.Tests/Domain/Services/`
 - [X] T036 [P] Bruno: `open` no `Campaign/Create.bru`, novo `Campaign/Set open.bru` e `Campaign/List characters.bru`, e pasta `bruno/CampaignCharacter/` (folder.bru seq 9) com Request access (open), Request access (closed), Approve, Deny, Invite, List invites, Accept invite, Decline invite — usando os próprios personagens do usuário da coleção (o mestre pode convidar os próprios personagens)
 - [X] T037 [P] Registrar em `specs/001-backend-core-entities/spec.md` (FR-034) e `specs/001-backend-core-entities/contracts/api.md` que a listagem de campanhas passou a mostrar todas (feature 005)
 - [X] T038 Rodar `dotnet build` e `dotnet test`, aplicar a migração no banco de dev (credenciais do `.env`) e seguir `specs/005-campaign-characters/quickstart.md` com dois usuários

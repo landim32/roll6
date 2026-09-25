@@ -21,7 +21,7 @@ Tipos TypeScript (`src/types/`, sempre `interface`, Princípio IV) espelhando os
 
 | Campo | Tipo | Persistência |
 |---|---|---|
-| `session` | `UserTokenInfo \| null` | `localStorage` `simple-tabletop-map:auth` |
+| `session` | `UserTokenInfo \| null` | `localStorage` `roll6:auth` |
 | `loading`, `error` | padrão da skill | — |
 
 Expirada (`expiresAt` passado) ou 401 → logout.
@@ -30,7 +30,7 @@ Expirada (`expiresAt` passado) ou 401 → logout.
 
 | Campo | Tipo | Persistência |
 |---|---|---|
-| `currentCampaign` | `CampaignInfo \| null` | `localStorage` `simple-tabletop-map:campaign` (só o id; recarregado da API) |
+| `currentCampaign` | `CampaignInfo \| null` | `localStorage` `roll6:campaign` (só o id; recarregado da API) |
 | `myCampaigns`, `searchResults` | `PagedList<CampaignInfo>` | — |
 | `isMaster` | derivado: `currentCampaign.userId === session.user.userId` | — |
 

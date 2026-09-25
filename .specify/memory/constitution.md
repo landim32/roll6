@@ -50,7 +50,7 @@ Templates / guidance:
 Deferred TODOs: none
 -->
 
-# SimpleTabletopMap Constitution
+# Roll6 Constitution
 
 > Padrões obrigatórios de stack tecnológica, convenções de código, arquitetura e segurança que
 > devem ser seguidos por todos os contribuidores.
@@ -133,7 +133,7 @@ Todos os imports DEVEM corresponder exatamente ao casing no disco.
 
 | Elemento | Convenção | Exemplo |
 |---|---|---|
-| Namespaces | PascalCase, file-scoped | `namespace SimpleTabletopMap.Domain.Services;` |
+| Namespaces | PascalCase, file-scoped | `namespace Roll6.Domain.Services;` |
 | Classes / Interfaces | PascalCase | `CampaignService`, `ICampaignRepository` |
 | Métodos | PascalCase | `GetById()`, `MapToDto()` |
 | Propriedades | PascalCase | `CampaignId`, `CreatedAt` |
@@ -218,7 +218,7 @@ entre frontend, backend e banco.
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `ConnectionStrings__SimpleTabletopMapContext` | Sim | Connection string PostgreSQL |
+| `ConnectionStrings__Roll6Context` | Sim | Connection string PostgreSQL |
 | `ASPNETCORE_ENVIRONMENT` | Sim | Development, Docker, Production |
 
 **Frontend**

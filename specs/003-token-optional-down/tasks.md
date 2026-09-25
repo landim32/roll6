@@ -11,8 +11,8 @@
 
 - **[P]**: pode rodar em paralelo (arquivos diferentes, sem dependência pendente)
 - **[Story]**: user story da spec (US1, US2)
-- `DTO/`, `Domain/`, `Infra/` abreviam `backend/SimpleTabletopMap.DTO/`,
-  `backend/SimpleTabletopMap.Domain/`, `backend/SimpleTabletopMap.Infra/`.
+- `DTO/`, `Domain/`, `Infra/` abreviam `backend/Roll6.DTO/`,
+  `backend/Roll6.Domain/`, `backend/Roll6.Infra/`.
 
 ---
 
@@ -28,8 +28,8 @@ Nenhuma tarefa: solução e dependências já existem.
 
 - [X] T001 Trocar `Token.DownSpace` de `int` para `int?` (sem valor inicial) mantendo a constante `DEFAULT_DOWN_SPACE = 2`, em `Domain/Models/Token.cs`
 - [X] T002 [P] Trocar `TokenInfo.DownSpace` de `int` para `int?` em `DTO/Token/TokenInfo.cs`
-- [X] T003 Configurar `down_space` como coluna anulável **sem** `HasDefaultValue`/`HasSentinel` (research R1) em `Infra/Context/SimpleTabletopMapContext.cs`
-- [X] T004 Gerar a migração `MakeTokenDownSpaceOptional` em `Infra/Migrations/` (`dotnet ef migrations add MakeTokenDownSpaceOptional --project SimpleTabletopMap.Infra --startup-project SimpleTabletopMap.API`, em `backend/`) e conferir que o `AlterColumn` só torna `down_space` anulável e remove o default, sem apagar dados
+- [X] T003 Configurar `down_space` como coluna anulável **sem** `HasDefaultValue`/`HasSentinel` (research R1) em `Infra/Context/Roll6Context.cs`
+- [X] T004 Gerar a migração `MakeTokenDownSpaceOptional` em `Infra/Migrations/` (`dotnet ef migrations add MakeTokenDownSpaceOptional --project Roll6.Infra --startup-project Roll6.API`, em `backend/`) e conferir que o `AlterColumn` só torna `down_space` anulável e remove o default, sem apagar dados
 
 **Checkpoint**: solução compila; `has-pending-model-changes` não acusa mudanças.
 
@@ -63,7 +63,7 @@ Nenhuma tarefa: solução e dependências já existem.
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [X] T009 [P] Atualizar `TokenLibraryServiceTests`: `Create_WithoutSpaces_UsesDefaults` passa a esperar `DownSpace` null (sem imagem deitado); novos casos para imagem deitado sem espaço → 2, espaço 3 sem imagem → 3, espaço 0 → 0, update removendo o estado deitado → null, em `backend/SimpleTabletopMap.Tests/Domain/Services/TokenLibraryServiceTests.cs`
+- [X] T009 [P] Atualizar `TokenLibraryServiceTests`: `Create_WithoutSpaces_UsesDefaults` passa a esperar `DownSpace` null (sem imagem deitado); novos casos para imagem deitado sem espaço → 2, espaço 3 sem imagem → 3, espaço 0 → 0, update removendo o estado deitado → null, em `backend/Roll6.Tests/Domain/Services/TokenLibraryServiceTests.cs`
 - [X] T010 [P] Atualizar `down_space` na tabela `tokens` de `specs/001-backend-core-entities/data-model.md` e a descrição de `TokenInsertInfo`/`TokenInfo` em `specs/001-backend-core-entities/contracts/api.md`, com referência à feature 003
 - [X] T011 Rodar `dotnet build` e `dotnet test` em `backend/`, aplicar a migração no banco de desenvolvimento e seguir `specs/003-token-optional-down/quickstart.md` — feito no banco de dev: itens 1–5 conferidos via API; item 6 (tokens antigos) garantido pela migração, que só altera a coluna (não havia tokens anteriores no banco)
 

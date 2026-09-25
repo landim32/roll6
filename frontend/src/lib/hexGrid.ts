@@ -2,7 +2,7 @@
  * Hex grid math for flat-top hexagons in an "odd-q" rectangular grid, following
  * https://www.redblobgames.com/grids/hexagons/ ("Size and Spacing", "Offset coordinates").
  *
- * Mirror of backend/SimpleTabletopMap.Domain/Grid/HexGrid.cs — keep both identical
+ * Mirror of backend/Roll6.Domain/Grid/HexGrid.cs — keep both identical
  * (constitution Principle VII). Positions are stored as column/row (x, y).
  */
 

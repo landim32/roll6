@@ -13,7 +13,7 @@ decisões abaixo fixam como a spec se encaixa no código existente.
 
 ## R1. Onde fica o cálculo do tamanho do hexágono
 
-- **Decision**: classe estática pura `HexGrid` em `SimpleTabletopMap.Domain/Grid/HexGrid.cs`,
+- **Decision**: classe estática pura `HexGrid` em `Roll6.Domain/Grid/HexGrid.cs`,
   sem dependências, com `CalculateHexSize(int columns, int rows, double visibleWidth, double
   visibleHeight)`. O frontend terá um módulo equivalente, espelhado 1:1 (Princípio VII).
 - **Rationale**: o Princípio VII pede a matemática de grid num módulo isolado e testável, e o

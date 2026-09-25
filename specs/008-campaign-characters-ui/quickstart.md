@@ -1,7 +1,7 @@
 # Quickstart: Personagens na Campanha
 
 Pré-requisitos: banco de dev acessível, API em Development (`dotnet run --project
-SimpleTabletopMap.API`, porta 5119) e `npm run dev` em `frontend/`. Sem migration nesta feature.
+Roll6.API`, porta 5119) e `npm run dev` em `frontend/`. Sem migration nesta feature.
 
 ```bash
 cd backend && dotnet test --filter "FullyQualifiedName~CharacterServiceTests|FullyQualifiedName~CampaignCharacterServiceTests"

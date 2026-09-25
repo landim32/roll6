@@ -5,7 +5,7 @@
 
 ## Summary
 
-Criar a Web API do SimpleTabletopMap com sete entidades (User, Character, Token, Campaign,
+Criar a Web API do Roll6 com sete entidades (User, Character, Token, Campaign,
 MapModel, Map, MapToken) em Clean Architecture, seguindo a skill `dotnet-architecture`.
 Usuários, senhas (hash PBKDF2) e login (JWT próprio) são locais; imagens vão para S3 via
 `AWSSDK.S3` com upload em endpoint próprio e URLs temporárias nas leituras. As regras de dono,
@@ -18,7 +18,7 @@ em [research.md](./research.md), [data-model.md](./data-model.md) e
 **Language/Version**: C# 12 / .NET 8.0 (compilado com SDK 9.0.309)
 **Primary Dependencies**: ASP.NET Core 8 Web API, EF Core 9.x + Npgsql.EntityFrameworkCore.PostgreSQL 9.x, Microsoft.AspNetCore.Authentication.JwtBearer 8.x, AWSSDK.S3, Swashbuckle.AspNetCore 8.x
 **Storage**: PostgreSQL (dados) + S3 ou compatível (imagens)
-**Testing**: xUnit + Moq + FluentAssertions (`SimpleTabletopMap.Tests`, skill `dotnet-test`)
+**Testing**: xUnit + Moq + FluentAssertions (`Roll6.Tests`, skill `dotnet-test`)
 **Target Platform**: Linux server (produção) / Windows (desenvolvimento)
 **Project Type**: web-service (backend de uma web app; frontend em feature futura)
 **Performance Goals**: listagens e buscas paginadas ≤ 1 s com 10.000 registros por entidade (SC-004)
@@ -34,11 +34,11 @@ em [research.md](./research.md), [data-model.md](./data-model.md) e
 | I | Skills obrigatórias | Todas as entidades criadas com `dotnet-architecture` (DTO → Infra.Interfaces → Domain → Infra → Application); testes com `dotnet-test` | ✅ |
 | II | Stack fixa | .NET 8, EF Core 9, PostgreSQL, Swashbuckle 8; sem outro ORM; sem NAuth/zTools. JwtBearer e AWSSDK.S3 preenchem o que a v2.0.0 deixou em aberto | ✅ |
 | III | Casing de diretórios | Regras de frontend; não se aplica a esta feature (só backend) | ➖ N/A |
-| IV | Convenções de código | Namespaces file-scoped `SimpleTabletopMap.*`, `_camelCase`, `[JsonPropertyName]` camelCase em todos os DTOs, DTOs `Info`/`InsertInfo`; respostas padrão ASP.NET Core (DTO direto, `ProblemDetails` nos erros) | ✅ |
+| IV | Convenções de código | Namespaces file-scoped `Roll6.*`, `_camelCase`, `[JsonPropertyName]` camelCase em todos os DTOs, DTOs `Info`/`InsertInfo`; respostas padrão ASP.NET Core (DTO direto, `ProblemDetails` nos erros) | ✅ |
 | V | Banco | snake_case plural, PK `{entidade}_id` bigint identity, `{tabela}_pkey`, `fk_{pai}_{filho}`, `ClientSetNull`, `timestamp without time zone`, `varchar(n)`, enums `integer` | ✅ |
 | VI | Autenticação e segurança | `[Authorize]` em todos os controllers (exceto cadastro/login); token Bearer guardado em localStorage pelo frontend; segredos só em config/env; CORS aberto só em Development | ✅ |
 | VII | Grid hexagonal | MapToken guarda posição axial `q`, `r`; `s` nunca persistido | ✅ |
-| — | Env vars | `ConnectionStrings__SimpleTabletopMapContext`, `ASPNETCORE_ENVIRONMENT` + `Jwt__*`, `S3__*` | ✅ |
+| — | Env vars | `ConnectionStrings__Roll6Context`, `ASPNETCORE_ENVIRONMENT` + `Jwt__*`, `S3__*` | ✅ |
 | — | Erros backend | `catch (Exception ex) => StatusCode(500, ex.Message)` mantido; capturas específicas antes dele devolvem `ProblemDetails` (400/403/404/409) | ✅ |
 
 Re-check pós-design (data-model e contratos): sem violações novas.
@@ -62,32 +62,32 @@ specs/001-backend-core-entities/
 
 ```text
 backend/
-├── SimpleTabletopMap.sln
-├── SimpleTabletopMap.DTO/                  # sem dependências
+├── Roll6.sln
+├── Roll6.DTO/                  # sem dependências
 │   ├── Common/          PagedList<T>, PageQuery
 │   ├── Settings/        JwtSettings, S3Settings
 │   └── {User,Character,Token,Campaign,MapModel,Map,MapToken,Image}/  *Info, *InsertInfo, *UpdateInfo
-├── SimpleTabletopMap.Infra.Interfaces/     # contratos genéricos <TModel>
+├── Roll6.Infra.Interfaces/     # contratos genéricos <TModel>
 │   ├── Repository/      I{Entity}Repository<TModel>
 │   └── AppServices/     IImageStorageAppService
-├── SimpleTabletopMap.Domain/
+├── Roll6.Domain/
 │   ├── Models/          User, Character, Token, Campaign, MapModel, Map, MapToken
 │   ├── Enums/           MapStatus, MapTokenType
 │   ├── Interfaces/      I{Entity}Service, IPasswordHasherService, ITokenService
 │   └── Services/        {Entity}Service, ImageService
-├── SimpleTabletopMap.Infra/
-│   ├── Context/         SimpleTabletopMapContext (Fluent API snake_case)
+├── Roll6.Infra/
+│   ├── Context/         Roll6Context (Fluent API snake_case)
 │   ├── Repository/      {Entity}Repository
 │   ├── AppServices/     S3ImageStorageAppService, JwtTokenService, PasswordHasherService
 │   └── Migrations/
-├── SimpleTabletopMap.Application/
+├── Roll6.Application/
 │   └── Startup.cs       DI centralizado (DbContext, repos, services, JWT, S3)
-├── SimpleTabletopMap.API/
+├── Roll6.API/
 │   ├── Controllers/     User, Image, Character, Token, Campaign, MapModel, Map, MapToken
 │   ├── Extensions/      ClaimsPrincipalExtensions (GetUserId)
 │   ├── Program.cs       CORS → Authentication → Authorization, Swagger com Bearer
 │   └── appsettings*.json
-└── SimpleTabletopMap.Tests/
+└── Roll6.Tests/
     └── Domain/Services/ {Entity}ServiceTests
 ```
 
