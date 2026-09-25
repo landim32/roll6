@@ -109,7 +109,7 @@ npm run build
 | | Development | Homolog (`ASPNETCORE_ENVIRONMENT=Docker`) | Production |
 |---|---|---|---|
 | Runs | `dotnet run` locally | `docker-compose.yml` | `docker-compose-prod.yml` on the server |
-| Config | `appsettings.Development.json` (committed, dev-only values) | `appsettings.Docker.json` (empty) + `.env` | `appsettings.Production.json` (non-secrets) + `.env.prod` (secrets only) |
+| Config | `appsettings.Development.json` (git-ignored; copy `appsettings.Template.json` and fill it) | `appsettings.Docker.json` (empty) + `.env` | `appsettings.Production.json` (non-secrets) + `.env.prod` (secrets only) |
 | Migrations | manual `dotnet ef database update` | applied on startup | applied on startup |
 | SSL / Swagger | dev cert / on | none / on | Caddy (`Caddyfile`, Let's Encrypt) / off |
 
