@@ -1,22 +1,30 @@
 using FluentAssertions;
 using Moq;
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Campaign;
 using Roll6.DTO.Common;
+using Roll6.DTO.Realtime;
+using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Tests.Domain.Services;
 
 public class CampaignServiceTests
 {
+    private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<ICampaignRepository<Campaign>> _repository = new();
     private readonly Mock<IMapRepository<Map>> _mapRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
+    private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
+    private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<ICampaignPlanRepository<CampaignPlan>> _campaignPlanRepository = new();
     private readonly CampaignService _service;
 
     public CampaignServiceTests()
@@ -31,7 +39,8 @@ public class CampaignServiceTests
         });
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns<Func<Task>>(action => action());
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
-            _campaignCharacterRepository.Object, _userRepository.Object, _unitOfWork.Object);
+            _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
+            _unitOfWork.Object, _turnRepository.Object, _notifier.Object, _campaignPlanRepository.Object);
     }
 
     [Fact]
@@ -55,7 +64,9 @@ public class CampaignServiceTests
         await _service.DeleteAsync(1, 10);
 
         _mapTokenRepository.Verify(r => r.DeleteByMapIdsAsync(deletedMapIds));
+        _mapNpcRepository.Verify(r => r.DeleteByMapIdsAsync(deletedMapIds));
         _mapRepository.Verify(r => r.DeleteRangeAsync(deletedMapIds));
+        _campaignNpcRepository.Verify(r => r.DeleteByCampaignAsync(10));
         _campaignCharacterRepository.Verify(r => r.DeleteByCampaignAsync(10));
         _repository.Verify(r => r.DeleteAsync(10));
     }
@@ -129,5 +140,81 @@ public class CampaignServiceTests
 
         result.Items.Should().ContainSingle(c => c.CampaignId == 10);
         _repository.Verify(r => r.ListPagedAsync(null, 0, 20, 1));
+    }
+
+    // --- 017: real-time table ---
+
+    private void Published(string type, Times times) =>
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == type && e.CampaignId == 10)), times);
+
+    [Fact]
+    public async Task CanRead_MasterAndApprovedParticipants()
+    {
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(10, 2)).ReturnsAsync(true);
+
+        (await _service.CanReadAsync(1, 10)).Should().BeTrue();
+        (await _service.CanReadAsync(2, 10)).Should().BeTrue();
+        (await _service.CanReadAsync(3, 10)).Should().BeFalse();
+        await _service.Invoking(s => s.CanReadAsync(1, 99)).Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task SetCurrentMap_Master_SavesAndPublishes()
+    {
+        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Active });
+
+        var result = await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 30 });
+
+        result.CurrentMapId.Should().Be(30);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.MAP_CURRENT && e.CampaignId == 10 && e.MapId == 30 && e.ActorUserId == 1)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetCurrentMap_SameMap_DoesNotPublish()
+    {
+        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
+        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Active });
+
+        await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 30 });
+
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        Published(TableEventType.MAP_CURRENT, Times.Never());
+    }
+
+    [Fact]
+    public async Task SetCurrentMap_PlayerOrForeignOrDeletedMap_Throws()
+    {
+        _mapRepository.Setup(r => r.GetByIdAsync(31)).ReturnsAsync(new Map { MapId = 31, CampaignId = 11, Status = MapStatus.Active });
+        _mapRepository.Setup(r => r.GetByIdAsync(32)).ReturnsAsync(new Map { MapId = 32, CampaignId = 10, Status = MapStatus.Deleted });
+
+        await _service.Invoking(s => s.SetCurrentMapAsync(2, 10, new CampaignCurrentMapInfo { MapId = 31 }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 31 }))
+            .Should().ThrowAsync<DomainValidationException>();
+        await _service.Invoking(s => s.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 32 }))
+            .Should().ThrowAsync<DomainValidationException>();
+        Published(TableEventType.MAP_CURRENT, Times.Never());
+    }
+
+    [Fact]
+    public async Task RenameAndDelete_PublishCampaignEvents()
+    {
+        _mapRepository.Setup(r => r.ListDeletedIdsByCampaignAsync(10)).ReturnsAsync(new List<long>());
+        await _service.RenameAsync(1, 10, new CampaignInsertInfo { Name = "Nova" });
+        await _service.DeleteAsync(1, 10);
+
+        Published(TableEventType.CAMPAIGN_CHANGED, Times.Once());
+        Published(TableEventType.CAMPAIGN_DELETED, Times.Once());
+        // Its plan entries go with it (018).
+        _campaignPlanRepository.Verify(r => r.DeleteByCampaignAsync(10), Times.Once);
+    }
+
+    [Fact]
+    public async Task Rename_ByAnotherUser_DoesNotPublish()
+    {
+        await _service.Invoking(s => s.RenameAsync(2, 10, new CampaignInsertInfo { Name = "X" })).Should().ThrowAsync<UnauthorizedAccessException>();
+
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
     }
 }

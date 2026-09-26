@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Roll6.Application.Auth;
 using Roll6.Domain.Interfaces;
 using Roll6.DTO.User;
 
@@ -64,6 +65,7 @@ public class UserController : ApiControllerBase
     }
 
     [HttpPut("name")]
+    [Authorize(Policy = AuthConstants.SESSION_POLICY)]
     [ProducesResponseType(typeof(UserInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> Rename([FromBody] UserNameInfo info)
     {
@@ -78,6 +80,7 @@ public class UserController : ApiControllerBase
     }
 
     [HttpPut("password")]
+    [Authorize(Policy = AuthConstants.SESSION_POLICY)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> ChangePassword([FromBody] UserPasswordInfo info)
     {

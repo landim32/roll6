@@ -4,13 +4,17 @@ import { characterService } from '../Services/characterService';
 import { campaignCharacterService } from '../Services/campaignCharacterService';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
+import { useRealtime, useTableEvents } from '../hooks/useRealtime';
+import { TABLE_EVENT } from '../types/realtime';
 import {
   buildCharacterOptions, readStoredSelections, resolveSelection, writeStoredSelection,
 } from '../lib/characterSelection';
 import type { CharacterOption, CharacterSelection } from '../lib/characterSelection';
 import type { CharacterInfo, CharacterInsertInfo, CharacterSearchInfo } from '../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
-import type { CampaignCharacterInfo, CampaignCharacterVitalsInfo } from '../types/campaignCharacter';
+import type {
+  CampaignCharacterDetailInfo, CampaignCharacterInfo, CampaignCharacterUpdateInfo,
+} from '../types/campaignCharacter';
 import type { ListQuery, PagedList } from '../types/common';
 
 /** Invites are polled at most this often (spec FR-020 / SC-003). */
@@ -59,10 +63,12 @@ interface CharacterContextType {
   remove: (campaignCharacterId: number) => Promise<void>;
   invite: (characterId: number) => Promise<CampaignCharacterInfo>;
   searchCharacters: (query: ListQuery) => Promise<PagedList<CharacterSearchInfo>>;
-  // Owner or master (party panel edit)
+  // Character owner (the character itself)
   getCharacter: (characterId: number) => Promise<CharacterInfo>;
   updateCharacter: (characterId: number, data: CharacterInsertInfo) => Promise<CharacterInfo>;
-  updateVitals: (campaignCharacterId: number, data: CampaignCharacterVitalsInfo) => Promise<CampaignCharacterInfo>;
+  // Party panel: anyone who sees the party reads; the owner or the master changes
+  getParticipation: (campaignCharacterId: number) => Promise<CampaignCharacterDetailInfo>;
+  updateParticipation: (campaignCharacterId: number, data: CampaignCharacterUpdateInfo) => Promise<CampaignCharacterDetailInfo>;
 }
 
 const requireCampaign = (campaignId: number | null): number => {
@@ -75,6 +81,7 @@ const CharacterContext = createContext<CharacterContextType | undefined>(undefin
 export const CharacterProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
   const { currentCampaign, isMaster } = useCampaign();
+  const { live } = useRealtime();
   const [myCharacters, setMyCharacters] = useState<CharacterInfo[]>([]);
   const [myParticipations, setMyParticipations] = useState<CampaignCharacterInfo[]>([]);
   /** Campaign the participations above were loaded for (they lag one render behind a switch). */
@@ -178,9 +185,17 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
     void refreshParty();
   }, [refreshParty]);
 
-  // Every 15 s while the tab is visible, and right away when it becomes visible again.
+  // Real-time table (017): participations and party change for everyone at once.
+  useTableEvents((event) => {
+    if (event.type === TABLE_EVENT.partyChanged || event.type === TABLE_EVENT.resync) {
+      void refresh(true);
+      void refreshParty();
+    }
+  });
+
+  // Without the real-time channel: every 15 s while the tab is visible, and right away when it becomes visible.
   useEffect(() => {
-    if (!session || campaignId === null) return;
+    if (!session || campaignId === null || live) return;
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
       void refresh(true);
@@ -192,7 +207,7 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', tick);
     };
-  }, [session, campaignId, refresh, refreshParty]);
+  }, [session, campaignId, live, refresh, refreshParty]);
 
   // ---------- selection ----------
 
@@ -302,8 +317,17 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
   const updateCharacter = useCallback((characterId: number, data: CharacterInsertInfo) =>
     run(() => characterService.update(characterId, data)), [run]);
 
-  const updateVitals = useCallback(async (campaignCharacterId: number, data: CampaignCharacterVitalsInfo) => {
-    const result = await run(() => campaignCharacterService.updateVitals(campaignCharacterId, data), false);
+  const getParticipation = useCallback(async (campaignCharacterId: number) => {
+    try {
+      setError(null);
+      return await campaignCharacterService.getById(campaignCharacterId);
+    } catch (err) {
+      return handleError(err);
+    }
+  }, []);
+
+  const updateParticipation = useCallback(async (campaignCharacterId: number, data: CampaignCharacterUpdateInfo) => {
+    const result = await run(() => campaignCharacterService.update(campaignCharacterId, data), false);
     await refreshParty();
     return result;
   }, [run, refreshParty]);
@@ -324,7 +348,7 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
     refresh, refreshParty, select, clearError,
     createCharacter, requestAccess, refreshInvites, acceptInvite, declineInvite,
     listCampaignCharacters, approve, deny, remove, invite, searchCharacters,
-    getCharacter, updateCharacter, updateVitals,
+    getCharacter, updateCharacter, getParticipation, updateParticipation,
   };
 
   return <CharacterContext.Provider value={value}>{children}</CharacterContext.Provider>;

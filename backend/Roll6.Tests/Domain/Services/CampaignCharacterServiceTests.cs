@@ -5,6 +5,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.CampaignCharacter;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -23,6 +24,9 @@ public class CampaignCharacterServiceTests
     private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
     private readonly Mock<ICharacterRepository<Character>> _characterRepository = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
+    private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly CampaignCharacterService _service;
 
     public CampaignCharacterServiceTests()
@@ -36,7 +40,7 @@ public class CampaignCharacterServiceTests
             _campaignRepository.Setup(r => r.GetByIdAsync(campaign.CampaignId)).ReturnsAsync(campaign);
         _campaignRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(campaigns);
 
-        var character = new Character { CharacterId = CHARACTER, UserId = PLAYER_ID, Name = "Thorin", Life = 12, Energy = 6 };
+        var character = new Character { CharacterId = CHARACTER, UserId = PLAYER_ID, Name = "Thorin", Life = 12, Energy = 6, Move = 5, Sheet = "Força 3" };
         _characterRepository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(character);
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character> { character });
 
@@ -47,9 +51,11 @@ public class CampaignCharacterServiceTests
         });
         _repository.Setup(r => r.InsertAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
         _repository.Setup(r => r.UpdateAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
+        _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
-            _characterRepository.Object, _userRepository.Object, Mock.Of<IImageStorageAppService>());
+            _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object,
+            Mock.Of<IImageStorageAppService>(), _notifier.Object);
     }
 
     private static CampaignCharacterRequestInfo Request(long campaignId) => new() { CampaignId = campaignId, CharacterId = CHARACTER };
@@ -106,6 +112,8 @@ public class CampaignCharacterServiceTests
         var result = await _service.ApproveRequestAsync(MASTER_ID, 50);
 
         result.Status.Should().Be((int)CampaignCharacterStatus.Approved);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.PARTY_CHANGED && e.CampaignId == CLOSED_CAMPAIGN && e.ActorUserId == MASTER_ID)), Times.Once);
     }
 
     [Fact]
@@ -116,6 +124,7 @@ public class CampaignCharacterServiceTests
         var act = () => _service.DenyRequestAsync(PLAYER_ID, 50);
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
     }
 
     [Fact]
@@ -250,7 +259,23 @@ public class CampaignCharacterServiceTests
 
         await _service.RemoveAsync(MASTER_ID, 70);
 
+        _mapTokenRepository.Verify(r => r.DeleteByCampaignCharacterAsync(70), Times.Once);
         _repository.Verify(r => r.DeleteAsync(70), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.PARTY_CHANGED)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.MapId == null)), Times.Once);
+        // The player has no other approved character there: he stops receiving the campaign's events.
+        _notifier.Verify(n => n.RemoveUserFromCampaignAsync(PLAYER_ID, CLOSED_CAMPAIGN), Times.Once);
+    }
+
+    [Fact]
+    public async Task Remove_PlayerWithAnotherApprovedCharacter_KeepsReceivingEvents()
+    {
+        SetupParticipation(70, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        _repository.Setup(r => r.HasApprovedCharacterAsync(CLOSED_CAMPAIGN, PLAYER_ID)).ReturnsAsync(true);
+
+        await _service.RemoveAsync(MASTER_ID, 70);
+
+        _notifier.Verify(n => n.RemoveUserFromCampaignAsync(It.IsAny<long>(), It.IsAny<long>()), Times.Never);
     }
 
     [Fact]
@@ -285,38 +310,86 @@ public class CampaignCharacterServiceTests
         result.TotalEnergy.Should().Be(6);
     }
 
+
+    [Fact]
+    public async Task ApproveRequest_CopiesTheCharacterSheet()
+    {
+        SetupParticipation(84, CLOSED_CAMPAIGN, CampaignCharacterStatus.RequestedAccess);
+
+        await _service.ApproveRequestAsync(MASTER_ID, 84);
+
+        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(p => p.Sheet == "Força 3" && p.CharacterStatus == null)), Times.Once);
+    }
+
+    private static CampaignCharacterUpdateInfo Play(int life = -2, int energy = 6) =>
+        new() { CurrentLife = life, CurrentEnergy = energy, CharacterStatus = "envenenado", Sheet = "Força 3 (ferido)" };
+
     [Theory]
     [InlineData(PLAYER_ID)]
     [InlineData(MASTER_ID)]
-    public async Task UpdateVitals_OwnerOrMaster_Saves(long userId)
+    public async Task Update_OwnerOrMaster_SavesOnlyTheParticipation(long userId)
     {
         SetupParticipation(81, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
 
-        var result = await _service.UpdateVitalsAsync(userId, 81, new CampaignCharacterVitalsInfo { CurrentLife = -2, CurrentEnergy = 6 });
+        var result = await _service.UpdateAsync(userId, 81, Play());
 
         result.CurrentLife.Should().Be(-2);
         result.CurrentEnergy.Should().Be(6);
+        result.CharacterStatus.Should().Be("envenenado");
+        result.Sheet.Should().Be("Força 3 (ferido)");
+        result.CharacterMove.Should().Be(5);
         _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Once);
+        _characterRepository.Verify(r => r.UpdateAsync(It.IsAny<Character>()), Times.Never);
     }
 
     [Fact]
-    public async Task UpdateVitals_Outsider_Throws()
+    public async Task Update_OtherParticipant_Throws()
     {
         SetupParticipation(82, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        _repository.Setup(r => r.HasApprovedCharacterAsync(CLOSED_CAMPAIGN, OUTSIDER_ID)).ReturnsAsync(true);
 
-        var act = () => _service.UpdateVitalsAsync(OUTSIDER_ID, 82, new CampaignCharacterVitalsInfo { CurrentLife = 1, CurrentEnergy = 1 });
+        var act = () => _service.UpdateAsync(OUTSIDER_ID, 82, Play(1, 1));
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
         _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
     }
 
     [Fact]
-    public async Task UpdateVitals_AboveTotal_Throws()
+    public async Task Update_AboveTotal_Throws()
     {
         SetupParticipation(83, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
 
-        var act = () => _service.UpdateVitalsAsync(PLAYER_ID, 83, new CampaignCharacterVitalsInfo { CurrentLife = 13, CurrentEnergy = 1 });
+        var act = () => _service.UpdateAsync(PLAYER_ID, 83, Play(13, 1));
 
         await act.Should().ThrowAsync<DomainValidationException>();
+    }
+
+    [Theory]
+    [InlineData(PLAYER_ID, false)]
+    [InlineData(MASTER_ID, false)]
+    [InlineData(OUTSIDER_ID, true)]
+    public async Task GetById_OwnerMasterOrApprovedParticipant_ReturnsTheSheet(long userId, bool approvedParticipant)
+    {
+        _repository.Setup(r => r.GetByIdAsync(85)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = 85, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER,
+            Status = CampaignCharacterStatus.Approved, Sheet = "Ficha da campanha", CharacterStatus = "ferido"
+        });
+        _repository.Setup(r => r.HasApprovedCharacterAsync(CLOSED_CAMPAIGN, OUTSIDER_ID)).ReturnsAsync(approvedParticipant);
+
+        var result = await _service.GetByIdAsync(userId, 85);
+
+        result.Sheet.Should().Be("Ficha da campanha");
+        result.CharacterStatus.Should().Be("ferido");
+    }
+
+    [Fact]
+    public async Task GetById_NotInTheCampaign_Throws()
+    {
+        SetupParticipation(86, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+
+        var act = () => _service.GetByIdAsync(OUTSIDER_ID, 86);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
 }

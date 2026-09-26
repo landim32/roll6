@@ -18,11 +18,12 @@ public class TokenController : ApiControllerBase
 
     [HttpGet]
     [ProducesResponseType(typeof(PagedList<TokenInfo>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> List([FromQuery] PageQuery query)
+    /// <summary>The token library; <c>mine=true</c> lists only the logged user's tokens.</summary>
+    public async Task<IActionResult> List([FromQuery] PageQuery query, [FromQuery] bool mine = false)
     {
         try
         {
-            return Ok(await _tokenService.ListAsync(query));
+            return Ok(await _tokenService.ListAsync(query, mine ? CurrentUserId : null));
         }
         catch (Exception ex)
         {

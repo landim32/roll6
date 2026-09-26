@@ -85,6 +85,12 @@ public class MapRepository : IMapRepository<Map>
         await _context.Maps.Where(e => idList.Contains(e.MapId)).ExecuteDeleteAsync();
     }
 
+    public async Task<List<long>> ListCampaignIdsByModelAsync(long mapModelId)
+    {
+        return await _context.Maps.Where(e => e.MapModelId == mapModelId && e.Status != MapStatus.Deleted)
+            .Select(e => e.CampaignId).Distinct().ToListAsync();
+    }
+
     public async Task<bool> ExistsByMapModelAsync(long mapModelId)
     {
         return await _context.Maps.AnyAsync(e => e.MapModelId == mapModelId);

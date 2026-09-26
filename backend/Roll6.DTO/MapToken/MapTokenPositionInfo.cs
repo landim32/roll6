@@ -1,0 +1,17 @@
+using System.Text.Json.Serialization;
+
+namespace Roll6.DTO.MapToken;
+
+/// <summary>New cell (column/row, odd-q) of a map token.</summary>
+public class MapTokenPositionInfo
+{
+    [JsonPropertyName("x")]
+    public int X { get; set; }
+
+    [JsonPropertyName("y")]
+    public int Y { get; set; }
+
+    /// <summary>New facing (0–5); null keeps the current one.</summary>
+    [JsonPropertyName("look")]
+    public int? Look { get; set; }
+}

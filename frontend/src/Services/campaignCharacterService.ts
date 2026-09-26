@@ -1,4 +1,6 @@
-import type { CampaignCharacterInfo, CampaignCharacterRequestInfo, CampaignCharacterVitalsInfo } from '../types/campaignCharacter';
+import type {
+  CampaignCharacterDetailInfo, CampaignCharacterInfo, CampaignCharacterRequestInfo, CampaignCharacterUpdateInfo,
+} from '../types/campaignCharacter';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 const API_BASE = `${API_URL}/api/campaigncharacter`;
@@ -70,12 +72,18 @@ class CampaignCharacterService {
     return this.post(`/${id}/deny`);
   }
 
-  /** Current life/energy in the campaign (character owner or campaign master). */
-  async updateVitals(id: number, data: CampaignCharacterVitalsInfo): Promise<CampaignCharacterInfo> {
-    const response = await fetch(`${API_BASE}/${id}/vitals`, {
+  /** The participation with the campaign sheet (master, character owner or approved participants). */
+  async getById(id: number): Promise<CampaignCharacterDetailInfo> {
+    const response = await fetch(`${API_BASE}/${id}`, { headers: getHeaders(true) });
+    return this.handleResponse<CampaignCharacterDetailInfo>(response);
+  }
+
+  /** Current life/energy, status and campaign sheet (character owner or campaign master). */
+  async update(id: number, data: CampaignCharacterUpdateInfo): Promise<CampaignCharacterDetailInfo> {
+    const response = await fetch(`${API_BASE}/${id}`, {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify(data),
     });
-    return this.handleResponse<CampaignCharacterInfo>(response);
+    return this.handleResponse<CampaignCharacterDetailInfo>(response);
   }
 
   /** Master removes the character from the campaign (the character itself is kept). */

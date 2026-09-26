@@ -5,6 +5,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Map;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -19,6 +20,7 @@ public class MapServiceTests
     private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly MapService _service;
 
     public MapServiceTests()
@@ -27,7 +29,7 @@ public class MapServiceTests
         _mapModelRepository.Setup(r => r.GetByIdAsync(20)).ReturnsAsync(new MapModel { MapModelId = 20, UserId = OTHER_USER_ID, Name = "Masmorra" });
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Map>())).ReturnsAsync((Map m) => m);
         _service = new MapService(_repository.Object, _campaignRepository.Object, _mapModelRepository.Object,
-            _campaignCharacterRepository.Object, Mock.Of<IImageStorageAppService>());
+            _campaignCharacterRepository.Object, Mock.Of<IImageStorageAppService>(), _notifier.Object);
     }
 
     private void SetupMap(MapStatus status = MapStatus.Active) =>
@@ -152,5 +154,31 @@ public class MapServiceTests
         var act = () => _service.UpdateAsync(OTHER_USER_ID, 30, new MapUpdateInfo { Name = "X", Status = 1 });
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    [Fact]
+    public async Task Delete_TheCurrentMap_ClearsItAndPublishes()
+    {
+        SetupMap();
+        var campaign = new Campaign { CampaignId = 10, UserId = OWNER_ID, Name = "Campanha", CurrentMapId = 30 };
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(campaign);
+
+        await _service.DeleteAsync(OWNER_ID, 30);
+
+        campaign.CurrentMapId.Should().BeNull();
+        _campaignRepository.Verify(r => r.UpdateAsync(campaign), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.MAP_DELETED && e.CampaignId == 10 && e.MapId == 30)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Delete_AnotherMap_KeepsTheCurrentOne()
+    {
+        SetupMap();
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = OWNER_ID, Name = "C", CurrentMapId = 31 });
+
+        await _service.DeleteAsync(OWNER_ID, 30);
+
+        _campaignRepository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
     }
 }

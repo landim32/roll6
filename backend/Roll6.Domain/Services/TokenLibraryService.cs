@@ -12,21 +12,27 @@ public class TokenLibraryService : ITokenLibraryService
 {
     private readonly ITokenRepository<Token> _repository;
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
+    private readonly ICharacterRepository<Character> _characterRepository;
+    private readonly INpcRepository<Npc> _npcRepository;
     private readonly IImageStorageAppService _imageStorage;
 
     public TokenLibraryService(
         ITokenRepository<Token> repository,
         IMapTokenRepository<MapToken> mapTokenRepository,
+        ICharacterRepository<Character> characterRepository,
+        INpcRepository<Npc> npcRepository,
         IImageStorageAppService imageStorage)
     {
+        _npcRepository = npcRepository;
+        _characterRepository = characterRepository;
         _repository = repository;
         _mapTokenRepository = mapTokenRepository;
         _imageStorage = imageStorage;
     }
 
-    public async Task<PagedList<TokenInfo>> ListAsync(PageQuery query)
+    public async Task<PagedList<TokenInfo>> ListAsync(PageQuery query, long? ownerUserId = null)
     {
-        var (items, total) = await _repository.ListPagedAsync(query.Search, query.Skip, query.PageSize);
+        var (items, total) = await _repository.ListPagedAsync(query.Search, query.Skip, query.PageSize, ownerUserId);
         return new PagedList<TokenInfo>
         {
             Items = items.Select(MapToDto).ToList(),
@@ -61,6 +67,10 @@ public class TokenLibraryService : ITokenLibraryService
         await GetOwnedAsync(userId, tokenId);
         if (await _mapTokenRepository.ExistsByTokenAsync(tokenId))
             throw new ConflictException("O token está em uso em mapas e não pode ser excluído.");
+        if (await _characterRepository.ExistsByTokenAsync(tokenId))
+            throw new ConflictException("O token está em uso por personagens e não pode ser excluído.");
+        if (await _npcRepository.ExistsByTokenAsync(tokenId))
+            throw new ConflictException("O token está em uso por NPCs e não pode ser excluído.");
         await _repository.DeleteAsync(tokenId);
     }
 

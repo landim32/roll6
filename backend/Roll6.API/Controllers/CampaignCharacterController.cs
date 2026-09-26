@@ -146,14 +146,29 @@ public class CampaignCharacterController : ApiControllerBase
         }
     }
 
-    /// <summary>Current life/energy in the campaign (character owner or campaign master).</summary>
-    [HttpPut("{id:long}/vitals")]
-    [ProducesResponseType(typeof(CampaignCharacterInfo), StatusCodes.Status200OK)]
-    public async Task<IActionResult> UpdateVitals(long id, [FromBody] CampaignCharacterVitalsInfo info)
+    /// <summary>The participation with the campaign sheet (master, character owner or approved participants).</summary>
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(CampaignCharacterDetailInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetById(long id)
     {
         try
         {
-            return Ok(await _service.UpdateVitalsAsync(CurrentUserId, id, info));
+            return Ok(await _service.GetByIdAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Current life/energy, status and campaign sheet (character owner or campaign master).</summary>
+    [HttpPut("{id:long}")]
+    [ProducesResponseType(typeof(CampaignCharacterDetailInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Update(long id, [FromBody] CampaignCharacterUpdateInfo info)
+    {
+        try
+        {
+            return Ok(await _service.UpdateAsync(CurrentUserId, id, info));
         }
         catch (Exception ex)
         {

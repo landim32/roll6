@@ -4,6 +4,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.MapModel;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -15,6 +16,7 @@ public class MapModelServiceTests
 
     private readonly Mock<IMapModelRepository<MapModel>> _repository = new();
     private readonly Mock<IMapRepository<Map>> _mapRepository = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly MapModelService _service;
 
     public MapModelServiceTests()
@@ -24,7 +26,8 @@ public class MapModelServiceTests
             MapModelId = 20, UserId = 1, Name = "Masmorra", CreatedAt = CREATED_AT, ChangedAt = CREATED_AT
         });
         _repository.Setup(r => r.UpdateAsync(It.IsAny<MapModel>())).ReturnsAsync((MapModel m) => m);
-        _service = new MapModelService(_repository.Object, _mapRepository.Object, Mock.Of<IImageStorageAppService>());
+        _mapRepository.Setup(r => r.ListCampaignIdsByModelAsync(It.IsAny<long>())).ReturnsAsync(new List<long>());
+        _service = new MapModelService(_repository.Object, _mapRepository.Object, Mock.Of<IImageStorageAppService>(), _notifier.Object);
     }
 
     [Fact]
@@ -108,5 +111,16 @@ public class MapModelServiceTests
 
         _repository.Verify(r => r.ListPagedAsync(null, 0, 20, 1));
         _repository.Verify(r => r.ListPagedAsync(It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>(), null), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_PublishesToEveryCampaignUsingTheModel()
+    {
+        _mapRepository.Setup(r => r.ListCampaignIdsByModelAsync(20)).ReturnsAsync(new List<long> { 10, 11 });
+
+        await _service.UpdateAsync(1, 20, new MapModelInsertInfo { Name = "Masmorra" });
+
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_SAVED)), Times.Exactly(2));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_SAVED && e.CampaignId == 11)), Times.Once);
     }
 }

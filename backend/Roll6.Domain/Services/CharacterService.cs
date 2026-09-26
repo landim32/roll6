@@ -1,7 +1,9 @@
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.Character;
 using Roll6.DTO.Common;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -12,16 +14,29 @@ public class CharacterService : ICharacterService
     private readonly ICharacterRepository<Character> _repository;
     private readonly ICampaignCharacterRepository<CampaignCharacter> _campaignCharacterRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IUserRepository<User> _userRepository;
+    private readonly ITokenRepository<Token> _tokenRepository;
+    private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
     private readonly IImageStorageAppService _imageStorage;
+
+    private readonly IRealtimeNotifier _notifier;
 
     public CharacterService(
         ICharacterRepository<Character> repository,
         ICampaignCharacterRepository<CampaignCharacter> campaignCharacterRepository,
         IUnitOfWork unitOfWork,
         IUserRepository<User> userRepository,
-        IImageStorageAppService imageStorage)
+        ITokenRepository<Token> tokenRepository,
+        IMapTokenRepository<MapToken> mapTokenRepository,
+        IImageStorageAppService imageStorage,
+        ITurnRepository<Turn> turnRepository,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
+        _turnRepository = turnRepository;
+        _tokenRepository = tokenRepository;
+        _mapTokenRepository = mapTokenRepository;
         _repository = repository;
         _campaignCharacterRepository = campaignCharacterRepository;
         _unitOfWork = unitOfWork;
@@ -31,7 +46,12 @@ public class CharacterService : ICharacterService
 
     public async Task<List<CharacterInfo>> ListAsync(long userId)
     {
-        return (await _repository.ListByUserAsync(userId)).Select(MapToDto).ToList();
+        var characters = await _repository.ListByUserAsync(userId);
+        var tokenIds = characters.Where(c => c.TokenId.HasValue).Select(c => c.TokenId!.Value).Distinct().ToList();
+        var tokens = tokenIds.Count == 0
+            ? new Dictionary<long, Token>()
+            : (await _tokenRepository.ListByIdsAsync(tokenIds)).ToDictionary(t => t.TokenId);
+        return characters.Select(c => MapToDto(c, c.TokenId.HasValue ? tokens.GetValueOrDefault(c.TokenId.Value) : null)).ToList();
     }
 
     /// <summary>Characters of every user (public fields only), for the master's invite search.</summary>
@@ -60,21 +80,24 @@ public class CharacterService : ICharacterService
 
     public async Task<CharacterInfo> GetByIdAsync(long userId, long characterId)
     {
-        return MapToDto(await GetEditableAsync(userId, characterId));
+        var character = await GetOwnedAsync(userId, characterId);
+        return MapToDto(character, await GetTokenAsync(character.TokenId));
     }
 
     public async Task<CharacterInfo> CreateAsync(long userId, CharacterInsertInfo info)
     {
+        var token = await GetTokenAsync(info.TokenId);
         var character = new Character { UserId = userId };
-        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Status, info.Move, info.Image);
+        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image, info.TokenId);
         character.CreatedAt = character.UpdatedAt;
-        return MapToDto(await _repository.InsertAsync(character));
+        return MapToDto(await _repository.InsertAsync(character), token);
     }
 
     public async Task<CharacterInfo> UpdateAsync(long userId, long characterId, CharacterInsertInfo info)
     {
-        var character = await GetEditableAsync(userId, characterId);
-        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Status, info.Move, info.Image);
+        var character = await GetOwnedAsync(userId, characterId);
+        var token = await GetTokenAsync(info.TokenId);
+        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image, info.TokenId);
         Character saved = character;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
@@ -82,29 +105,35 @@ public class CharacterService : ICharacterService
             // Lower totals also lower the current values in every campaign (FR-011).
             await _campaignCharacterRepository.ClampVitalsAsync(character.CharacterId, character.Life, character.Energy);
         });
-        return MapToDto(saved);
+        await PublishToCampaignsAsync(await _campaignCharacterRepository.ListCampaignIdsByCharacterAsync(characterId), userId);
+        return MapToDto(saved, token);
     }
 
     public async Task DeleteAsync(long userId, long characterId)
     {
         await GetOwnedAsync(userId, characterId);
+        var campaignIds = await _campaignCharacterRepository.ListCampaignIdsByCharacterAsync(characterId);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
+            await _mapTokenRepository.DeleteByCharacterAsync(characterId);
+            await _turnRepository.DeleteByCharacterAsync(characterId);
             await _campaignCharacterRepository.DeleteByCharacterAsync(characterId);
             await _repository.DeleteAsync(characterId);
         });
+        await PublishToCampaignsAsync(campaignIds, userId);
     }
 
-    /// <summary>The owner, or the master of a campaign where the character is approved, may read and edit it.</summary>
-    private async Task<Character> GetEditableAsync(long userId, long characterId)
+    /// <summary>The character's name, picture, token and totals show in parties and pieces (017).</summary>
+    private async Task PublishToCampaignsAsync(IEnumerable<long> campaignIds, long userId)
     {
-        var character = await _repository.GetByIdAsync(characterId)
-            ?? throw new KeyNotFoundException("Personagem não encontrado.");
-        if (character.UserId != userId && !await _campaignCharacterRepository.IsApprovedInCampaignOfAsync(characterId, userId))
-            throw new UnauthorizedAccessException("Apenas o dono ou o mestre da campanha podem editar este personagem.");
-        return character;
+        foreach (var campaignId in campaignIds)
+        {
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.PARTY_CHANGED, campaignId, userId));
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
+        }
     }
 
+    /// <summary>Only the owner reads and changes the character; the master changes only the participation (010 FR-006).</summary>
     private async Task<Character> GetOwnedAsync(long userId, long characterId)
     {
         var character = await _repository.GetByIdAsync(characterId)
@@ -114,7 +143,16 @@ public class CharacterService : ICharacterService
         return character;
     }
 
-    private CharacterInfo MapToDto(Character character) => new()
+    /// <summary>The character's token (404 when the informed one does not exist).</summary>
+    private async Task<Token?> GetTokenAsync(long? tokenId)
+    {
+        if (tokenId is not long id)
+            return null;
+        return await _tokenRepository.GetByIdAsync(id)
+            ?? throw new KeyNotFoundException("Token não encontrado.");
+    }
+
+    private CharacterInfo MapToDto(Character character, Token? token) => new()
     {
         CharacterId = character.CharacterId,
         UserId = character.UserId,
@@ -122,10 +160,12 @@ public class CharacterService : ICharacterService
         Sheet = character.Sheet,
         Life = character.Life,
         Energy = character.Energy,
-        Status = character.Status,
         Move = character.Move,
         Image = character.Image,
         ImageUrl = _imageStorage.GetUrl(character.Image),
+        TokenId = character.TokenId,
+        TokenName = token?.Name,
+        TokenImageUrl = _imageStorage.GetUrl(token?.UpImage),
         CreatedAt = character.CreatedAt,
         UpdatedAt = character.UpdatedAt
     };

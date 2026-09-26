@@ -2,7 +2,7 @@ import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react';
 import { authService } from '../Services/authService';
 import {
-  AUTH_STORAGE_KEY, CAMPAIGN_STORAGE_KEY, CHARACTER_STORAGE_KEY, readStoredSession, setUnauthorizedHandler,
+  AUTH_STORAGE_KEY, CAMPAIGN_STORAGE_KEY, CHARACTER_STORAGE_KEY, MAP_STORAGE_KEY, TURN_STORAGE_KEY, readStoredSession, setUnauthorizedHandler,
 } from '../Services/apiHelpers';
 import type { UserInfo, UserInsertInfo, UserLoginInfo, UserPasswordInfo, UserTokenInfo } from '../types/auth';
 
@@ -58,6 +58,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     localStorage.removeItem(CAMPAIGN_STORAGE_KEY);
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
+    localStorage.removeItem(TURN_STORAGE_KEY);
+    localStorage.removeItem(MAP_STORAGE_KEY);
     setSession(null);
   }, []);
 

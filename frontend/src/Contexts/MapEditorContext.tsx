@@ -1,7 +1,13 @@
-import { createContext, useCallback, useMemo, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { mapModelService } from '../Services/mapModelService';
 import { mapService } from '../Services/mapService';
+import { campaignService } from '../Services/campaignService';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { useTableEvents } from '../hooks/useRealtime';
+import { TABLE_EVENT } from '../types/realtime';
+import { MAP_STORAGE_KEY } from '../Services/apiHelpers';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { gridPixelSize, HEX_SIZE } from '../lib/hexGrid';
@@ -9,6 +15,7 @@ import {
   createEmptyDraft, draftFromMapModel, isSameDraft, MAX_GRID_SIZE, MIN_GRID_SIZE, toMapModelInsert,
 } from '../lib/draft';
 import type { MapDraft } from '../lib/draft';
+import { MAP_STATUS_DELETED } from '../types/map';
 import type { MapInfo } from '../types/map';
 
 /** Zoom limits and step (research R3). */
@@ -79,7 +86,8 @@ interface MapEditorContextType {
   toggleResizeMode: () => void;
   // Map lifecycle
   newMap: () => void;
-  loadMapModel: (mapModelId: number, map?: MapInfo | null) => Promise<MapDraft>;
+  /** `keepView` keeps zoom/pan (the same map reloaded because someone saved it, 017). */
+  loadMapModel: (mapModelId: number, map?: MapInfo | null, options?: { keepView?: boolean }) => Promise<MapDraft>;
   discardChanges: () => void;
   saveMap: (info?: SaveMapInfo) => Promise<SaveMapResult>;
   clearError: () => void;
@@ -97,6 +105,32 @@ const loadImageSize = (url: string): Promise<{ width: number; height: number } |
   });
 
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
+
+/** Map remembered across reloads. */
+interface StoredMap {
+  mapModelId: number;
+  mapId: number | null;
+}
+
+const readStoredMap = (): StoredMap | null => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MAP_STORAGE_KEY) ?? 'null') as Partial<StoredMap> | null;
+    return parsed && typeof parsed.mapModelId === 'number'
+      ? { mapModelId: parsed.mapModelId, mapId: typeof parsed.mapId === 'number' ? parsed.mapId : null }
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredMap = (map: StoredMap | null) => {
+  try {
+    if (map) localStorage.setItem(MAP_STORAGE_KEY, JSON.stringify(map));
+    else localStorage.removeItem(MAP_STORAGE_KEY);
+  } catch {
+    // Storage unavailable: the map just isn't reopened after a reload.
+  }
+};
 
 export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
@@ -177,16 +211,16 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   // ---------- map lifecycle ----------
 
-  const resetTo = useCallback((next: MapDraft) => {
+  const resetTo = useCallback((next: MapDraft, keepView = false) => {
     setDraft(next);
     setSaved(next);
     setResizeMode(false);
-    setView(INITIAL_VIEW);
+    if (!keepView) setView(INITIAL_VIEW);
   }, []);
 
   const newMap = useCallback(() => resetTo(createEmptyDraft()), [resetTo]);
 
-  const loadMapModel = useCallback(async (mapModelId: number, map?: MapInfo | null): Promise<MapDraft> => {
+  const loadMapModel = useCallback(async (mapModelId: number, map?: MapInfo | null, options?: { keepView?: boolean }): Promise<MapDraft> => {
     try {
       setLoading(true);
       setError(null);
@@ -197,7 +231,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
         const size = await loadImageSize(next.imageUrl);
         if (size) next = { ...next, imageWidth: size.width, imageHeight: size.height };
       }
-      resetTo(next);
+      resetTo(next, options?.keepView ?? false);
       return next;
     } catch (err) {
       return handleError(err);
@@ -245,6 +279,115 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   }, [draft, needsName, isCopy, currentCampaign, isMaster]);
 
   const clearError = useCallback(() => setError(null), []);
+
+  // ---------- remember the open map across reloads ----------
+
+  /** False while the remembered map is being reopened, so the empty start draft doesn't erase it. */
+  const restoredRef = useRef(false);
+  /** Same as `restoredRef`, as state: following the master waits for the restore (017). */
+  const [restored, setRestored] = useState(false);
+  const markRestored = (value: boolean) => {
+    restoredRef.current = value;
+    setRestored(value);
+  };
+
+  // Once logged in, reopen the remembered map (a campaign map through its map, else the model alone).
+  useEffect(() => {
+    markRestored(false);
+    if (!session) return;
+    const stored = readStoredMap();
+    if (!stored) {
+      markRestored(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const map = stored.mapId !== null ? await mapService.getById(stored.mapId) : null;
+        if (cancelled) return;
+        if (map && map.status === MAP_STATUS_DELETED) throw new Error('map deleted');
+        await loadMapModel(map?.mapModelId ?? stored.mapModelId, map);
+      } catch {
+        // Deleted, no longer accessible or offline: start with an empty map.
+        if (!cancelled) writeStoredMap(null);
+      } finally {
+        if (!cancelled) markRestored(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once per session
+  }, [session?.user.userId]);
+
+  // Remember whatever map is open (opened, saved as new or copied); a new empty map forgets it.
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    writeStoredMap(draft.mapModelId !== null ? { mapModelId: draft.mapModelId, mapId: draft.mapId } : null);
+  }, [draft.mapModelId, draft.mapId]);
+
+  // ---------- real-time table (017) ----------
+
+  const { t } = useTranslation();
+  const { selectCampaign } = useCampaign();
+  const campaignId = currentCampaign?.campaignId ?? null;
+  const currentMapId = currentCampaign?.currentMapId ?? null;
+
+  // The master opening a map of his current campaign makes it the map the players follow.
+  useEffect(() => {
+    if (!restored || !isMaster || campaignId === null || draft.mapId === null) return;
+    if (draft.campaignId !== campaignId || draft.mapId === currentMapId) return;
+    campaignService.setCurrentMap(campaignId, draft.mapId)
+      .then((campaign) => selectCampaign(campaign))
+      .catch(() => { /* players just don't follow this time */ });
+  }, [restored, isMaster, campaignId, currentMapId, draft.mapId, draft.campaignId, selectCampaign]);
+
+  /** Opens a campaign map by id (following the master or reloading the same map). */
+  const openCampaignMap = useCallback(async (mapId: number, options?: { keepView?: boolean }) => {
+    const map = await mapService.getById(mapId);
+    if (map.status === MAP_STATUS_DELETED) return null;
+    return loadMapModel(map.mapModelId, map, options);
+  }, [loadMapModel]);
+
+  /**
+   * Players follow the master's map: on entering the campaign (after the restore, so it wins over the
+   * remembered map) and whenever the master switches. Opening another map on their own is fine until the
+   * next switch. Unsaved changes are never discarded.
+   */
+  const followedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!restored) return;
+    const key = `${campaignId}:${currentMapId}`;
+    if (followedRef.current === key) return;
+    followedRef.current = key;
+    if (isMaster || campaignId === null || currentMapId === null || draft.mapId === currentMapId) return;
+    if (isDirty) {
+      toast.warning(t('realtime.mapChangedDirty'));
+      return;
+    }
+    const hadMap = draft.mapId !== null;
+    openCampaignMap(currentMapId)
+      .then((opened) => {
+        if (opened && hadMap) toast.info(t('realtime.followedMap', { name: opened.name }));
+      })
+      .catch(() => { /* not accessible (yet): stay on the current map */ });
+  }, [restored, campaignId, currentMapId, isMaster, isDirty, draft.mapId, openCampaignMap, t]);
+
+  useTableEvents((event) => {
+    if (event.type === TABLE_EVENT.mapSaved) {
+      const savedModelId = (event.data as { mapModelId?: number } | null)?.mapModelId;
+      if (savedModelId === undefined || savedModelId !== draft.mapModelId) return;
+      if (isDirty) {
+        toast.warning(t('realtime.mapChangedDirty'));
+        return;
+      }
+      const reload = draft.mapId !== null
+        ? openCampaignMap(draft.mapId, { keepView: true })
+        : loadMapModel(savedModelId, null, { keepView: true });
+      reload.catch(() => { /* keep what is on screen */ });
+    } else if (event.type === TABLE_EVENT.mapDeleted && event.mapId !== null && event.mapId === draft.mapId) {
+      newMap();
+      toast.warning(t('realtime.mapDeleted'));
+    }
+  });
 
   const value: MapEditorContextType = {
     draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, loading, error,

@@ -15,9 +15,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__Roll6Context: ${CONNECTION_STRING}
-      Jwt__Secret: ${JWT_SECRET}
-      S3__Folder: ${S3_FOLDER:-roll6}
+      ConnectionStrings__Roll6Context: ${ROLL6_CONNECTION_STRING}
+      Jwt__Secret: ${ROLL6_JWT_SECRET}
+      S3__Folder: roll6
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     depends_on:
@@ -67,6 +67,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      # Site address used by the Caddyfile ({$ROLL6_DOMAIN}), e.g. roll6.example.com.
+      ROLL6_DOMAIN: ${ROLL6_DOMAIN:?ROLL6_DOMAIN is required}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

@@ -3,8 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using Roll6.Domain.Interfaces;
 using Roll6.DTO.Campaign;
 using Roll6.DTO.CampaignCharacter;
+using Roll6.DTO.CampaignNpc;
+using Roll6.DTO.CampaignPlan;
 using Roll6.DTO.Common;
 using Roll6.DTO.Map;
+using Roll6.DTO.Turn;
 
 namespace Roll6.API.Controllers;
 
@@ -14,15 +17,24 @@ public class CampaignController : ApiControllerBase
     private readonly ICampaignService _campaignService;
     private readonly IMapService _mapService;
     private readonly ICampaignCharacterService _campaignCharacterService;
+    private readonly ICampaignNpcService _campaignNpcService;
+    private readonly ITurnService _turnService;
+    private readonly ICampaignPlanService _campaignPlanService;
 
     public CampaignController(
         ICampaignService campaignService,
         IMapService mapService,
-        ICampaignCharacterService campaignCharacterService)
+        ICampaignCharacterService campaignCharacterService,
+        ICampaignNpcService campaignNpcService,
+        ITurnService turnService,
+        ICampaignPlanService campaignPlanService)
     {
+        _campaignPlanService = campaignPlanService;
+        _turnService = turnService;
         _campaignService = campaignService;
         _mapService = mapService;
         _campaignCharacterService = campaignCharacterService;
+        _campaignNpcService = campaignNpcService;
     }
 
     [HttpGet]
@@ -125,6 +137,81 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Current turn and its entries (master or approved participants).</summary>
+    [HttpGet("{id:long}/turn")]
+    [ProducesResponseType(typeof(TurnStateInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTurn(long id)
+    {
+        try
+        {
+            return Ok(await _turnService.GetStateAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Entries of a turn, oldest first (turn summary).</summary>
+    [HttpGet("{id:long}/turn/{turnNo:int}")]
+    [ProducesResponseType(typeof(List<TurnInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListTurn(long id, int turnNo)
+    {
+        try
+        {
+            return Ok(await _turnService.ListAsync(CurrentUserId, id, turnNo));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Plan entries of the campaign, without descriptions (master only, 018).</summary>
+    [HttpGet("{id:long}/plan")]
+    [ProducesResponseType(typeof(List<CampaignPlanInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListPlans(long id)
+    {
+        try
+        {
+            return Ok(await _campaignPlanService.ListAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Master: sets the map the players follow (017); null clears it.</summary>
+    [HttpPut("{id:long}/current-map")]
+    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetCurrentMap(long id, [FromBody] CampaignCurrentMapInfo info)
+    {
+        try
+        {
+            return Ok(await _campaignService.SetCurrentMapAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Finishes the current turn (master); lists who hasn't acted unless forced.</summary>
+    [HttpPost("{id:long}/turn/finish")]
+    [ProducesResponseType(typeof(TurnFinishResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> FinishTurn(long id, [FromBody] TurnFinishInfo info)
+    {
+        try
+        {
+            return Ok(await _turnService.FinishAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpGet("{id:long}/character")]
     [ProducesResponseType(typeof(List<CampaignCharacterInfo>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListCharacters(long id)
@@ -132,6 +219,21 @@ public class CampaignController : ApiControllerBase
         try
         {
             return Ok(await _campaignCharacterService.ListByCampaignAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>NPCs available in the campaign (master and approved participants).</summary>
+    [HttpGet("{id:long}/npc")]
+    [ProducesResponseType(typeof(List<CampaignNpcInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListNpcs(long id)
+    {
+        try
+        {
+            return Ok(await _campaignNpcService.ListByCampaignAsync(CurrentUserId, id));
         }
         catch (Exception ex)
         {

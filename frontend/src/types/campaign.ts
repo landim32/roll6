@@ -9,6 +9,10 @@ export interface CampaignInfo {
   name: string;
   /** Open campaigns approve access requests immediately. */
   open: boolean;
+  /** Turn in progress (016), starts at 1. */
+  currentTurn: number;
+  /** Campaign map the master opened last; players follow it (017). */
+  currentMapId: number | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -22,9 +22,6 @@ public class CharacterInfo
     [JsonPropertyName("energy")]
     public int Energy { get; set; }
 
-    [JsonPropertyName("status")]
-    public string? Status { get; set; }
-
     [JsonPropertyName("move")]
     public int Move { get; set; }
 
@@ -33,6 +30,16 @@ public class CharacterInfo
 
     [JsonPropertyName("imageUrl")]
     public string? ImageUrl { get; set; }
+
+    [JsonPropertyName("tokenId")]
+    public long? TokenId { get; set; }
+
+    [JsonPropertyName("tokenName")]
+    public string? TokenName { get; set; }
+
+    /// <summary>Presigned URL of the token's standing image.</summary>
+    [JsonPropertyName("tokenImageUrl")]
+    public string? TokenImageUrl { get; set; }
 
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }

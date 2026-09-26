@@ -26,6 +26,12 @@ public class CampaignCharacterRepository : ICampaignCharacterRepository<Campaign
             .FirstOrDefaultAsync(e => e.CampaignId == campaignId && e.CharacterId == characterId);
     }
 
+    public async Task<List<CampaignCharacter>> ListByIdsAsync(IEnumerable<long> ids)
+    {
+        var idList = ids.ToList();
+        return await _context.CampaignCharacters.AsNoTracking().Where(e => idList.Contains(e.CampaignCharacterId)).ToListAsync();
+    }
+
     public async Task<List<CampaignCharacter>> ListByCampaignAsync(long campaignId, bool approvedOnly)
     {
         var query = _context.CampaignCharacters.AsNoTracking().Where(e => e.CampaignId == campaignId);
@@ -41,6 +47,12 @@ public class CampaignCharacterRepository : ICampaignCharacterRepository<Campaign
                         && _context.Characters.Any(c => c.CharacterId == e.CharacterId && c.UserId == userId))
             .OrderBy(e => e.CampaignCharacterId)
             .ToListAsync();
+    }
+
+    public async Task<List<long>> ListCampaignIdsByCharacterAsync(long characterId)
+    {
+        return await _context.CampaignCharacters.Where(e => e.CharacterId == characterId)
+            .Select(e => e.CampaignId).Distinct().ToListAsync();
     }
 
     public async Task<bool> HasApprovedCharacterAsync(long campaignId, long userId)
@@ -89,14 +101,6 @@ public class CampaignCharacterRepository : ICampaignCharacterRepository<Campaign
     public async Task DeleteAsync(long id)
     {
         await _context.CampaignCharacters.Where(e => e.CampaignCharacterId == id).ExecuteDeleteAsync();
-    }
-
-    public async Task<bool> IsApprovedInCampaignOfAsync(long characterId, long masterUserId)
-    {
-        return await _context.CampaignCharacters
-            .AnyAsync(e => e.CharacterId == characterId
-                           && e.Status == CampaignCharacterStatus.Approved
-                           && _context.Campaigns.Any(c => c.CampaignId == e.CampaignId && c.UserId == masterUserId));
     }
 
     public async Task ClampVitalsAsync(long characterId, int totalLife, int totalEnergy)

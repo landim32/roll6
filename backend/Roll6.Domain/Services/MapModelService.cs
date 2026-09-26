@@ -2,8 +2,10 @@ using Roll6.Domain.Grid;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.Common;
 using Roll6.DTO.MapModel;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -14,12 +16,15 @@ public class MapModelService : IMapModelService
     private readonly IMapModelRepository<MapModel> _repository;
     private readonly IMapRepository<Map> _mapRepository;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly IRealtimeNotifier _notifier;
 
     public MapModelService(
         IMapModelRepository<MapModel> repository,
         IMapRepository<Map> mapRepository,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
         _repository = repository;
         _mapRepository = mapRepository;
         _imageStorage = imageStorage;
@@ -54,7 +59,11 @@ public class MapModelService : IMapModelService
     {
         var mapModel = await GetOwnedAsync(userId, mapModelId);
         ApplyChanges(mapModel, info);
-        return MapToDto(await _repository.UpdateAsync(mapModel));
+        var result = MapToDto(await _repository.UpdateAsync(mapModel));
+        // Whoever has a map of this model open sees the new image/grid (017); a model may serve several campaigns.
+        foreach (var campaignId in await _mapRepository.ListCampaignIdsByModelAsync(mapModelId))
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_SAVED, campaignId, userId, data: new { mapModelId }));
+        return result;
     }
 
     public async Task DeleteAsync(long userId, long mapModelId)
