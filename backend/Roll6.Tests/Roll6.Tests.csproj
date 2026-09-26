@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Roll6.API\Roll6.API.csproj" />
     <ProjectReference Include="..\Roll6.Application\Roll6.Application.csproj" />
     <ProjectReference Include="..\Roll6.Domain\Roll6.Domain.csproj" />
     <ProjectReference Include="..\Roll6.DTO\Roll6.DTO.csproj" />

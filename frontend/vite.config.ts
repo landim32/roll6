@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => {
         '/api': { target: apiProxy, changeOrigin: true },
         // Real-time table events (SignalR, WebSocket upgrade).
         '/hubs': { target: apiProxy, changeOrigin: true, ws: true },
+        // MCP server for AI assistants (020, Streamable HTTP).
+        '/mcp': { target: apiProxy, changeOrigin: true },
       },
     },
     test: { environment: 'node', include: ['src/**/*.test.ts'] },
