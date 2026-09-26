@@ -28,6 +28,10 @@ export interface CampaignCharacterInfo {
   /** The character's totals. */
   totalLife: number;
   totalEnergy: number;
+  /** The character's move. */
+  characterMove: number;
+  /** Free-text condition of the character in this campaign (not the participation `status`). */
+  characterStatus: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,8 +42,15 @@ export interface CampaignCharacterRequestInfo {
   characterId: number;
 }
 
-/** Body of the vitals update (at most the character's totals). */
-export interface CampaignCharacterVitalsInfo {
+/** A participation with the campaign sheet (the lists leave it out). */
+export interface CampaignCharacterDetailInfo extends CampaignCharacterInfo {
+  sheet: string | null;
+}
+
+/** What the owner or the master changes in a participation (current values at most the totals). */
+export interface CampaignCharacterUpdateInfo {
   currentLife: number;
   currentEnergy: number;
+  characterStatus: string | null;
+  sheet: string | null;
 }

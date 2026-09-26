@@ -16,9 +16,6 @@ public class CharacterInsertInfo
     [JsonPropertyName("energy")]
     public int Energy { get; set; }
 
-    [JsonPropertyName("status")]
-    public string? Status { get; set; }
-
     [JsonPropertyName("move")]
     public int Move { get; set; }
 

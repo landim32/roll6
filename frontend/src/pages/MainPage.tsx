@@ -13,7 +13,7 @@ import { SaveMapModal } from '../components/modals/SaveMapModal';
 import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { useMapEditor } from '../hooks/useMapEditor';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
-import type { CampaignCharacterInfo } from '../types/campaignCharacter';
+import type { CharacterEditTarget } from '../components/modals/CharacterFormModal';
 
 /** Main screen: always the map with the grid; every other window opens as a modal over it. */
 export const MainPage = () => {
@@ -23,8 +23,8 @@ export const MainPage = () => {
   const [mapOpen, setMapOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
-  /** Party card being edited (character form in edit mode). */
-  const [editing, setEditing] = useState<CampaignCharacterInfo | null>(null);
+  /** Party card opened in the character form (edit or read-only, per mode). */
+  const [editing, setEditing] = useState<CharacterEditTarget | null>(null);
 
   // Closing or reloading the tab with unsaved changes asks the browser to confirm.
   useEffect(() => {
@@ -51,7 +51,7 @@ export const MainPage = () => {
         onSave={() => { void requestSave(); }}
         guard={guard}
       />
-      <PartyPanel onEdit={setEditing} />
+      <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })} />
       <MapControls onOpenImage={openImage} />
       <GridSizeFooter onEditGrid={() => setGridOpen(true)} />
 
@@ -64,7 +64,7 @@ export const MainPage = () => {
       <CharacterFormModal
         open={editing !== null}
         onOpenChange={(o) => { if (!o) setEditing(null); }}
-        editing={editing && { characterId: editing.characterId, participation: editing }}
+        editing={editing}
       />
     </div>
   );

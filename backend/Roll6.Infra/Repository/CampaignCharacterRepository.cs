@@ -91,14 +91,6 @@ public class CampaignCharacterRepository : ICampaignCharacterRepository<Campaign
         await _context.CampaignCharacters.Where(e => e.CampaignCharacterId == id).ExecuteDeleteAsync();
     }
 
-    public async Task<bool> IsApprovedInCampaignOfAsync(long characterId, long masterUserId)
-    {
-        return await _context.CampaignCharacters
-            .AnyAsync(e => e.CharacterId == characterId
-                           && e.Status == CampaignCharacterStatus.Approved
-                           && _context.Campaigns.Any(c => c.CampaignId == e.CampaignId && c.UserId == masterUserId));
-    }
-
     public async Task ClampVitalsAsync(long characterId, int totalLife, int totalEnergy)
     {
         await _context.CampaignCharacters

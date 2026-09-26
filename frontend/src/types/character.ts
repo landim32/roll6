@@ -8,7 +8,6 @@ export interface CharacterInfo {
   sheet: string | null;
   life: number;
   energy: number;
-  status: string | null;
   move: number;
   /** Stored file name ({guid}.{ext}). */
   image: string | null;
@@ -24,7 +23,6 @@ export interface CharacterInsertInfo {
   sheet: string | null;
   life: number;
   energy: number;
-  status: string | null;
   move: number;
   image: string | null;
 }

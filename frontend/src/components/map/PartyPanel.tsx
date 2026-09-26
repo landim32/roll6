@@ -4,10 +4,12 @@ import { PartyCard } from './PartyCard';
 import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useCharacter } from '../../hooks/useCharacter';
+import { participationMode } from '../../lib/campaignCharacterForm';
+import type { ParticipationMode } from '../../lib/campaignCharacterForm';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 
 interface PartyPanelProps {
-  onEdit: (member: CampaignCharacterInfo) => void;
+  onOpen: (member: CampaignCharacterInfo, mode: ParticipationMode) => void;
 }
 
 /** localStorage key of the collapsed state ("1" = collapsed). */
@@ -23,9 +25,10 @@ const readCollapsed = (): boolean => {
 
 /**
  * Fixed, compact panel over the map (left, below the menu) with the approved characters of the
- * current campaign. The master may edit every card; players only their own.
+ * current campaign. Every card opens the character form: to edit for the owner or the master, read-only
+ * for the other participants.
  */
-export const PartyPanel = ({ onEdit }: PartyPanelProps) => {
+export const PartyPanel = ({ onOpen }: PartyPanelProps) => {
   const { t } = useTranslation();
   const { session } = useAuth();
   const { isMaster } = useCampaign();
@@ -62,15 +65,18 @@ export const PartyPanel = ({ onEdit }: PartyPanelProps) => {
         <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={toggle} aria-label={t('party.collapse')} title={t('party.collapse')}>‹</button>
       </header>
       <ul>
-        {party.map((member) => (
-          <PartyCard
-            key={member.campaignCharacterId}
-            member={member}
-            current={currentSelection === member.characterId}
-            canEdit={isMaster || member.characterOwnerId === session?.user.userId}
-            onEdit={() => onEdit(member)}
-          />
-        ))}
+        {party.map((member) => {
+          const mode = participationMode(isMaster, member.characterOwnerId === session?.user.userId);
+          return (
+            <PartyCard
+              key={member.campaignCharacterId}
+              member={member}
+              current={currentSelection === member.characterId}
+              mode={mode}
+              onOpen={() => onOpen(member, mode)}
+            />
+          );
+        })}
       </ul>
     </section>
   );

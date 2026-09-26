@@ -21,9 +21,6 @@ public interface ICampaignCharacterRepository<TModel> where TModel : class
     Task DeleteByCharacterAsync(long characterId);
     Task DeleteAsync(long id);
 
-    /// <summary>True when the character is approved in a campaign mastered by the user.</summary>
-    Task<bool> IsApprovedInCampaignOfAsync(long characterId, long masterUserId);
-
     /// <summary>Lowers current life/energy above the new totals in every campaign of the character.</summary>
     Task ClampVitalsAsync(long characterId, int totalLife, int totalEnergy);
 }

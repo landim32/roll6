@@ -2,7 +2,6 @@ import type { CharacterInsertInfo } from '../types/character';
 
 /** Same limits as the backend Character.Update (Guard.RequiredText / OptionalText / NonNegative). */
 export const MAX_CHARACTER_NAME = 260;
-export const MAX_CHARACTER_STATUS = 260;
 export const MAX_CHARACTER_SHEET = 20000;
 
 /** Form values as typed (numbers stay strings until validated). */
@@ -11,14 +10,13 @@ export interface CharacterForm {
   life: string;
   energy: string;
   move: string;
-  status: string;
   sheet: string;
 }
 
 export type CharacterFormError =
-  | 'nameRequired' | 'nameTooLong' | 'notInteger' | 'negative' | 'statusTooLong' | 'sheetTooLong';
+  | 'nameRequired' | 'nameTooLong' | 'notInteger' | 'negative' | 'sheetTooLong';
 
-export const emptyCharacterForm = (): CharacterForm => ({ name: '', life: '0', energy: '0', move: '0', status: '', sheet: '' });
+export const emptyCharacterForm = (): CharacterForm => ({ name: '', life: '0', energy: '0', move: '0', sheet: '' });
 
 /** Empty number fields count as 0. */
 const toNumber = (value: string): number => (value.trim() === '' ? 0 : Number(value));
@@ -30,7 +28,6 @@ export const validateCharacterForm = (form: CharacterForm): CharacterFormError |
   const numbers = [form.life, form.energy, form.move].map(toNumber);
   if (numbers.some((n) => !Number.isInteger(n))) return 'notInteger';
   if (numbers.some((n) => n < 0)) return 'negative';
-  if (form.status.trim().length > MAX_CHARACTER_STATUS) return 'statusTooLong';
   if (form.sheet.length > MAX_CHARACTER_SHEET) return 'sheetTooLong';
   return null;
 };
@@ -41,7 +38,6 @@ export const toCharacterInsert = (form: CharacterForm, image: string | null): Ch
   life: toNumber(form.life),
   energy: toNumber(form.energy),
   move: toNumber(form.move),
-  status: form.status.trim() || null,
   sheet: form.sheet.trim() ? form.sheet : null,
   image,
 });

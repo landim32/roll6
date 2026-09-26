@@ -11,7 +11,7 @@ public class CharacterTests
     {
         var character = new Character();
 
-        character.Update("Aria", "# Ficha", 12, 6, null, 4, null);
+        character.Update("Aria", "# Ficha", 12, 6, 4, null);
 
         character.Life.Should().Be(12);
         character.Energy.Should().Be(6);
@@ -22,7 +22,7 @@ public class CharacterTests
     [InlineData(0, -1, "energy")]
     public void Update_NegativeTotals_Throw(int life, int energy, string field)
     {
-        var act = () => new Character().Update("Aria", null, life, energy, null, 0, null);
+        var act = () => new Character().Update("Aria", null, life, energy, 0, null);
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey(field);
     }

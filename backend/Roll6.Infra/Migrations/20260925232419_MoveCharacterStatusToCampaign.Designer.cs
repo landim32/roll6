@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Roll6.Infra.Context;
@@ -11,9 +12,11 @@ using Roll6.Infra.Context;
 namespace Roll6.Infra.Migrations
 {
     [DbContext(typeof(Roll6Context))]
-    partial class Roll6ContextModelSnapshot : ModelSnapshot
+    [Migration("20260925232419_MoveCharacterStatusToCampaign")]
+    partial class MoveCharacterStatusToCampaign
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

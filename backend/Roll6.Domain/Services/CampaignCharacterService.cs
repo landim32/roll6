@@ -42,8 +42,8 @@ public class CampaignCharacterService : ICampaignCharacterService
         existing?.EnsureCanRequestAgain();
 
         // The master's own characters join directly, like in an open campaign.
-        var participation = CampaignCharacter.RequestAccess(campaign.CampaignId, character.CharacterId,
-            autoApprove: campaign.Open || campaign.UserId == userId, character.Life, character.Energy);
+        var participation = CampaignCharacter.RequestAccess(campaign.CampaignId, character,
+            autoApprove: campaign.Open || campaign.UserId == userId);
         return (await MapToDtoAsync(new[] { await _repository.InsertAsync(participation) })).Single();
     }
 
@@ -52,7 +52,7 @@ public class CampaignCharacterService : ICampaignCharacterService
         var participation = await GetParticipationAsync(campaignCharacterId);
         EnsureMaster(userId, await GetCampaignAsync(participation.CampaignId));
         var character = await GetCharacterAsync(participation.CharacterId);
-        participation.ApproveRequest(character.Life, character.Energy);
+        participation.ApproveRequest(character);
         return await SaveAsync(participation);
     }
 
@@ -73,11 +73,11 @@ public class CampaignCharacterService : ICampaignCharacterService
         var existing = await _repository.GetAsync(campaign.CampaignId, character.CharacterId);
         if (existing == null)
         {
-            var invite = CampaignCharacter.CreateInvite(campaign.CampaignId, character.CharacterId, character.Life, character.Energy);
+            var invite = CampaignCharacter.CreateInvite(campaign.CampaignId, character);
             return (await MapToDtoAsync(new[] { await _repository.InsertAsync(invite) })).Single();
         }
 
-        existing.Invite(character.Life, character.Energy);
+        existing.Invite(character);
         return await SaveAsync(existing);
     }
 
@@ -86,7 +86,7 @@ public class CampaignCharacterService : ICampaignCharacterService
         var participation = await GetParticipationAsync(campaignCharacterId);
         var character = await GetCharacterAsync(participation.CharacterId);
         EnsureCharacterOwner(userId, character);
-        participation.AcceptInvite(character.Life, character.Energy);
+        participation.AcceptInvite(character);
         return await SaveAsync(participation);
     }
 
@@ -115,17 +115,29 @@ public class CampaignCharacterService : ICampaignCharacterService
         throw new UnauthorizedAccessException("Apenas o mestre ou participantes aprovados podem ver os personagens da campanha.");
     }
 
-    /// <summary>Current life/energy in the campaign; the character owner or the campaign master.</summary>
-    public async Task<CampaignCharacterInfo> UpdateVitalsAsync(long userId, long campaignCharacterId, CampaignCharacterVitalsInfo info)
+    /// <summary>The participation with its sheet: the master, the character owner or any approved participant.</summary>
+    public async Task<CampaignCharacterDetailInfo> GetByIdAsync(long userId, long campaignCharacterId)
+    {
+        var participation = await GetParticipationAsync(campaignCharacterId);
+        var campaign = await GetCampaignAsync(participation.CampaignId);
+        var character = await GetCharacterAsync(participation.CharacterId);
+        if (character.UserId != userId && campaign.UserId != userId
+            && !await _repository.HasApprovedCharacterAsync(campaign.CampaignId, userId))
+            throw new UnauthorizedAccessException("Apenas o mestre ou participantes aprovados podem ver este personagem.");
+        return await MapToDetailAsync(participation);
+    }
+
+    /// <summary>Current life/energy, status and campaign sheet; the character owner or the campaign master (010 FR-007).</summary>
+    public async Task<CampaignCharacterDetailInfo> UpdateAsync(long userId, long campaignCharacterId, CampaignCharacterUpdateInfo info)
     {
         var participation = await GetParticipationAsync(campaignCharacterId);
         var campaign = await GetCampaignAsync(participation.CampaignId);
         var character = await GetCharacterAsync(participation.CharacterId);
         if (character.UserId != userId && campaign.UserId != userId)
-            throw new UnauthorizedAccessException("Apenas o dono do personagem ou o mestre da campanha podem alterar a vida e a energia.");
+            throw new UnauthorizedAccessException("Apenas o dono do personagem ou o mestre da campanha podem alterar os dados na campanha.");
 
-        participation.SetVitals(info.CurrentLife, info.CurrentEnergy, character.Life, character.Energy);
-        return await SaveAsync(participation);
+        participation.UpdatePlay(info.CurrentLife, info.CurrentEnergy, info.CharacterStatus, info.Sheet, character.Life, character.Energy);
+        return await MapToDetailAsync(await _repository.UpdateAsync(participation));
     }
 
     public async Task<List<CampaignCharacterInfo>> ListMineAsync(long userId, long campaignId)
@@ -145,6 +157,33 @@ public class CampaignCharacterService : ICampaignCharacterService
     private async Task<CampaignCharacterInfo> SaveAsync(CampaignCharacter participation)
     {
         return (await MapToDtoAsync(new[] { await _repository.UpdateAsync(participation) })).Single();
+    }
+
+    private async Task<CampaignCharacterDetailInfo> MapToDetailAsync(CampaignCharacter participation)
+    {
+        var info = (await MapToDtoAsync(new[] { participation })).Single();
+        return new CampaignCharacterDetailInfo
+        {
+            CampaignCharacterId = info.CampaignCharacterId,
+            CampaignId = info.CampaignId,
+            CampaignName = info.CampaignName,
+            CampaignOwnerName = info.CampaignOwnerName,
+            CharacterId = info.CharacterId,
+            CharacterName = info.CharacterName,
+            CharacterImageUrl = info.CharacterImageUrl,
+            CharacterOwnerId = info.CharacterOwnerId,
+            CharacterOwnerName = info.CharacterOwnerName,
+            Status = info.Status,
+            CurrentLife = info.CurrentLife,
+            CurrentEnergy = info.CurrentEnergy,
+            TotalLife = info.TotalLife,
+            TotalEnergy = info.TotalEnergy,
+            CharacterMove = info.CharacterMove,
+            CharacterStatus = info.CharacterStatus,
+            CreatedAt = info.CreatedAt,
+            UpdatedAt = info.UpdatedAt,
+            Sheet = participation.Sheet
+        };
     }
 
     private async Task<Campaign> GetCampaignAsync(long campaignId)
@@ -210,6 +249,8 @@ public class CampaignCharacterService : ICampaignCharacterService
                 CurrentEnergy = p.CurrentEnergy,
                 TotalLife = character?.Life ?? 0,
                 TotalEnergy = character?.Energy ?? 0,
+                CharacterMove = character?.Move ?? 0,
+                CharacterStatus = p.CharacterStatus,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt
             };

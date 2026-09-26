@@ -60,21 +60,21 @@ public class CharacterService : ICharacterService
 
     public async Task<CharacterInfo> GetByIdAsync(long userId, long characterId)
     {
-        return MapToDto(await GetEditableAsync(userId, characterId));
+        return MapToDto(await GetOwnedAsync(userId, characterId));
     }
 
     public async Task<CharacterInfo> CreateAsync(long userId, CharacterInsertInfo info)
     {
         var character = new Character { UserId = userId };
-        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Status, info.Move, info.Image);
+        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image);
         character.CreatedAt = character.UpdatedAt;
         return MapToDto(await _repository.InsertAsync(character));
     }
 
     public async Task<CharacterInfo> UpdateAsync(long userId, long characterId, CharacterInsertInfo info)
     {
-        var character = await GetEditableAsync(userId, characterId);
-        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Status, info.Move, info.Image);
+        var character = await GetOwnedAsync(userId, characterId);
+        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image);
         Character saved = character;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
@@ -95,16 +95,7 @@ public class CharacterService : ICharacterService
         });
     }
 
-    /// <summary>The owner, or the master of a campaign where the character is approved, may read and edit it.</summary>
-    private async Task<Character> GetEditableAsync(long userId, long characterId)
-    {
-        var character = await _repository.GetByIdAsync(characterId)
-            ?? throw new KeyNotFoundException("Personagem não encontrado.");
-        if (character.UserId != userId && !await _campaignCharacterRepository.IsApprovedInCampaignOfAsync(characterId, userId))
-            throw new UnauthorizedAccessException("Apenas o dono ou o mestre da campanha podem editar este personagem.");
-        return character;
-    }
-
+    /// <summary>Only the owner reads and changes the character; the master changes only the participation (010 FR-006).</summary>
     private async Task<Character> GetOwnedAsync(long userId, long characterId)
     {
         var character = await _repository.GetByIdAsync(characterId)
@@ -122,7 +113,6 @@ public class CharacterService : ICharacterService
         Sheet = character.Sheet,
         Life = character.Life,
         Energy = character.Energy,
-        Status = character.Status,
         Move = character.Move,
         Image = character.Image,
         ImageUrl = _imageStorage.GetUrl(character.Image),

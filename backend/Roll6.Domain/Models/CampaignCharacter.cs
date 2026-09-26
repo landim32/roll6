@@ -1,5 +1,6 @@
 using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
+using Roll6.Domain.Validation;
 
 namespace Roll6.Domain.Models;
 
@@ -8,7 +9,8 @@ namespace Roll6.Domain.Models;
 /// invite → Invited (Denied → Invited, RequestedAccess → Approved);
 /// request → Approved (open campaign) or RequestedAccess (closed);
 /// Invited → Approved/Denied by the character owner; RequestedAccess → Approved/Denied by the master.
-/// Holds the character's current life/energy in this campaign (totals live in <see cref="Character"/>).
+/// Holds what belongs to the character in this campaign: current life/energy (totals live in <see cref="Character"/>),
+/// the character status and the campaign's copy of the sheet. The owner or the master may change them.
 /// </summary>
 public class CampaignCharacter
 {
@@ -18,19 +20,25 @@ public class CampaignCharacter
     public CampaignCharacterStatus Status { get; set; }
     public int CurrentLife { get; set; }
     public int CurrentEnergy { get; set; }
+
+    /// <summary>Free-text condition in this campaign ("envenenado"); not the participation <see cref="Status"/>.</summary>
+    public string? CharacterStatus { get; set; }
+
+    /// <summary>The campaign's sheet: a copy of the character's sheet taken when joining, independent afterwards.</summary>
+    public string? Sheet { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>Access request, approved directly when <paramref name="autoApprove"/> (open campaign or the master's own character).</summary>
-    public static CampaignCharacter RequestAccess(long campaignId, long characterId, bool autoApprove, int totalLife, int totalEnergy)
+    public static CampaignCharacter RequestAccess(long campaignId, Character character, bool autoApprove)
     {
-        return Create(campaignId, characterId,
-            autoApprove ? CampaignCharacterStatus.Approved : CampaignCharacterStatus.RequestedAccess, totalLife, totalEnergy);
+        return Create(campaignId, character,
+            autoApprove ? CampaignCharacterStatus.Approved : CampaignCharacterStatus.RequestedAccess);
     }
 
-    public static CampaignCharacter CreateInvite(long campaignId, long characterId, int totalLife, int totalEnergy)
+    public static CampaignCharacter CreateInvite(long campaignId, Character character)
     {
-        return Create(campaignId, characterId, CampaignCharacterStatus.Invited, totalLife, totalEnergy);
+        return Create(campaignId, character, CampaignCharacterStatus.Invited);
     }
 
     /// <summary>A character that already has a participation cannot request access again.</summary>
@@ -45,7 +53,7 @@ public class CampaignCharacter
         });
     }
 
-    public void Invite(int totalLife, int totalEnergy)
+    public void Invite(Character character)
     {
         switch (Status)
         {
@@ -53,7 +61,7 @@ public class CampaignCharacter
                 ChangeTo(CampaignCharacterStatus.Invited);
                 break;
             case CampaignCharacterStatus.RequestedAccess:
-                Join(totalLife, totalEnergy);
+                Join(character);
                 break;
             case CampaignCharacterStatus.Invited:
                 throw new ConflictException("O personagem já foi convidado.");
@@ -62,57 +70,73 @@ public class CampaignCharacter
         }
     }
 
-    public void AcceptInvite(int totalLife, int totalEnergy)
+    public void AcceptInvite(Character character)
     {
         EnsureStatus(CampaignCharacterStatus.Invited, "Não há convite pendente para aceitar.");
-        Join(totalLife, totalEnergy);
+        Join(character);
     }
 
     public void DeclineInvite() => Transition(CampaignCharacterStatus.Invited, CampaignCharacterStatus.Denied, "Não há convite pendente para recusar.");
 
-    public void ApproveRequest(int totalLife, int totalEnergy)
+    public void ApproveRequest(Character character)
     {
         EnsureStatus(CampaignCharacterStatus.RequestedAccess, "Não há pedido de acesso pendente para aprovar.");
-        Join(totalLife, totalEnergy);
+        Join(character);
     }
 
     public void DenyRequest() => Transition(CampaignCharacterStatus.RequestedAccess, CampaignCharacterStatus.Denied, "Não há pedido de acesso pendente para recusar.");
 
-    /// <summary>Current life/energy in the campaign: only while approved, never above the totals, may be negative (fallen).</summary>
-    public void SetVitals(int currentLife, int currentEnergy, int totalLife, int totalEnergy)
+    /// <summary>
+    /// What changes during play: current life/energy (never above the totals, may be negative = fallen),
+    /// the character status and the campaign sheet. Only while approved.
+    /// </summary>
+    public void UpdatePlay(int currentLife, int currentEnergy, string? characterStatus, string? sheet, int totalLife, int totalEnergy)
     {
         if (Status != CampaignCharacterStatus.Approved)
-            throw new ConflictException("Só personagens aprovados na campanha têm vida e energia atuais.");
+            throw new ConflictException("Só personagens aprovados na campanha podem ter os dados da campanha alterados.");
         if (currentLife > totalLife)
             throw new DomainValidationException("currentLife", $"A vida atual não pode passar do total ({totalLife}).");
         if (currentEnergy > totalEnergy)
             throw new DomainValidationException("currentEnergy", $"A energia atual não pode passar do total ({totalEnergy}).");
+        CharacterStatus = Guard.OptionalText(characterStatus, "characterStatus", 260);
+        Sheet = Guard.OptionalText(sheet, "sheet", 20000);
         CurrentLife = currentLife;
         CurrentEnergy = currentEnergy;
         UpdatedAt = DateTime.UtcNow;
     }
 
-    private static CampaignCharacter Create(long campaignId, long characterId, CampaignCharacterStatus status, int totalLife, int totalEnergy)
+    private static CampaignCharacter Create(long campaignId, Character character, CampaignCharacterStatus status)
     {
         var now = DateTime.UtcNow;
-        return new CampaignCharacter
+        var participation = new CampaignCharacter
         {
             CampaignId = campaignId,
-            CharacterId = characterId,
+            CharacterId = character.CharacterId,
             Status = status,
-            CurrentLife = totalLife,
-            CurrentEnergy = totalEnergy,
             CreatedAt = now,
             UpdatedAt = now
         };
+        participation.ResetFrom(character);
+        return participation;
     }
 
-    /// <summary>Entering the campaign (FR-012): approved, with current values reset to the character's totals.</summary>
-    private void Join(int totalLife, int totalEnergy)
+    /// <summary>Entering the campaign: approved, starting over from the character (see <see cref="ResetFrom"/>).</summary>
+    private void Join(Character character)
     {
-        CurrentLife = totalLife;
-        CurrentEnergy = totalEnergy;
+        ResetFrom(character);
         ChangeTo(CampaignCharacterStatus.Approved);
+    }
+
+    /// <summary>
+    /// Fresh start in the campaign (010 FR-003): current values at the character's totals, a copy of its sheet
+    /// and no status. Done when the participation is created or becomes approved.
+    /// </summary>
+    private void ResetFrom(Character character)
+    {
+        CurrentLife = character.Life;
+        CurrentEnergy = character.Energy;
+        Sheet = character.Sheet;
+        CharacterStatus = null;
     }
 
     private void EnsureStatus(CampaignCharacterStatus expected, string error)

@@ -2,14 +2,17 @@ import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { VitalBar } from './VitalBar';
 import { isFallen } from '../../lib/vitals';
+import { PARTICIPATION_MODE } from '../../lib/campaignCharacterForm';
+import type { ParticipationMode } from '../../lib/campaignCharacterForm';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 
 interface PartyCardProps {
   member: CampaignCharacterInfo;
   /** The user's current character (highlighted). */
   current: boolean;
-  canEdit: boolean;
-  onEdit: () => void;
+  /** Owner/master get the pencil (edit); everyone else the eye (read-only). */
+  mode: ParticipationMode;
+  onOpen: () => void;
 }
 
 const PencilIcon = () => (
@@ -18,10 +21,18 @@ const PencilIcon = () => (
   </svg>
 );
 
+const EyeIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+    <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
+    <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0" />
+  </svg>
+);
+
 /** One character of the party: round picture, name, life and energy bars (current/total). */
-export const PartyCard = ({ member, current, canEdit, onEdit }: PartyCardProps) => {
+export const PartyCard = ({ member, current, mode, onOpen }: PartyCardProps) => {
   const { t } = useTranslation();
   const fallen = isFallen(member.currentLife);
+  const view = mode === PARTICIPATION_MODE.viewer;
   return (
     <li className={`stm-party-card${current ? ' is-current' : ''}${fallen ? ' stm-party-fallen' : ''}`}>
       <CharacterAvatar name={member.characterName} imageUrl={member.characterImageUrl} size={32} />
@@ -29,11 +40,15 @@ export const PartyCard = ({ member, current, canEdit, onEdit }: PartyCardProps) 
         <div className="stm-party-name">
           <span title={member.characterName}>{member.characterName}</span>
           {fallen && <span className="badge text-bg-danger">{t('party.fallen')}</span>}
-          {canEdit && (
-            <button type="button" className="btn btn-link btn-sm p-0 ms-auto" aria-label={t('party.edit', { name: member.characterName })} onClick={onEdit}>
-              <PencilIcon />
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-link btn-sm p-0 ms-auto"
+            aria-label={t(view ? 'party.view' : 'party.edit', { name: member.characterName })}
+            title={t(view ? 'party.view' : 'party.edit', { name: member.characterName })}
+            onClick={onOpen}
+          >
+            {view ? <EyeIcon /> : <PencilIcon />}
+          </button>
         </div>
         <VitalBar label={t('party.life')} current={member.currentLife} total={member.totalLife} variant="life" />
         <VitalBar label={t('party.energy')} current={member.currentEnergy} total={member.totalEnergy} variant="energy" />

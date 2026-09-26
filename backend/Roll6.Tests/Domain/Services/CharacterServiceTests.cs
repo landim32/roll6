@@ -30,7 +30,6 @@ public class CharacterServiceTests
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Character>())).ReturnsAsync((Character c) => c);
         _repository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(() => new Character { CharacterId = CHARACTER, UserId = OWNER, Name = "Aria", Life = 12, Energy = 6 });
-        _campaignCharacterRepository.Setup(r => r.IsApprovedInCampaignOfAsync(CHARACTER, MASTER)).ReturnsAsync(true);
         _service = new CharacterService(_repository.Object, _campaignCharacterRepository.Object,
             _unitOfWork.Object, _userRepository.Object, _imageStorage.Object);
     }
@@ -76,23 +75,24 @@ public class CharacterServiceTests
     private static CharacterInsertInfo Changes(int life = 10, int energy = 4) =>
         new() { Name = "Aria", Life = life, Energy = energy, Move = 6 };
 
-    [Theory]
-    [InlineData(OWNER)]
-    [InlineData(MASTER)]
-    public async Task GetAndUpdate_OwnerOrMasterOfApprovedCampaign_Allowed(long userId)
+    [Fact]
+    public async Task GetAndUpdate_Owner_Allowed()
     {
-        (await _service.GetByIdAsync(userId, CHARACTER)).Name.Should().Be("Aria");
+        (await _service.GetByIdAsync(OWNER, CHARACTER)).Name.Should().Be("Aria");
 
-        var updated = await _service.UpdateAsync(userId, CHARACTER, Changes());
+        var updated = await _service.UpdateAsync(OWNER, CHARACTER, Changes());
 
         updated.Life.Should().Be(10);
     }
 
-    [Fact]
-    public async Task GetAndUpdate_Outsider_Throws()
+    /// <summary>The master changes only the participation, never the character itself (010 FR-006).</summary>
+    [Theory]
+    [InlineData(MASTER)]
+    [InlineData(OUTSIDER)]
+    public async Task GetAndUpdate_NotOwner_Throws(long userId)
     {
-        await _service.Invoking(s => s.GetByIdAsync(OUTSIDER, CHARACTER)).Should().ThrowAsync<UnauthorizedAccessException>();
-        await _service.Invoking(s => s.UpdateAsync(OUTSIDER, CHARACTER, Changes())).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.GetByIdAsync(userId, CHARACTER)).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.UpdateAsync(userId, CHARACTER, Changes())).Should().ThrowAsync<UnauthorizedAccessException>();
         _repository.Verify(r => r.UpdateAsync(It.IsAny<Character>()), Times.Never);
     }
 

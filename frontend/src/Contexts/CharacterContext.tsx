@@ -10,7 +10,9 @@ import {
 import type { CharacterOption, CharacterSelection } from '../lib/characterSelection';
 import type { CharacterInfo, CharacterInsertInfo, CharacterSearchInfo } from '../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
-import type { CampaignCharacterInfo, CampaignCharacterVitalsInfo } from '../types/campaignCharacter';
+import type {
+  CampaignCharacterDetailInfo, CampaignCharacterInfo, CampaignCharacterUpdateInfo,
+} from '../types/campaignCharacter';
 import type { ListQuery, PagedList } from '../types/common';
 
 /** Invites are polled at most this often (spec FR-020 / SC-003). */
@@ -59,10 +61,12 @@ interface CharacterContextType {
   remove: (campaignCharacterId: number) => Promise<void>;
   invite: (characterId: number) => Promise<CampaignCharacterInfo>;
   searchCharacters: (query: ListQuery) => Promise<PagedList<CharacterSearchInfo>>;
-  // Owner or master (party panel edit)
+  // Character owner (the character itself)
   getCharacter: (characterId: number) => Promise<CharacterInfo>;
   updateCharacter: (characterId: number, data: CharacterInsertInfo) => Promise<CharacterInfo>;
-  updateVitals: (campaignCharacterId: number, data: CampaignCharacterVitalsInfo) => Promise<CampaignCharacterInfo>;
+  // Party panel: anyone who sees the party reads; the owner or the master changes
+  getParticipation: (campaignCharacterId: number) => Promise<CampaignCharacterDetailInfo>;
+  updateParticipation: (campaignCharacterId: number, data: CampaignCharacterUpdateInfo) => Promise<CampaignCharacterDetailInfo>;
 }
 
 const requireCampaign = (campaignId: number | null): number => {
@@ -302,8 +306,17 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
   const updateCharacter = useCallback((characterId: number, data: CharacterInsertInfo) =>
     run(() => characterService.update(characterId, data)), [run]);
 
-  const updateVitals = useCallback(async (campaignCharacterId: number, data: CampaignCharacterVitalsInfo) => {
-    const result = await run(() => campaignCharacterService.updateVitals(campaignCharacterId, data), false);
+  const getParticipation = useCallback(async (campaignCharacterId: number) => {
+    try {
+      setError(null);
+      return await campaignCharacterService.getById(campaignCharacterId);
+    } catch (err) {
+      return handleError(err);
+    }
+  }, []);
+
+  const updateParticipation = useCallback(async (campaignCharacterId: number, data: CampaignCharacterUpdateInfo) => {
+    const result = await run(() => campaignCharacterService.update(campaignCharacterId, data), false);
     await refreshParty();
     return result;
   }, [run, refreshParty]);
@@ -324,7 +337,7 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
     refresh, refreshParty, select, clearError,
     createCharacter, requestAccess, refreshInvites, acceptInvite, declineInvite,
     listCampaignCharacters, approve, deny, remove, invite, searchCharacters,
-    getCharacter, updateCharacter, updateVitals,
+    getCharacter, updateCharacter, getParticipation, updateParticipation,
   };
 
   return <CharacterContext.Provider value={value}>{children}</CharacterContext.Provider>;

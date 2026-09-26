@@ -14,5 +14,6 @@ public interface ICampaignCharacterService
     Task<List<CampaignCharacterInfo>> ListByCampaignAsync(long userId, long campaignId);
     Task<List<CampaignCharacterInfo>> ListMineAsync(long userId, long campaignId);
     Task RemoveAsync(long userId, long campaignCharacterId);
-    Task<CampaignCharacterInfo> UpdateVitalsAsync(long userId, long campaignCharacterId, CampaignCharacterVitalsInfo info);
+    Task<CampaignCharacterDetailInfo> GetByIdAsync(long userId, long campaignCharacterId);
+    Task<CampaignCharacterDetailInfo> UpdateAsync(long userId, long campaignCharacterId, CampaignCharacterUpdateInfo info);
 }
