@@ -185,9 +185,16 @@
   },
   "hexMenu": {
     "emptyHex": "Hex vazio",
+    "move": "Mover",
     "addToken": "Incluir token",
     "changeToken": "Alterar token",
     "deleteToken": "Excluir"
+  },
+  "movement": {
+    "counter": "Movimento",
+    "hint": "Clique no destino, depois no sentido. Esc cancela.",
+    "overLimit": "O movimento passou do máximo.",
+    "unreachable": "Não há caminho até esse hex."
   },
   "mapTokens": {
     "hexOccupied": "O hex precisa estar livre.",
@@ -344,6 +351,7 @@
     "npcUpdated": "{{name}} atualizado.",
     "npcRemoved": "{{name}} retirado da campanha.",
     "npcPlaced": "{{name}} colocado no mapa.",
+    "tokenMoved": "{{name}} movido.",
     "mapTokenAdded": "{{name}} colocado no mapa.",
     "mapTokenChanged": "Token de {{name}} alterado.",
     "mapTokenDeleted": "{{name}} excluído do mapa."

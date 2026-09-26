@@ -1,10 +1,12 @@
 /** Map token types — pieces on a campaign map; mirror the backend MapToken DTOs. */
 
-/** Piece type (backend MapTokenType); constants because `enum` is not allowed. */
+/**
+ * Piece type (backend MapTokenType); constants because `enum` is not allowed. NPC pieces come from the NPC
+ * panel; any other token placed from the hex menu is an object.
+ */
 export const MAP_TOKEN_TYPE = {
   character: 1,
   npc: 2,
-  enemy: 3,
   object: 4,
 } as const;
 
@@ -39,7 +41,7 @@ export interface MapTokenInfo {
   updatedAt: string;
 }
 
-/** New piece from the hex menu (NPCs, enemies, objects). */
+/** New piece from the hex menu (always an object). */
 export interface MapTokenInsertInfo {
   mapId: number;
   tokenId: number;
@@ -67,6 +69,8 @@ export interface MapTokenCharacterInsertInfo {
 export interface MapTokenPositionInfo {
   x: number;
   y: number;
+  /** New facing (0–5); omitted keeps the current one. */
+  look?: number;
 }
 
 export interface MapTokenTokenInfo {

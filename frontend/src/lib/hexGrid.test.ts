@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   axialToOffset, gridPath, gridPixelSize, HEX_SIZE, hexCenter, hexCorners, hexPath, hexRound, isInsideGrid, offsetToAxial,
-  pixelToHex,
+  pixelToHex, neighbor, turnCost, movementField, movementCost, pathTo, arrivalCost, lookToward,
 } from './hexGrid';
 
 // Reference values shared with backend/Roll6.Tests/Domain/Grid/HexGridTests.cs.
@@ -111,5 +111,77 @@ describe('pixelToHex (cube rounding)', () => {
     expect(path.startsWith('M80.00,34.64')).toBe(true);
     expect(path.split('L')).toHaveLength(6);
     expect(path.endsWith('Z')).toBe(true);
+  });
+});
+
+// Same reference cases as HexGridTests.MovementCost_ReferenceCases in the backend (grid 5 x 5).
+describe('movement (steps + turns)', () => {
+  const free = () => false;
+  const start = { x: 2, y: 2, look: 0 };
+
+  it('finds the neighbor on each side from an even and an odd column', () => {
+    expect([0, 1, 2, 3, 4, 5].map((look) => neighbor(2, 2, look))).toEqual([
+      { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 3, y: 2 }, { x: 2, y: 3 }, { x: 1, y: 2 }, { x: 1, y: 1 },
+    ]);
+    expect([0, 1, 2, 3, 4, 5].map((look) => neighbor(1, 1, look))).toEqual([
+      { x: 1, y: 0 }, { x: 2, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }, { x: 0, y: 2 }, { x: 0, y: 1 },
+    ]);
+  });
+
+  it('counts the fewest turns', () => {
+    expect(turnCost(0, 0)).toBe(0);
+    expect(turnCost(0, 1)).toBe(1);
+    expect(turnCost(0, 5)).toBe(1);
+    expect(turnCost(1, 4)).toBe(3);
+    expect(turnCost(5, 2)).toBe(3);
+  });
+
+  it.each([
+    [{ x: 2, y: 2, look: 0 }, 0],
+    [{ x: 2, y: 1, look: 0 }, 1],
+    [{ x: 2, y: 2, look: 3 }, 3],
+    [{ x: 3, y: 1, look: 1 }, 2],
+    [{ x: 2, y: 3, look: 3 }, 4],
+    [{ x: 2, y: 0, look: 0 }, 2],
+  ])('costs %j = %i', (end, cost) => {
+    expect(movementCost(movementField(start, 5, 5, free), end)).toBe(cost);
+  });
+
+  it('walks around blocked hexes and never through them', () => {
+    const blocked = (x: number, y: number) => x === 2 && y === 1;
+    const field = movementField(start, 5, 5, blocked);
+    const cost = movementCost(field, { x: 2, y: 0, look: 0 });
+    expect(cost).not.toBeNull();
+    expect(cost!).toBeGreaterThan(2);
+    expect(pathTo(field, { x: 2, y: 0, look: 0 }).some((s) => s.x === 2 && s.y === 1)).toBe(false);
+  });
+
+  it('has no path to blocked hexes or outside the grid', () => {
+    const blocked = (x: number, y: number) => x === 2 && y === 1;
+    const field = movementField(start, 5, 5, blocked);
+    expect(movementCost(field, { x: 2, y: 1, look: 0 })).toBeNull();
+    expect(movementCost(field, { x: 5, y: 0, look: 0 })).toBeNull();
+    expect(arrivalCost(field, 2, 1)).toBeNull();
+  });
+
+  it('rebuilds the path and the cheapest arrival', () => {
+    const field = movementField(start, 5, 5, free);
+    const path = pathTo(field, { x: 2, y: 3, look: 3 });
+    expect(path[0]).toEqual(start);
+    expect(path[path.length - 1]).toEqual({ x: 2, y: 3, look: 3 });
+    expect(path).toHaveLength(5);
+    expect(arrivalCost(field, 2, 3)).toEqual({ cost: 4, state: { x: 2, y: 3, look: 3 } });
+    expect(arrivalCost(field, 2, 2)).toEqual({ cost: 0, state: start });
+  });
+
+  it('faces the side the point lies on', () => {
+    const c = { x: 100, y: 100 };
+    expect(lookToward(c, { x: 100, y: 50 }, 3)).toBe(0);
+    expect(lookToward(c, { x: 150, y: 70 }, 3)).toBe(1);
+    expect(lookToward(c, { x: 150, y: 130 }, 3)).toBe(2);
+    expect(lookToward(c, { x: 100, y: 150 }, 0)).toBe(3);
+    expect(lookToward(c, { x: 50, y: 130 }, 0)).toBe(4);
+    expect(lookToward(c, { x: 50, y: 70 }, 0)).toBe(5);
+    expect(lookToward(c, c, 2)).toBe(2);
   });
 });

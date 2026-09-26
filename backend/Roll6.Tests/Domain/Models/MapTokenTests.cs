@@ -62,8 +62,26 @@ public class MapTokenTests
     [Fact]
     public void Update_NpcPieceWithAnotherType_Throws()
     {
-        var act = () => new MapToken { MapNpcId = 90 }.Update("Goblin", (int)MapTokenType.Enemy, null, 0, 0, null, 0, 0, 0, 0);
+        var act = () => new MapToken { MapNpcId = 90 }.Update("Goblin", (int)MapTokenType.Object, null, 0, 0, null, 0, 0, 0, 0);
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("mapNpcId");
+    }
+
+    [Fact]
+    public void Update_NpcWithoutOccurrence_Throws()
+    {
+        var act = () => new MapToken().Update("Goblin", (int)MapTokenType.Npc, null, 0, 0, null, 0, 0, 0, 0);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("mapNpcId");
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(5)]
+    public void Update_UnknownType_Throws(int tokenType)
+    {
+        var act = () => new MapToken().Update("Pedra", tokenType, null, 0, 0, null, 0, 0, 0, 0);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("tokenType");
     }
 }

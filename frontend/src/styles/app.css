@@ -480,12 +480,17 @@ body,
   pointer-events: none;
 }
 
-/* Disc behind each piece: translucent gray, translucent blue for campaign characters */
+/* Disc behind each piece: translucent gray (objects), blue for campaign characters, red for NPCs */
 .stm-map .stm-map-token-disc {
   fill: rgba(108, 117, 125, 0.35);
   stroke: rgba(173, 181, 189, 0.6);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+}
+
+.stm-map .stm-map-token.is-npc .stm-map-token-disc {
+  fill: rgba(220, 53, 69, 0.35);
+  stroke: rgba(234, 134, 143, 0.85);
 }
 
 .stm-map .stm-map-token.is-character .stm-map-token-disc {
@@ -670,4 +675,73 @@ body,
   background: var(--bs-primary);
   border-color: var(--bs-primary);
   outline: none;
+}
+
+/* ---------- Movement (015) ---------- */
+
+.stm-map .stm-map-token-front {
+  fill: rgba(255, 255, 255, 0.9);
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.stm-map .stm-movement {
+  pointer-events: none;
+}
+
+.stm-map .stm-move-trail {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.stm-map .stm-move-target {
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.stm-map .stm-move-trail.is-ok { stroke: rgba(25, 135, 84, 0.85); }
+.stm-map .stm-move-trail.is-over { stroke: rgba(220, 53, 69, 0.85); }
+.stm-map .stm-move-trail.is-free { stroke: rgba(173, 181, 189, 0.85); }
+.stm-map .stm-move-target.is-ok { fill: rgba(25, 135, 84, 0.3); stroke: rgba(25, 135, 84, 0.9); }
+.stm-map .stm-move-target.is-over { fill: rgba(220, 53, 69, 0.3); stroke: rgba(220, 53, 69, 0.9); }
+.stm-map .stm-move-target.is-free { fill: rgba(173, 181, 189, 0.3); stroke: rgba(173, 181, 189, 0.9); }
+
+/* Counter "spent/total" in the bottom-right corner, left of the map controls */
+.stm-move-counter {
+  position: absolute;
+  right: calc(1rem + 48px + 12px);
+  bottom: calc(var(--stm-footer-height) + 1rem);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 8px 14px;
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(44, 44, 48, 0.8);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  color: #fff;
+  pointer-events: none;
+}
+
+.stm-move-counter strong {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stm-move-counter.is-ok strong { color: #75b798; }
+.stm-move-counter.is-over strong { color: #ea868f; }
+
+.stm-move-counter small {
+  color: rgba(235, 235, 245, 0.6);
+}
+
+.stm-move-counter .stm-move-hint {
+  font-size: 0.7rem;
 }

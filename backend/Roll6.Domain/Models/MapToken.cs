@@ -47,12 +47,12 @@ public class MapToken
     public void Update(string? name, int tokenType, string? sheet, int life, int energy, string? status, int move, int x, int y, int? look)
     {
         if (!Enum.IsDefined(typeof(MapTokenType), tokenType))
-            throw new DomainValidationException("tokenType", "O tipo deve ser 1 (Character), 2 (Npc), 3 (Enemy) ou 4 (Object).");
+            throw new DomainValidationException("tokenType", "O tipo deve ser 1 (Character), 2 (Npc) ou 4 (Object).");
 
-        if (MapNpcId.HasValue && tokenType != (int)MapTokenType.Npc)
-            throw new DomainValidationException("mapNpcId", "Peças de NPC da campanha devem ser do tipo NPC.");
         if ((tokenType == (int)MapTokenType.Character) != CampaignCharacterId.HasValue)
             throw new DomainValidationException("campaignCharacterId", "Tokens de personagem precisam estar ligados a um personagem da campanha.");
+        if ((tokenType == (int)MapTokenType.Npc) != MapNpcId.HasValue)
+            throw new DomainValidationException("mapNpcId", "Peças de NPC precisam estar ligadas a um NPC do mapa.");
 
         Name = Guard.RequiredText(name, "name", 260);
         TokenType = (MapTokenType)tokenType;
@@ -97,6 +97,15 @@ public class MapToken
     {
         X = x;
         Y = y;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Turns the piece to one of the six sides (0 top … 5 top-left, clockwise).</summary>
+    public void Face(int look)
+    {
+        if (look < 0 || look > MAX_LOOK)
+            throw new DomainValidationException("look", $"O campo look deve estar entre 0 e {MAX_LOOK}.");
+        Look = look;
         UpdatedAt = DateTime.UtcNow;
     }
 }

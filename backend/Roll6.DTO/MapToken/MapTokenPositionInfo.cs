@@ -10,4 +10,8 @@ public class MapTokenPositionInfo
 
     [JsonPropertyName("y")]
     public int Y { get; set; }
+
+    /// <summary>New facing (0–5); null keeps the current one.</summary>
+    [JsonPropertyName("look")]
+    public int? Look { get; set; }
 }

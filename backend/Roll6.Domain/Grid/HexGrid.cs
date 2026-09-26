@@ -63,6 +63,65 @@ public static class HexGrid
         return AxialToOffset(hq, hr);
     }
 
+    /// <summary>
+    /// Axial direction of each facing (look 0–5, clockwise from the top of a flat-top hex): top, top-right,
+    /// bottom-right, bottom, bottom-left, top-left ("Neighbors" in the guide).
+    /// </summary>
+    public static readonly (int Q, int R)[] LookDirections = { (0, -1), (1, -1), (1, 0), (0, 1), (-1, 1), (-1, 0) };
+
+    /// <summary>Column/row of the hex next to (x, y) on the <paramref name="look"/> side.</summary>
+    public static (int X, int Y) Neighbor(int x, int y, int look)
+    {
+        var (q, r) = OffsetToAxial(x, y);
+        var (dq, dr) = LookDirections[look];
+        return AxialToOffset(q + dq, r + dr);
+    }
+
+    /// <summary>Fewest 60° turns between two facings.</summary>
+    public static int TurnCost(int from, int to)
+    {
+        var d = Math.Abs(from - to) % 6;
+        return Math.Min(d, 6 - d);
+    }
+
+    /// <summary>
+    /// Cheapest movement from one (hex, facing) to another: turning one side costs 1 and stepping into the
+    /// hex ahead costs 1. Breadth-first search over (hex, facing) states ("Movement range" in the guide);
+    /// hexes outside the grid or blocked are never entered. Null when unreachable.
+    /// </summary>
+    public static int? MovementCost(int fromX, int fromY, int fromLook, int toX, int toY, int toLook,
+        int columns, int rows, Func<int, int, bool> isBlocked)
+    {
+        var start = (fromX, fromY, fromLook);
+        var target = (toX, toY, toLook);
+        var dist = new Dictionary<(int X, int Y, int Look), int> { [start] = 0 };
+        var queue = new Queue<(int X, int Y, int Look)>();
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            var cost = dist[current];
+            if (current == target)
+                return cost;
+            var next = new List<(int X, int Y, int Look)>
+            {
+                (current.X, current.Y, (current.Look + 5) % 6),
+                (current.X, current.Y, (current.Look + 1) % 6)
+            };
+            var (aheadX, aheadY) = Neighbor(current.X, current.Y, current.Look);
+            if (IsInsideGrid(aheadX, aheadY, columns, rows) && !isBlocked(aheadX, aheadY))
+                next.Add((aheadX, aheadY, current.Look));
+            foreach (var state in next)
+            {
+                if (dist.ContainsKey(state))
+                    continue;
+                dist[state] = cost + 1;
+                queue.Enqueue(state);
+            }
+        }
+        return null;
+    }
+
     /// <summary>True when the column/row is inside a grid of <paramref name="columns"/> × <paramref name="rows"/>.</summary>
     public static bool IsInsideGrid(int x, int y, int columns, int rows)
     {

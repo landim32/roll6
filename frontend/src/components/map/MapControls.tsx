@@ -7,7 +7,7 @@ interface MapControlsProps {
   onOpenImage: () => void;
 }
 
-/** Buttons at the bottom-right corner: zoom in/out, image+ and image resize mode. */
+/** Buttons at the bottom-right corner: zoom in/out, scene image and image resize mode. */
 export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   const { t } = useTranslation();
   const { view, zoomIn, zoomOut, resizeMode, toggleResizeMode, canEdit, draft } = useMapEditor();
@@ -30,7 +30,7 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
       <button type="button" className="btn btn-secondary" title={t('map.zoomOut')} aria-label={t('map.zoomOut')}
         disabled={view.zoom <= MIN_ZOOM} onClick={() => zoomOut(...center())}>−</button>
       <button type="button" className="btn btn-secondary" title={t('map.image')} aria-label={t('map.image')}
-        disabled={!canEdit} onClick={onOpenImage}>🖼+</button>
+        disabled={!canEdit} onClick={onOpenImage}>🖼</button>
       <button type="button" className={`btn ${resizeMode ? 'btn-warning' : 'btn-secondary'}`} title={t('map.resize')}
         aria-label={t('map.resize')} aria-pressed={resizeMode} disabled={!canEdit} onClick={onToggleResize}>⤡</button>
     </div>

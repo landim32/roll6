@@ -98,4 +98,47 @@ public class HexGridTests
     {
         HexGrid.IsInsideGrid(x, y, 5, 4).Should().Be(inside);
     }
+
+    /// <summary>Same cases as frontend/src/lib/hexGrid.test.ts ("movement (steps + turns)").</summary>
+    [Theory]
+    [InlineData(2, 2, 0, 0)]
+    [InlineData(2, 1, 0, 1)]
+    [InlineData(2, 2, 3, 3)]
+    [InlineData(3, 1, 1, 2)]
+    [InlineData(2, 3, 3, 4)]
+    [InlineData(2, 0, 0, 2)]
+    public void MovementCost_ReferenceCases(int x, int y, int look, int cost)
+    {
+        HexGrid.MovementCost(2, 2, 0, x, y, look, 5, 5, (_, _) => false).Should().Be(cost);
+    }
+
+    [Fact]
+    public void MovementCost_WalksAroundBlockedHexes()
+    {
+        static bool Blocked(int x, int y) => x == 2 && y == 1;
+
+        HexGrid.MovementCost(2, 2, 0, 2, 0, 0, 5, 5, Blocked).Should().BeGreaterThan(2);
+        HexGrid.MovementCost(2, 2, 0, 2, 1, 0, 5, 5, Blocked).Should().BeNull();
+        HexGrid.MovementCost(2, 2, 0, 5, 0, 0, 5, 5, Blocked).Should().BeNull();
+    }
+
+    [Fact]
+    public void Neighbor_EachSideFromEvenAndOddColumns()
+    {
+        Enumerable.Range(0, 6).Select(look => HexGrid.Neighbor(2, 2, look)).Should().Equal(
+            (2, 1), (3, 1), (3, 2), (2, 3), (1, 2), (1, 1));
+        Enumerable.Range(0, 6).Select(look => HexGrid.Neighbor(1, 1, look)).Should().Equal(
+            (1, 0), (2, 1), (2, 2), (1, 2), (0, 2), (0, 1));
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0)]
+    [InlineData(0, 1, 1)]
+    [InlineData(0, 5, 1)]
+    [InlineData(1, 4, 3)]
+    [InlineData(5, 2, 3)]
+    public void TurnCost_FewestTurns(int from, int to, int cost)
+    {
+        HexGrid.TurnCost(from, to).Should().Be(cost);
+    }
 }

@@ -4,11 +4,17 @@ import type {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { useAuth } from '../../hooks/useAuth';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useMapEditor } from '../../hooks/useMapEditor';
-import { useMapPointer } from '../../hooks/useMapPointer';
+import { toMapPoint, useMapPointer } from '../../hooks/useMapPointer';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useNpc } from '../../hooks/useNpc';
+import { useTokenMovement } from '../../hooks/useTokenMovement';
+import { hexCenter, lookToward } from '../../lib/hexGrid';
+import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewOf } from '../../lib/movement';
+import { MAP_TOKEN_TYPE } from '../../types/mapToken';
+import type { MapTokenInfo } from '../../types/mapToken';
 import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt } from '../../lib/mapTokens';
 import type { Offset } from '../../lib/hexGrid';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
@@ -16,6 +22,8 @@ import { HexGridLayer } from './HexGridLayer';
 import { HexHighlight } from './HexHighlight';
 import { HexMenu } from './HexMenu';
 import { ImageLayer } from './ImageLayer';
+import { MovementCounter } from './MovementCounter';
+import { MovementLayer } from './MovementLayer';
 import { ResizeHandles } from './ResizeHandles';
 import { TokenLayer } from './TokenLayer';
 
@@ -48,6 +56,8 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
   const { draft, hexSize, view, panBy, zoomIn, zoomOut, resizeMode, canEdit, setImageLayout } = useMapEditor();
   const { mapTokens, canPlace, placeCharacter, moveToken } = useMapToken();
   const { party } = useCharacter();
+  const { session } = useAuth();
+  const movement = useTokenMovement();
   const { placeOnMap } = useNpc();
   const hexAt = useMapPointer();
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -79,9 +89,60 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
     setPanning(true);
   };
 
+  /**
+   * Who may move a piece (015): the master any piece of the open campaign map; a player only the pieces of
+   * his own characters.
+   */
+  const canMove = (token: MapTokenInfo): boolean => {
+    if (draft.mapId === null) return false;
+    if (canPlace) return true;
+    if (token.tokenType !== MAP_TOKEN_TYPE.character) return false;
+    return party.some((p) => p.campaignCharacterId === token.campaignCharacterId && p.characterOwnerId === session?.user.userId);
+  };
+
+  /** Movement mode: the path follows the hovered hex; in the facing phase the piece turns to the mouse. */
+  const moveWithPointer = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const { state } = movement;
+    if (state.phase === 'path') {
+      movement.hover(hexAt(event));
+    } else if (state.phase === 'facing') {
+      const point = toMapPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), view);
+      movement.face(lookToward(hexCenter(state.destination.x, state.destination.y, hexSize), point, state.look));
+    }
+  };
+
+  /** Movement mode clicks: pick the destination, then confirm the facing. */
+  const clickWhileMoving = async () => {
+    const { state } = movement;
+    if (state.phase === 'path') {
+      if (state.cost === null) {
+        if (state.target) toast.warning(t('movement.unreachable'));
+        return;
+      }
+      if (!canPickDestination(state, canPlace)) {
+        toast.warning(t('movement.overLimit'));
+        return;
+      }
+      movement.pick();
+      return;
+    }
+    if (state.phase !== 'facing') return;
+    if (!canConfirm(state, canPlace)) {
+      toast.warning(t('movement.overLimit'));
+      return;
+    }
+    try {
+      const piece = await movement.confirm();
+      if (piece) toast.success(t('toast.tokenMoved', { name: piece.name }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    }
+  };
+
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (!last.current) {
-      hover(hexAt(event));
+      hover(movement.active ? null : hexAt(event));
+      if (movement.active) moveWithPointer(event);
       return;
     }
     const dx = event.clientX - last.current.x;
@@ -107,9 +168,16 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
     const clicked = start
       && Math.abs(event.clientX - start.x) < CLICK_TOLERANCE
       && Math.abs(event.clientY - start.y) < CLICK_TOLERANCE;
-    if (!clicked || !canPlace || resizeMode) return;
+    if (!clicked || resizeMode) return;
+    if (movement.active) {
+      void clickWhileMoving();
+      return;
+    }
     const hex = hexAt(event);
     if (!hex) return;
+    // Players only get a menu (with "Mover") on the pieces of their own characters.
+    const piece = tokenAt(mapTokens, hex.x, hex.y);
+    if (!canPlace && !(piece && canMove(piece))) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setMenu({ hex, left: event.clientX - rect.left, top: event.clientY - rect.top });
     hover(hex);
@@ -189,6 +257,11 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
 
   const hasImage = !!draft.imageUrl && !!draft.imageWidth && !!draft.imageHeight;
   const menuToken = menu ? tokenAt(mapTokens, menu.hex.x, menu.hex.y) : undefined;
+  const moveState = movement.state;
+  const moveStatus = currentStatus(moveState);
+  const movePreview = moveState.phase === 'idle' ? null : { mapTokenId: moveState.piece.mapTokenId, ...previewOf(moveState)! };
+  const moveDestination = moveState.phase === 'facing' ? moveState.destination
+    : moveState.phase === 'path' && moveState.cost !== null ? moveState.target : null;
 
   return (
     <>
@@ -199,6 +272,11 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
         onPointerUp={onPointerUp}
         onPointerCancel={stopPan}
         onPointerLeave={() => hover(null)}
+        onContextMenu={(event) => {
+          if (!movement.active) return;
+          event.preventDefault();
+          movement.cancel();
+        }}
         onWheel={onWheel}
         onDragOver={onDragOver}
         onDragLeave={() => hover(null)}
@@ -209,7 +287,10 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
           <HexGridLayer columns={draft.gridWidth} rows={draft.gridHeight} hexSize={hexSize} />
           <HexHighlight hex={selectedHex} hexSize={hexSize} variant="selected" />
           <HexHighlight hex={sameHex(hoverHex, selectedHex) ? null : hoverHex} hexSize={hexSize} />
-          <TokenLayer tokens={mapTokens} hexSize={hexSize} />
+          {moveState.phase !== 'idle' && moveStatus && (
+            <MovementLayer trail={moveState.trail} destination={moveDestination} status={moveStatus} hexSize={hexSize} />
+          )}
+          <TokenLayer tokens={mapTokens} hexSize={hexSize} preview={movePreview} />
           {resizeMode && canEdit && hasImage && (
             <ResizeHandles
               layout={{ left: draft.imageLeft, top: draft.imageTop, width: draft.imageWidth ?? 1, height: draft.imageHeight ?? 1 }}
@@ -219,11 +300,16 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
           )}
         </g>
       </svg>
+      {moveState.phase !== 'idle' && moveState.piece.kind === MOVEMENT_KIND.limited && moveStatus && (
+        <MovementCounter spent={moveState.cost} total={moveState.piece.total ?? 0} status={moveStatus} />
+      )}
       {menu && (
         <HexMenu
           left={menu.left}
           top={menu.top}
           token={menuToken ? { name: menuToken.name, imageUrl: menuToken.upImageUrl } : null}
+          canManage={canPlace}
+          onMove={menuToken && canMove(menuToken) ? () => movement.start(menuToken) : undefined}
           onClose={closeMenu}
           onAdd={() => {
             setPickedHex(menu.hex);

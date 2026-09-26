@@ -115,3 +115,139 @@ export const hexPath = (x: number, y: number, size: number): string => {
   const corners = hexCorners(hexCenter(x, y, size), size);
   return `M${corners.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join('L')}Z`;
 };
+
+/**
+ * Axial direction of each facing (`look` 0–5, clockwise from the top of a flat-top hex): top, top-right,
+ * bottom-right, bottom, bottom-left, top-left ("Neighbors" in the guide). Mirror of HexGrid.LookDirections.
+ */
+export const LOOK_DIRECTIONS: readonly Axial[] = [
+  { q: 0, r: -1 }, { q: 1, r: -1 }, { q: 1, r: 0 }, { q: 0, r: 1 }, { q: -1, r: 1 }, { q: -1, r: 0 },
+];
+
+/** Column/row of the hex next to (x, y) on the `look` side. Mirror of HexGrid.Neighbor. */
+export const neighbor = (x: number, y: number, look: number): Offset => {
+  const axial = offsetToAxial(x, y);
+  const direction = LOOK_DIRECTIONS[look];
+  const offset = axialToOffset(axial.q + direction.q, axial.r + direction.r);
+  return { x: offset.x + 0, y: offset.y + 0 };
+};
+
+/** Fewest 60° turns between two facings. Mirror of HexGrid.TurnCost. */
+export const turnCost = (from: number, to: number): number => {
+  const d = Math.abs(from - to) % 6;
+  return Math.min(d, 6 - d);
+};
+
+/** A piece on a hex facing one of its sides. */
+export interface MoveState {
+  x: number;
+  y: number;
+  look: number;
+}
+
+export const stateKey = (s: MoveState): string => `${s.x},${s.y},${s.look}`;
+
+const parseKey = (key: string): MoveState => {
+  const [x, y, look] = key.split(',').map(Number);
+  return { x, y, look };
+};
+
+/** Cheapest cost to every reachable (hex, facing) from a start state, with the way back. */
+export interface MovementField {
+  start: MoveState;
+  dist: Map<string, number>;
+  parent: Map<string, string>;
+}
+
+/**
+ * Breadth-first search ("Movement range" / pathfinding in the guide) over (hex, facing) states: turning one
+ * side left or right costs 1, stepping into the hex ahead costs 1. Hexes outside the grid or blocked are
+ * never entered. Transitions are tried in a fixed order (left, right, ahead) so ties are stable.
+ * Mirror of HexGrid.MovementCost.
+ */
+export const movementField = (
+  start: MoveState,
+  columns: number,
+  rows: number,
+  isBlocked: (x: number, y: number) => boolean,
+): MovementField => {
+  const dist = new Map<string, number>([[stateKey(start), 0]]);
+  const parent = new Map<string, string>();
+  const queue: MoveState[] = [start];
+  for (let head = 0; head < queue.length; head++) {
+    const current = queue[head];
+    const currentKey = stateKey(current);
+    const cost = dist.get(currentKey)! + 1;
+    const ahead = neighbor(current.x, current.y, current.look);
+    const next: MoveState[] = [
+      { ...current, look: (current.look + 5) % 6 },
+      { ...current, look: (current.look + 1) % 6 },
+    ];
+    if (isInsideGrid(ahead, columns, rows) && !isBlocked(ahead.x, ahead.y)) next.push({ ...ahead, look: current.look });
+    for (const state of next) {
+      const key = stateKey(state);
+      if (dist.has(key)) continue;
+      dist.set(key, cost);
+      parent.set(key, currentKey);
+      queue.push(state);
+    }
+  }
+  return { start, dist, parent };
+};
+
+/** Cost to end on this hex with this facing, or null when unreachable. */
+export const movementCost = (field: MovementField, state: MoveState): number | null =>
+  field.dist.get(stateKey(state)) ?? null;
+
+/** States from the start to `state` (inclusive), or an empty list when unreachable. */
+export const pathTo = (field: MovementField, state: MoveState): MoveState[] => {
+  let key: string | undefined = stateKey(state);
+  if (!field.dist.has(key)) return [];
+  const path: MoveState[] = [];
+  while (key !== undefined) {
+    path.push(parseKey(key));
+    key = field.parent.get(key);
+  }
+  return path.reverse();
+};
+
+/**
+ * Cheapest way to reach a hex walking into it (facing the step), or null when unreachable. The start hex
+ * costs 0 with the start facing.
+ */
+export const arrivalCost = (field: MovementField, x: number, y: number): { cost: number; state: MoveState } | null => {
+  if (field.start.x === x && field.start.y === y) return { cost: 0, state: field.start };
+  let best: { cost: number; state: MoveState } | null = null;
+  for (let look = 0; look < 6; look++) {
+    const state = { x, y, look };
+    const key = stateKey(state);
+    const cost = field.dist.get(key);
+    const from = field.parent.get(key);
+    if (cost === undefined || from === undefined) continue;
+    const previous = parseKey(from);
+    const stepped = previous.x !== x || previous.y !== y;
+    if (stepped && (best === null || cost < best.cost)) best = { cost, state };
+  }
+  return best;
+};
+
+/** Center angle (degrees, SVG y down) of each facing side. */
+const SIDE_ANGLES = [-90, -30, 30, 90, 150, -150];
+
+/** Facing side closest to where `point` lies from `center`; a point on the center keeps `current`. */
+export const lookToward = (center: Point, point: Point, current: number): number => {
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  if (Math.hypot(dx, dy) < 1) return current;
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  let best = current;
+  let bestDiff = Infinity;
+  SIDE_ANGLES.forEach((side, look) => {
+    const diff = Math.abs(((angle - side + 540) % 360) - 180);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = look;
+    }
+  });
+  return best;
+};

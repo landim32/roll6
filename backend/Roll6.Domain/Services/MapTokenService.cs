@@ -62,6 +62,8 @@ public class MapTokenService : IMapTokenService
         var map = await EnsureMapOwnerAsync(userId, info.MapId);
         if (info.TokenType == (int)MapTokenType.Character)
             throw new DomainValidationException("tokenType", "Personagens entram no mapa pelo painel da campanha.");
+        if (info.TokenType == (int)MapTokenType.Npc)
+            throw new DomainValidationException("tokenType", "NPCs entram no mapa pelo painel de NPCs.");
         var token = await GetTokenAsync(info.TokenId);
         await EnsureFreeHexAsync(map, info.X, info.Y, null);
 
@@ -113,12 +115,47 @@ public class MapTokenService : IMapTokenService
         return await MapToDtoAsync(await _repository.UpdateAsync(mapToken));
     }
 
+    /// <summary>
+    /// Moves and turns a piece (015). The master moves any piece without limit; a player moves only the piece of
+    /// his own approved character, and the cheapest cost (1 per step into the hex ahead + 1 per 60° turn,
+    /// around the other pieces) must fit the character's move.
+    /// </summary>
     public async Task<MapTokenInfo> MoveAsync(long userId, long mapTokenId, MapTokenPositionInfo info)
     {
-        var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
+        var mapToken = await _repository.GetByIdAsync(mapTokenId)
+            ?? throw new KeyNotFoundException("Token do mapa não encontrado.");
+        var map = await _mapRepository.GetByIdAsync(mapToken.MapId)
+            ?? throw new KeyNotFoundException("Mapa não encontrado.");
+        map.EnsureNotDeleted();
+        var look = info.Look ?? mapToken.Look;
+        if (map.UserId != userId)
+            await EnsurePlayerMoveAsync(userId, map, mapToken, info.X, info.Y, look);
         await EnsureFreeHexAsync(map, info.X, info.Y, mapToken.MapTokenId);
+
         mapToken.MoveTo(info.X, info.Y);
+        mapToken.Face(look);
         return await MapToDtoAsync(await _repository.UpdateAsync(mapToken));
+    }
+
+    /// <summary>A player moves only his own approved character, within its move.</summary>
+    private async Task EnsurePlayerMoveAsync(long userId, Map map, MapToken mapToken, int x, int y, int look)
+    {
+        var participation = mapToken.CampaignCharacterId is long participationId
+            ? await _campaignCharacterRepository.GetByIdAsync(participationId)
+            : null;
+        var character = participation != null ? await _characterRepository.GetByIdAsync(participation.CharacterId) : null;
+        if (participation == null || participation.Status != CampaignCharacterStatus.Approved || character?.UserId != userId)
+            throw new UnauthorizedAccessException("Você só pode mover os seus personagens.");
+
+        var model = await _mapModelRepository.GetByIdAsync(map.MapModelId);
+        var others = (await _repository.ListByMapAsync(map.MapId))
+            .Where(t => t.MapTokenId != mapToken.MapTokenId)
+            .Select(t => (t.X, t.Y))
+            .ToHashSet();
+        var cost = HexGrid.MovementCost(mapToken.X, mapToken.Y, mapToken.Look, x, y, look,
+            model?.GridWidth ?? int.MaxValue, model?.GridHeight ?? int.MaxValue, (hx, hy) => others.Contains((hx, hy)));
+        if (cost == null || cost > character.Move)
+            throw new DomainValidationException("move", "O movimento passou do máximo.");
     }
 
     public async Task<MapTokenInfo> ChangeTokenAsync(long userId, long mapTokenId, MapTokenTokenInfo info)

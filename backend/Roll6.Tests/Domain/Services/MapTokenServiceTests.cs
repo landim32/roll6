@@ -48,10 +48,10 @@ public class MapTokenServiceTests
     [Fact]
     public async Task Create_WithoutName_CopiesTokenName()
     {
-        var result = await _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = (int)MapTokenType.Enemy });
+        var result = await _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = (int)MapTokenType.Object });
 
         result.Name.Should().Be("Goblin");
-        result.TokenType.Should().Be((int)MapTokenType.Enemy);
+        result.TokenType.Should().Be((int)MapTokenType.Object);
         result.X.Should().Be(0);
         result.Y.Should().Be(0);
     }
@@ -79,7 +79,7 @@ public class MapTokenServiceTests
 
         var result = await _service.UpdateAsync(1, 40, new MapTokenUpdateInfo
         {
-            Name = "Goblin", TokenType = (int)MapTokenType.Enemy, Life = 3, X = 2, Y = 0
+            Name = "Goblin", TokenType = (int)MapTokenType.Object, Life = 3, X = 2, Y = 0
         });
 
         result.X.Should().Be(2);
@@ -90,7 +90,7 @@ public class MapTokenServiceTests
     [Fact]
     public async Task Create_WithoutLook_FacesTop()
     {
-        var result = await _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 3 });
+        var result = await _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 4 });
 
         result.Look.Should().Be(0);
     }
@@ -100,7 +100,7 @@ public class MapTokenServiceTests
     {
         _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Goblin" });
 
-        var result = await _service.UpdateAsync(1, 40, new MapTokenUpdateInfo { Name = "Goblin", TokenType = 3, Look = 5 });
+        var result = await _service.UpdateAsync(1, 40, new MapTokenUpdateInfo { Name = "Goblin", TokenType = 4, Look = 5 });
 
         result.Look.Should().Be(5);
     }
@@ -110,7 +110,7 @@ public class MapTokenServiceTests
     [InlineData(-1)]
     public async Task Create_WithLookOutOfRange_Throws(int look)
     {
-        var act = () => _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 3, Look = look });
+        var act = () => _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 4, Look = look });
 
         (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("look");
         _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Never);
@@ -153,7 +153,7 @@ public class MapTokenServiceTests
         _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(10, 2)).ReturnsAsync(true);
         _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Goblin" });
 
-        var act = () => _service.UpdateAsync(2, 40, new MapTokenUpdateInfo { Name = "Goblin", TokenType = 3 });
+        var act = () => _service.UpdateAsync(2, 40, new MapTokenUpdateInfo { Name = "Goblin", TokenType = 4 });
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
@@ -266,7 +266,7 @@ public class MapTokenServiceTests
     [Fact]
     public async Task Move_ToOccupiedHex_Throws_AndToFreeHex_Moves()
     {
-        _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Goblin", TokenType = MapTokenType.Npc });
+        _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Goblin", TokenType = MapTokenType.Object });
         _repository.Setup(r => r.ExistsAtAsync(30, 1, 1, 40)).ReturnsAsync(true);
 
         var blocked = () => _service.MoveAsync(1, 40, new MapTokenPositionInfo { X = 1, Y = 1 });
@@ -304,9 +304,17 @@ public class MapTokenServiceTests
     {
         _repository.Setup(r => r.ExistsAtAsync(30, 0, 0, null)).ReturnsAsync(true);
 
-        var act = () => _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 2 });
+        var act = () => _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 4 });
 
         await act.Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task Create_NpcType_Throws()
+    {
+        var act = () => _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 2 });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("tokenType");
     }
 
     [Fact]
@@ -332,7 +340,7 @@ public class MapTokenServiceTests
         _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
         {
             MapToken.PlaceCharacter(30, 5, APPROVED, "Nome antigo", 3, 2),
-            new() { MapTokenId = 41, MapId = 30, TokenId = 5, Name = "Goblin", TokenType = MapTokenType.Npc, Life = 4 }
+            new() { MapTokenId = 41, MapId = 30, TokenId = 5, Name = "Goblin", TokenType = MapTokenType.Object, Life = 4 }
         });
 
         var result = await _service.ListByMapAsync(1, 30);
@@ -378,5 +386,69 @@ public class MapTokenServiceTests
 
         _repository.Verify(r => r.DeleteAsync(44), Times.Once);
         _mapNpcRepository.Verify(r => r.DeleteAsync(90), Times.Once);
+    }
+
+    private MapToken AriaPiece()
+    {
+        var piece = MapToken.PlaceCharacter(30, 5, APPROVED, "Aria", 2, 2);
+        piece.MapTokenId = 42;
+        _repository.Setup(r => r.GetByIdAsync(42)).ReturnsAsync(piece);
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { piece });
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 5);
+        return piece;
+    }
+
+    [Fact]
+    public async Task Move_SavesTheFacing_AndRejectsInvalidOnes()
+    {
+        AriaPiece();
+
+        var moved = await _service.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 3 });
+        (moved.X, moved.Y, moved.Look).Should().Be((2, 1, 3));
+
+        (await _service.Invoking(s => s.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 6 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("look");
+    }
+
+    [Fact]
+    public async Task Move_PlayerOwnCharacter_WithinItsMove()
+    {
+        AriaPiece();
+
+        // 2 steps ahead (cost 2 <= move 5).
+        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 });
+
+        (moved.X, moved.Y).Should().Be((2, 0));
+    }
+
+    [Fact]
+    public async Task Move_PlayerBeyondItsMove_Throws()
+    {
+        AriaPiece();
+
+        // Turning around and walking 3 hexes down costs 6 > move 5.
+        (await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 5, Look = 3 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Move_MasterBeyondTheMove_IsAllowed()
+    {
+        AriaPiece();
+
+        var moved = await _service.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 7, Look = 3 });
+
+        (moved.X, moved.Y).Should().Be((2, 7));
+    }
+
+    [Fact]
+    public async Task Move_PlayerOtherPieces_Throws()
+    {
+        AriaPiece();
+        _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Bau", TokenType = MapTokenType.Object });
+
+        await _service.Invoking(s => s.MoveAsync(3, 42, new MapTokenPositionInfo { X = 2, Y = 1 })).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.MoveAsync(2, 40, new MapTokenPositionInfo { X = 1, Y = 1 })).Should().ThrowAsync<UnauthorizedAccessException>();
     }
 }

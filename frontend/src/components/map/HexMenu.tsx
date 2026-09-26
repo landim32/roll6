@@ -12,6 +12,10 @@ interface HexMenuProps {
   onChange: () => void;
   /** Opens the delete confirmation (hex with a piece). */
   onDelete: () => void;
+  /** Starts the "Mover" mode on the piece (015); absent when the user can't move it. */
+  onMove?: () => void;
+  /** Master: add/change/delete tokens. Players only get "Mover" on their own characters. */
+  canManage?: boolean;
   onClose: () => void;
 }
 
@@ -38,12 +42,18 @@ const TrashIcon = () => (
   </svg>
 );
 
+const MoveIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+    <path d="M8 .5a.5.5 0 0 1 .35.15l2 2a.5.5 0 0 1-.7.7L8.5 2.21V7.5h5.29l-1.14-1.15a.5.5 0 0 1 .7-.7l2 2a.5.5 0 0 1 0 .7l-2 2a.5.5 0 0 1-.7-.7l1.14-1.15H8.5v5.29l1.15-1.14a.5.5 0 0 1 .7.7l-2 2a.5.5 0 0 1-.7 0l-2-2a.5.5 0 0 1 .7-.7l1.15 1.14V8.5H2.21l1.14 1.15a.5.5 0 0 1-.7.7l-2-2a.5.5 0 0 1 0-.7l2-2a.5.5 0 1 1 .7.7L2.21 7.5H7.5V2.21L6.35 3.35a.5.5 0 1 1-.7-.7l2-2A.5.5 0 0 1 8 .5" />
+  </svg>
+);
+
 /**
  * Floating menu next to a clicked hex, in the style of an iOS context menu: translucent blurred panel,
  * rounded corners, large touch rows with the icon on the right, springing out of the click point.
  * Stays inside the map; closes on outside click, Esc or after choosing. Master only.
  */
-export const HexMenu = ({ left, top, token = null, onAdd, onChange, onDelete, onClose }: HexMenuProps) => {
+export const HexMenu = ({ left, top, token = null, onAdd, onChange, onDelete, onMove, canManage = true, onClose }: HexMenuProps) => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [place, setPlace] = useState<{ left: number; top: number; origin: string } | null>(null);
@@ -99,9 +109,15 @@ export const HexMenu = ({ left, top, token = null, onAdd, onChange, onDelete, on
           <span className="stm-float-menu-title" title={token.name}>{token.name}</span>
         </div>
       )}
-      {token ? (
+      {token && onMove && (
+        <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus onClick={choose(onMove)}>
+          <span>{t('hexMenu.move')}</span>
+          <MoveIcon />
+        </button>
+      )}
+      {!canManage ? null : token ? (
         <>
-          <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus onClick={choose(onChange)}>
+          <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove} onClick={choose(onChange)}>
             <span>{t('hexMenu.changeToken')}</span>
             <SwapIcon />
           </button>

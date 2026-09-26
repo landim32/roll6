@@ -17,11 +17,12 @@ interface MapTokenContextType {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  /** New NPC piece from the hex menu. */
+  /** New object piece from the hex menu (NPCs come from the NPC panel). */
   addToken: (token: TokenInfo, x: number, y: number) => Promise<MapTokenInfo>;
   /** Places a party character; `tokenId` is saved on the character when it has none. */
   placeCharacter: (participation: CampaignCharacterInfo, x: number, y: number, tokenId?: number) => Promise<MapTokenInfo>;
-  moveToken: (mapTokenId: number, x: number, y: number) => Promise<MapTokenInfo>;
+  /** Moves (and optionally turns) a piece; players only their own characters, within the move (015). */
+  moveToken: (mapTokenId: number, x: number, y: number, look?: number) => Promise<MapTokenInfo>;
   changeToken: (mapTokenId: number, tokenId: number) => Promise<MapTokenInfo>;
   /** Removes the piece from the map (the library token is kept). */
   deleteToken: (mapTokenId: number) => Promise<void>;
@@ -84,7 +85,7 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addToken = useCallback((token: TokenInfo, x: number, y: number) => run(() => mapTokenService.create({
-    mapId: requireMap(), tokenId: token.tokenId, name: token.name, tokenType: MAP_TOKEN_TYPE.npc,
+    mapId: requireMap(), tokenId: token.tokenId, name: token.name, tokenType: MAP_TOKEN_TYPE.object,
     sheet: null, life: 0, energy: 0, status: null, move: 0, x, y, look: 0,
   })),
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,8 +105,8 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [run, mapId, refreshParty, refreshCharacters]);
 
-  const moveToken = useCallback((mapTokenId: number, x: number, y: number) =>
-    run(() => mapTokenService.move(mapTokenId, { x, y })), [run]);
+  const moveToken = useCallback((mapTokenId: number, x: number, y: number, look?: number) =>
+    run(() => mapTokenService.move(mapTokenId, { x, y, look })), [run]);
 
   const changeToken = useCallback((mapTokenId: number, tokenId: number) =>
     run(() => mapTokenService.changeToken(mapTokenId, { tokenId })), [run]);
