@@ -55,6 +55,10 @@ public class CampaignCharacterInfo
     [JsonPropertyName("characterStatus")]
     public string? CharacterStatus { get; set; }
 
+    /// <summary>The character's token; without one, placing it on a map asks for a token.</summary>
+    [JsonPropertyName("characterTokenId")]
+    public long? CharacterTokenId { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

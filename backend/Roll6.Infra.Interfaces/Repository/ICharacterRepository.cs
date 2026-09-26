@@ -11,4 +11,6 @@ public interface ICharacterRepository<TModel> where TModel : class
     Task<TModel> InsertAsync(TModel entity);
     Task<TModel> UpdateAsync(TModel entity);
     Task DeleteAsync(long id);
+    /// <summary>True when some character uses the token as its own.</summary>
+    Task<bool> ExistsByTokenAsync(long tokenId);
 }

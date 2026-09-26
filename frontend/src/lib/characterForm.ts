@@ -33,11 +33,12 @@ export const validateCharacterForm = (form: CharacterForm): CharacterFormError |
 };
 
 /** Builds the API payload from a valid form (trimmed; empty texts become null). */
-export const toCharacterInsert = (form: CharacterForm, image: string | null): CharacterInsertInfo => ({
+export const toCharacterInsert = (form: CharacterForm, image: string | null, tokenId: number | null): CharacterInsertInfo => ({
   name: form.name.trim(),
   life: toNumber(form.life),
   energy: toNumber(form.energy),
   move: toNumber(form.move),
   sheet: form.sheet.trim() ? form.sheet : null,
   image,
+  tokenId,
 });

@@ -13,13 +13,15 @@ public class TokenLibraryServiceTests
 {
     private readonly Mock<ITokenRepository<Token>> _repository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
+    private readonly Mock<ICharacterRepository<Character>> _characterRepository = new();
+    private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly TokenLibraryService _service;
 
     public TokenLibraryServiceTests()
     {
         _repository.Setup(r => r.InsertAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
         _repository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, UserId = 1, Name = "Goblin" });
-        _service = new TokenLibraryService(_repository.Object, _mapTokenRepository.Object, Mock.Of<IImageStorageAppService>());
+        _service = new TokenLibraryService(_repository.Object, _mapTokenRepository.Object, _characterRepository.Object, _npcRepository.Object, Mock.Of<IImageStorageAppService>());
     }
 
     private const string DOWN_IMAGE = "0123456789abcdef0123456789abcdef.png";
@@ -108,6 +110,42 @@ public class TokenLibraryServiceTests
         var act = () => _service.DeleteAsync(1, 5);
 
         await act.Should().ThrowAsync<ConflictException>();
+        _repository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Delete_TokenOfACharacter_Throws()
+    {
+        _characterRepository.Setup(r => r.ExistsByTokenAsync(5)).ReturnsAsync(true);
+
+        var act = () => _service.DeleteAsync(1, 5);
+
+        await act.Should().ThrowAsync<ConflictException>().WithMessage("*personagens*");
+        _repository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(1L)]
+    [InlineData(null)]
+    public async Task List_PassesTheOwnerFilter(long? ownerUserId)
+    {
+        _repository.Setup(r => r.ListPagedAsync("gob", 0, 12, ownerUserId))
+            .ReturnsAsync((new List<Token> { new() { TokenId = 5, UserId = 1, Name = "Goblin" } }, 1));
+
+        var result = await _service.ListAsync(new DTO.Common.PageQuery { Search = "gob", PageSize = 12 }, ownerUserId);
+
+        result.Items.Should().ContainSingle(t => t.TokenId == 5);
+        _repository.Verify(r => r.ListPagedAsync("gob", 0, 12, ownerUserId), Times.Once);
+    }
+
+    [Fact]
+    public async Task Delete_TokenOfAnNpc_Throws()
+    {
+        _npcRepository.Setup(r => r.ExistsByTokenAsync(5)).ReturnsAsync(true);
+
+        var act = () => _service.DeleteAsync(1, 5);
+
+        await act.Should().ThrowAsync<ConflictException>().WithMessage("*NPCs*");
         _repository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
     }
 }

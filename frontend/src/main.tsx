@@ -9,8 +9,13 @@ import { AuthProvider } from './Contexts/AuthContext';
 import { CampaignProvider } from './Contexts/CampaignContext';
 import { CharacterProvider } from './Contexts/CharacterContext';
 import { MapEditorProvider } from './Contexts/MapEditorContext';
+import { MapTokenProvider } from './Contexts/MapTokenContext';
+import { NpcProvider } from './Contexts/NpcContext';
+import { TokenProvider } from './Contexts/TokenContext';
 
-// Provider chain: Auth → Campaign (needs the session) → Character (needs the campaign) → MapEditor → App.
+// Provider chain: Auth → Campaign (needs the session) → Character (needs the campaign) → MapEditor →
+// Token (library) → MapToken (pieces of the open map: needs the editor, the campaign and the characters) →
+// Npc (library and campaign NPCs; places pieces, so it needs MapToken) → App.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
@@ -18,7 +23,13 @@ createRoot(document.getElementById('root')!).render(
         <CampaignProvider>
           <CharacterProvider>
             <MapEditorProvider>
-              <App />
+              <TokenProvider>
+                <MapTokenProvider>
+                  <NpcProvider>
+                    <App />
+                  </NpcProvider>
+                </MapTokenProvider>
+              </TokenProvider>
             </MapEditorProvider>
           </CharacterProvider>
         </CampaignProvider>

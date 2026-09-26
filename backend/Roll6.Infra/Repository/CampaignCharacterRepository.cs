@@ -26,6 +26,12 @@ public class CampaignCharacterRepository : ICampaignCharacterRepository<Campaign
             .FirstOrDefaultAsync(e => e.CampaignId == campaignId && e.CharacterId == characterId);
     }
 
+    public async Task<List<CampaignCharacter>> ListByIdsAsync(IEnumerable<long> ids)
+    {
+        var idList = ids.ToList();
+        return await _context.CampaignCharacters.AsNoTracking().Where(e => idList.Contains(e.CampaignCharacterId)).ToListAsync();
+    }
+
     public async Task<List<CampaignCharacter>> ListByCampaignAsync(long campaignId, bool approvedOnly)
     {
         var query = _context.CampaignCharacters.AsNoTracking().Where(e => e.CampaignId == campaignId);

@@ -44,6 +44,9 @@ public static class Startup
         services.AddScoped<IMapTokenRepository<MapToken>, MapTokenRepository>();
         services.AddScoped<ICharacterRepository<Character>, CharacterRepository>();
         services.AddScoped<ICampaignCharacterRepository<CampaignCharacter>, CampaignCharacterRepository>();
+        services.AddScoped<INpcRepository<Npc>, NpcRepository>();
+        services.AddScoped<ICampaignNpcRepository<CampaignNpc>, CampaignNpcRepository>();
+        services.AddScoped<IMapNpcRepository<MapNpc>, MapNpcRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // AppServices
@@ -62,6 +65,9 @@ public static class Startup
         services.AddScoped<IMapTokenService, MapTokenService>();
         services.AddScoped<ICharacterService, CharacterService>();
         services.AddScoped<ICampaignCharacterService, CampaignCharacterService>();
+        services.AddScoped<INpcService, NpcService>();
+        services.AddScoped<ICampaignNpcService, CampaignNpcService>();
+        services.AddScoped<IMapNpcService, MapNpcService>();
 
         // Authentication
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

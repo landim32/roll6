@@ -110,6 +110,11 @@
     "characterStatus": "Status",
     "campaignSheetTab": "Ficha da campanha",
     "campaignSheetHint": "Cópia da ficha feita quando o personagem entrou na campanha; alterações aqui não mudam a ficha original.",
+    "token": "Token",
+    "noToken": "Sem token",
+    "chooseToken": "Escolher token",
+    "removeToken": "Remover",
+    "tokenHint": "Peça usada quando o personagem é colocado no mapa.",
     "readOnlyHint": "Só o dono do personagem pode alterar estes dados.",
     "emptySheet": "Ficha vazia.",
     "campaignSection": "Nesta campanha",
@@ -117,6 +122,78 @@
     "currentEnergy": "Energia atual",
     "changeImage": "Trocar imagem",
     "vitalsHint": "Podem ficar em zero ou negativos (personagem caído), mas não passar do total."
+  },
+  "tokens": {
+    "modalTitle": "Tokens",
+    "cropHint": "Arraste a imagem para enquadrar, use o zoom (ou a roda do mouse) e gire se precisar. O recorte é quadrado e salvo em 240 × 240 px.",
+    "mineTab": "Meus Tokens",
+    "mineEmpty": "Você ainda não cadastrou tokens. Use a aba Incluir token ou procure na biblioteca.",
+    "edit": "Editar {{name}}",
+    "editTitle": "Editar token",
+    "searchTab": "Buscar tokens",
+    "createTab": "Incluir token",
+    "search": "Buscar por nome",
+    "empty": "Nenhum token encontrado. Cadastre um na aba Incluir token.",
+    "name": "Nome",
+    "description": "Descrição (opcional)",
+    "upImage": "Imagem em pé",
+    "downImage": "Imagem deitado (opcional)",
+    "upSpace": "Espaço em pé",
+    "downSpace": "Espaço deitado (opcional)",
+    "errors": {
+      "nameRequired": "Informe o nome do token.",
+      "nameTooLong": "O nome deve ter no máximo 260 caracteres.",
+      "descriptionTooLong": "A descrição deve ter no máximo 2.000 caracteres.",
+      "invalidSpace": "Os espaços devem ser números inteiros não negativos."
+    }
+  },
+  "npcs": {
+    "title": "NPCs ({{count}})",
+    "empty": "Nenhum NPC na campanha.",
+    "add": "Incluir NPC",
+    "edit": "Editar {{name}}",
+    "editTitle": "Editar NPC",
+    "collapse": "Recolher",
+    "expand": "Mostrar NPCs",
+    "pickerTitle": "Incluir NPC",
+    "mineTab": "Meus NPCs",
+    "newTab": "Novo NPC",
+    "inCampaign": "Na campanha",
+    "mineEmpty": "Você ainda não tem NPCs. Cadastre um na aba Novo NPC.",
+    "search": "Buscar por nome",
+    "stats": "Vida {{life}} · Energia {{energy}} · Movimento {{move}}",
+    "name": "Nome",
+    "image": "Imagem (opcional)",
+    "token": "Token",
+    "noToken": "Sem token",
+    "chooseToken": "Escolher token",
+    "life": "Vida",
+    "energy": "Energia",
+    "move": "Movimento",
+    "sheet": "Ficha",
+    "remove": "Retirar da campanha",
+    "removeTitle": "Retirar NPC",
+    "removeMessage": "Retirar {{name}} da campanha? As peças dele saem dos mapas da campanha; o NPC continua na sua biblioteca.",
+    "errors": {
+      "nameRequired": "Informe o nome do NPC.",
+      "nameTooLong": "O nome deve ter no máximo 260 caracteres.",
+      "notInteger": "Vida, energia e movimento devem ser números inteiros.",
+      "negative": "Vida, energia e movimento não podem ser negativos.",
+      "sheetTooLong": "A ficha deve ter no máximo 20.000 caracteres.",
+      "tokenRequired": "Escolha um token para o NPC."
+    }
+  },
+  "hexMenu": {
+    "emptyHex": "Hex vazio",
+    "addToken": "Incluir token",
+    "changeToken": "Alterar token",
+    "deleteToken": "Excluir"
+  },
+  "mapTokens": {
+    "hexOccupied": "O hex precisa estar livre.",
+    "chooseCharacterToken": "Escolher token de {{name}}",
+    "deleteTitle": "Excluir token",
+    "deleteMessage": "Excluir {{name}} do mapa? A peça sai deste mapa; o token continua na biblioteca."
   },
   "notifications": {
     "label": "Notificações",
@@ -190,6 +267,9 @@
   },
   "image": {
     "title": "Imagem do cenário",
+    "rotation": "Girar",
+    "rotateLeft": "Girar 90° para a esquerda",
+    "rotateRight": "Girar 90° para a direita",
     "uploadTab": "Enviar imagem",
     "libraryTab": "Buscar mapas",
     "file": "Arquivo (PNG, JPEG ou WebP, até 10 MB)",
@@ -256,6 +336,16 @@
     "characterCreatedApproved": "{{name}} criado e incluído na campanha.",
     "characterCreatedRequested": "{{name}} criado. Aguardando aprovação do mestre.",
     "characterRequestFailed": "{{name}} criado, mas o pedido de acesso falhou: {{error}}. Tente em Selecionar Personagem.",
-    "characterUpdated": "{{name}} atualizado."
+    "characterUpdated": "{{name}} atualizado.",
+    "tokenCreated": "Token {{name}} cadastrado.",
+    "tokenUpdated": "Token {{name}} atualizado.",
+    "npcAdded": "{{name}} incluído na campanha.",
+    "npcCreated": "{{name}} cadastrado e incluído na campanha.",
+    "npcUpdated": "{{name}} atualizado.",
+    "npcRemoved": "{{name}} retirado da campanha.",
+    "npcPlaced": "{{name}} colocado no mapa.",
+    "mapTokenAdded": "{{name}} colocado no mapa.",
+    "mapTokenChanged": "Token de {{name}} alterado.",
+    "mapTokenDeleted": "{{name}} excluído do mapa."
   }
 }

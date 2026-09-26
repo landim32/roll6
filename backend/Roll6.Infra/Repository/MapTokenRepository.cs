@@ -61,4 +61,45 @@ public class MapTokenRepository : IMapTokenRepository<MapToken>
         var idList = mapIds.ToList();
         await _context.MapTokens.Where(e => idList.Contains(e.MapId)).ExecuteDeleteAsync();
     }
+
+    public async Task<MapToken?> GetByMapAndCampaignCharacterAsync(long mapId, long campaignCharacterId)
+    {
+        return await _context.MapTokens.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.MapId == mapId && e.CampaignCharacterId == campaignCharacterId);
+    }
+
+    public async Task<bool> ExistsAtAsync(long mapId, int x, int y, long? exceptMapTokenId)
+    {
+        return await _context.MapTokens.AnyAsync(e => e.MapId == mapId && e.X == x && e.Y == y
+                                                      && (exceptMapTokenId == null || e.MapTokenId != exceptMapTokenId));
+    }
+
+    public async Task DeleteByCampaignCharacterAsync(long campaignCharacterId)
+    {
+        await _context.MapTokens.Where(e => e.CampaignCharacterId == campaignCharacterId).ExecuteDeleteAsync();
+    }
+
+    public async Task<MapToken?> GetByMapNpcIdAsync(long mapNpcId)
+    {
+        return await _context.MapTokens.AsNoTracking().FirstOrDefaultAsync(e => e.MapNpcId == mapNpcId);
+    }
+
+    public async Task<List<MapToken>> ListByMapNpcIdsAsync(IEnumerable<long> mapNpcIds)
+    {
+        var idList = mapNpcIds.Select(id => (long?)id).ToList();
+        return await _context.MapTokens.AsNoTracking().Where(e => idList.Contains(e.MapNpcId)).ToListAsync();
+    }
+
+    public async Task DeleteByMapNpcIdsAsync(IEnumerable<long> mapNpcIds)
+    {
+        var idList = mapNpcIds.Select(id => (long?)id).ToList();
+        await _context.MapTokens.Where(e => idList.Contains(e.MapNpcId)).ExecuteDeleteAsync();
+    }
+
+    public async Task DeleteByCharacterAsync(long characterId)
+    {
+        await _context.MapTokens
+            .Where(e => _context.CampaignCharacters.Any(c => c.CampaignCharacterId == e.CampaignCharacterId && c.CharacterId == characterId))
+            .ExecuteDeleteAsync();
+    }
 }

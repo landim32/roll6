@@ -21,6 +21,8 @@ public class CharacterServiceTests
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
+    private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly CharacterService _service;
 
     public CharacterServiceTests()
@@ -31,7 +33,7 @@ public class CharacterServiceTests
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Character>())).ReturnsAsync((Character c) => c);
         _repository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(() => new Character { CharacterId = CHARACTER, UserId = OWNER, Name = "Aria", Life = 12, Energy = 6 });
         _service = new CharacterService(_repository.Object, _campaignCharacterRepository.Object,
-            _unitOfWork.Object, _userRepository.Object, _imageStorage.Object);
+            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object);
     }
 
     [Fact]
@@ -108,5 +110,39 @@ public class CharacterServiceTests
         await _service.UpdateAsync(OWNER, CHARACTER, Changes(life: 8, energy: 2));
 
         _campaignCharacterRepository.Verify(r => r.ClampVitalsAsync(CHARACTER, 8, 2), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_WithUnknownToken_Throws()
+    {
+        var info = Changes();
+        info.TokenId = 99;
+
+        await _service.Invoking(s => s.UpdateAsync(OWNER, CHARACTER, info)).Should().ThrowAsync<KeyNotFoundException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Character>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_WithToken_ReturnsItsNameAndImage()
+    {
+        _tokenRepository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, Name = "Guerreira", UpImage = "0123456789abcdef0123456789abcdef.png" });
+        var info = Changes();
+        info.TokenId = 5;
+
+        var result = await _service.UpdateAsync(OWNER, CHARACTER, info);
+
+        result.TokenId.Should().Be(5);
+        result.TokenName.Should().Be("Guerreira");
+        result.TokenImageUrl.Should().Be("https://cdn/0123456789abcdef0123456789abcdef.png");
+    }
+
+    [Fact]
+    public async Task Delete_Owner_RemovesItsMapPiecesFirst()
+    {
+        await _service.DeleteAsync(OWNER, CHARACTER);
+
+        _mapTokenRepository.Verify(r => r.DeleteByCharacterAsync(CHARACTER), Times.Once);
+        _campaignCharacterRepository.Verify(r => r.DeleteByCharacterAsync(CHARACTER), Times.Once);
+        _repository.Verify(r => r.DeleteAsync(CHARACTER), Times.Once);
     }
 }

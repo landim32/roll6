@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Roll6.Domain.Interfaces;
 using Roll6.DTO.Campaign;
 using Roll6.DTO.CampaignCharacter;
+using Roll6.DTO.CampaignNpc;
 using Roll6.DTO.Common;
 using Roll6.DTO.Map;
 
@@ -14,15 +15,18 @@ public class CampaignController : ApiControllerBase
     private readonly ICampaignService _campaignService;
     private readonly IMapService _mapService;
     private readonly ICampaignCharacterService _campaignCharacterService;
+    private readonly ICampaignNpcService _campaignNpcService;
 
     public CampaignController(
         ICampaignService campaignService,
         IMapService mapService,
-        ICampaignCharacterService campaignCharacterService)
+        ICampaignCharacterService campaignCharacterService,
+        ICampaignNpcService campaignNpcService)
     {
         _campaignService = campaignService;
         _mapService = mapService;
         _campaignCharacterService = campaignCharacterService;
+        _campaignNpcService = campaignNpcService;
     }
 
     [HttpGet]
@@ -132,6 +136,21 @@ public class CampaignController : ApiControllerBase
         try
         {
             return Ok(await _campaignCharacterService.ListByCampaignAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>NPCs available in the campaign (master only).</summary>
+    [HttpGet("{id:long}/npc")]
+    [ProducesResponseType(typeof(List<CampaignNpcInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListNpcs(long id)
+    {
+        try
+        {
+            return Ok(await _campaignNpcService.ListByCampaignAsync(CurrentUserId, id));
         }
         catch (Exception ex)
         {

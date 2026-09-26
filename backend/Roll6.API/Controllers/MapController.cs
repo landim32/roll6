@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Roll6.Domain.Interfaces;
 using Roll6.DTO.Map;
+using Roll6.DTO.MapNpc;
 using Roll6.DTO.MapToken;
 
 namespace Roll6.API.Controllers;
@@ -11,11 +12,13 @@ public class MapController : ApiControllerBase
 {
     private readonly IMapService _mapService;
     private readonly IMapTokenService _mapTokenService;
+    private readonly IMapNpcService _mapNpcService;
 
-    public MapController(IMapService mapService, IMapTokenService mapTokenService)
+    public MapController(IMapService mapService, IMapTokenService mapTokenService, IMapNpcService mapNpcService)
     {
         _mapService = mapService;
         _mapTokenService = mapTokenService;
+        _mapNpcService = mapNpcService;
     }
 
     [HttpGet("{id:long}")]
@@ -83,6 +86,21 @@ public class MapController : ApiControllerBase
         try
         {
             return Ok(await _mapTokenService.ListByMapAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>NPC occurrences on the map (master or approved participants).</summary>
+    [HttpGet("{id:long}/npc")]
+    [ProducesResponseType(typeof(List<MapNpcInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListNpcs(long id)
+    {
+        try
+        {
+            return Ok(await _mapNpcService.ListByMapAsync(CurrentUserId, id));
         }
         catch (Exception ex)
         {

@@ -11,6 +11,8 @@ import type { CropArea } from '../../lib/cropImage';
 export interface ImageCrop {
   src: string;
   area: CropArea;
+  /** Degrees, clockwise; the area is measured on the rotated image (pass it to cropToFile). */
+  rotation: number;
 }
 
 interface ImageCropperProps {
@@ -25,21 +27,40 @@ interface ImageCropperProps {
   currentName?: string;
   /** Removes the saved picture (edit mode). */
   onRemoveCurrent?: () => void;
+  /** Crop guide: round (character pictures) or square (token images). The saved crop is always square. */
+  shape?: 'round' | 'square';
+  /** Shows the rotation controls (90° buttons + fine slider). */
+  rotatable?: boolean;
+  /** Help text under the cropper (defaults to the character picture hint). */
+  hint?: string;
 }
 
-const MIN_ZOOM = 1;
+/** Below 1 the image shrinks inside the frame; the uncovered part is saved transparent. */
+const MIN_ZOOM = 0.2;
+const START_ZOOM = 1;
 const MAX_ZOOM = 4;
+const MAX_ROTATION = 180;
+
+/** Keeps the angle within −180…180 after the 90° buttons. */
+const normalizeRotation = (degrees: number): number => {
+  const turned = ((degrees + MAX_ROTATION) % 360 + 360) % 360 - MAX_ROTATION;
+  return turned === -MAX_ROTATION ? MAX_ROTATION : turned;
+};
 
 /**
- * File picker + square crop with a round guide (character pictures), zoom by slider or wheel. In
+ * File picker + square crop with a round (character pictures) or square (token images) guide, zoom by
+ * slider or wheel and, when `rotatable`, rotation by 90° buttons or a slider. In
  * edit mode the saved picture is shown with "Trocar imagem" / "Remover imagem" until a new file is chosen.
  */
-export const ImageCropper = ({ id, onChange, hasCurrent = false, currentUrl, currentName = '', onRemoveCurrent }: ImageCropperProps) => {
+export const ImageCropper = ({
+  id, onChange, hasCurrent = false, currentUrl, currentName = '', onRemoveCurrent, shape = 'round', rotatable = false, hint,
+}: ImageCropperProps) => {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(MIN_ZOOM);
+  const [zoom, setZoom] = useState(START_ZOOM);
+  const [rotation, setRotation] = useState(0);
 
   // The object URL lives while this image is being cropped.
   useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
@@ -49,7 +70,8 @@ export const ImageCropper = ({ id, onChange, hasCurrent = false, currentUrl, cur
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) return toast.error(t('image.invalidType'));
     if (file.size > MAX_IMAGE_BYTES) return toast.error(t('image.tooLarge'));
     setCrop({ x: 0, y: 0 });
-    setZoom(MIN_ZOOM);
+    setZoom(START_ZOOM);
+    setRotation(0);
     setSrc(URL.createObjectURL(file));
   };
 
@@ -59,8 +81,8 @@ export const ImageCropper = ({ id, onChange, hasCurrent = false, currentUrl, cur
   };
 
   const onCropComplete = useCallback((_: Area, pixels: Area) => {
-    if (src) onChange({ src, area: pixels });
-  }, [src, onChange]);
+    if (src) onChange({ src, area: pixels, rotation });
+  }, [src, rotation, onChange]);
 
   const showCurrent = !src && hasCurrent;
 
@@ -84,13 +106,16 @@ export const ImageCropper = ({ id, onChange, hasCurrent = false, currentUrl, cur
               image={src}
               crop={crop}
               zoom={zoom}
+              rotation={rotation}
               minZoom={MIN_ZOOM}
+              restrictPosition={false}
               maxZoom={MAX_ZOOM}
               aspect={1}
-              cropShape="round"
-              showGrid={false}
+              cropShape={shape === 'square' ? 'rect' : 'round'}
+              showGrid={shape === 'square'}
               onCropChange={setCrop}
               onZoomChange={setZoom}
+              onRotationChange={rotatable ? setRotation : undefined}
               onCropComplete={onCropComplete}
             />
           </div>
@@ -100,7 +125,19 @@ export const ImageCropper = ({ id, onChange, hasCurrent = false, currentUrl, cur
               value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
             <button type="button" className="btn btn-sm btn-outline-secondary text-nowrap" onClick={clear}>{t('characterForm.removeImage')}</button>
           </div>
-          <div className="form-text">{t('characterForm.cropHint')}</div>
+          {rotatable && (
+            <div className="d-flex align-items-center gap-2 mt-2">
+              <label className="form-label mb-0 small" htmlFor={`${id}-rotation`}>{t('image.rotation')}</label>
+              <button type="button" className="btn btn-sm btn-outline-secondary" aria-label={t('image.rotateLeft')} title={t('image.rotateLeft')}
+                onClick={() => setRotation((r) => normalizeRotation(r - 90))}>↺</button>
+              <input id={`${id}-rotation`} type="range" className="form-range flex-grow-1" min={-MAX_ROTATION} max={MAX_ROTATION} step={1}
+                value={rotation} onChange={(e) => setRotation(Number(e.target.value))} />
+              <button type="button" className="btn btn-sm btn-outline-secondary" aria-label={t('image.rotateRight')} title={t('image.rotateRight')}
+                onClick={() => setRotation((r) => normalizeRotation(r + 90))}>↻</button>
+              <small className="text-body-secondary text-nowrap" style={{ minWidth: '3.5em' }}>{rotation}°</small>
+            </div>
+          )}
+          <div className="form-text">{hint ?? t('characterForm.cropHint')}</div>
         </>
       )}
     </div>

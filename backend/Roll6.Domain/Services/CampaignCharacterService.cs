@@ -16,6 +16,8 @@ public class CampaignCharacterService : ICampaignCharacterService
     private readonly ICampaignRepository<Campaign> _campaignRepository;
     private readonly ICharacterRepository<Character> _characterRepository;
     private readonly IUserRepository<User> _userRepository;
+    private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IImageStorageAppService _imageStorage;
 
     public CampaignCharacterService(
@@ -23,8 +25,12 @@ public class CampaignCharacterService : ICampaignCharacterService
         ICampaignRepository<Campaign> campaignRepository,
         ICharacterRepository<Character> characterRepository,
         IUserRepository<User> userRepository,
+        IMapTokenRepository<MapToken> mapTokenRepository,
+        IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage)
     {
+        _mapTokenRepository = mapTokenRepository;
+        _unitOfWork = unitOfWork;
         _repository = repository;
         _campaignRepository = campaignRepository;
         _characterRepository = characterRepository;
@@ -151,7 +157,12 @@ public class CampaignCharacterService : ICampaignCharacterService
     {
         var participation = await GetParticipationAsync(campaignCharacterId);
         EnsureMaster(userId, await GetCampaignAsync(participation.CampaignId));
-        await _repository.DeleteAsync(participation.CampaignCharacterId);
+        // Its pieces on the campaign maps go first (FKs never cascade).
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await _mapTokenRepository.DeleteByCampaignCharacterAsync(participation.CampaignCharacterId);
+            await _repository.DeleteAsync(participation.CampaignCharacterId);
+        });
     }
 
     private async Task<CampaignCharacterInfo> SaveAsync(CampaignCharacter participation)
@@ -180,6 +191,7 @@ public class CampaignCharacterService : ICampaignCharacterService
             TotalEnergy = info.TotalEnergy,
             CharacterMove = info.CharacterMove,
             CharacterStatus = info.CharacterStatus,
+            CharacterTokenId = info.CharacterTokenId,
             CreatedAt = info.CreatedAt,
             UpdatedAt = info.UpdatedAt,
             Sheet = participation.Sheet
@@ -251,6 +263,7 @@ public class CampaignCharacterService : ICampaignCharacterService
                 TotalEnergy = character?.Energy ?? 0,
                 CharacterMove = character?.Move ?? 0,
                 CharacterStatus = p.CharacterStatus,
+                CharacterTokenId = character?.TokenId,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt
             };

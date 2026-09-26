@@ -49,4 +49,53 @@ public class HexGridTests
         Distance(HexGrid.OffsetToAxial(0, 1), HexGrid.OffsetToAxial(1, 0)).Should().Be(1);
         Distance(HexGrid.OffsetToAxial(0, 0), HexGrid.OffsetToAxial(2, 0)).Should().Be(2);
     }
+
+    [Fact]
+    public void PixelToHex_CenterOfEveryHex_ReturnsTheHex()
+    {
+        const double size = HexGrid.HEX_SIZE;
+        for (var x = 0; x < 5; x++)
+        for (var y = 0; y < 4; y++)
+        {
+            var cx = size + 1.5 * size * x;
+            var cy = Math.Sqrt(3) / 2 * size + Math.Sqrt(3) * size * y + (x % 2 == 1 ? Math.Sqrt(3) / 2 * size : 0);
+            HexGrid.PixelToHex(cx, cy, size).Should().Be((x, y));
+            // Near the flat sides (0,8·size left/right of the center) it is still the same hex.
+            HexGrid.PixelToHex(cx + 0.8 * size, cy, size).Should().Be((x, y));
+            HexGrid.PixelToHex(cx - 0.8 * size, cy, size).Should().Be((x, y));
+        }
+    }
+
+    /// <summary>Same points as frontend/src/lib/hexGrid.test.ts.</summary>
+    [Theory]
+    [InlineData(40, 34.64, 0, 0)]
+    [InlineData(100, 69.28, 1, 0)]
+    [InlineData(160, 103.92, 2, 1)]
+    [InlineData(1, 1, -1, -1)]
+    [InlineData(100, 5, 1, -1)]
+    public void PixelToHex_ReferencePoints(double px, double py, int x, int y)
+    {
+        HexGrid.PixelToHex(px, py, HexGrid.HEX_SIZE).Should().Be((x, y));
+    }
+
+    [Theory]
+    [InlineData(0.2, 0.2, 0, 0)]
+    [InlineData(0.6, 0.3, 1, 0)]
+    [InlineData(0.4, 0.4, 0, 1)]
+    [InlineData(-0.6, 0.1, -1, 0)]
+    public void HexRound_FixesTheComponentWithTheLargestError(double q, double r, int expectedQ, int expectedR)
+    {
+        HexGrid.HexRound(q, r).Should().Be((expectedQ, expectedR));
+    }
+
+    [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(4, 3, true)]
+    [InlineData(5, 0, false)]
+    [InlineData(0, 4, false)]
+    [InlineData(-1, 0, false)]
+    public void IsInsideGrid_ChecksColumnsAndRows(int x, int y, bool inside)
+    {
+        HexGrid.IsInsideGrid(x, y, 5, 4).Should().Be(inside);
+    }
 }

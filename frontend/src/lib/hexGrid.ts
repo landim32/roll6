@@ -72,3 +72,46 @@ export const gridPath = (columns: number, rows: number, size: number): string =>
   }
   return parts.join('');
 };
+
+/**
+ * Nearest hex to a fractional axial coordinate: round the three cube components and fix the one
+ * with the largest change so that q + r + s = 0 ("Rounding to nearest hex" in the guide).
+ * Mirror of HexGrid.HexRound (halves round up, as Math.round does).
+ */
+export const hexRound = (q: number, r: number): Axial => {
+  const s = -q - r;
+  let rq = Math.round(q);
+  let rr = Math.round(r);
+  const rs = Math.round(s);
+  const dq = Math.abs(rq - q);
+  const dr = Math.abs(rr - r);
+  const ds = Math.abs(rs - s);
+  if (dq > dr && dq > ds) rq = -rr - rs;
+  else if (dr > ds) rr = -rq - rs;
+  // `+ 0` turns -0 into 0 so results compare equal to the backend's ints.
+  return { q: rq + 0, r: rr + 0 };
+};
+
+/**
+ * Map point (px) to the column/row of the hex under it ("Pixel to Hex", flat-top). The layout
+ * origin is the center of hex (0, 0): (size, √3/2·size). Mirror of HexGrid.PixelToHex.
+ */
+export const pixelToHex = (point: Point, size: number): Offset => {
+  const x = point.x - size;
+  const y = point.y - (SQRT_3 / 2) * size;
+  const q = ((2 / 3) * x) / size;
+  const r = ((-1 / 3) * x + (SQRT_3 / 3) * y) / size;
+  const rounded = hexRound(q, r);
+  const offset = axialToOffset(rounded.q, rounded.r);
+  return { x: offset.x + 0, y: offset.y + 0 };
+};
+
+/** True when the column/row is inside a grid of columns × rows. Mirror of HexGrid.IsInsideGrid. */
+export const isInsideGrid = (offset: Offset, columns: number, rows: number): boolean =>
+  offset.x >= 0 && offset.x < columns && offset.y >= 0 && offset.y < rows;
+
+/** SVG path data of a single hex (the hover highlight). */
+export const hexPath = (x: number, y: number, size: number): string => {
+  const corners = hexCorners(hexCenter(x, y, size), size);
+  return `M${corners.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join('L')}Z`;
+};

@@ -22,6 +22,20 @@ public class MapTokenInfo
     [JsonPropertyName("downImageUrl")]
     public string? DownImageUrl { get; set; }
 
+    /// <summary>Participation of a Character token (its name/vitals/status/sheet are shown).</summary>
+    [JsonPropertyName("campaignCharacterId")]
+    public long? CampaignCharacterId { get; set; }
+
+    [JsonPropertyName("characterId")]
+    public long? CharacterId { get; set; }
+
+    /// <summary>NPC occurrence of an Npc piece (its name/vitals/status are shown).</summary>
+    [JsonPropertyName("mapNpcId")]
+    public long? MapNpcId { get; set; }
+
+    [JsonPropertyName("npcId")]
+    public long? NpcId { get; set; }
+
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 

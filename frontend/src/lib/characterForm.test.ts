@@ -24,13 +24,14 @@ describe('validateCharacterForm', () => {
 
 describe('toCharacterInsert', () => {
   it('trims, converts numbers and turns empty texts into null', () => {
-    expect(toCharacterInsert(form({ name: ' Aria ', life: '12', energy: '', move: '6', sheet: '' }), null)).toEqual({
-      name: 'Aria', life: 12, energy: 0, move: 6, sheet: null, image: null,
+    expect(toCharacterInsert(form({ name: ' Aria ', life: '12', energy: '', move: '6', sheet: '' }), null, null)).toEqual({
+      name: 'Aria', life: 12, energy: 0, move: 6, sheet: null, image: null, tokenId: null,
     });
   });
 
   it('keeps the sheet text and the uploaded image', () => {
-    const result = toCharacterInsert(form({ sheet: 'Força 3\nDestreza 2' }), 'abc.png');
+    const result = toCharacterInsert(form({ sheet: 'Força 3\nDestreza 2' }), 'abc.png', 7);
+    expect(result.tokenId).toBe(7);
     expect(result.sheet).toBe('Força 3\nDestreza 2');
     expect(result.image).toBe('abc.png');
   });

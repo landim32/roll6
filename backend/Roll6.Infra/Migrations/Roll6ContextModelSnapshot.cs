@@ -128,6 +128,41 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("campaign_characters", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.CampaignNpc", b =>
+                {
+                    b.Property<long>("CampaignNpcId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_npc_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("CampaignNpcId"));
+
+                    b.Property<long>("CampaignId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("NpcId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("npc_id");
+
+                    b.HasKey("CampaignNpcId")
+                        .HasName("campaign_npcs_pkey");
+
+                    b.HasIndex("NpcId");
+
+                    b.HasIndex("CampaignId", "NpcId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_campaign_npcs_campaign_npc");
+
+                    b.ToTable("campaign_npcs", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.Character", b =>
                 {
                     b.Property<long>("CharacterId")
@@ -171,6 +206,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(20000)")
                         .HasColumnName("sheet");
 
+                    b.Property<long?>("TokenId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("token_id");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -183,6 +222,8 @@ namespace Roll6.Infra.Migrations
 
                     b.HasKey("CharacterId")
                         .HasName("characters_pkey");
+
+                    b.HasIndex("TokenId");
 
                     b.HasIndex("UserId");
 
@@ -333,6 +374,64 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("map_models", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.MapNpc", b =>
+                {
+                    b.Property<long>("MapNpcId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_npc_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("MapNpcId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Energy")
+                        .HasColumnType("integer")
+                        .HasColumnName("energy");
+
+                    b.Property<int>("Life")
+                        .HasColumnType("integer")
+                        .HasColumnName("life");
+
+                    b.Property<long>("MapId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("NpcId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("npc_id");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("MapNpcId")
+                        .HasName("map_npcs_pkey");
+
+                    b.HasIndex("MapId");
+
+                    b.HasIndex("NpcId");
+
+                    b.ToTable("map_npcs", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.MapToken", b =>
                 {
                     b.Property<long>("MapTokenId")
@@ -341,6 +440,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnName("map_token_id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("MapTokenId"));
+
+                    b.Property<long?>("CampaignCharacterId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_character_id");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -365,6 +468,10 @@ namespace Roll6.Infra.Migrations
                     b.Property<long>("MapId")
                         .HasColumnType("bigint")
                         .HasColumnName("map_id");
+
+                    b.Property<long?>("MapNpcId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_npc_id");
 
                     b.Property<int>("Move")
                         .HasColumnType("integer")
@@ -411,11 +518,88 @@ namespace Roll6.Infra.Migrations
                     b.HasKey("MapTokenId")
                         .HasName("map_tokens_pkey");
 
-                    b.HasIndex("MapId");
+                    b.HasIndex("CampaignCharacterId");
+
+                    b.HasIndex("MapNpcId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_map_tokens_map_npc")
+                        .HasFilter("map_npc_id IS NOT NULL");
 
                     b.HasIndex("TokenId");
 
+                    b.HasIndex("MapId", "CampaignCharacterId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_map_tokens_map_campaign_character")
+                        .HasFilter("campaign_character_id IS NOT NULL");
+
                     b.ToTable("map_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.Npc", b =>
+                {
+                    b.Property<long>("NpcId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("npc_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("NpcId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Energy")
+                        .HasColumnType("integer")
+                        .HasColumnName("energy");
+
+                    b.Property<string>("Image")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("image");
+
+                    b.Property<int>("Life")
+                        .HasColumnType("integer")
+                        .HasColumnName("life");
+
+                    b.Property<int>("Move")
+                        .HasColumnType("integer")
+                        .HasColumnName("move");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Sheet")
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("sheet");
+
+                    b.Property<long>("TokenId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("token_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("NpcId")
+                        .HasName("npcs_pkey");
+
+                    b.HasIndex("TokenId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("npcs", (string)null);
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.Token", b =>
@@ -555,8 +739,28 @@ namespace Roll6.Infra.Migrations
                         .HasConstraintName("fk_character_campaign_character");
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.CampaignNpc", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("CampaignId")
+                        .IsRequired()
+                        .HasConstraintName("fk_campaign_campaign_npc");
+
+                    b.HasOne("Roll6.Domain.Models.Npc", null)
+                        .WithMany()
+                        .HasForeignKey("NpcId")
+                        .IsRequired()
+                        .HasConstraintName("fk_npc_campaign_npc");
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.Character", b =>
                 {
+                    b.HasOne("Roll6.Domain.Models.Token", null)
+                        .WithMany()
+                        .HasForeignKey("TokenId")
+                        .HasConstraintName("fk_token_character");
+
                     b.HasOne("Roll6.Domain.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -594,19 +798,59 @@ namespace Roll6.Infra.Migrations
                         .HasConstraintName("fk_user_map_model");
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.MapNpc", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Map", null)
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .IsRequired()
+                        .HasConstraintName("fk_map_map_npc");
+
+                    b.HasOne("Roll6.Domain.Models.Npc", null)
+                        .WithMany()
+                        .HasForeignKey("NpcId")
+                        .IsRequired()
+                        .HasConstraintName("fk_npc_map_npc");
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.MapToken", b =>
                 {
+                    b.HasOne("Roll6.Domain.Models.CampaignCharacter", null)
+                        .WithMany()
+                        .HasForeignKey("CampaignCharacterId")
+                        .HasConstraintName("fk_campaign_character_map_token");
+
                     b.HasOne("Roll6.Domain.Models.Map", null)
                         .WithMany()
                         .HasForeignKey("MapId")
                         .IsRequired()
                         .HasConstraintName("fk_map_map_token");
 
+                    b.HasOne("Roll6.Domain.Models.MapNpc", null)
+                        .WithMany()
+                        .HasForeignKey("MapNpcId")
+                        .HasConstraintName("fk_map_npc_map_token");
+
                     b.HasOne("Roll6.Domain.Models.Token", null)
                         .WithMany()
                         .HasForeignKey("TokenId")
                         .IsRequired()
                         .HasConstraintName("fk_token_map_token");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.Npc", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Token", null)
+                        .WithMany()
+                        .HasForeignKey("TokenId")
+                        .IsRequired()
+                        .HasConstraintName("fk_token_npc");
+
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_npc");
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.Token", b =>

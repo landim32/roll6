@@ -4,6 +4,7 @@ public interface ICampaignCharacterRepository<TModel> where TModel : class
 {
     Task<TModel?> GetByIdAsync(long id);
     Task<TModel?> GetAsync(long campaignId, long characterId);
+    Task<List<TModel>> ListByIdsAsync(IEnumerable<long> ids);
     Task<List<TModel>> ListByCampaignAsync(long campaignId, bool approvedOnly);
 
     /// <summary>Pending invites (Invited) of characters owned by the user.</summary>

@@ -3,6 +3,7 @@ import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { VitalBar } from './VitalBar';
 import { isFallen } from '../../lib/vitals';
 import { PARTICIPATION_MODE } from '../../lib/campaignCharacterForm';
+import { PARTICIPATION_DRAG_TYPE } from '../../lib/mapTokens';
 import type { ParticipationMode } from '../../lib/campaignCharacterForm';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 
@@ -13,6 +14,8 @@ interface PartyCardProps {
   /** Owner/master get the pencil (edit); everyone else the eye (read-only). */
   mode: ParticipationMode;
   onOpen: () => void;
+  /** The master can drop the card on a hex of the open campaign map (011 US2). */
+  draggable?: boolean;
 }
 
 const PencilIcon = () => (
@@ -29,12 +32,19 @@ const EyeIcon = () => (
 );
 
 /** One character of the party: round picture, name, life and energy bars (current/total). */
-export const PartyCard = ({ member, current, mode, onOpen }: PartyCardProps) => {
+export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: PartyCardProps) => {
   const { t } = useTranslation();
   const fallen = isFallen(member.currentLife);
   const view = mode === PARTICIPATION_MODE.viewer;
   return (
-    <li className={`stm-party-card${current ? ' is-current' : ''}${fallen ? ' stm-party-fallen' : ''}`}>
+    <li
+      className={`stm-party-card${current ? ' is-current' : ''}${fallen ? ' stm-party-fallen' : ''}${draggable ? ' stm-party-draggable' : ''}`}
+      draggable={draggable}
+      onDragStart={draggable ? (event) => {
+        event.dataTransfer.setData(PARTICIPATION_DRAG_TYPE, String(member.campaignCharacterId));
+        event.dataTransfer.effectAllowed = 'move';
+      } : undefined}
+    >
       <CharacterAvatar name={member.characterName} imageUrl={member.characterImageUrl} size={32} />
       <div className="stm-party-info">
         <div className="stm-party-name">

@@ -6,6 +6,7 @@ import { Modal } from '../ui/Modal';
 import { Tabs } from '../ui/Tabs';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { ImageCropper } from '../ui/ImageCropper';
+import { TokenModal } from './TokenModal';
 import type { ImageCrop } from '../ui/ImageCropper';
 import { useCharacter } from '../../hooks/useCharacter';
 import { imageService } from '../../Services/imageService';
@@ -70,6 +71,9 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
   const [currentEnergy, setCurrentEnergy] = useState('');
   const [characterStatus, setCharacterStatus] = useState('');
   const [campaignSheet, setCampaignSheet] = useState('');
+  /** The character's own token (011 US5): chosen in the tokens modal, saved with the character. */
+  const [token, setToken] = useState<{ tokenId: number; name: string; imageUrl: string | null } | null>(null);
+  const [pickingToken, setPickingToken] = useState(false);
 
   const participationId = editing?.participation.campaignCharacterId ?? null;
   const mode = editing?.mode ?? null;
@@ -86,6 +90,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
     setDetail(null);
     setKeptImage(null);
     setForm(emptyCharacterForm());
+    setToken(null);
     if (!editing) return;
     let cancelled = false;
     const loadCharacter = isOwner ? getCharacter(editing.participation.characterId) : Promise.resolve(null);
@@ -101,6 +106,9 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
           setOriginal(character);
           setForm(toForm(character));
           setKeptImage(character.image ? { file: character.image, url: character.imageUrl } : null);
+          setToken(character.tokenId !== null
+            ? { tokenId: character.tokenId, name: character.tokenName ?? '', imageUrl: character.tokenImageUrl }
+            : null);
         }
       })
       .catch((err) => {
@@ -131,7 +139,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
   };
 
   const saveParticipation = async (before: CampaignCharacterDetailInfo) => {
-    const draft = isOwner ? toCharacterInsert(form, null) : null;
+    const draft = isOwner ? toCharacterInsert(form, null, token?.tokenId ?? null) : null;
     const totalLife = draft?.life ?? before.totalLife;
     const totalEnergy = draft?.energy ?? before.totalEnergy;
     const vitals = vitalsToSave(before, totalLife, totalEnergy);
@@ -150,7 +158,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
     try {
       let name = before.characterName;
       if (draft) {
-        const image = crop ? (await imageService.upload(await cropToFile(crop.src, crop.area))).fileName : keptImage?.file ?? null;
+        const image = crop ? (await imageService.upload(await cropToFile(crop.src, crop.area, { rotation: crop.rotation }))).fileName : keptImage?.file ?? null;
         name = (await updateCharacter(before.characterId, { ...draft, image })).name;
       }
       await updateParticipation(before.campaignCharacterId, toCampaignUpdate({
@@ -181,8 +189,8 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
 
     setSaving(true);
     try {
-      const image = crop ? (await imageService.upload(await cropToFile(crop.src, crop.area))).fileName : null;
-      const { character, participation, requestError } = await createCharacter(toCharacterInsert(form, image));
+      const image = crop ? (await imageService.upload(await cropToFile(crop.src, crop.area, { rotation: crop.rotation }))).fileName : null;
+      const { character, participation, requestError } = await createCharacter(toCharacterInsert(form, image, token?.tokenId ?? null));
       const name = character.name;
       if (requestError) toast.warning(t('toast.characterRequestFailed', { name, error: requestError }));
       else if (!participation) toast.success(t('toast.characterCreated', { name }));
@@ -262,6 +270,22 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
                   {numberField('life')}
                   {numberField('energy')}
                   {numberField('move')}
+                  <div className="col-12">
+                    <span className="form-label d-block">{t('characterForm.token')}</span>
+                    <div className="d-flex align-items-center gap-2">
+                      {token && <CharacterAvatar name={token.name} imageUrl={token.imageUrl} size={40} />}
+                      <span className={token ? '' : 'text-body-secondary'}>{token ? token.name : t('characterForm.noToken')}</span>
+                      <button type="button" className="btn btn-outline-secondary btn-sm ms-auto" onClick={() => setPickingToken(true)}>
+                        {t('characterForm.chooseToken')}
+                      </button>
+                      {token && (
+                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setToken(null)}>
+                          {t('characterForm.removeToken')}
+                        </button>
+                      )}
+                    </div>
+                    <div className="form-text">{t('characterForm.tokenHint')}</div>
+                  </div>
                 </>
               ) : detail && (
                 <>
@@ -324,6 +348,11 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
               </div>
             )}
           </form>
+          <TokenModal
+            open={pickingToken}
+            onOpenChange={setPickingToken}
+            onSelect={(chosen) => setToken({ tokenId: chosen.tokenId, name: chosen.name, imageUrl: chosen.upImageUrl })}
+          />
         </>
       )}
     </Modal>

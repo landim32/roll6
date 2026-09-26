@@ -32,6 +32,8 @@ export interface CampaignCharacterInfo {
   characterMove: number;
   /** Free-text condition of the character in this campaign (not the participation `status`). */
   characterStatus: string | null;
+  /** The character's token; without one, placing it on the map asks for a token. */
+  characterTokenId: number | null;
   createdAt: string;
   updatedAt: string;
 }

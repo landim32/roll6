@@ -21,4 +21,8 @@ public class CharacterInsertInfo
 
     [JsonPropertyName("image")]
     public string? Image { get; set; }
+
+    /// <summary>Library token used when the character is placed on a map (optional).</summary>
+    [JsonPropertyName("tokenId")]
+    public long? TokenId { get; set; }
 }

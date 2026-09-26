@@ -25,9 +25,11 @@ public class TokenRepository : ITokenRepository<Token>
         return await _context.Tokens.AsNoTracking().Where(e => idList.Contains(e.TokenId)).ToListAsync();
     }
 
-    public async Task<(List<Token> Items, int TotalCount)> ListPagedAsync(string? search, int skip, int take)
+    public async Task<(List<Token> Items, int TotalCount)> ListPagedAsync(string? search, int skip, int take, long? ownerUserId)
     {
         var query = _context.Tokens.AsNoTracking();
+        if (ownerUserId.HasValue)
+            query = query.Where(e => e.UserId == ownerUserId.Value);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var pattern = $"%{search.Trim()}%";

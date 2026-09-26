@@ -30,6 +30,51 @@ public class MapTokenController : ApiControllerBase
         }
     }
 
+    /// <summary>Places a campaign character (its token, or the informed one saved on it when it has none). Master only.</summary>
+    [HttpPost("character")]
+    [ProducesResponseType(typeof(MapTokenInfo), StatusCodes.Status201Created)]
+    public async Task<IActionResult> PlaceCharacter([FromBody] MapTokenCharacterInsertInfo info)
+    {
+        try
+        {
+            var mapToken = await _mapTokenService.PlaceCharacterAsync(CurrentUserId, info);
+            return Created($"/api/map/{mapToken.MapId}/token", mapToken);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    [HttpPut("{id:long}/position")]
+    [ProducesResponseType(typeof(MapTokenInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Move(long id, [FromBody] MapTokenPositionInfo info)
+    {
+        try
+        {
+            return Ok(await _mapTokenService.MoveAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Another library token for the piece; position, facing and link are kept.</summary>
+    [HttpPut("{id:long}/token")]
+    [ProducesResponseType(typeof(MapTokenInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ChangeToken(long id, [FromBody] MapTokenTokenInfo info)
+    {
+        try
+        {
+            return Ok(await _mapTokenService.ChangeTokenAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpPut("{id:long}")]
     [ProducesResponseType(typeof(MapTokenInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(long id, [FromBody] MapTokenUpdateInfo info)

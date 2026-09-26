@@ -14,6 +14,8 @@ public class CampaignService : ICampaignService
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
     private readonly ICampaignCharacterRepository<CampaignCharacter> _campaignCharacterRepository;
     private readonly IUserRepository<User> _userRepository;
+    private readonly ICampaignNpcRepository<CampaignNpc> _campaignNpcRepository;
+    private readonly IMapNpcRepository<MapNpc> _mapNpcRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public CampaignService(
@@ -22,8 +24,12 @@ public class CampaignService : ICampaignService
         IMapTokenRepository<MapToken> mapTokenRepository,
         ICampaignCharacterRepository<CampaignCharacter> campaignCharacterRepository,
         IUserRepository<User> userRepository,
+        ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
+        IMapNpcRepository<MapNpc> mapNpcRepository,
         IUnitOfWork unitOfWork)
     {
+        _campaignNpcRepository = campaignNpcRepository;
+        _mapNpcRepository = mapNpcRepository;
         _repository = repository;
         _mapRepository = mapRepository;
         _mapTokenRepository = mapTokenRepository;
@@ -85,8 +91,10 @@ public class CampaignService : ICampaignService
             if (deletedMapIds.Count > 0)
             {
                 await _mapTokenRepository.DeleteByMapIdsAsync(deletedMapIds);
+                await _mapNpcRepository.DeleteByMapIdsAsync(deletedMapIds);
                 await _mapRepository.DeleteRangeAsync(deletedMapIds);
             }
+            await _campaignNpcRepository.DeleteByCampaignAsync(campaignId);
             await _campaignCharacterRepository.DeleteByCampaignAsync(campaignId);
             await _repository.DeleteAsync(campaignId);
         });

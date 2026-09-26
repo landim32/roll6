@@ -23,6 +23,8 @@ public class CampaignCharacterServiceTests
     private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
     private readonly Mock<ICharacterRepository<Character>> _characterRepository = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
+    private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly CampaignCharacterService _service;
 
     public CampaignCharacterServiceTests()
@@ -47,9 +49,11 @@ public class CampaignCharacterServiceTests
         });
         _repository.Setup(r => r.InsertAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
         _repository.Setup(r => r.UpdateAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
+        _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
-            _characterRepository.Object, _userRepository.Object, Mock.Of<IImageStorageAppService>());
+            _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object,
+            Mock.Of<IImageStorageAppService>());
     }
 
     private static CampaignCharacterRequestInfo Request(long campaignId) => new() { CampaignId = campaignId, CharacterId = CHARACTER };
@@ -250,6 +254,7 @@ public class CampaignCharacterServiceTests
 
         await _service.RemoveAsync(MASTER_ID, 70);
 
+        _mapTokenRepository.Verify(r => r.DeleteByCampaignCharacterAsync(70), Times.Once);
         _repository.Verify(r => r.DeleteAsync(70), Times.Once);
     }
 

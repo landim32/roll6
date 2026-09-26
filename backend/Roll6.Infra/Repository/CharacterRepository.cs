@@ -70,4 +70,9 @@ public class CharacterRepository : ICharacterRepository<Character>
         _context.Characters.Remove(entity);
         await _context.SaveChangesAsync();
     }
+
+    public async Task<bool> ExistsByTokenAsync(long tokenId)
+    {
+        return await _context.Characters.AnyAsync(e => e.TokenId == tokenId);
+    }
 }

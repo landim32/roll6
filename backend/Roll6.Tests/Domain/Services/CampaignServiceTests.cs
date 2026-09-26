@@ -16,6 +16,8 @@ public class CampaignServiceTests
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
+    private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
+    private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly CampaignService _service;
 
@@ -31,7 +33,8 @@ public class CampaignServiceTests
         });
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns<Func<Task>>(action => action());
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
-            _campaignCharacterRepository.Object, _userRepository.Object, _unitOfWork.Object);
+            _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
+            _unitOfWork.Object);
     }
 
     [Fact]
@@ -55,7 +58,9 @@ public class CampaignServiceTests
         await _service.DeleteAsync(1, 10);
 
         _mapTokenRepository.Verify(r => r.DeleteByMapIdsAsync(deletedMapIds));
+        _mapNpcRepository.Verify(r => r.DeleteByMapIdsAsync(deletedMapIds));
         _mapRepository.Verify(r => r.DeleteRangeAsync(deletedMapIds));
+        _campaignNpcRepository.Verify(r => r.DeleteByCampaignAsync(10));
         _campaignCharacterRepository.Verify(r => r.DeleteByCampaignAsync(10));
         _repository.Verify(r => r.DeleteAsync(10));
     }
