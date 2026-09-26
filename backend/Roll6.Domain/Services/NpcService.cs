@@ -1,8 +1,10 @@
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.Common;
 using Roll6.DTO.Npc;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -17,13 +19,17 @@ public class NpcService : INpcService
     private readonly IImageStorageAppService _imageStorage;
     private readonly ITurnRepository<Turn> _turnRepository;
 
+    private readonly IRealtimeNotifier _notifier;
+
     public NpcService(
         INpcRepository<Npc> repository,
         ITokenRepository<Token> tokenRepository,
         ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         IImageStorageAppService imageStorage,
-        ITurnRepository<Turn> turnRepository)
+        ITurnRepository<Turn> turnRepository,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
         _turnRepository = turnRepository;
         _repository = repository;
         _tokenRepository = tokenRepository;
@@ -66,7 +72,11 @@ public class NpcService : INpcService
         var npc = await GetOwnedAsync(userId, npcId);
         npc.Update(info.TokenId, info.Name, info.Life, info.Energy, info.Move, info.Sheet, info.Image);
         var token = await GetTokenAsync(npc.TokenId);
-        return MapToDto(await _repository.UpdateAsync(npc), token);
+        var result = MapToDto(await _repository.UpdateAsync(npc), token);
+        // The campaign NPC cards show the library NPC (017).
+        foreach (var campaignId in await _campaignNpcRepository.ListCampaignIdsByNpcAsync(npcId))
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_NPCS_CHANGED, campaignId, userId));
+        return result;
     }
 
     public async Task DeleteAsync(long userId, long npcId)

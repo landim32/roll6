@@ -1,5 +1,5 @@
 import type { PagedList } from '../types/common';
-import type { MapInfo, MapInsertInfo } from '../types/map';
+import type { MapInfo, MapInsertInfo, MapUpdateInfo } from '../types/map';
 import { API_URL, getHeaders, handleApiResponse, toQuery } from './apiHelpers';
 
 interface MapServiceConfig {
@@ -38,6 +38,20 @@ class MapService {
       method: 'POST', headers: getHeaders(true), body: JSON.stringify(data),
     });
     return this.handleResponse<MapInfo>(response);
+  }
+
+  /** Master: renames a campaign map or archives/reactivates it. */
+  async update(id: number, data: MapUpdateInfo): Promise<MapInfo> {
+    const response = await fetch(`${API_URL}/api/map/${id}`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify(data),
+    });
+    return this.handleResponse<MapInfo>(response);
+  }
+
+  /** Master: deletes a campaign map (soft delete). */
+  async remove(id: number): Promise<void> {
+    const response = await fetch(`${API_URL}/api/map/${id}`, { method: 'DELETE', headers: getHeaders(true) });
+    return this.handleResponse<void>(response);
   }
 }
 

@@ -4,6 +4,9 @@ import { mapTokenService } from '../Services/mapTokenService';
 import { useCampaign } from '../hooks/useCampaign';
 import { useCharacter } from '../hooks/useCharacter';
 import { useMapEditor } from '../hooks/useMapEditor';
+import { useTableEvents } from '../hooks/useRealtime';
+import { affectsMap, applyTokenEvent } from '../lib/realtimeEvents';
+import { TABLE_EVENT } from '../types/realtime';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import type { MapTokenInfo } from '../types/mapToken';
@@ -63,6 +66,24 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Real-time table (017): pieces moved/changed by anyone show up right away; wider changes reload the map.
+  useTableEvents((event) => {
+    switch (event.type) {
+      case TABLE_EVENT.mapTokenUpserted:
+      case TABLE_EVENT.mapTokenDeleted:
+        setMapTokens((prev) => applyTokenEvent(prev, event, mapIdRef.current));
+        break;
+      case TABLE_EVENT.mapTokensChanged:
+        if (affectsMap(event, mapIdRef.current)) void refresh();
+        break;
+      case TABLE_EVENT.resync:
+        void refresh();
+        break;
+      default:
+        break;
+    }
+  });
 
   const run = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
     try {

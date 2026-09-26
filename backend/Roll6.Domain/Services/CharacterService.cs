@@ -1,7 +1,9 @@
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.Character;
 using Roll6.DTO.Common;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -18,6 +20,8 @@ public class CharacterService : ICharacterService
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
     private readonly IImageStorageAppService _imageStorage;
 
+    private readonly IRealtimeNotifier _notifier;
+
     public CharacterService(
         ICharacterRepository<Character> repository,
         ICampaignCharacterRepository<CampaignCharacter> campaignCharacterRepository,
@@ -26,8 +30,10 @@ public class CharacterService : ICharacterService
         ITokenRepository<Token> tokenRepository,
         IMapTokenRepository<MapToken> mapTokenRepository,
         IImageStorageAppService imageStorage,
-        ITurnRepository<Turn> turnRepository)
+        ITurnRepository<Turn> turnRepository,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
         _turnRepository = turnRepository;
         _tokenRepository = tokenRepository;
         _mapTokenRepository = mapTokenRepository;
@@ -99,12 +105,14 @@ public class CharacterService : ICharacterService
             // Lower totals also lower the current values in every campaign (FR-011).
             await _campaignCharacterRepository.ClampVitalsAsync(character.CharacterId, character.Life, character.Energy);
         });
+        await PublishToCampaignsAsync(await _campaignCharacterRepository.ListCampaignIdsByCharacterAsync(characterId), userId);
         return MapToDto(saved, token);
     }
 
     public async Task DeleteAsync(long userId, long characterId)
     {
         await GetOwnedAsync(userId, characterId);
+        var campaignIds = await _campaignCharacterRepository.ListCampaignIdsByCharacterAsync(characterId);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _mapTokenRepository.DeleteByCharacterAsync(characterId);
@@ -112,6 +120,17 @@ public class CharacterService : ICharacterService
             await _campaignCharacterRepository.DeleteByCharacterAsync(characterId);
             await _repository.DeleteAsync(characterId);
         });
+        await PublishToCampaignsAsync(campaignIds, userId);
+    }
+
+    /// <summary>The character's name, picture, token and totals show in parties and pieces (017).</summary>
+    private async Task PublishToCampaignsAsync(IEnumerable<long> campaignIds, long userId)
+    {
+        foreach (var campaignId in campaignIds)
+        {
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.PARTY_CHANGED, campaignId, userId));
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
+        }
     }
 
     /// <summary>Only the owner reads and changes the character; the master changes only the participation (010 FR-006).</summary>

@@ -5,6 +5,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.CampaignCharacter;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -25,6 +26,7 @@ public class CampaignCharacterServiceTests
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly CampaignCharacterService _service;
 
     public CampaignCharacterServiceTests()
@@ -53,7 +55,7 @@ public class CampaignCharacterServiceTests
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
             _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object,
-            Mock.Of<IImageStorageAppService>());
+            Mock.Of<IImageStorageAppService>(), _notifier.Object);
     }
 
     private static CampaignCharacterRequestInfo Request(long campaignId) => new() { CampaignId = campaignId, CharacterId = CHARACTER };
@@ -110,6 +112,8 @@ public class CampaignCharacterServiceTests
         var result = await _service.ApproveRequestAsync(MASTER_ID, 50);
 
         result.Status.Should().Be((int)CampaignCharacterStatus.Approved);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.PARTY_CHANGED && e.CampaignId == CLOSED_CAMPAIGN && e.ActorUserId == MASTER_ID)), Times.Once);
     }
 
     [Fact]
@@ -120,6 +124,7 @@ public class CampaignCharacterServiceTests
         var act = () => _service.DenyRequestAsync(PLAYER_ID, 50);
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
     }
 
     [Fact]
@@ -256,6 +261,21 @@ public class CampaignCharacterServiceTests
 
         _mapTokenRepository.Verify(r => r.DeleteByCampaignCharacterAsync(70), Times.Once);
         _repository.Verify(r => r.DeleteAsync(70), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.PARTY_CHANGED)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.MapId == null)), Times.Once);
+        // The player has no other approved character there: he stops receiving the campaign's events.
+        _notifier.Verify(n => n.RemoveUserFromCampaignAsync(PLAYER_ID, CLOSED_CAMPAIGN), Times.Once);
+    }
+
+    [Fact]
+    public async Task Remove_PlayerWithAnotherApprovedCharacter_KeepsReceivingEvents()
+    {
+        SetupParticipation(70, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        _repository.Setup(r => r.HasApprovedCharacterAsync(CLOSED_CAMPAIGN, PLAYER_ID)).ReturnsAsync(true);
+
+        await _service.RemoveAsync(MASTER_ID, 70);
+
+        _notifier.Verify(n => n.RemoveUserFromCampaignAsync(It.IsAny<long>(), It.IsAny<long>()), Times.Never);
     }
 
     [Fact]

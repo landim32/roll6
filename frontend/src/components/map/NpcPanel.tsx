@@ -12,8 +12,8 @@ interface NpcPanelProps {
 }
 
 /**
- * Right-hand panel with the NPCs of the current campaign — master only (014). Mirrors the party panel;
- * "Incluir NPC" closes the list.
+ * Right-hand panel with the NPCs of the current campaign (014). Mirrors the party panel. The master edits,
+ * drags and adds NPCs ("Incluir NPC" closes the list); approved players only see the cards.
  */
 export const NpcPanel = ({ onAdd, onEdit }: NpcPanelProps) => {
   const { t } = useTranslation();
@@ -21,7 +21,8 @@ export const NpcPanel = ({ onAdd, onEdit }: NpcPanelProps) => {
   const { campaignNpcs } = useNpc();
   const { canPlace } = useMapToken();
 
-  if (!isMaster || !currentCampaign) return null;
+  // Players get the list only when they may see it; with nothing to show there is no panel for them.
+  if (!currentCampaign || (!isMaster && campaignNpcs.length === 0)) return null;
 
   return (
     <SidePanel
@@ -30,11 +31,13 @@ export const NpcPanel = ({ onAdd, onEdit }: NpcPanelProps) => {
       storageKey="roll6:npc-collapsed"
       collapseLabel={t('npcs.collapse')}
       expandLabel={t('npcs.expand')}
-      footer={<button type="button" className="btn btn-outline-primary btn-sm w-100" onClick={onAdd}>{t('npcs.add')}</button>}
+      footer={isMaster
+        ? <button type="button" className="btn btn-outline-primary btn-sm w-100" onClick={onAdd}>{t('npcs.add')}</button>
+        : undefined}
     >
       {campaignNpcs.length === 0 && <li className="text-body-secondary small px-1">{t('npcs.empty')}</li>}
       {campaignNpcs.map((npc) => (
-        <NpcCard key={npc.campaignNpcId} npc={npc} onEdit={() => onEdit(npc)} draggable={canPlace} />
+        <NpcCard key={npc.campaignNpcId} npc={npc} onEdit={isMaster ? () => onEdit(npc) : undefined} draggable={isMaster && canPlace} />
       ))}
     </SidePanel>
   );

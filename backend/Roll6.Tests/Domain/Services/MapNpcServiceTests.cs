@@ -5,6 +5,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.MapNpc;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -29,6 +30,7 @@ public class MapNpcServiceTests
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly List<MapToken> _insertedPieces = new();
     private readonly MapNpcService _service;
     private long _nextId = 90;
@@ -47,7 +49,7 @@ public class MapNpcServiceTests
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _service = new MapNpcService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _mapTokenRepository.Object,
             _npcRepository.Object, _campaignNpcRepository.Object, _campaignCharacterRepository.Object, _tokenRepository.Object,
-            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object);
+            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object, _notifier.Object);
     }
 
     private static MapNpcInsertInfo At(int x, int y) => new() { MapId = MAP, NpcId = NPC, X = x, Y = y };
@@ -107,6 +109,8 @@ public class MapNpcServiceTests
 
         (result.Name, result.Life, result.Status).Should().Be(("Goblin 2", -1, "caído"));
         _npcRepository.Verify(r => r.UpdateAsync(It.IsAny<Npc>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.MAP_TOKENS_CHANGED && e.CampaignId == CAMPAIGN && e.MapId == MAP)), Times.Once);
     }
 
     [Fact]
@@ -115,6 +119,7 @@ public class MapNpcServiceTests
         _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin" });
 
         await _service.Invoking(s => s.UpdateAsync(PLAYER, 90, new MapNpcUpdateInfo { Name = "X" })).Should().ThrowAsync<UnauthorizedAccessException>();
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
     }
 
     [Fact]

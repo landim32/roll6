@@ -25,6 +25,8 @@ public class Roll6Context : DbContext
     public DbSet<CampaignNpc> CampaignNpcs { get; set; }
     public DbSet<MapNpc> MapNpcs { get; set; }
     public DbSet<Turn> Turns { get; set; }
+    public DbSet<CampaignPlan> CampaignPlans { get; set; }
+    public DbSet<ApiKey> ApiKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -72,6 +74,10 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(260).IsRequired();
             entity.Property(e => e.Open).HasColumnName("open");
             entity.Property(e => e.CurrentTurn).HasColumnName("current_turn").HasDefaultValue(1).HasSentinel(0);
+            entity.Property(e => e.CurrentMapId).HasColumnName("current_map_id");
+            // Map the table follows (017); a map belongs to its campaign, so no navigation both ways.
+            entity.HasOne<Map>().WithMany().HasForeignKey(e => e.CurrentMapId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_campaign_current");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_campaign");
@@ -234,6 +240,40 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_campaign_npc");
             entity.HasOne<Npc>().WithMany().HasForeignKey(e => e.NpcId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_npc_campaign_npc");
+        });
+
+        modelBuilder.Entity<ApiKey>(entity =>
+        {
+            entity.ToTable("api_keys");
+            entity.HasKey(e => e.ApiKeyId).HasName("api_keys_pkey");
+            entity.Property(e => e.ApiKeyId).HasColumnName("api_key_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(ApiKey.MAX_NAME).IsRequired();
+            entity.Property(e => e.KeyPrefix).HasColumnName("key_prefix").HasMaxLength(20).IsRequired();
+            entity.Property(e => e.KeyHash).HasColumnName("key_hash").HasMaxLength(64).IsRequired();
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.LastUsedAt).HasColumnName("last_used_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.RevokedAt).HasColumnName("revoked_at").HasColumnType(TIMESTAMP);
+            entity.HasIndex(e => e.KeyHash).IsUnique().HasDatabaseName("ix_api_keys_hash");
+            entity.HasIndex(e => e.UserId).HasDatabaseName("ix_api_keys_user");
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_api_key");
+        });
+
+        modelBuilder.Entity<CampaignPlan>(entity =>
+        {
+            entity.ToTable("campaign_plans");
+            entity.HasKey(e => e.CampaignPlanId).HasName("campaign_plans_pkey");
+            entity.Property(e => e.CampaignPlanId).HasColumnName("campaign_plan_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.CampaignId).HasColumnName("campaign_id");
+            entity.Property(e => e.Title).HasColumnName("title").HasMaxLength(CampaignPlan.MAX_TITLE).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(CampaignPlan.MAX_DESCRIPTION);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.Property(e => e.ChangedAt).HasColumnName("changed_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.HasIndex(e => e.CampaignId).HasDatabaseName("ix_campaign_plans_campaign");
+            entity.HasOne<Campaign>().WithMany().HasForeignKey(e => e.CampaignId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_plan");
         });
 
         modelBuilder.Entity<MapNpc>(entity =>

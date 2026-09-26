@@ -4,6 +4,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.CampaignNpc;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -25,6 +26,8 @@ public class CampaignNpcServiceTests
     private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
     private readonly CampaignNpcService _service;
 
     public CampaignNpcServiceTests()
@@ -38,7 +41,8 @@ public class CampaignNpcServiceTests
         _repository.Setup(r => r.InsertAsync(It.IsAny<CampaignNpc>())).ReturnsAsync((CampaignNpc c) => c);
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _service = new CampaignNpcService(_repository.Object, _campaignRepository.Object, _npcRepository.Object, _tokenRepository.Object,
-            _mapNpcRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object);
+            _mapNpcRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object,
+            _campaignCharacterRepository.Object, _notifier.Object);
     }
 
     private static CampaignNpcInsertInfo Add(long npcId = NPC) => new() { CampaignId = CAMPAIGN, NpcId = npcId };
@@ -49,6 +53,8 @@ public class CampaignNpcServiceTests
         var result = await _service.AddAsync(MASTER, Add());
 
         (result.CampaignId, result.NpcId, result.Name, result.Life).Should().Be((CAMPAIGN, NPC, "Goblin", 7));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.CAMPAIGN_NPCS_CHANGED && e.CampaignId == CAMPAIGN)), Times.Once);
     }
 
     [Fact]
@@ -73,12 +79,15 @@ public class CampaignNpcServiceTests
     }
 
     [Fact]
-    public async Task List_OnlyTheMaster()
+    public async Task List_MasterAndApprovedParticipants_OthersDenied()
     {
+        const long STRANGER = 3;
         _repository.Setup(r => r.ListByCampaignAsync(CAMPAIGN)).ReturnsAsync(new List<CampaignNpc> { new() { CampaignNpcId = 3, CampaignId = CAMPAIGN, NpcId = NPC } });
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(CAMPAIGN, PLAYER)).ReturnsAsync(true);
 
         (await _service.ListByCampaignAsync(MASTER, CAMPAIGN)).Should().ContainSingle(c => c.Name == "Goblin");
-        await _service.Invoking(s => s.ListByCampaignAsync(PLAYER, CAMPAIGN)).Should().ThrowAsync<UnauthorizedAccessException>();
+        (await _service.ListByCampaignAsync(PLAYER, CAMPAIGN)).Should().ContainSingle(c => c.Name == "Goblin");
+        await _service.Invoking(s => s.ListByCampaignAsync(STRANGER, CAMPAIGN)).Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]

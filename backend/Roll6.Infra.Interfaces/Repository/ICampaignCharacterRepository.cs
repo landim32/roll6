@@ -16,6 +16,9 @@ public interface ICampaignCharacterRepository<TModel> where TModel : class
     /// <summary>Participations of the user's characters in the campaign (any status).</summary>
     Task<List<TModel>> ListByCampaignAndUserAsync(long campaignId, long userId);
 
+    /// <summary>Campaigns where the character has a participation (any status).</summary>
+    Task<List<long>> ListCampaignIdsByCharacterAsync(long characterId);
+
     Task<TModel> InsertAsync(TModel entity);
     Task<TModel> UpdateAsync(TModel entity);
     Task DeleteByCampaignAsync(long campaignId);

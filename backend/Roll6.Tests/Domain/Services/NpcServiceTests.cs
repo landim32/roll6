@@ -5,6 +5,7 @@ using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Common;
 using Roll6.DTO.Npc;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -20,6 +21,7 @@ public class NpcServiceTests
     private readonly Mock<INpcRepository<Npc>> _repository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly NpcService _service;
 
     public NpcServiceTests()
@@ -29,7 +31,8 @@ public class NpcServiceTests
         _repository.Setup(r => r.GetByIdAsync(NPC)).ReturnsAsync(() => new Npc { NpcId = NPC, UserId = OWNER, TokenId = 5, Name = "Goblin" });
         _repository.Setup(r => r.InsertAsync(It.IsAny<Npc>())).ReturnsAsync((Npc n) => n);
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Npc>())).ReturnsAsync((Npc n) => n);
-        _service = new NpcService(_repository.Object, _tokenRepository.Object, _campaignNpcRepository.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object);
+        _campaignNpcRepository.Setup(r => r.ListCampaignIdsByNpcAsync(It.IsAny<long>())).ReturnsAsync(new List<long>());
+        _service = new NpcService(_repository.Object, _tokenRepository.Object, _campaignNpcRepository.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object, _notifier.Object);
     }
 
     private static NpcInsertInfo Info(long tokenId = 5) => new() { TokenId = tokenId, Name = "Goblin", Life = 7, Move = 6 };
@@ -88,5 +91,16 @@ public class NpcServiceTests
         await _service.DeleteAsync(OWNER, NPC);
 
         _repository.Verify(r => r.DeleteAsync(NPC), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_PublishesToTheCampaignsWithTheNpc()
+    {
+        _campaignNpcRepository.Setup(r => r.ListCampaignIdsByNpcAsync(NPC)).ReturnsAsync(new List<long> { 10 });
+
+        await _service.UpdateAsync(OWNER, NPC, Info());
+
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.CAMPAIGN_NPCS_CHANGED && e.CampaignId == 10 && e.ActorUserId == OWNER)), Times.Once);
     }
 }

@@ -32,6 +32,14 @@ class CampaignService {
     return this.handleResponse<CampaignInfo>(response);
   }
 
+  /** Master: sets the map the players follow (017); null clears it. */
+  async setCurrentMap(id: number, mapId: number | null): Promise<CampaignInfo> {
+    const response = await fetch(`${API_BASE}/${id}/current-map`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ mapId }),
+    });
+    return this.handleResponse<CampaignInfo>(response);
+  }
+
   /** Creates a campaign owned by the logged user. */
   async create(data: CampaignInsertInfo): Promise<CampaignInfo> {
     const response = await fetch(API_BASE, {

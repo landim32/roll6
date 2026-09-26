@@ -2,7 +2,10 @@ using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
+using Roll6.DTO.Realtime;
 using Roll6.DTO.Turn;
+using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Domain.Services;
@@ -23,6 +26,7 @@ public class TurnService : ITurnService
     private readonly IMapNpcRepository<MapNpc> _mapNpcRepository;
     private readonly INpcRepository<Npc> _npcRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRealtimeNotifier _notifier;
 
     public TurnService(
         ITurnRepository<Turn> repository,
@@ -33,8 +37,10 @@ public class TurnService : ITurnService
         ICharacterRepository<Character> characterRepository,
         IMapNpcRepository<MapNpc> mapNpcRepository,
         INpcRepository<Npc> npcRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
         _repository = repository;
         _campaignRepository = campaignRepository;
         _mapRepository = mapRepository;
@@ -68,7 +74,9 @@ public class TurnService : ITurnService
         var actor = await ResolveActorAsync(userId, piece, campaign);
         var turn = Turn.Action(campaign.CampaignId, map.MapId, actor.CharacterId, actor.NpcId, actor.MapNpcId,
             campaign.CurrentTurn, info.Description);
-        return (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
+        var result = (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
+        await PublishTurnChangedAsync(campaign.CampaignId, userId);
+        return result;
     }
 
     /// <summary>Removes the piece's entries of the current turn and undoes its move when the former hex is free.</summary>
@@ -94,6 +102,9 @@ public class TurnService : ITurnService
             if (entries.Count > 0)
                 await _repository.DeleteRangeAsync(entries.Select(e => e.TurnId));
         });
+        await PublishTurnChangedAsync(campaign.CampaignId, userId);
+        if (reverted)
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaign.CampaignId, userId, map.MapId));
         return new TurnResetResultInfo { Removed = entries.Count, Reverted = reverted || movement == null };
     }
 
@@ -124,6 +135,8 @@ public class TurnService : ITurnService
         var finished = campaign.CurrentTurn;
         campaign.AdvanceTurn();
         await _campaignRepository.UpdateAsync(campaign);
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
+            data: new { finishedTurn = finished, turnNo = campaign.CurrentTurn }));
         return new TurnFinishResultInfo { Finished = true, FinishedTurn = finished, TurnNo = campaign.CurrentTurn };
     }
 
@@ -141,7 +154,9 @@ public class TurnService : ITurnService
             TurnType.ActionResult => Turn.ActionResult(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, info.Description),
             _ => throw new DomainValidationException("turnType", "O tipo deve ser 1 (Movement), 2 (Action) ou 3 (ActionResult).")
         };
-        return (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
+        var result = (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
+        await PublishTurnChangedAsync(campaign.CampaignId, userId);
+        return result;
     }
 
     public async Task DeleteAsync(long userId, long turnId)
@@ -150,7 +165,11 @@ public class TurnService : ITurnService
             ?? throw new KeyNotFoundException("Registro de turno não encontrado.");
         await GetMasteredCampaignAsync(userId, turn.CampaignId);
         await _repository.DeleteAsync(turnId);
+        await PublishTurnChangedAsync(turn.CampaignId, userId);
     }
+
+    private Task PublishTurnChangedAsync(long campaignId, long userId) =>
+        _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, campaignId, userId));
 
     private static int Required(int? value, string field) =>
         value ?? throw new DomainValidationException(field, $"O campo {field} é obrigatório.");

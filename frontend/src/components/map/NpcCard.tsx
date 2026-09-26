@@ -10,7 +10,8 @@ import type { CampaignNpcInfo } from '../../types/npc';
 
 interface NpcCardProps {
   npc: CampaignNpcInfo;
-  onEdit: () => void;
+  /** Master only: the pencil opens the NPC form; players see the card without it. */
+  onEdit?: () => void;
   /** The master can drop the card on a hex of the open campaign map: each drop is a new piece. */
   draggable: boolean;
 }
@@ -46,10 +47,12 @@ export const NpcCard = ({ npc, onEdit, draggable }: NpcCardProps) => {
         <div className="stm-party-name">
           {turnNo !== null && <TurnStatusDot status={npcStatus(entries, npc.npcId, occurrenceIds)} />}
           <span title={npc.name}>{npc.name}</span>
-          <button type="button" className="btn btn-link btn-sm p-0 ms-auto" aria-label={t('npcs.edit', { name: npc.name })}
-            title={t('npcs.edit', { name: npc.name })} onClick={onEdit}>
-            <PencilIcon />
-          </button>
+          {onEdit && (
+            <button type="button" className="btn btn-link btn-sm p-0 ms-auto" aria-label={t('npcs.edit', { name: npc.name })}
+              title={t('npcs.edit', { name: npc.name })} onClick={onEdit}>
+              <PencilIcon />
+            </button>
+          )}
         </div>
         <VitalBar label={t('party.life')} current={npc.life} total={npc.life} variant="life" />
         <VitalBar label={t('party.energy')} current={npc.energy} total={npc.energy} variant="energy" />

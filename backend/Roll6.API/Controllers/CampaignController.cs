@@ -4,6 +4,7 @@ using Roll6.Domain.Interfaces;
 using Roll6.DTO.Campaign;
 using Roll6.DTO.CampaignCharacter;
 using Roll6.DTO.CampaignNpc;
+using Roll6.DTO.CampaignPlan;
 using Roll6.DTO.Common;
 using Roll6.DTO.Map;
 using Roll6.DTO.Turn;
@@ -18,14 +19,17 @@ public class CampaignController : ApiControllerBase
     private readonly ICampaignCharacterService _campaignCharacterService;
     private readonly ICampaignNpcService _campaignNpcService;
     private readonly ITurnService _turnService;
+    private readonly ICampaignPlanService _campaignPlanService;
 
     public CampaignController(
         ICampaignService campaignService,
         IMapService mapService,
         ICampaignCharacterService campaignCharacterService,
         ICampaignNpcService campaignNpcService,
-        ITurnService turnService)
+        ITurnService turnService,
+        ICampaignPlanService campaignPlanService)
     {
+        _campaignPlanService = campaignPlanService;
         _turnService = turnService;
         _campaignService = campaignService;
         _mapService = mapService;
@@ -163,6 +167,36 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Plan entries of the campaign, without descriptions (master only, 018).</summary>
+    [HttpGet("{id:long}/plan")]
+    [ProducesResponseType(typeof(List<CampaignPlanInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListPlans(long id)
+    {
+        try
+        {
+            return Ok(await _campaignPlanService.ListAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Master: sets the map the players follow (017); null clears it.</summary>
+    [HttpPut("{id:long}/current-map")]
+    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetCurrentMap(long id, [FromBody] CampaignCurrentMapInfo info)
+    {
+        try
+        {
+            return Ok(await _campaignService.SetCurrentMapAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Finishes the current turn (master); lists who hasn't acted unless forced.</summary>
     [HttpPost("{id:long}/turn/finish")]
     [ProducesResponseType(typeof(TurnFinishResultInfo), StatusCodes.Status200OK)]
@@ -192,7 +226,7 @@ public class CampaignController : ApiControllerBase
         }
     }
 
-    /// <summary>NPCs available in the campaign (master only).</summary>
+    /// <summary>NPCs available in the campaign (master and approved participants).</summary>
     [HttpGet("{id:long}/npc")]
     [ProducesResponseType(typeof(List<CampaignNpcInfo>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListNpcs(long id)

@@ -33,6 +33,11 @@ public class CampaignNpcRepository : ICampaignNpcRepository<CampaignNpc>
             .ToListAsync();
     }
 
+    public async Task<List<long>> ListCampaignIdsByNpcAsync(long npcId)
+    {
+        return await _context.CampaignNpcs.Where(e => e.NpcId == npcId).Select(e => e.CampaignId).Distinct().ToListAsync();
+    }
+
     public async Task<bool> ExistsByNpcAsync(long npcId)
     {
         return await _context.CampaignNpcs.AnyAsync(e => e.NpcId == npcId);

@@ -5,15 +5,17 @@ import { useAuth } from '../../hooks/useAuth';
 interface UserMenuProps {
   onEdit: () => void;
   onChangePassword: () => void;
+  /** "Chaves de API" (019). */
+  onApiKeys: () => void;
   onLogout: () => void;
 }
 
 /**
- * User name in the top menu opening "Editar / Trocar senha / Sair". Radix handles Esc, outside
+ * User name in the top menu opening "Editar / Trocar senha / Chaves de API / Sair". Radix handles Esc, outside
  * click and keyboard navigation (research R1); `modal={false}` keeps it from competing with the
  * Radix Dialog opened by the items, which run after the menu closes (onSelect).
  */
-export const UserMenu = ({ onEdit, onChangePassword, onLogout }: UserMenuProps) => {
+export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onLogout }: UserMenuProps) => {
   const { t } = useTranslation();
   const { session } = useAuth();
 
@@ -29,6 +31,7 @@ export const UserMenu = ({ onEdit, onChangePassword, onLogout }: UserMenuProps) 
         <DropdownMenu.Content className="dropdown-menu show stm-user-menu" align="end" sideOffset={4}>
           <DropdownMenu.Item className="dropdown-item" onSelect={onEdit}>{t('userMenu.edit')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onChangePassword}>{t('userMenu.changePassword')}</DropdownMenu.Item>
+          <DropdownMenu.Item className="dropdown-item" onSelect={onApiKeys}>{t('userMenu.apiKeys')}</DropdownMenu.Item>
           <DropdownMenu.Separator className="dropdown-divider" />
           <DropdownMenu.Item className="dropdown-item" onSelect={onLogout}>{t('userMenu.logout')}</DropdownMenu.Item>
         </DropdownMenu.Content>

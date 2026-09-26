@@ -11,10 +11,12 @@ import { CharacterProvider } from './Contexts/CharacterContext';
 import { MapEditorProvider } from './Contexts/MapEditorContext';
 import { MapTokenProvider } from './Contexts/MapTokenContext';
 import { NpcProvider } from './Contexts/NpcContext';
+import { RealtimeProvider } from './Contexts/RealtimeContext';
 import { TokenProvider } from './Contexts/TokenContext';
 import { TurnProvider } from './Contexts/TurnContext';
 
-// Provider chain: Auth → Campaign (needs the session) → Character (needs the campaign) → MapEditor →
+// Provider chain: Auth → Campaign (needs the session) → Realtime (table events of the current campaign; every
+// provider below reacts to them) → Character (needs the campaign) → MapEditor →
 // Token (library) → MapToken (pieces of the open map: needs the editor, the campaign and the characters) →
 // Npc (library and campaign NPCs; places pieces, so it needs MapToken) → Turn (turn of the current campaign;
 // resetting reloads the pieces) → App.
@@ -23,19 +25,21 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <CampaignProvider>
-          <CharacterProvider>
-            <MapEditorProvider>
-              <TokenProvider>
-                <MapTokenProvider>
-                  <NpcProvider>
-                    <TurnProvider>
-                      <App />
-                    </TurnProvider>
-                  </NpcProvider>
-                </MapTokenProvider>
-              </TokenProvider>
-            </MapEditorProvider>
-          </CharacterProvider>
+          <RealtimeProvider>
+            <CharacterProvider>
+              <MapEditorProvider>
+                <TokenProvider>
+                  <MapTokenProvider>
+                    <NpcProvider>
+                      <TurnProvider>
+                        <App />
+                      </TurnProvider>
+                    </NpcProvider>
+                  </MapTokenProvider>
+                </TokenProvider>
+              </MapEditorProvider>
+            </CharacterProvider>
+          </RealtimeProvider>
         </CampaignProvider>
       </AuthProvider>
     </BrowserRouter>

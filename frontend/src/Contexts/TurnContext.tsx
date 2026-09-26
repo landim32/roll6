@@ -6,6 +6,8 @@ import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { useCharacter } from '../hooks/useCharacter';
 import { useMapToken } from '../hooks/useMapToken';
+import { useRealtime, useTableEvents } from '../hooks/useRealtime';
+import { TABLE_EVENT } from '../types/realtime';
 import { trackTurn } from '../lib/turnStatus';
 import type { TurnSeen } from '../lib/turnStatus';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
@@ -71,6 +73,7 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
   const { currentCampaign, isMaster } = useCampaign();
   const { myParticipations } = useCharacter();
   const { refresh: refreshMapTokens } = useMapToken();
+  const { live } = useRealtime();
   const [turnNo, setTurnNo] = useState<number | null>(null);
   const [entries, setEntries] = useState<TurnInfo[]>([]);
   const [unread, setUnread] = useState<number[]>([]);
@@ -116,9 +119,15 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
     void refresh();
   }, [refresh]);
 
-  // Every 15 s while the tab is visible, and right away when it becomes visible again.
+  // Real-time table (017): the turn changes for everyone at once.
+  useTableEvents((event) => {
+    if (event.type === TABLE_EVENT.turnChanged || event.type === TABLE_EVENT.turnFinished || event.type === TABLE_EVENT.resync)
+      void refresh();
+  });
+
+  // Without the real-time channel: every 15 s while the tab is visible, and right away when it becomes visible.
   useEffect(() => {
-    if (!canRead) return;
+    if (!canRead || live) return;
     const tick = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
@@ -128,7 +137,7 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', tick);
     };
-  }, [canRead, refresh]);
+  }, [canRead, live, refresh]);
 
   const run = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
     try {

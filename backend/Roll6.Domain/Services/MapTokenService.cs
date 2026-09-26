@@ -3,7 +3,9 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Grid;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.MapToken;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -28,6 +30,7 @@ public class MapTokenService : IMapTokenService
     private readonly ICampaignRepository<Campaign> _campaignRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly IRealtimeNotifier _notifier;
 
     public MapTokenService(
         IMapTokenRepository<MapToken> repository,
@@ -41,8 +44,10 @@ public class MapTokenService : IMapTokenService
         ITurnRepository<Turn> turnRepository,
         ICampaignRepository<Campaign> campaignRepository,
         IUnitOfWork unitOfWork,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
         _turnRepository = turnRepository;
         _campaignRepository = campaignRepository;
         _repository = repository;
@@ -78,7 +83,7 @@ public class MapTokenService : IMapTokenService
         mapToken.Update(name, info.TokenType, info.Sheet, info.Life, info.Energy, info.Status, info.Move, info.X, info.Y, info.Look);
         mapToken.CreatedAt = mapToken.UpdatedAt;
 
-        return await MapToDtoAsync(await _repository.InsertAsync(mapToken));
+        return await PublishPieceAsync(map, userId, await MapToDtoAsync(await _repository.InsertAsync(mapToken)));
     }
 
     /// <summary>
@@ -110,7 +115,7 @@ public class MapTokenService : IMapTokenService
             saved = await _repository.InsertAsync(MapToken.PlaceCharacter(
                 map.MapId, tokenId, participation.CampaignCharacterId, character.Name, info.X, info.Y));
         });
-        return await MapToDtoAsync(saved);
+        return await PublishPieceAsync(map, userId, await MapToDtoAsync(saved));
     }
 
     public async Task<MapTokenInfo> UpdateAsync(long userId, long mapTokenId, MapTokenUpdateInfo info)
@@ -118,7 +123,7 @@ public class MapTokenService : IMapTokenService
         var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
         await EnsureFreeHexAsync(map, info.X, info.Y, mapToken.MapTokenId);
         mapToken.Update(info.Name, info.TokenType, info.Sheet, info.Life, info.Energy, info.Status, info.Move, info.X, info.Y, info.Look);
-        return await MapToDtoAsync(await _repository.UpdateAsync(mapToken));
+        return await PublishPieceAsync(map, userId, await MapToDtoAsync(await _repository.UpdateAsync(mapToken)));
     }
 
     /// <summary>
@@ -149,7 +154,10 @@ public class MapTokenService : IMapTokenService
             if (turn != null)
                 await _turnRepository.InsertAsync(turn);
         });
-        return await MapToDtoAsync(saved);
+        var result = await PublishPieceAsync(map, userId, await MapToDtoAsync(saved));
+        if (turn != null)
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, map.CampaignId, userId));
+        return result;
     }
 
     /// <summary>The Movement entry of a character/NPC piece, or null for objects; refuses a second move in the turn.</summary>
@@ -196,16 +204,16 @@ public class MapTokenService : IMapTokenService
 
     public async Task<MapTokenInfo> ChangeTokenAsync(long userId, long mapTokenId, MapTokenTokenInfo info)
     {
-        var (mapToken, _) = await GetOwnedAsync(userId, mapTokenId);
+        var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
         await GetTokenAsync(info.TokenId);
         mapToken.ChangeToken(info.TokenId);
-        return await MapToDtoAsync(await _repository.UpdateAsync(mapToken));
+        return await PublishPieceAsync(map, userId, await MapToDtoAsync(await _repository.UpdateAsync(mapToken)));
     }
 
     /// <summary>Removes the piece; a piece of an NPC occurrence takes the occurrence with it.</summary>
     public async Task DeleteAsync(long userId, long mapTokenId)
     {
-        var (mapToken, _) = await GetOwnedAsync(userId, mapTokenId);
+        var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _repository.DeleteAsync(mapToken.MapTokenId);
@@ -215,6 +223,17 @@ public class MapTokenService : IMapTokenService
                 await _mapNpcRepository.DeleteAsync(mapNpcId);
             }
         });
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKEN_DELETED, map.CampaignId, userId, map.MapId,
+            new { mapTokenId = mapToken.MapTokenId }));
+        if (mapToken.MapNpcId != null)
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, map.CampaignId, userId));
+    }
+
+    /// <summary>Tells the table about a created/moved/changed piece (017) and hands the DTO back.</summary>
+    private async Task<MapTokenInfo> PublishPieceAsync(Map map, long userId, MapTokenInfo piece)
+    {
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKEN_UPSERTED, map.CampaignId, userId, map.MapId, piece));
+        return piece;
     }
 
     private async Task<(MapToken MapToken, Map Map)> GetOwnedAsync(long userId, long mapTokenId)

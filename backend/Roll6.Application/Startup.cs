@@ -1,10 +1,13 @@
 using System.Text;
 using Amazon.S3;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Roll6.Application.Auth;
+using Roll6.Application.Realtime;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
@@ -70,9 +73,29 @@ public static class Startup
         services.AddScoped<ICampaignNpcService, CampaignNpcService>();
         services.AddScoped<IMapNpcService, MapNpcService>();
         services.AddScoped<ITurnService, TurnService>();
+        services.AddScoped<ICampaignPlanRepository<CampaignPlan>, CampaignPlanRepository>();
+        services.AddScoped<ICampaignPlanService, CampaignPlanService>();
+        services.AddScoped<IApiKeyRepository<ApiKey>, ApiKeyRepository>();
+        services.AddScoped<IApiKeyService, ApiKeyService>();
+        services.AddSingleton(TimeProvider.System);
+
+        // Real-time table events (017): the hub only pushes; changes keep going through the REST API.
+        services.AddSignalR();
+        services.AddSingleton<TableConnections>();
+        services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
 
         // Authentication
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        // Authentication: the default scheme picks the API key (X-Api-Key header, 019) or the JWT per request, so
+        // every [Authorize] accepts both with the same "sub" claim.
+        services.AddAuthentication(AuthConstants.POLICY_SCHEME)
+            .AddPolicyScheme(AuthConstants.POLICY_SCHEME, "JWT or API key", options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                    context.Request.Headers.ContainsKey(AuthConstants.API_KEY_HEADER)
+                        ? AuthConstants.API_KEY_SCHEME
+                        : JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(AuthConstants.API_KEY_SCHEME, null)
             .AddJwtBearer(options =>
             {
                 options.MapInboundClaims = false;
@@ -87,8 +110,23 @@ public static class Startup
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
                     NameClaimType = "name"
                 };
+                // Browsers can't send the Authorization header on WebSockets: the hub takes the token from the
+                // query string, and only there.
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var token = context.Request.Query["access_token"];
+                        if (!string.IsNullOrEmpty(token) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                            context.Token = token;
+                        return Task.CompletedTask;
+                    }
+                };
             });
-        services.AddAuthorization();
+        // Some operations need a logged-in user, never an API key (key management, name/password, the hub).
+        services.AddAuthorization(options => options.AddPolicy(AuthConstants.SESSION_POLICY, policy => policy
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context => !context.User.HasClaim(AuthConstants.AUTH_METHOD_CLAIM, AuthConstants.API_KEY_METHOD))));
 
         return services;
     }

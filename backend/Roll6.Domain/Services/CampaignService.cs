@@ -1,8 +1,11 @@
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.Campaign;
 using Roll6.DTO.Common;
+using Roll6.DTO.Realtime;
+using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Domain.Services;
@@ -18,6 +21,8 @@ public class CampaignService : ICampaignService
     private readonly IMapNpcRepository<MapNpc> _mapNpcRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITurnRepository<Turn> _turnRepository;
+    private readonly IRealtimeNotifier _notifier;
+    private readonly ICampaignPlanRepository<CampaignPlan> _campaignPlanRepository;
 
     public CampaignService(
         ICampaignRepository<Campaign> repository,
@@ -28,8 +33,12 @@ public class CampaignService : ICampaignService
         ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         IMapNpcRepository<MapNpc> mapNpcRepository,
         IUnitOfWork unitOfWork,
-        ITurnRepository<Turn> turnRepository)
+        ITurnRepository<Turn> turnRepository,
+        IRealtimeNotifier notifier,
+        ICampaignPlanRepository<CampaignPlan> campaignPlanRepository)
     {
+        _campaignPlanRepository = campaignPlanRepository;
+        _notifier = notifier;
         _turnRepository = turnRepository;
         _campaignNpcRepository = campaignNpcRepository;
         _mapNpcRepository = mapNpcRepository;
@@ -72,14 +81,18 @@ public class CampaignService : ICampaignService
     {
         var campaign = await GetOwnedAsync(userId, campaignId);
         campaign.Rename(info.Name);
-        return await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
+        return result;
     }
 
     public async Task<CampaignInfo> SetOpenAsync(long userId, long campaignId, CampaignOpenInfo info)
     {
         var campaign = await GetOwnedAsync(userId, campaignId);
         campaign.SetOpen(info.Open);
-        return await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
+        return result;
     }
 
     public async Task DeleteAsync(long userId, long campaignId)
@@ -99,9 +112,36 @@ public class CampaignService : ICampaignService
                 await _mapRepository.DeleteRangeAsync(deletedMapIds);
             }
             await _campaignNpcRepository.DeleteByCampaignAsync(campaignId);
+            await _campaignPlanRepository.DeleteByCampaignAsync(campaignId);
             await _campaignCharacterRepository.DeleteByCampaignAsync(campaignId);
             await _repository.DeleteAsync(campaignId);
         });
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_DELETED, campaignId, userId));
+    }
+
+    public async Task<bool> CanReadAsync(long userId, long campaignId)
+    {
+        var campaign = await GetCampaignAsync(campaignId);
+        return campaign.UserId == userId || await _campaignCharacterRepository.HasApprovedCharacterAsync(campaignId, userId);
+    }
+
+    public async Task<CampaignInfo> SetCurrentMapAsync(long userId, long campaignId, CampaignCurrentMapInfo info)
+    {
+        var campaign = await GetOwnedAsync(userId, campaignId);
+        if (info.MapId is long mapId)
+        {
+            var map = await _mapRepository.GetByIdAsync(mapId)
+                ?? throw new KeyNotFoundException("Mapa não encontrado.");
+            if (map.CampaignId != campaignId || map.Status == Enums.MapStatus.Deleted)
+                throw new DomainValidationException("mapId", "O mapa precisa ser um mapa ativo desta campanha.");
+        }
+        if (campaign.CurrentMapId == info.MapId)
+            return await MapToDtoAsync(campaign);
+
+        campaign.SetCurrentMap(info.MapId);
+        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_CURRENT, campaignId, userId, info.MapId));
+        return result;
     }
 
     private async Task<Campaign> GetCampaignAsync(long campaignId)
@@ -137,6 +177,7 @@ public class CampaignService : ICampaignService
         Name = campaign.Name,
         Open = campaign.Open,
         CurrentTurn = campaign.CurrentTurn,
+        CurrentMapId = campaign.CurrentMapId,
         CreatedAt = campaign.CreatedAt,
         UpdatedAt = campaign.UpdatedAt
     };

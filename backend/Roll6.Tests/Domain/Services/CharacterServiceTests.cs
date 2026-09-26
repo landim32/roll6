@@ -4,6 +4,7 @@ using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Character;
 using Roll6.DTO.Common;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -22,6 +23,7 @@ public class CharacterServiceTests
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly CharacterService _service;
@@ -32,9 +34,10 @@ public class CharacterServiceTests
             .Returns((string? file) => file == null ? null : $"https://cdn/{file}");
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Character>())).ReturnsAsync((Character c) => c);
+        _campaignCharacterRepository.Setup(r => r.ListCampaignIdsByCharacterAsync(It.IsAny<long>())).ReturnsAsync(new List<long>());
         _repository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(() => new Character { CharacterId = CHARACTER, UserId = OWNER, Name = "Aria", Life = 12, Energy = 6 });
         _service = new CharacterService(_repository.Object, _campaignCharacterRepository.Object,
-            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object, _turnRepository.Object);
+            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object, _turnRepository.Object, _notifier.Object);
     }
 
     [Fact]
@@ -145,5 +148,19 @@ public class CharacterServiceTests
         _mapTokenRepository.Verify(r => r.DeleteByCharacterAsync(CHARACTER), Times.Once);
         _campaignCharacterRepository.Verify(r => r.DeleteByCharacterAsync(CHARACTER), Times.Once);
         _repository.Verify(r => r.DeleteAsync(CHARACTER), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_PublishesToEveryCampaignOfTheCharacter()
+    {
+        _campaignCharacterRepository.Setup(r => r.ListCampaignIdsByCharacterAsync(CHARACTER)).ReturnsAsync(new List<long> { 10, 11 });
+
+        await _service.UpdateAsync(OWNER, CHARACTER, Changes());
+
+        foreach (var campaignId in new long[] { 10, 11 })
+        {
+            _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.PARTY_CHANGED && e.CampaignId == campaignId)), Times.Once);
+            _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.CampaignId == campaignId)), Times.Once);
+        }
     }
 }

@@ -50,6 +50,14 @@ export const useTokenMovement = () => {
     }, field));
   }, [mapTokens, draft.gridWidth, draft.gridHeight]);
 
+  // Someone else moved or removed the piece meanwhile (real-time, 017): the planned path is no longer valid.
+  useEffect(() => {
+    if (state.phase === 'idle') return;
+    const current = mapTokens.find((t) => t.mapTokenId === state.piece.mapTokenId);
+    if (!current || current.x !== state.piece.x || current.y !== state.piece.y || current.look !== state.piece.look)
+      setState(IDLE);
+  }, [mapTokens, state]);
+
   const hover = useCallback((hex: Offset | null) => setState((s) => hoverPath(s, hex)), []);
   const face = useCallback((look: number) => setState((s) => pointFacing(s, look)), []);
   const pick = useCallback(() => setState((s) => pickDestination(s)), []);

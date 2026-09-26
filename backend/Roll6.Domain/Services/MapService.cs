@@ -1,8 +1,10 @@
 using Roll6.Domain.Grid;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.Common;
 using Roll6.DTO.Map;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -15,14 +17,17 @@ public class MapService : IMapService
     private readonly IMapModelRepository<MapModel> _mapModelRepository;
     private readonly ICampaignCharacterRepository<CampaignCharacter> _campaignCharacterRepository;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly IRealtimeNotifier _notifier;
 
     public MapService(
         IMapRepository<Map> repository,
         ICampaignRepository<Campaign> campaignRepository,
         IMapModelRepository<MapModel> mapModelRepository,
         ICampaignCharacterRepository<CampaignCharacter> campaignCharacterRepository,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
         _repository = repository;
         _campaignRepository = campaignRepository;
         _mapModelRepository = mapModelRepository;
@@ -68,7 +73,9 @@ public class MapService : IMapService
             CreatedAt = now,
             UpdatedAt = now
         };
-        return MapToDto(await _repository.InsertWithNextSequenceAsync(map, mapModel.Name), mapModel);
+        var result = MapToDto(await _repository.InsertWithNextSequenceAsync(map, mapModel.Name), mapModel);
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAPS_CHANGED, result.CampaignId, userId, result.MapId, result));
+        return result;
     }
 
     public async Task<MapInfo> UpdateAsync(long userId, long mapId, MapUpdateInfo info)
@@ -76,7 +83,9 @@ public class MapService : IMapService
         var map = await GetOwnedAsync(userId, mapId);
         map.Update(info.Name, info.Status);
         var updated = await _repository.UpdateAsync(map);
-        return MapToDto(updated, await _mapModelRepository.GetByIdAsync(updated.MapModelId));
+        var result = MapToDto(updated, await _mapModelRepository.GetByIdAsync(updated.MapModelId));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAPS_CHANGED, result.CampaignId, userId, result.MapId, result));
+        return result;
     }
 
     public async Task DeleteAsync(long userId, long mapId)
@@ -84,6 +93,19 @@ public class MapService : IMapService
         var map = await GetOwnedAsync(userId, mapId);
         map.MarkDeleted();
         await _repository.UpdateAsync(map);
+        await AfterDeletedAsync(map, userId);
+    }
+
+    /// <summary>A deleted map stops being the one the table follows, and whoever has it open closes it (017).</summary>
+    private async Task AfterDeletedAsync(Map map, long userId)
+    {
+        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId);
+        if (campaign?.CurrentMapId == map.MapId)
+        {
+            campaign.SetCurrentMap(null);
+            await _campaignRepository.UpdateAsync(campaign);
+        }
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_DELETED, map.CampaignId, userId, map.MapId));
     }
 
     /// <summary>Returns the map when it exists, is not deleted and belongs to the user.</summary>

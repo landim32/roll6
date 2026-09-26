@@ -49,6 +49,12 @@ public class CampaignCharacterRepository : ICampaignCharacterRepository<Campaign
             .ToListAsync();
     }
 
+    public async Task<List<long>> ListCampaignIdsByCharacterAsync(long characterId)
+    {
+        return await _context.CampaignCharacters.Where(e => e.CharacterId == characterId)
+            .Select(e => e.CampaignId).Distinct().ToListAsync();
+    }
+
     public async Task<bool> HasApprovedCharacterAsync(long campaignId, long userId)
     {
         return await _context.CampaignCharacters

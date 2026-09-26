@@ -5,6 +5,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.MapToken;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -23,6 +24,7 @@ public class MapTokenServiceTests
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly MapTokenService _service;
 
     private const long APPROVED = 70;
@@ -45,7 +47,7 @@ public class MapTokenServiceTests
         _repository.Setup(r => r.UpdateAsync(It.IsAny<MapToken>())).ReturnsAsync((MapToken t) => t);
         _service = new MapTokenService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _tokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _turnRepository.Object, _campaignRepository.Object,
-            _unitOfWork.Object, Mock.Of<IImageStorageAppService>());
+            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _notifier.Object);
     }
 
     [Fact]
@@ -389,6 +391,8 @@ public class MapTokenServiceTests
 
         _repository.Verify(r => r.DeleteAsync(44), Times.Once);
         _mapNpcRepository.Verify(r => r.DeleteAsync(90), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.MAP_TOKEN_DELETED && e.CampaignId == 10 && e.MapId == 30)), Times.Once);
     }
 
     private MapToken AriaPiece()
@@ -435,6 +439,9 @@ public class MapTokenServiceTests
 
         recorded.Should().NotBeNull();
         (recorded!.TurnType, recorded.TurnNo, recorded.CharacterId, recorded.MapId).Should().Be((TurnType.Movement, 3, (long?)ARIA, (long?)30));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_UPSERTED
+            && e.CampaignId == 10 && e.MapId == 30 && e.ActorUserId == 2 && ((MapTokenInfo)e.Data!).X == 2)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED && e.CampaignId == 10)), Times.Once);
         (recorded.BeforeX, recorded.BeforeY, recorded.X, recorded.Y).Should().Be(((int?)2, (int?)2, (int?)2, (int?)0));
     }
 
@@ -447,6 +454,7 @@ public class MapTokenServiceTests
         await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 })).Should().ThrowAsync<ConflictException>();
         _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
         _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
     }
 
     [Fact]

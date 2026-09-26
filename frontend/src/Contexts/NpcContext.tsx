@@ -4,14 +4,18 @@ import { campaignNpcService } from '../Services/campaignNpcService';
 import { mapNpcService } from '../Services/mapNpcService';
 import { npcService } from '../Services/npcService';
 import { useCampaign } from '../hooks/useCampaign';
+import { useCharacter } from '../hooks/useCharacter';
 import { useMapEditor } from '../hooks/useMapEditor';
 import { useMapToken } from '../hooks/useMapToken';
+import { useRealtime, useTableEvents } from '../hooks/useRealtime';
+import { TABLE_EVENT } from '../types/realtime';
+import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { ListQuery, PagedList } from '../types/common';
 import type { CampaignNpcInfo, MapNpcInfo, NpcInfo, NpcInsertInfo } from '../types/npc';
 
 interface NpcContextType {
   // State
-  /** NPCs of the current campaign (empty unless the user is its master). */
+  /** NPCs of the current campaign (master and approved participants; empty for anyone else). */
   campaignNpcs: CampaignNpcInfo[];
   loading: boolean;
   error: string | null;
@@ -33,8 +37,13 @@ interface NpcContextType {
 
 const NpcContext = createContext<NpcContextType | undefined>(undefined);
 
+/** The campaign NPC list is polled this often while the tab is visible. */
+const NPC_POLL_MS = 15_000;
+
 export const NpcProvider = ({ children }: { children: ReactNode }) => {
   const { currentCampaign, isMaster } = useCampaign();
+  const { myParticipations } = useCharacter();
+  const { live } = useRealtime();
   const { draft } = useMapEditor();
   const { refresh: refreshMapTokens } = useMapToken();
   const [campaignNpcs, setCampaignNpcs] = useState<CampaignNpcInfo[]>([]);
@@ -43,7 +52,11 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
   /** Campaign whose NPCs are wanted; late responses for another campaign are dropped. */
   const campaignRef = useRef<number | null>(null);
 
-  const campaignId = isMaster ? currentCampaign?.campaignId ?? null : null;
+  const currentId = currentCampaign?.campaignId ?? null;
+  /** Players see the campaign NPCs read-only once they have an approved character in it (else the API answers 403). */
+  const canSee = currentId !== null && (isMaster || myParticipations.some(
+    (p) => p.campaignId === currentId && p.status === CAMPAIGN_CHARACTER_STATUS.approved));
+  const campaignId = canSee ? currentId : null;
 
   const handleError = (err: unknown): never => {
     setError(err instanceof Error ? err.message : 'Unknown error');
@@ -68,6 +81,25 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     void refreshCampaignNpcs();
   }, [refreshCampaignNpcs]);
+
+  // Real-time table (017): NPCs added/removed/edited by the master show up right away.
+  useTableEvents((event) => {
+    if (event.type === TABLE_EVENT.campaignNpcsChanged || event.type === TABLE_EVENT.resync) void refreshCampaignNpcs();
+  });
+
+  // Without the real-time channel, players see the master's changes by polling (same rhythm as the party panel).
+  useEffect(() => {
+    if (campaignId === null || live) return;
+    const tick = () => {
+      if (document.visibilityState === 'visible') void refreshCampaignNpcs();
+    };
+    const timer = window.setInterval(tick, NPC_POLL_MS);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [campaignId, live, refreshCampaignNpcs]);
 
   const run = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
     try {

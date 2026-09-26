@@ -2,7 +2,9 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Grid;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.MapNpc;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -26,6 +28,8 @@ public class MapNpcService : IMapNpcService
     private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IImageStorageAppService _imageStorage;
 
+    private readonly IRealtimeNotifier _notifier;
+
     public MapNpcService(
         IMapNpcRepository<MapNpc> repository,
         IMapRepository<Map> mapRepository,
@@ -37,8 +41,10 @@ public class MapNpcService : IMapNpcService
         ITokenRepository<Token> tokenRepository,
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
-        ITurnRepository<Turn> turnRepository)
+        ITurnRepository<Turn> turnRepository,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
         _turnRepository = turnRepository;
         _repository = repository;
         _mapRepository = mapRepository;
@@ -81,34 +87,42 @@ public class MapNpcService : IMapNpcService
             saved = await _repository.InsertAsync(MapNpc.FromNpc(map.MapId, npc));
             await _mapTokenRepository.InsertAsync(MapToken.PlaceNpc(map.MapId, npc.TokenId, saved.MapNpcId, saved.Name, info.X, info.Y, info.Look));
         });
+        await PublishPiecesChangedAsync(map, userId);
         return (await MapToDtoAsync(new List<MapNpc> { saved })).Single();
     }
 
     public async Task<MapNpcInfo> UpdateAsync(long userId, long mapNpcId, MapNpcUpdateInfo info)
     {
-        var mapNpc = await GetOwnedAsync(userId, mapNpcId);
+        var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
         mapNpc.Update(info.Name, info.Life, info.Energy, info.Status);
-        return (await MapToDtoAsync(new List<MapNpc> { await _repository.UpdateAsync(mapNpc) })).Single();
+        var result = (await MapToDtoAsync(new List<MapNpc> { await _repository.UpdateAsync(mapNpc) })).Single();
+        await PublishPiecesChangedAsync(map, userId);
+        return result;
     }
 
     /// <summary>Removes the occurrence and its piece.</summary>
     public async Task DeleteAsync(long userId, long mapNpcId)
     {
-        var mapNpc = await GetOwnedAsync(userId, mapNpcId);
+        var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _mapTokenRepository.DeleteByMapNpcIdsAsync(new[] { mapNpc.MapNpcId });
             await _turnRepository.DeleteByMapNpcIdsAsync(new[] { mapNpc.MapNpcId });
             await _repository.DeleteAsync(mapNpc.MapNpcId);
         });
+        await PublishPiecesChangedAsync(map, userId);
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, map.CampaignId, userId));
     }
 
-    private async Task<MapNpc> GetOwnedAsync(long userId, long mapNpcId)
+    /// <summary>The occurrence's piece shows its name/vitals: the map's pieces must be reloaded (017).</summary>
+    private Task PublishPiecesChangedAsync(Map map, long userId) =>
+        _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, map.CampaignId, userId, map.MapId));
+
+    private async Task<(MapNpc MapNpc, Map Map)> GetOwnedAsync(long userId, long mapNpcId)
     {
         var mapNpc = await _repository.GetByIdAsync(mapNpcId)
             ?? throw new KeyNotFoundException("NPC do mapa não encontrado.");
-        await GetMasteredMapAsync(userId, mapNpc.MapId);
-        return mapNpc;
+        return (mapNpc, await GetMasteredMapAsync(userId, mapNpc.MapId));
     }
 
     private async Task<Map> GetMapAsync(long mapId)

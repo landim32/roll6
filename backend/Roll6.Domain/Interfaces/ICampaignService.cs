@@ -12,4 +12,10 @@ public interface ICampaignService
     Task<CampaignInfo> RenameAsync(long userId, long campaignId, CampaignInsertInfo info);
     Task<CampaignInfo> SetOpenAsync(long userId, long campaignId, CampaignOpenInfo info);
     Task DeleteAsync(long userId, long campaignId);
+
+    /// <summary>True for the master and for users with an approved character (who may follow the table in real time).</summary>
+    Task<bool> CanReadAsync(long userId, long campaignId);
+
+    /// <summary>Master: sets the map the players follow (017); publishes <c>map.current</c> when it changes.</summary>
+    Task<CampaignInfo> SetCurrentMapAsync(long userId, long campaignId, CampaignCurrentMapInfo info);
 }

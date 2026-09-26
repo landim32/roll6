@@ -4,6 +4,8 @@ import { characterService } from '../Services/characterService';
 import { campaignCharacterService } from '../Services/campaignCharacterService';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
+import { useRealtime, useTableEvents } from '../hooks/useRealtime';
+import { TABLE_EVENT } from '../types/realtime';
 import {
   buildCharacterOptions, readStoredSelections, resolveSelection, writeStoredSelection,
 } from '../lib/characterSelection';
@@ -79,6 +81,7 @@ const CharacterContext = createContext<CharacterContextType | undefined>(undefin
 export const CharacterProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
   const { currentCampaign, isMaster } = useCampaign();
+  const { live } = useRealtime();
   const [myCharacters, setMyCharacters] = useState<CharacterInfo[]>([]);
   const [myParticipations, setMyParticipations] = useState<CampaignCharacterInfo[]>([]);
   /** Campaign the participations above were loaded for (they lag one render behind a switch). */
@@ -182,9 +185,17 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
     void refreshParty();
   }, [refreshParty]);
 
-  // Every 15 s while the tab is visible, and right away when it becomes visible again.
+  // Real-time table (017): participations and party change for everyone at once.
+  useTableEvents((event) => {
+    if (event.type === TABLE_EVENT.partyChanged || event.type === TABLE_EVENT.resync) {
+      void refresh(true);
+      void refreshParty();
+    }
+  });
+
+  // Without the real-time channel: every 15 s while the tab is visible, and right away when it becomes visible.
   useEffect(() => {
-    if (!session || campaignId === null) return;
+    if (!session || campaignId === null || live) return;
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
       void refresh(true);
@@ -196,7 +207,7 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', tick);
     };
-  }, [session, campaignId, refresh, refreshParty]);
+  }, [session, campaignId, live, refresh, refreshParty]);
 
   // ---------- selection ----------
 

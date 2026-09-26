@@ -13,6 +13,9 @@ public class Campaign
 
     /// <summary>Current turn of the campaign (016), starting at 1.</summary>
     public int CurrentTurn { get; set; } = 1;
+
+    /// <summary>Campaign map the master opened last (017): players follow it. Null when there is none.</summary>
+    public long? CurrentMapId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -26,6 +29,13 @@ public class Campaign
     public void AdvanceTurn()
     {
         CurrentTurn++;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Sets (or clears) the map the table follows.</summary>
+    public void SetCurrentMap(long? mapId)
+    {
+        CurrentMapId = mapId;
         UpdatedAt = DateTime.UtcNow;
     }
 

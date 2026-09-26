@@ -13,4 +13,6 @@ public interface IMapRepository<TModel> where TModel : class
     Task<List<long>> ListDeletedIdsByCampaignAsync(long campaignId);
     Task DeleteRangeAsync(IEnumerable<long> ids);
     Task<bool> ExistsByMapModelAsync(long mapModelId);
+    /// <summary>Campaigns with a non-deleted map made from the model.</summary>
+    Task<List<long>> ListCampaignIdsByModelAsync(long mapModelId);
 }

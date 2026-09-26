@@ -4,7 +4,9 @@ using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
+using Roll6.DTO.Realtime;
 using Roll6.DTO.Turn;
+using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Tests.Domain.Services;
@@ -34,6 +36,7 @@ public class TurnServiceTests
     private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3 };
     private readonly MapToken _ariaPiece;
     private readonly TurnService _service;
@@ -73,7 +76,7 @@ public class TurnServiceTests
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
 
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
-            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object);
+            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _notifier.Object);
     }
 
     // --- State (US1) ---
@@ -100,6 +103,8 @@ public class TurnServiceTests
 
         (result.TurnType, result.TurnNo, result.CharacterId, result.ActorName, result.Description)
             .Should().Be(((int)TurnType.Action, 3, (long?)ARIA, "Aria", "Ataca o goblin"));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.TURN_CHANGED && e.CampaignId == CAMPAIGN && e.ActorUserId == PLAYER)), Times.Once);
     }
 
     [Fact]
@@ -142,6 +147,7 @@ public class TurnServiceTests
 
         (result.Finished, result.TurnNo).Should().Be((false, 3));
         result.Pending.Should().Equal("Bram");
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
         _campaignRepository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
     }
 
@@ -154,6 +160,7 @@ public class TurnServiceTests
 
         (result.Finished, result.FinishedTurn, result.TurnNo).Should().Be((true, (int?)3, 4));
         _campaignRepository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.CurrentTurn == 4)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_FINISHED && e.CampaignId == CAMPAIGN)), Times.Once);
     }
 
     [Fact]

@@ -19,6 +19,10 @@ public class CampaignInfo
     [JsonPropertyName("currentTurn")]
     public int CurrentTurn { get; set; }
 
+    /// <summary>Map the master opened last; players follow it (017).</summary>
+    [JsonPropertyName("currentMapId")]
+    public long? CurrentMapId { get; set; }
+
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 

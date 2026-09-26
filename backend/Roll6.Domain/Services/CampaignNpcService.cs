@@ -1,13 +1,18 @@
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.CampaignNpc;
+using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Domain.Services;
 
-/// <summary>NPCs available in a campaign: only the master adds (his own NPCs), lists and removes them.</summary>
+/// <summary>
+/// NPCs available in a campaign: only the master adds (his own NPCs) and removes them; the master and the
+/// approved participants list them (players see the NPC cards read-only).
+/// </summary>
 public class CampaignNpcService : ICampaignNpcService
 {
     private readonly ICampaignNpcRepository<CampaignNpc> _repository;
@@ -19,6 +24,9 @@ public class CampaignNpcService : ICampaignNpcService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly ICampaignCharacterRepository<CampaignCharacter> _campaignCharacterRepository;
+
+    private readonly IRealtimeNotifier _notifier;
 
     public CampaignNpcService(
         ICampaignNpcRepository<CampaignNpc> repository,
@@ -29,8 +37,12 @@ public class CampaignNpcService : ICampaignNpcService
         IMapTokenRepository<MapToken> mapTokenRepository,
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
-        ITurnRepository<Turn> turnRepository)
+        ITurnRepository<Turn> turnRepository,
+        ICampaignCharacterRepository<CampaignCharacter> campaignCharacterRepository,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
+        _campaignCharacterRepository = campaignCharacterRepository;
         _turnRepository = turnRepository;
         _repository = repository;
         _campaignRepository = campaignRepository;
@@ -44,7 +56,10 @@ public class CampaignNpcService : ICampaignNpcService
 
     public async Task<List<CampaignNpcInfo>> ListByCampaignAsync(long userId, long campaignId)
     {
-        await GetMasteredAsync(userId, campaignId);
+        var campaign = await _campaignRepository.GetByIdAsync(campaignId)
+            ?? throw new KeyNotFoundException("Campanha não encontrada.");
+        if (campaign.UserId != userId && !await _campaignCharacterRepository.HasApprovedCharacterAsync(campaignId, userId))
+            throw new UnauthorizedAccessException("Apenas o mestre ou participantes aprovados podem ver os NPCs da campanha.");
         return await MapToDtoAsync(await _repository.ListByCampaignAsync(campaignId));
     }
 
@@ -59,7 +74,9 @@ public class CampaignNpcService : ICampaignNpcService
             throw new ConflictException("O NPC já está nesta campanha.");
 
         var saved = await _repository.InsertAsync(CampaignNpc.Create(campaign.CampaignId, npc.NpcId));
-        return (await MapToDtoAsync(new List<CampaignNpc> { saved })).Single();
+        var result = (await MapToDtoAsync(new List<CampaignNpc> { saved })).Single();
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_NPCS_CHANGED, campaign.CampaignId, userId));
+        return result;
     }
 
     /// <summary>Removes the NPC from the campaign together with its occurrences (and their pieces) on the campaign's maps.</summary>
@@ -80,6 +97,9 @@ public class CampaignNpcService : ICampaignNpcService
             }
             await _repository.DeleteAsync(campaignNpc.CampaignNpcId);
         });
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_NPCS_CHANGED, campaignNpc.CampaignId, userId));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignNpc.CampaignId, userId));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, campaignNpc.CampaignId, userId));
     }
 
     private async Task<Campaign> GetMasteredAsync(long userId, long campaignId)

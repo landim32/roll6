@@ -897,3 +897,84 @@ body,
 .stm-turn-summary > li.is-type-1 { border-left-color: var(--bs-info); }
 .stm-turn-summary > li.is-type-2 { border-left-color: var(--bs-success); }
 .stm-turn-summary > li.is-type-3 { border-left-color: var(--bs-warning); }
+
+/* ---------- real-time table (017) ---------- */
+.stm-realtime-badge {
+  background: rgba(var(--bs-danger-rgb), 0.15);
+  color: var(--bs-danger-text-emphasis);
+  border: 1px solid rgba(var(--bs-danger-rgb), 0.5);
+  font-weight: 500;
+}
+
+/* ---------- campaign settings and plan (018) ---------- */
+.stm-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin-left: -0.4rem;
+}
+
+/* A stable height so switching tabs doesn't make the window jump. */
+.stm-settings-body {
+  min-height: 420px;
+}
+
+.stm-plan-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.stm-plan-list .list-group {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.stm-plan-list .list-group-item {
+  text-align: left;
+}
+
+.stm-plan-editor {
+  min-width: 0;
+}
+
+.stm-markdown img {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 768px) {
+  .stm-plan-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- API keys (019) ---------- */
+.stm-api-key-secret {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--bs-border-radius);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--bs-body-color);
+  font-size: 0.9rem;
+  word-break: break-all;
+  user-select: all;
+}
+
+.stm-api-key-table {
+  font-size: 0.85rem;
+}
+
+.stm-api-key-table td,
+.stm-api-key-table th {
+  white-space: nowrap;
+}
+
+.stm-api-key-table td.text-break {
+  white-space: normal;
+  min-width: 8rem;
+}

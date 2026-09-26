@@ -22,6 +22,68 @@ namespace Roll6.Infra.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Roll6.Domain.Models.ApiKey", b =>
+                {
+                    b.Property<long>("ApiKeyId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("api_key_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ApiKeyId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key_hash");
+
+                    b.Property<string>("KeyPrefix")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("key_prefix");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("ApiKeyId")
+                        .HasName("api_keys_pkey");
+
+                    b.HasIndex("KeyHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_api_keys_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_api_keys_user");
+
+                    b.ToTable("api_keys", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.Campaign", b =>
                 {
                     b.Property<long>("CampaignId")
@@ -36,6 +98,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<long?>("CurrentMapId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("current_map_id");
 
                     b.Property<int>("CurrentTurn")
                         .ValueGeneratedOnAdd()
@@ -65,6 +131,8 @@ namespace Roll6.Infra.Migrations
 
                     b.HasKey("CampaignId")
                         .HasName("campaigns_pkey");
+
+                    b.HasIndex("CurrentMapId");
 
                     b.HasIndex("UserId");
 
@@ -167,6 +235,51 @@ namespace Roll6.Infra.Migrations
                         .HasDatabaseName("ix_campaign_npcs_campaign_npc");
 
                     b.ToTable("campaign_npcs", (string)null);
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.CampaignPlan", b =>
+                {
+                    b.Property<long>("CampaignPlanId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_plan_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("CampaignPlanId"));
+
+                    b.Property<long>("CampaignId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_id");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("changed_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(50000)
+                        .HasColumnType("character varying(50000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("title");
+
+                    b.HasKey("CampaignPlanId")
+                        .HasName("campaign_plans_pkey");
+
+                    b.HasIndex("CampaignId")
+                        .HasDatabaseName("ix_campaign_plans_campaign");
+
+                    b.ToTable("campaign_plans", (string)null);
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.Character", b =>
@@ -810,8 +923,22 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.ApiKey", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_api_key");
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.Campaign", b =>
                 {
+                    b.HasOne("Roll6.Domain.Models.Map", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentMapId")
+                        .HasConstraintName("fk_map_campaign_current");
+
                     b.HasOne("Roll6.Domain.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -847,6 +974,15 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("NpcId")
                         .IsRequired()
                         .HasConstraintName("fk_npc_campaign_npc");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.CampaignPlan", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("CampaignId")
+                        .IsRequired()
+                        .HasConstraintName("fk_campaign_plan");
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.Character", b =>

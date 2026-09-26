@@ -29,6 +29,12 @@ export interface MapInfo {
   updatedAt: string;
 }
 
+/** Rename a campaign map or change its status (1 active, 2 archived). */
+export interface MapUpdateInfo {
+  name: string;
+  status: number;
+}
+
 /** Data to add a map model to a campaign. */
 export interface MapInsertInfo {
   campaignId: number;
