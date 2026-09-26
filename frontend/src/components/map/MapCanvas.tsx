@@ -11,8 +11,10 @@ import { toMapPoint, useMapPointer } from '../../hooks/useMapPointer';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useNpc } from '../../hooks/useNpc';
 import { useTokenMovement } from '../../hooks/useTokenMovement';
+import { useTurn } from '../../hooks/useTurn';
 import { hexCenter, lookToward } from '../../lib/hexGrid';
 import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewOf } from '../../lib/movement';
+import { hasEntries, hasMoved, lastActions, movementTrails } from '../../lib/turnStatus';
 import { MAP_TOKEN_TYPE } from '../../types/mapToken';
 import type { MapTokenInfo } from '../../types/mapToken';
 import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt } from '../../lib/mapTokens';
@@ -25,7 +27,9 @@ import { ImageLayer } from './ImageLayer';
 import { MovementCounter } from './MovementCounter';
 import { MovementLayer } from './MovementLayer';
 import { ResizeHandles } from './ResizeHandles';
+import { SpeechBubbleLayer } from './SpeechBubbleLayer';
 import { TokenLayer } from './TokenLayer';
+import { TurnTrailLayer } from './TurnTrailLayer';
 
 /** What the tokens modal is opened for, from the map. */
 export type TokenPickRequest =
@@ -37,6 +41,10 @@ interface MapCanvasProps {
   onPickToken: (request: TokenPickRequest) => void;
   /** Asks to remove a piece (the page confirms first). */
   onDeleteToken: (target: { mapTokenId: number; name: string }) => void;
+  /** "Agir" on a piece (the page opens the action modal, 016). */
+  onAct: (target: { mapTokenId: number; name: string }) => void;
+  /** "Resetar turno" on a piece (the page confirms first, 016). */
+  onResetTurn: (target: { mapTokenId: number; name: string }) => void;
   /** A modal opened from the hex menu (tokens or delete confirmation) is still open: the hex stays selected. */
   picking?: boolean;
 }
@@ -51,7 +59,7 @@ const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y ==
  * The hex under the mouse is highlighted; the master clicks a hex for its menu and drops party cards
  * on hexes (011).
  */
-export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCanvasProps) => {
+export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, picking = false }: MapCanvasProps) => {
   const { t } = useTranslation();
   const { draft, hexSize, view, panBy, zoomIn, zoomOut, resizeMode, canEdit, setImageLayout } = useMapEditor();
   const { mapTokens, canPlace, placeCharacter, moveToken } = useMapToken();
@@ -59,6 +67,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
   const { session } = useAuth();
   const movement = useTokenMovement();
   const { placeOnMap } = useNpc();
+  const { turnNo, entries: turnEntries, refresh: refreshTurn } = useTurn();
   const hexAt = useMapPointer();
   const last = useRef<{ x: number; y: number } | null>(null);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
@@ -93,11 +102,21 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
    * Who may move a piece (015): the master any piece of the open campaign map; a player only the pieces of
    * his own characters.
    */
+  const isOwnCharacter = (token: MapTokenInfo): boolean =>
+    token.tokenType === MAP_TOKEN_TYPE.character
+    && party.some((p) => p.campaignCharacterId === token.campaignCharacterId && p.characterOwnerId === session?.user.userId);
+
+  /** Characters and NPCs move once per turn (016); objects move freely. */
   const canMove = (token: MapTokenInfo): boolean => {
     if (draft.mapId === null) return false;
-    if (canPlace) return true;
-    if (token.tokenType !== MAP_TOKEN_TYPE.character) return false;
-    return party.some((p) => p.campaignCharacterId === token.campaignCharacterId && p.characterOwnerId === session?.user.userId);
+    if (!canPlace && !isOwnCharacter(token)) return false;
+    return token.tokenType === MAP_TOKEN_TYPE.object || !hasMoved(turnEntries, token);
+  };
+
+  /** "Agir"/"Resetar turno" (016): the master on characters and NPCs, a player on his own characters. */
+  const canTakeTurn = (token: MapTokenInfo): boolean => {
+    if (draft.mapId === null || turnNo === null || token.tokenType === MAP_TOKEN_TYPE.object) return false;
+    return canPlace || isOwnCharacter(token);
   };
 
   /** Movement mode: the path follows the hovered hex; in the facing phase the piece turns to the mouse. */
@@ -134,6 +153,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
     try {
       const piece = await movement.confirm();
       if (piece) toast.success(t('toast.tokenMoved', { name: piece.name }));
+      void refreshTurn();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
     }
@@ -175,9 +195,9 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
     }
     const hex = hexAt(event);
     if (!hex) return;
-    // Players only get a menu (with "Mover") on the pieces of their own characters.
+    // Players only get a menu (Mover / Agir / Resetar turno) on the pieces of their own characters.
     const piece = tokenAt(mapTokens, hex.x, hex.y);
-    if (!canPlace && !(piece && canMove(piece))) return;
+    if (!canPlace && !(piece && (canMove(piece) || canTakeTurn(piece)))) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setMenu({ hex, left: event.clientX - rect.left, top: event.clientY - rect.top });
     hover(hex);
@@ -239,6 +259,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
           break;
         case 'move':
           await moveToken(action.mapTokenId, hex.x, hex.y);
+          void refreshTurn();
           break;
         case 'place':
           await placeCharacter(participation, hex.x, hex.y);
@@ -256,6 +277,8 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
   };
 
   const hasImage = !!draft.imageUrl && !!draft.imageWidth && !!draft.imageHeight;
+  const trails = movementTrails(turnEntries, draft.mapId);
+  const bubbles = lastActions(turnEntries);
   const menuToken = menu ? tokenAt(mapTokens, menu.hex.x, menu.hex.y) : undefined;
   const moveState = movement.state;
   const moveStatus = currentStatus(moveState);
@@ -290,7 +313,9 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
           {moveState.phase !== 'idle' && moveStatus && (
             <MovementLayer trail={moveState.trail} destination={moveDestination} status={moveStatus} hexSize={hexSize} />
           )}
+          <TurnTrailLayer trails={trails} hexSize={hexSize} columns={draft.gridWidth} rows={draft.gridHeight} />
           <TokenLayer tokens={mapTokens} hexSize={hexSize} preview={movePreview} />
+          {!movement.active && <SpeechBubbleLayer tokens={mapTokens} bubbles={bubbles} hexSize={hexSize} />}
           {resizeMode && canEdit && hasImage && (
             <ResizeHandles
               layout={{ left: draft.imageLeft, top: draft.imageTop, width: draft.imageWidth ?? 1, height: draft.imageHeight ?? 1 }}
@@ -310,6 +335,10 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, picking = false }: MapCa
           token={menuToken ? { name: menuToken.name, imageUrl: menuToken.upImageUrl } : null}
           canManage={canPlace}
           onMove={menuToken && canMove(menuToken) ? () => movement.start(menuToken) : undefined}
+          onAct={menuToken && canTakeTurn(menuToken)
+            ? () => onAct({ mapTokenId: menuToken.mapTokenId, name: menuToken.name }) : undefined}
+          onResetTurn={menuToken && canTakeTurn(menuToken) && hasEntries(turnEntries, menuToken)
+            ? () => onResetTurn({ mapTokenId: menuToken.mapTokenId, name: menuToken.name }) : undefined}
           onClose={closeMenu}
           onAdd={() => {
             setPickedHex(menu.hex);

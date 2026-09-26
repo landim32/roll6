@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
+import { TurnStatusDot } from '../ui/TurnStatusDot';
+import { useTurn } from '../../hooks/useTurn';
+import { characterStatus } from '../../lib/turnStatus';
 import { VitalBar } from './VitalBar';
 import { isFallen } from '../../lib/vitals';
 import { PARTICIPATION_MODE } from '../../lib/campaignCharacterForm';
@@ -34,6 +37,7 @@ const EyeIcon = () => (
 /** One character of the party: round picture, name, life and energy bars (current/total). */
 export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: PartyCardProps) => {
   const { t } = useTranslation();
+  const { turnNo, entries } = useTurn();
   const fallen = isFallen(member.currentLife);
   const view = mode === PARTICIPATION_MODE.viewer;
   return (
@@ -48,6 +52,7 @@ export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: 
       <CharacterAvatar name={member.characterName} imageUrl={member.characterImageUrl} size={32} />
       <div className="stm-party-info">
         <div className="stm-party-name">
+          {turnNo !== null && <TurnStatusDot status={characterStatus(entries, member.characterId)} />}
           <span title={member.characterName}>{member.characterName}</span>
           {fallen && <span className="badge text-bg-danger">{t('party.fallen')}</span>}
           <button

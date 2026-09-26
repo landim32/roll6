@@ -6,6 +6,7 @@ using Roll6.DTO.CampaignCharacter;
 using Roll6.DTO.CampaignNpc;
 using Roll6.DTO.Common;
 using Roll6.DTO.Map;
+using Roll6.DTO.Turn;
 
 namespace Roll6.API.Controllers;
 
@@ -16,13 +17,16 @@ public class CampaignController : ApiControllerBase
     private readonly IMapService _mapService;
     private readonly ICampaignCharacterService _campaignCharacterService;
     private readonly ICampaignNpcService _campaignNpcService;
+    private readonly ITurnService _turnService;
 
     public CampaignController(
         ICampaignService campaignService,
         IMapService mapService,
         ICampaignCharacterService campaignCharacterService,
-        ICampaignNpcService campaignNpcService)
+        ICampaignNpcService campaignNpcService,
+        ITurnService turnService)
     {
+        _turnService = turnService;
         _campaignService = campaignService;
         _mapService = mapService;
         _campaignCharacterService = campaignCharacterService;
@@ -122,6 +126,51 @@ public class CampaignController : ApiControllerBase
         try
         {
             return Ok(await _mapService.ListByCampaignAsync(CurrentUserId, id, query));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Current turn and its entries (master or approved participants).</summary>
+    [HttpGet("{id:long}/turn")]
+    [ProducesResponseType(typeof(TurnStateInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTurn(long id)
+    {
+        try
+        {
+            return Ok(await _turnService.GetStateAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Entries of a turn, oldest first (turn summary).</summary>
+    [HttpGet("{id:long}/turn/{turnNo:int}")]
+    [ProducesResponseType(typeof(List<TurnInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListTurn(long id, int turnNo)
+    {
+        try
+        {
+            return Ok(await _turnService.ListAsync(CurrentUserId, id, turnNo));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Finishes the current turn (master); lists who hasn't acted unless forced.</summary>
+    [HttpPost("{id:long}/turn/finish")]
+    [ProducesResponseType(typeof(TurnFinishResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> FinishTurn(long id, [FromBody] TurnFinishInfo info)
+    {
+        try
+        {
+            return Ok(await _turnService.FinishAsync(CurrentUserId, id, info));
         }
         catch (Exception ex)
         {

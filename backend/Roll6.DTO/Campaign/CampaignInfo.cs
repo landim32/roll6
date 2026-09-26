@@ -16,6 +16,9 @@ public class CampaignInfo
     [JsonPropertyName("open")]
     public bool Open { get; set; }
 
+    [JsonPropertyName("currentTurn")]
+    public int CurrentTurn { get; set; }
+
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 

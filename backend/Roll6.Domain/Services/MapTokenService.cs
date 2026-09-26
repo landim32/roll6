@@ -24,6 +24,8 @@ public class MapTokenService : IMapTokenService
     private readonly ICharacterRepository<Character> _characterRepository;
     private readonly IMapNpcRepository<MapNpc> _mapNpcRepository;
     private readonly INpcRepository<Npc> _npcRepository;
+    private readonly ITurnRepository<Turn> _turnRepository;
+    private readonly ICampaignRepository<Campaign> _campaignRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IImageStorageAppService _imageStorage;
 
@@ -36,9 +38,13 @@ public class MapTokenService : IMapTokenService
         ICharacterRepository<Character> characterRepository,
         IMapNpcRepository<MapNpc> mapNpcRepository,
         INpcRepository<Npc> npcRepository,
+        ITurnRepository<Turn> turnRepository,
+        ICampaignRepository<Campaign> campaignRepository,
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage)
     {
+        _turnRepository = turnRepository;
+        _campaignRepository = campaignRepository;
         _repository = repository;
         _mapRepository = mapRepository;
         _mapModelRepository = mapModelRepository;
@@ -132,9 +138,39 @@ public class MapTokenService : IMapTokenService
             await EnsurePlayerMoveAsync(userId, map, mapToken, info.X, info.Y, look);
         await EnsureFreeHexAsync(map, info.X, info.Y, mapToken.MapTokenId);
 
+        // Characters and NPC occurrences move once per turn, and the move is recorded (016); objects don't.
+        var turn = await PrepareMovementTurnAsync(map, mapToken, info.X, info.Y, look);
         mapToken.MoveTo(info.X, info.Y);
         mapToken.Face(look);
-        return await MapToDtoAsync(await _repository.UpdateAsync(mapToken));
+        MapToken saved = mapToken;
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            saved = await _repository.UpdateAsync(mapToken);
+            if (turn != null)
+                await _turnRepository.InsertAsync(turn);
+        });
+        return await MapToDtoAsync(saved);
+    }
+
+    /// <summary>The Movement entry of a character/NPC piece, or null for objects; refuses a second move in the turn.</summary>
+    private async Task<Turn?> PrepareMovementTurnAsync(Map map, MapToken mapToken, int x, int y, int look)
+    {
+        long? characterId = null;
+        long? npcId = null;
+        if (mapToken.CampaignCharacterId is long participationId)
+            characterId = (await _campaignCharacterRepository.GetByIdAsync(participationId))?.CharacterId;
+        else if (mapToken.MapNpcId is long occurrenceId)
+            npcId = (await _mapNpcRepository.GetByIdAsync(occurrenceId))?.NpcId;
+        if (characterId == null && npcId == null)
+            return null;
+
+        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
+            ?? throw new KeyNotFoundException("Campanha não encontrada.");
+        var mapNpcId = characterId == null ? mapToken.MapNpcId : null;
+        if (await _turnRepository.ExistsMovementAsync(campaign.CampaignId, campaign.CurrentTurn, characterId, mapNpcId))
+            throw new ConflictException("Já se moveu neste turno.");
+        return Turn.Movement(campaign.CampaignId, map.MapId, characterId, npcId, mapNpcId, campaign.CurrentTurn,
+            (mapToken.X, mapToken.Y, mapToken.Look), (x, y, look));
     }
 
     /// <summary>A player moves only his own approved character, within its move.</summary>
@@ -174,7 +210,10 @@ public class MapTokenService : IMapTokenService
         {
             await _repository.DeleteAsync(mapToken.MapTokenId);
             if (mapToken.MapNpcId is long mapNpcId)
+            {
+                await _turnRepository.DeleteByMapNpcIdsAsync(new[] { mapNpcId });
                 await _mapNpcRepository.DeleteAsync(mapNpcId);
+            }
         });
     }
 

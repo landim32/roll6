@@ -12,6 +12,8 @@ namespace Roll6.Tests.Domain.Services;
 
 public class MapTokenServiceTests
 {
+    private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
+    private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _repository = new();
     private readonly Mock<IMapRepository<Map>> _mapRepository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
@@ -34,6 +36,7 @@ public class MapTokenServiceTests
         _tokenRepository.Setup(r => r.GetByIdAsync(6)).ReturnsAsync(new Token { TokenId = 6, UserId = 9, Name = "Guerreira" });
         _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token>());
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentTurn = 3 });
         _characterRepository.Setup(r => r.UpdateAsync(It.IsAny<Character>())).ReturnsAsync((Character c) => c);
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character>());
         _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter>());
@@ -41,7 +44,7 @@ public class MapTokenServiceTests
         _repository.Setup(r => r.InsertAsync(It.IsAny<MapToken>())).ReturnsAsync((MapToken t) => t);
         _repository.Setup(r => r.UpdateAsync(It.IsAny<MapToken>())).ReturnsAsync((MapToken t) => t);
         _service = new MapTokenService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _tokenRepository.Object,
-            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object,
+            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _turnRepository.Object, _campaignRepository.Object,
             _unitOfWork.Object, Mock.Of<IImageStorageAppService>());
     }
 
@@ -419,6 +422,31 @@ public class MapTokenServiceTests
         var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 });
 
         (moved.X, moved.Y).Should().Be((2, 0));
+    }
+
+    [Fact]
+    public async Task Move_RecordsTheMovementOfTheCurrentTurn()
+    {
+        AriaPiece();
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 });
+
+        recorded.Should().NotBeNull();
+        (recorded!.TurnType, recorded.TurnNo, recorded.CharacterId, recorded.MapId).Should().Be((TurnType.Movement, 3, (long?)ARIA, (long?)30));
+        (recorded.BeforeX, recorded.BeforeY, recorded.X, recorded.Y).Should().Be(((int?)2, (int?)2, (int?)2, (int?)0));
+    }
+
+    [Fact]
+    public async Task Move_TwiceInTheSameTurn_Throws()
+    {
+        AriaPiece();
+        _turnRepository.Setup(r => r.ExistsMovementAsync(10, 3, ARIA, null)).ReturnsAsync(true);
+
+        await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 })).Should().ThrowAsync<ConflictException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
     }
 
     [Fact]

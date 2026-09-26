@@ -16,6 +16,12 @@ export const CAMPAIGN_STORAGE_KEY = 'roll6:campaign';
 /** localStorage key of the chosen character per campaign ({ [campaignId]: 'gm' | characterId }). */
 export const CHARACTER_STORAGE_KEY = 'roll6:character';
 
+/** localStorage key of the open map ({ mapModelId, mapId }; mapId null for a model opened outside a campaign). */
+export const MAP_STORAGE_KEY = 'roll6:map';
+
+/** localStorage key of the turn notifications per campaign ({ [campaignId]: { known, unread } }, 016). */
+export const TURN_STORAGE_KEY = 'roll6:turn-seen';
+
 /** Reads the stored session, or null. */
 export const readStoredSession = (): UserTokenInfo | null => {
   const raw = localStorage.getItem(AUTH_STORAGE_KEY);

@@ -47,6 +47,7 @@ public static class Startup
         services.AddScoped<INpcRepository<Npc>, NpcRepository>();
         services.AddScoped<ICampaignNpcRepository<CampaignNpc>, CampaignNpcRepository>();
         services.AddScoped<IMapNpcRepository<MapNpc>, MapNpcRepository>();
+        services.AddScoped<ITurnRepository<Turn>, TurnRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // AppServices
@@ -68,6 +69,7 @@ public static class Startup
         services.AddScoped<INpcService, NpcService>();
         services.AddScoped<ICampaignNpcService, CampaignNpcService>();
         services.AddScoped<IMapNpcService, MapNpcService>();
+        services.AddScoped<ITurnService, TurnService>();
 
         // Authentication
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -11,6 +11,7 @@ namespace Roll6.Tests.Domain.Services;
 
 public class CampaignServiceTests
 {
+    private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<ICampaignRepository<Campaign>> _repository = new();
     private readonly Mock<IMapRepository<Map>> _mapRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
@@ -34,7 +35,7 @@ public class CampaignServiceTests
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns<Func<Task>>(action => action());
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
-            _unitOfWork.Object);
+            _unitOfWork.Object, _turnRepository.Object);
     }
 
     [Fact]

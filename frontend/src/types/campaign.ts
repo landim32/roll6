@@ -9,6 +9,8 @@ export interface CampaignInfo {
   name: string;
   /** Open campaigns approve access requests immediately. */
   open: boolean;
+  /** Turn in progress (016), starts at 1. */
+  currentTurn: number;
   createdAt: string;
   updatedAt: string;
 }

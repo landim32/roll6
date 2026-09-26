@@ -1,7 +1,8 @@
-import { createContext, useCallback, useMemo, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { mapModelService } from '../Services/mapModelService';
 import { mapService } from '../Services/mapService';
+import { MAP_STORAGE_KEY } from '../Services/apiHelpers';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { gridPixelSize, HEX_SIZE } from '../lib/hexGrid';
@@ -9,6 +10,7 @@ import {
   createEmptyDraft, draftFromMapModel, isSameDraft, MAX_GRID_SIZE, MIN_GRID_SIZE, toMapModelInsert,
 } from '../lib/draft';
 import type { MapDraft } from '../lib/draft';
+import { MAP_STATUS_DELETED } from '../types/map';
 import type { MapInfo } from '../types/map';
 
 /** Zoom limits and step (research R3). */
@@ -97,6 +99,32 @@ const loadImageSize = (url: string): Promise<{ width: number; height: number } |
   });
 
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
+
+/** Map remembered across reloads. */
+interface StoredMap {
+  mapModelId: number;
+  mapId: number | null;
+}
+
+const readStoredMap = (): StoredMap | null => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MAP_STORAGE_KEY) ?? 'null') as Partial<StoredMap> | null;
+    return parsed && typeof parsed.mapModelId === 'number'
+      ? { mapModelId: parsed.mapModelId, mapId: typeof parsed.mapId === 'number' ? parsed.mapId : null }
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredMap = (map: StoredMap | null) => {
+  try {
+    if (map) localStorage.setItem(MAP_STORAGE_KEY, JSON.stringify(map));
+    else localStorage.removeItem(MAP_STORAGE_KEY);
+  } catch {
+    // Storage unavailable: the map just isn't reopened after a reload.
+  }
+};
 
 export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
@@ -245,6 +273,44 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   }, [draft, needsName, isCopy, currentCampaign, isMaster]);
 
   const clearError = useCallback(() => setError(null), []);
+
+  // ---------- remember the open map across reloads ----------
+
+  /** False while the remembered map is being reopened, so the empty start draft doesn't erase it. */
+  const restoredRef = useRef(false);
+
+  // Once logged in, reopen the remembered map (a campaign map through its map, else the model alone).
+  useEffect(() => {
+    restoredRef.current = false;
+    if (!session) return;
+    const stored = readStoredMap();
+    if (!stored) {
+      restoredRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const map = stored.mapId !== null ? await mapService.getById(stored.mapId) : null;
+        if (cancelled) return;
+        if (map && map.status === MAP_STATUS_DELETED) throw new Error('map deleted');
+        await loadMapModel(map?.mapModelId ?? stored.mapModelId, map);
+      } catch {
+        // Deleted, no longer accessible or offline: start with an empty map.
+        if (!cancelled) writeStoredMap(null);
+      } finally {
+        if (!cancelled) restoredRef.current = true;
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once per session
+  }, [session?.user.userId]);
+
+  // Remember whatever map is open (opened, saved as new or copied); a new empty map forgets it.
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    writeStoredMap(draft.mapModelId !== null ? { mapModelId: draft.mapModelId, mapId: draft.mapId } : null);
+  }, [draft.mapModelId, draft.mapId]);
 
   const value: MapEditorContextType = {
     draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, loading, error,

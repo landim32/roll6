@@ -37,6 +37,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<int>("CurrentTurn")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("current_turn");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)
@@ -666,6 +672,95 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("tokens", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.Turn", b =>
+                {
+                    b.Property<long>("TurnId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("turn_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("TurnId"));
+
+                    b.Property<int?>("BeforeLook")
+                        .HasColumnType("integer")
+                        .HasColumnName("before_look");
+
+                    b.Property<int?>("BeforeX")
+                        .HasColumnType("integer")
+                        .HasColumnName("before_x");
+
+                    b.Property<int?>("BeforeY")
+                        .HasColumnType("integer")
+                        .HasColumnName("before_y");
+
+                    b.Property<long>("CampaignId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_id");
+
+                    b.Property<long?>("CharacterId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("character_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<int?>("Look")
+                        .HasColumnType("integer")
+                        .HasColumnName("look");
+
+                    b.Property<long?>("MapId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_id");
+
+                    b.Property<long?>("MapNpcId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_npc_id");
+
+                    b.Property<long?>("NpcId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("npc_id");
+
+                    b.Property<int>("TurnNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("turn_no");
+
+                    b.Property<int>("TurnType")
+                        .HasColumnType("integer")
+                        .HasColumnName("turn_type");
+
+                    b.Property<int?>("X")
+                        .HasColumnType("integer")
+                        .HasColumnName("x");
+
+                    b.Property<int?>("Y")
+                        .HasColumnType("integer")
+                        .HasColumnName("y");
+
+                    b.HasKey("TurnId")
+                        .HasName("turns_pkey");
+
+                    b.HasIndex("CharacterId");
+
+                    b.HasIndex("MapId");
+
+                    b.HasIndex("MapNpcId");
+
+                    b.HasIndex("NpcId");
+
+                    b.HasIndex("CampaignId", "TurnNo")
+                        .HasDatabaseName("ix_turns_campaign_turn");
+
+                    b.ToTable("turns", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.User", b =>
                 {
                     b.Property<long>("UserId")
@@ -860,6 +955,35 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("fk_user_token");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.Turn", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("CampaignId")
+                        .IsRequired()
+                        .HasConstraintName("fk_campaign_turn");
+
+                    b.HasOne("Roll6.Domain.Models.Character", null)
+                        .WithMany()
+                        .HasForeignKey("CharacterId")
+                        .HasConstraintName("fk_character_turn");
+
+                    b.HasOne("Roll6.Domain.Models.Map", null)
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .HasConstraintName("fk_map_turn");
+
+                    b.HasOne("Roll6.Domain.Models.MapNpc", null)
+                        .WithMany()
+                        .HasForeignKey("MapNpcId")
+                        .HasConstraintName("fk_map_npc_turn");
+
+                    b.HasOne("Roll6.Domain.Models.Npc", null)
+                        .WithMany()
+                        .HasForeignKey("NpcId")
+                        .HasConstraintName("fk_npc_turn");
                 });
 #pragma warning restore 612, 618
         }

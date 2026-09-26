@@ -19,6 +19,7 @@ public class MapNpcServiceTests
     private const long MAP = 30;
     private const long NPC = 8;
 
+    private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<IMapNpcRepository<MapNpc>> _repository = new();
     private readonly Mock<IMapRepository<Map>> _mapRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
@@ -46,7 +47,7 @@ public class MapNpcServiceTests
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _service = new MapNpcService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _mapTokenRepository.Object,
             _npcRepository.Object, _campaignNpcRepository.Object, _campaignCharacterRepository.Object, _tokenRepository.Object,
-            _unitOfWork.Object, Mock.Of<IImageStorageAppService>());
+            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object);
     }
 
     private static MapNpcInsertInfo At(int x, int y) => new() { MapId = MAP, NpcId = NPC, X = x, Y = y };

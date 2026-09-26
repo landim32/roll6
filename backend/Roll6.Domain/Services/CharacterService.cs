@@ -12,6 +12,7 @@ public class CharacterService : ICharacterService
     private readonly ICharacterRepository<Character> _repository;
     private readonly ICampaignCharacterRepository<CampaignCharacter> _campaignCharacterRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IUserRepository<User> _userRepository;
     private readonly ITokenRepository<Token> _tokenRepository;
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
@@ -24,8 +25,10 @@ public class CharacterService : ICharacterService
         IUserRepository<User> userRepository,
         ITokenRepository<Token> tokenRepository,
         IMapTokenRepository<MapToken> mapTokenRepository,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        ITurnRepository<Turn> turnRepository)
     {
+        _turnRepository = turnRepository;
         _tokenRepository = tokenRepository;
         _mapTokenRepository = mapTokenRepository;
         _repository = repository;
@@ -105,6 +108,7 @@ public class CharacterService : ICharacterService
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _mapTokenRepository.DeleteByCharacterAsync(characterId);
+            await _turnRepository.DeleteByCharacterAsync(characterId);
             await _campaignCharacterRepository.DeleteByCharacterAsync(characterId);
             await _repository.DeleteAsync(characterId);
         });

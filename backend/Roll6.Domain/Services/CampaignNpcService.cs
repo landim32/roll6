@@ -17,6 +17,7 @@ public class CampaignNpcService : ICampaignNpcService
     private readonly IMapNpcRepository<MapNpc> _mapNpcRepository;
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IImageStorageAppService _imageStorage;
 
     public CampaignNpcService(
@@ -27,8 +28,10 @@ public class CampaignNpcService : ICampaignNpcService
         IMapNpcRepository<MapNpc> mapNpcRepository,
         IMapTokenRepository<MapToken> mapTokenRepository,
         IUnitOfWork unitOfWork,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        ITurnRepository<Turn> turnRepository)
     {
+        _turnRepository = turnRepository;
         _repository = repository;
         _campaignRepository = campaignRepository;
         _npcRepository = npcRepository;
@@ -72,6 +75,7 @@ public class CampaignNpcService : ICampaignNpcService
             if (mapNpcIds.Count > 0)
             {
                 await _mapTokenRepository.DeleteByMapNpcIdsAsync(mapNpcIds);
+                await _turnRepository.DeleteByMapNpcIdsAsync(mapNpcIds);
                 await _mapNpcRepository.DeleteRangeAsync(mapNpcIds);
             }
             await _repository.DeleteAsync(campaignNpc.CampaignNpcId);

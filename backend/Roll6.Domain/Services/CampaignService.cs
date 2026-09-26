@@ -17,6 +17,7 @@ public class CampaignService : ICampaignService
     private readonly ICampaignNpcRepository<CampaignNpc> _campaignNpcRepository;
     private readonly IMapNpcRepository<MapNpc> _mapNpcRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITurnRepository<Turn> _turnRepository;
 
     public CampaignService(
         ICampaignRepository<Campaign> repository,
@@ -26,8 +27,10 @@ public class CampaignService : ICampaignService
         IUserRepository<User> userRepository,
         ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         IMapNpcRepository<MapNpc> mapNpcRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ITurnRepository<Turn> turnRepository)
     {
+        _turnRepository = turnRepository;
         _campaignNpcRepository = campaignNpcRepository;
         _mapNpcRepository = mapNpcRepository;
         _repository = repository;
@@ -87,6 +90,7 @@ public class CampaignService : ICampaignService
 
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
+            await _turnRepository.DeleteByCampaignAsync(campaignId);
             var deletedMapIds = await _mapRepository.ListDeletedIdsByCampaignAsync(campaignId);
             if (deletedMapIds.Count > 0)
             {
@@ -132,6 +136,7 @@ public class CampaignService : ICampaignService
         OwnerName = ownerNames.GetValueOrDefault(campaign.UserId, string.Empty),
         Name = campaign.Name,
         Open = campaign.Open,
+        CurrentTurn = campaign.CurrentTurn,
         CreatedAt = campaign.CreatedAt,
         UpdatedAt = campaign.UpdatedAt
     };

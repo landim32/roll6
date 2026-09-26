@@ -23,6 +23,7 @@ public class MapNpcService : IMapNpcService
     private readonly ICampaignCharacterRepository<CampaignCharacter> _campaignCharacterRepository;
     private readonly ITokenRepository<Token> _tokenRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IImageStorageAppService _imageStorage;
 
     public MapNpcService(
@@ -35,8 +36,10 @@ public class MapNpcService : IMapNpcService
         ICampaignCharacterRepository<CampaignCharacter> campaignCharacterRepository,
         ITokenRepository<Token> tokenRepository,
         IUnitOfWork unitOfWork,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        ITurnRepository<Turn> turnRepository)
     {
+        _turnRepository = turnRepository;
         _repository = repository;
         _mapRepository = mapRepository;
         _mapModelRepository = mapModelRepository;
@@ -95,6 +98,7 @@ public class MapNpcService : IMapNpcService
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _mapTokenRepository.DeleteByMapNpcIdsAsync(new[] { mapNpc.MapNpcId });
+            await _turnRepository.DeleteByMapNpcIdsAsync(new[] { mapNpc.MapNpcId });
             await _repository.DeleteAsync(mapNpc.MapNpcId);
         });
     }

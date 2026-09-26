@@ -8,6 +8,7 @@ import { MapControls } from '../components/map/MapControls';
 import { NpcPanel } from '../components/map/NpcPanel';
 import { PartyPanel } from '../components/map/PartyPanel';
 import { TopMenu } from '../components/menu/TopMenu';
+import { ActModal } from '../components/modals/ActModal';
 import { CampaignModal } from '../components/modals/CampaignModal';
 import { CharacterFormModal } from '../components/modals/CharacterFormModal';
 import { GridSizeModal } from '../components/modals/GridSizeModal';
@@ -21,6 +22,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { useMapEditor } from '../hooks/useMapEditor';
 import { useMapToken } from '../hooks/useMapToken';
+import { useTurn } from '../hooks/useTurn';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import type { CharacterEditTarget } from '../components/modals/CharacterFormModal';
 import type { CampaignNpcInfo } from '../types/npc';
@@ -43,6 +45,10 @@ export const MainPage = () => {
   const [editingNpc, setEditingNpc] = useState<CampaignNpcInfo | null>(null);
   /** Piece waiting for the delete confirmation. */
   const [toDelete, setToDelete] = useState<{ mapTokenId: number; name: string } | null>(null);
+  /** Piece acting ("Agir") and piece waiting for the "Resetar turno" confirmation (016). */
+  const [acting, setActing] = useState<{ mapTokenId: number; name: string } | null>(null);
+  const [toReset, setToReset] = useState<{ mapTokenId: number; name: string } | null>(null);
+  const { reset: resetTurn } = useTurn();
   const { addToken, changeToken, placeCharacter, deleteToken } = useMapToken();
   const { t } = useTranslation();
 
@@ -91,13 +97,31 @@ export const MainPage = () => {
     }
   };
 
+  const onConfirmReset = async () => {
+    if (!toReset) return;
+    try {
+      const result = await resetTurn(toReset.mapTokenId);
+      if (result.reverted) toast.success(t('toast.turnReset', { name: toReset.name }));
+      else toast.warning(t('toast.turnResetNotReverted', { name: toReset.name }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+      throw err;
+    }
+  };
+
   const tokenPickTitle = tokenPick?.kind === 'character'
     ? t('mapTokens.chooseCharacterToken', { name: tokenPick.participation.characterName })
     : undefined;
 
   return (
     <div className="stm-main">
-      <MapCanvas onPickToken={setTokenPick} onDeleteToken={setToDelete} picking={tokenPick !== null || toDelete !== null} />
+      <MapCanvas
+        onPickToken={setTokenPick}
+        onDeleteToken={setToDelete}
+        onAct={setActing}
+        onResetTurn={setToReset}
+        picking={tokenPick !== null || toDelete !== null}
+      />
       <TopMenu
         onOpenCampaign={() => setCampaignOpen(true)}
         onOpenMap={() => setMapOpen(true)}
@@ -130,6 +154,16 @@ export const MainPage = () => {
         message={toDelete ? t('mapTokens.deleteMessage', { name: toDelete.name }) : ''}
         confirmLabel={t('hexMenu.deleteToken')}
         onConfirm={onConfirmDelete}
+        danger
+      />
+      <ActModal open={acting !== null} piece={acting} onClose={() => setActing(null)} />
+      <ConfirmModal
+        open={toReset !== null}
+        onOpenChange={(o) => { if (!o) setToReset(null); }}
+        title={t('turn.resetTitle')}
+        message={toReset ? t('turn.resetMessage', { name: toReset.name }) : ''}
+        confirmLabel={t('turn.reset')}
+        onConfirm={onConfirmReset}
         danger
       />
       <CharacterFormModal

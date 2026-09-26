@@ -17,6 +17,7 @@ public class CampaignNpcServiceTests
     private const long NPC = 8;
     private const long OTHERS_NPC = 9;
 
+    private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _repository = new();
     private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
@@ -37,7 +38,7 @@ public class CampaignNpcServiceTests
         _repository.Setup(r => r.InsertAsync(It.IsAny<CampaignNpc>())).ReturnsAsync((CampaignNpc c) => c);
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _service = new CampaignNpcService(_repository.Object, _campaignRepository.Object, _npcRepository.Object, _tokenRepository.Object,
-            _mapNpcRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object, Mock.Of<IImageStorageAppService>());
+            _mapNpcRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object);
     }
 
     private static CampaignNpcInsertInfo Add(long npcId = NPC) => new() { CampaignId = CAMPAIGN, NpcId = npcId };

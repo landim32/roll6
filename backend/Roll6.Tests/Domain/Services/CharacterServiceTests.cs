@@ -16,6 +16,7 @@ public class CharacterServiceTests
     private const long MASTER = 1;
     private const long OUTSIDER = 9;
 
+    private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<ICharacterRepository<Character>> _repository = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
@@ -33,7 +34,7 @@ public class CharacterServiceTests
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Character>())).ReturnsAsync((Character c) => c);
         _repository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(() => new Character { CharacterId = CHARACTER, UserId = OWNER, Name = "Aria", Life = 12, Energy = 6 });
         _service = new CharacterService(_repository.Object, _campaignCharacterRepository.Object,
-            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object);
+            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object, _turnRepository.Object);
     }
 
     [Fact]

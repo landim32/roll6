@@ -154,6 +154,13 @@ body,
   border-top: 1px solid var(--stm-border);
 }
 
+.stm-footer-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}
+
 .stm-footer .btn-link {
   padding: 0;
   font-size: inherit;
@@ -392,7 +399,8 @@ body,
   line-height: 1.2;
 }
 
-.stm-party-name > span:first-child {
+.stm-party-name > span:first-child:not(.stm-turn-dot),
+.stm-party-name > .stm-turn-dot + span {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -745,3 +753,147 @@ body,
 .stm-move-counter .stm-move-hint {
   font-size: 0.7rem;
 }
+
+/* ---------- turns (016) ---------- */
+.stm-turn-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.stm-turn-dot.is-none { background: var(--bs-danger); }
+.stm-turn-dot.is-moved { background: var(--bs-warning); }
+.stm-turn-dot.is-acted { background: var(--bs-success); }
+
+.stm-turn-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stm-turn-badge {
+  background: rgba(255, 193, 7, 0.15);
+  color: var(--bs-warning);
+  border: 1px solid rgba(255, 193, 7, 0.5);
+  font-weight: 600;
+}
+
+.stm-map .stm-turn-trails {
+  pointer-events: none;
+}
+
+.stm-map .stm-turn-trail {
+  fill: none;
+  stroke: rgba(var(--bs-info-rgb), 0.6);
+  stroke-width: 4;
+  stroke-dasharray: 8 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.stm-map .stm-turn-trail-start {
+  fill: rgba(var(--bs-info-rgb), 0.6);
+}
+
+.stm-map .stm-bubbles {
+  pointer-events: none;
+}
+
+/* The balloon sits at the bottom of its foreignObject, right above the piece. */
+.stm-bubble-anchor {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.stm-bubble {
+  position: relative;
+  max-width: 100%;
+  margin-bottom: 10px;
+  padding: 4px 8px;
+  background: #fff;
+  color: #212529;
+  border: 2px solid #212529;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+/* Tail pointing down to the piece (outside the clipped box, so drawn by the anchor). */
+.stm-bubble-anchor::after {
+  content: "";
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-top: 10px solid #212529;
+  border-bottom: 0;
+}
+
+.stm-bubble-anchor::before {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -4px;
+  border: 4px solid transparent;
+  border-top: 7px solid #fff;
+  border-bottom: 0;
+  z-index: 1;
+}
+
+.stm-bubble-anchor {
+  position: relative;
+}
+
+.stm-turn-notification {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.stm-turn-summary {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stm-turn-summary > li {
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--bs-border-color);
+  background: rgba(255, 255, 255, 0.03);
+  overflow-wrap: anywhere;
+}
+
+.stm-turn-summary .stm-turn-type {
+  margin-right: 0.5rem;
+  background: var(--bs-secondary-bg);
+  color: var(--bs-body-color);
+}
+
+.stm-turn-summary > li.is-type-1 { border-left-color: var(--bs-info); }
+.stm-turn-summary > li.is-type-2 { border-left-color: var(--bs-success); }
+.stm-turn-summary > li.is-type-3 { border-left-color: var(--bs-warning); }

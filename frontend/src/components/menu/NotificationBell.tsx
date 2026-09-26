@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { useCharacter } from '../../hooks/useCharacter';
+import { useTurn } from '../../hooks/useTurn';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 
 const BellIcon = () => (
@@ -12,10 +13,26 @@ const BellIcon = () => (
   </svg>
 );
 
-/** Bell right of the user name: pending campaign invites with accept / decline (FR-018/019). */
-export const NotificationBell = () => {
+interface NotificationBellProps {
+  /** Opens the summary of a finished turn (016). */
+  onOpenTurn: (turnNo: number) => void;
+}
+
+const FlagIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+    <path d="M14.778.085A.5.5 0 0 1 15 .5V8a.5.5 0 0 1-.314.464L14.5 8l.186.464-.003.001-.006.003-.023.009a12 12 0 0 1-.397.15c-.264.095-.631.223-1.047.35-.816.252-1.879.523-2.71.523-.847 0-1.548-.28-2.158-.525l-.028-.01C7.68 8.71 7.14 8.5 6.5 8.5c-.7 0-1.638.23-2.437.477A20 20 0 0 0 3 9.342V15.5a.5.5 0 0 1-1 0V.5a.5.5 0 0 1 1 0v.282c.226-.079.496-.17.79-.26C4.606.272 5.67 0 6.5 0c.84 0 1.524.277 2.121.519l.043.018C9.286.788 9.828 1 10.5 1c.7 0 1.638-.23 2.437-.477a20 20 0 0 0 1.349-.476l.019-.007.004-.002h.001" />
+  </svg>
+);
+
+/**
+ * Bell right of the user name: pending campaign invites with accept / decline (FR-018/019) and the finished
+ * turns of the current campaign, which open the turn summary (016).
+ */
+export const NotificationBell = ({ onOpenTurn }: NotificationBellProps) => {
   const { t } = useTranslation();
   const { invites, refreshInvites, acceptInvite, declineInvite } = useCharacter();
+  const { notifications: turns, dismiss } = useTurn();
+  const count = invites.length + turns.length;
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const act = async (invite: CampaignCharacterInfo, accept: boolean) => {
@@ -40,12 +57,28 @@ export const NotificationBell = () => {
       <DropdownMenu.Trigger asChild>
         <button type="button" className="btn btn-sm btn-outline-secondary stm-bell" aria-label={t('notifications.label')}>
           <BellIcon />
-          {invites.length > 0 && <span className="badge rounded-pill text-bg-danger">{invites.length}</span>}
+          {count > 0 && <span className="badge rounded-pill text-bg-danger">{count}</span>}
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="dropdown-menu show stm-user-menu stm-notifications p-0" align="end" sideOffset={4}>
-          {invites.length === 0 ? (
+          {turns.map((turn) => (
+            <DropdownMenu.Item
+              key={`turn-${turn.turnNo}`}
+              className="dropdown-item stm-notification stm-turn-notification"
+              onSelect={() => {
+                dismiss(turn.turnNo);
+                onOpenTurn(turn.turnNo);
+              }}
+            >
+              <FlagIcon />
+              <span className="d-flex flex-column">
+                <span>{t('notifications.turnFinished', { no: turn.turnNo })}</span>
+                <small className="text-body-secondary">{t('notifications.turnFinishedHint')}</small>
+              </span>
+            </DropdownMenu.Item>
+          ))}
+          {count === 0 ? (
             <DropdownMenu.Label className="dropdown-item-text text-body-secondary py-2">{t('notifications.empty')}</DropdownMenu.Label>
           ) : invites.map((invite) => {
             const busy = busyId === invite.campaignCharacterId;

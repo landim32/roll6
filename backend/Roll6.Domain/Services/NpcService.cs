@@ -15,13 +15,16 @@ public class NpcService : INpcService
     private readonly ITokenRepository<Token> _tokenRepository;
     private readonly ICampaignNpcRepository<CampaignNpc> _campaignNpcRepository;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly ITurnRepository<Turn> _turnRepository;
 
     public NpcService(
         INpcRepository<Npc> repository,
         ITokenRepository<Token> tokenRepository,
         ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        ITurnRepository<Turn> turnRepository)
     {
+        _turnRepository = turnRepository;
         _repository = repository;
         _tokenRepository = tokenRepository;
         _campaignNpcRepository = campaignNpcRepository;
@@ -71,6 +74,7 @@ public class NpcService : INpcService
         await GetOwnedAsync(userId, npcId);
         if (await _campaignNpcRepository.ExistsByNpcAsync(npcId))
             throw new ConflictException("O NPC está em uso em campanhas e não pode ser excluído.");
+        await _turnRepository.DeleteByNpcAsync(npcId);
         await _repository.DeleteAsync(npcId);
     }
 

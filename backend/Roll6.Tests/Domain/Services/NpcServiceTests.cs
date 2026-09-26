@@ -16,6 +16,7 @@ public class NpcServiceTests
     private const long OTHER = 2;
     private const long NPC = 8;
 
+    private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<INpcRepository<Npc>> _repository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
@@ -28,7 +29,7 @@ public class NpcServiceTests
         _repository.Setup(r => r.GetByIdAsync(NPC)).ReturnsAsync(() => new Npc { NpcId = NPC, UserId = OWNER, TokenId = 5, Name = "Goblin" });
         _repository.Setup(r => r.InsertAsync(It.IsAny<Npc>())).ReturnsAsync((Npc n) => n);
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Npc>())).ReturnsAsync((Npc n) => n);
-        _service = new NpcService(_repository.Object, _tokenRepository.Object, _campaignNpcRepository.Object, Mock.Of<IImageStorageAppService>());
+        _service = new NpcService(_repository.Object, _tokenRepository.Object, _campaignNpcRepository.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object);
     }
 
     private static NpcInsertInfo Info(long tokenId = 5) => new() { TokenId = tokenId, Name = "Goblin", Life = 7, Move = 6 };

@@ -188,7 +188,9 @@
     "move": "Mover",
     "addToken": "Incluir token",
     "changeToken": "Alterar token",
-    "deleteToken": "Excluir"
+    "deleteToken": "Excluir",
+    "act": "Agir",
+    "resetTurn": "Resetar turno"
   },
   "movement": {
     "counter": "Movimento",
@@ -207,7 +209,9 @@
     "empty": "Nenhuma notificação",
     "invite": "{{campaign}} (mestre {{owner}}) convidou {{character}}",
     "accept": "Aceitar",
-    "decline": "Recusar"
+    "decline": "Recusar",
+    "turnFinished": "Turno {{no}} finalizado",
+    "turnFinishedHint": "Clique para ver o resumo"
   },
   "party": {
     "title": "Personagens ({{count}})",
@@ -354,6 +358,37 @@
     "tokenMoved": "{{name}} movido.",
     "mapTokenAdded": "{{name}} colocado no mapa.",
     "mapTokenChanged": "Token de {{name}} alterado.",
-    "mapTokenDeleted": "{{name}} excluído do mapa."
+    "mapTokenDeleted": "{{name}} excluído do mapa.",
+    "turnFinished": "Turno {{no}} finalizado.",
+    "actionRecorded": "Ação registrada.",
+    "turnReset": "Turno de {{name}} resetado.",
+    "turnResetNotReverted": "Turno de {{name}} resetado; o hex anterior está ocupado, a peça ficou onde está."
+  },
+  "turn": {
+    "label": "Turno {{no}}",
+    "finish": "Finalizar turno",
+    "pendingTitle": "Ainda falta agir",
+    "pendingMessage": "Estes personagens ainda não agiram neste turno:",
+    "finishAnyway": "Finalizar mesmo assim",
+    "back": "Voltar",
+    "status": {
+      "none": "Ainda não agiu",
+      "moved": "Moveu",
+      "acted": "Agiu"
+    },
+    "act": "Agir",
+    "actTitle": "Agir — {{name}}",
+    "actPlaceholder": "Descreva a ação…",
+    "actLabel": "Ação",
+    "reset": "Resetar turno",
+    "resetTitle": "Resetar turno",
+    "resetMessage": "Apagar as ações de {{name}} neste turno e desfazer o movimento?",
+    "alreadyMoved": "Já se moveu neste turno.",
+    "summaryTitle": "Resumo do turno {{no}}",
+    "summaryEmpty": "Nada foi feito neste turno.",
+    "moved": "moveu de ({{fromX}}, {{fromY}}) para ({{x}}, {{y}})",
+    "movement": "Movimento",
+    "action": "Ação",
+    "result": "Resultado"
   }
 }

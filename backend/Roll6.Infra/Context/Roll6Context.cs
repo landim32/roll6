@@ -24,6 +24,7 @@ public class Roll6Context : DbContext
     public DbSet<Npc> Npcs { get; set; }
     public DbSet<CampaignNpc> CampaignNpcs { get; set; }
     public DbSet<MapNpc> MapNpcs { get; set; }
+    public DbSet<Turn> Turns { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +71,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.UserId).HasColumnName("user_id");
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(260).IsRequired();
             entity.Property(e => e.Open).HasColumnName("open");
+            entity.Property(e => e.CurrentTurn).HasColumnName("current_turn").HasDefaultValue(1).HasSentinel(0);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_campaign");
@@ -251,6 +253,39 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_map_npc");
             entity.HasOne<Npc>().WithMany().HasForeignKey(e => e.NpcId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_npc_map_npc");
+        });
+
+        modelBuilder.Entity<Turn>(entity =>
+        {
+            entity.ToTable("turns");
+            entity.HasKey(e => e.TurnId).HasName("turns_pkey");
+            entity.Property(e => e.TurnId).HasColumnName("turn_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.CampaignId).HasColumnName("campaign_id");
+            entity.Property(e => e.MapId).HasColumnName("map_id");
+            entity.Property(e => e.CharacterId).HasColumnName("character_id");
+            entity.Property(e => e.NpcId).HasColumnName("npc_id");
+            entity.Property(e => e.MapNpcId).HasColumnName("map_npc_id");
+            entity.Property(e => e.TurnNo).HasColumnName("turn_no");
+            entity.Property(e => e.TurnType).HasColumnName("turn_type").HasConversion<int>();
+            entity.Property(e => e.BeforeX).HasColumnName("before_x");
+            entity.Property(e => e.BeforeY).HasColumnName("before_y");
+            entity.Property(e => e.BeforeLook).HasColumnName("before_look");
+            entity.Property(e => e.X).HasColumnName("x");
+            entity.Property(e => e.Y).HasColumnName("y");
+            entity.Property(e => e.Look).HasColumnName("look");
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(Turn.MAX_DESCRIPTION);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.HasIndex(e => new { e.CampaignId, e.TurnNo }).HasDatabaseName("ix_turns_campaign_turn");
+            entity.HasOne<Campaign>().WithMany().HasForeignKey(e => e.CampaignId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_turn");
+            entity.HasOne<Map>().WithMany().HasForeignKey(e => e.MapId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_turn");
+            entity.HasOne<Character>().WithMany().HasForeignKey(e => e.CharacterId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_character_turn");
+            entity.HasOne<Npc>().WithMany().HasForeignKey(e => e.NpcId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_npc_turn");
+            entity.HasOne<MapNpc>().WithMany().HasForeignKey(e => e.MapNpcId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_npc_turn");
         });
     }
 
