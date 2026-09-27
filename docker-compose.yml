@@ -2,6 +2,7 @@
 # Usage: docker compose up --build -d   (reads .env)
 # Frontend: http://localhost:${WEB_PORT} (nginx proxies /api to the api service; no CORS needed).
 # API/Swagger directly: http://localhost:${APP_PORT}/swagger
+# MCP server: http://localhost:${WEB_PORT}/mcp (through nginx) or http://localhost:${MCP_PORT}/mcp
 # Fixed project name: containers, network and volumes are prefixed "roll6" whatever the folder is called.
 name: roll6
 
@@ -30,6 +31,21 @@ services:
     networks:
       - roll6-network
 
+  mcp:
+    build:
+      context: ./backend
+      dockerfile: Roll6.Mcp/Dockerfile
+    container_name: roll6-mcp
+    ports:
+      - "${MCP_PORT:-5100}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      Roll6Api__BaseUrl: http://api:8080
+    depends_on:
+      - api
+    networks:
+      - roll6-network
+
   web:
     build:
       context: ./frontend
@@ -41,6 +57,7 @@ services:
       - "${WEB_PORT:-8080}:80"
     depends_on:
       - api
+      - mcp
     networks:
       - roll6-network
 

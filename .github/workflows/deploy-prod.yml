@@ -44,34 +44,9 @@ jobs:
             cd "$DEPLOY_DIR"
           fi
 
-          # The db container (official postgres image) needs user/password/database to create the database:
-          # they are read from the connection string, so it is the only database secret.
-          CONNECTION_STRING=$(cat <<'CSEOF'
-          ${{ secrets.ROLL6_CONNECTION_STRING }}
-          CSEOF
-          )
-          CONNECTION_STRING=$(echo "$CONNECTION_STRING" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-          cs_value() {
-            echo "$CONNECTION_STRING" | tr ';' '\n' \
-              | grep -i -E "^[[:space:]]*($1)[[:space:]]*=" | head -n 1 | cut -d= -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
-          }
-          POSTGRES_USER=$(cs_value 'Username|User Id|UserId|User')
-          POSTGRES_PASSWORD=$(cs_value 'Password|Pwd')
-          POSTGRES_DB=$(cs_value 'Database|Initial Catalog')
-          if [ -z "$POSTGRES_USER" ] || [ -z "$POSTGRES_PASSWORD" ] || [ -z "$POSTGRES_DB" ]; then
-            echo "ROLL6_CONNECTION_STRING must contain Username, Password and Database." >&2
-            exit 1
-          fi
-
           # Inject .env.prod from GitHub Secrets (keep in sync with .env.prod.example)
-          cat > .env.prod <<ENVEOF
-          ROLL6_DOMAIN=${{ vars.ROLL6_DOMAIN }}
-          ROLL6_CONNECTION_STRING=$CONNECTION_STRING
-          POSTGRES_USER=$POSTGRES_USER
-          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-          POSTGRES_DB=$POSTGRES_DB
-          ENVEOF
-          cat >> .env.prod <<'ENVEOF'
+          cat > .env.prod <<'ENVEOF'
+          ROLL6_CONNECTION_STRING=${{ secrets.ROLL6_CONNECTION_STRING }}
           ROLL6_JWT_SECRET=${{ secrets.ROLL6_JWT_SECRET }}
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -82,7 +57,7 @@ jobs:
           sed -i 's/^[[:space:]]*//' .env.prod
 
           # Create external network if it doesn't exist
-          docker network inspect roll6-external >/dev/null 2>&1 || docker network create roll6-external
+          docker network inspect emagine-network >/dev/null 2>&1 || docker network create emagine-network
 
           # Deploy with docker compose (migrations are applied by the API on startup)
           docker compose --env-file .env.prod -f docker-compose-prod.yml down
@@ -103,7 +78,6 @@ jobs:
         echo "## Production Deployment" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- Server: \`${{ secrets.PROD_SSH_HOST }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "- Domain: \`${{ vars.ROLL6_DOMAIN }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- Branch: \`main\`" >> $GITHUB_STEP_SUMMARY
         echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- Triggered by: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY

@@ -2,8 +2,7 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using FluentAssertions;
-using Microsoft.AspNetCore.Http;
-using Roll6.API.Mcp;
+using Roll6.Mcp;
 
 namespace Roll6.Tests.Mcp;
 
@@ -13,9 +12,7 @@ public class McpDescriptionTests
     private static readonly List<McpToolCatalog.Tool> TOOLS = McpToolCatalog.Tools();
 
     /// <summary>Parameters filled by dependency injection are not part of the tool's input.</summary>
-    private static bool IsInjected(ParameterInfo parameter) =>
-        parameter.ParameterType == typeof(IHttpContextAccessor)
-        || (parameter.ParameterType.IsInterface && parameter.ParameterType.Namespace == "Roll6.Domain.Interfaces");
+    private static bool IsInjected(ParameterInfo parameter) => parameter.ParameterType == typeof(Roll6ApiClient);
 
     public static IEnumerable<object[]> ToolNames() => TOOLS.Select(t => new object[] { t.Name });
 

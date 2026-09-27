@@ -1,4 +1,4 @@
-namespace Roll6.API.Mcp;
+namespace Roll6.Mcp;
 
 /// <summary>Reference guide of the Roll6 domain for AI assistants (020), served as a resource and a tool.</summary>
 public static class Roll6Guide

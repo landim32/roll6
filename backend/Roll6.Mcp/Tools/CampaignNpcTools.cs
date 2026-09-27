@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.CampaignNpc;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>NPCs available in a campaign (020). Mirrors CampaignNpcController: master only.</summary>
 [McpServerToolType]
@@ -21,10 +20,10 @@ public static class CampaignNpcTools
         Related tools: list_my_npcs, create_npc, place_npc_on_map, list_campaign_npcs.
         """)]
     public static Task<CallToolResult> AddNpcToCampaign(
-        ICampaignNpcService campaignNpcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Id of the master's library NPC (npcId from list_my_npcs).")] long npcId) =>
-        McpToolRunner.RunAsync(() => campaignNpcs.AddAsync(McpUser.Id(http), new CampaignNpcInsertInfo { CampaignId = campaignId, NpcId = npcId }));
+        api.SendAsync(HttpMethod.Post, "/api/campaignnpc", new CampaignNpcInsertInfo { CampaignId = campaignId, NpcId = npcId });
 
     [McpServerTool(Name = "remove_npc_from_campaign", Title = "Remove NPC from campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaignnpc/{id}")]
@@ -37,7 +36,7 @@ public static class CampaignNpcTools
         Related tools: list_campaign_npcs (campaignNpcId).
         """)]
     public static Task<CallToolResult> RemoveNpcFromCampaign(
-        ICampaignNpcService campaignNpcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the campaign NPC (campaignNpcId from list_campaign_npcs — not the npcId).")] long campaignNpcId) =>
-        McpToolRunner.RunAsync(() => campaignNpcs.RemoveAsync(McpUser.Id(http), campaignNpcId));
+        api.SendAsync(HttpMethod.Delete, $"/api/campaignnpc/{campaignNpcId}");
 }

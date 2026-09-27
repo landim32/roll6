@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.Token;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>The shared token library (020): images used to draw pieces on maps. Mirrors TokenController.</summary>
 [McpServerToolType]
@@ -27,12 +26,12 @@ public static class TokenTools
         Related tools: create_token, add_object_to_map, create_npc (needs a tokenId), create_character (tokenId).
         """)]
     public static Task<CallToolResult> ListTokens(
-        ITokenLibraryService tokens, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PAGE)] int page = 1,
         [Description(McpDocs.PAGE_SIZE)] int pageSize = 20,
         [Description(McpDocs.SEARCH)] string? search = null,
         [Description(McpDocs.MINE)] bool mine = false) =>
-        McpToolRunner.RunAsync(() => tokens.ListAsync(McpDocs.Page(page, pageSize, search), mine ? McpUser.Id(http) : null));
+        api.SendAsync(HttpMethod.Get, "/api/token", null, ("page", page), ("pageSize", pageSize), ("search", search), ("mine", mine));
 
     [McpServerTool(Name = "get_token", Title = "Get token", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/token/{id}")]
@@ -44,9 +43,9 @@ public static class TokenTools
         Related tools: list_tokens, update_token.
         """)]
     public static Task<CallToolResult> GetToken(
-        ITokenLibraryService tokens,
+        Roll6ApiClient api,
         [Description("Id of the token (tokenId from list_tokens).")] long tokenId) =>
-        McpToolRunner.RunAsync(() => tokens.GetByIdAsync(tokenId));
+        api.SendAsync(HttpMethod.Get, $"/api/token/{tokenId}");
 
     [McpServerTool(Name = "create_token", Title = "Create token", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/token")]
@@ -59,17 +58,17 @@ public static class TokenTools
         Related tools: upload_image, add_object_to_map, create_npc.
         """)]
     public static Task<CallToolResult> CreateToken(
-        ITokenLibraryService tokens, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Token name (required, up to 260 characters). Example: \"Goblin archer\".")] string name,
         [Description("Optional free text describing the token.")] string? description = null,
         [Description("Hexes the standing token occupies (0 or more). Default 1.")] int? upSpace = null,
         [Description("Hexes the token occupies when down (0 or more). Only used with downImage; default 2.")] int? downSpace = null,
         [Description("Image of the token standing. " + McpDocs.IMAGE_FILE)] string? upImage = null,
         [Description("Optional image of the token lying down (fallen). " + McpDocs.IMAGE_FILE)] string? downImage = null) =>
-        McpToolRunner.RunAsync(() => tokens.CreateAsync(McpUser.Id(http), new TokenInsertInfo
+        api.SendAsync(HttpMethod.Post, "/api/token", new TokenInsertInfo
         {
             Name = name, Description = description, UpSpace = upSpace, DownSpace = downSpace, UpImage = upImage, DownImage = downImage
-        }));
+        });
 
     [McpServerTool(Name = "update_token", Title = "Update token", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/token/{id}")]
@@ -83,7 +82,7 @@ public static class TokenTools
         Related tools: get_token.
         """)]
     public static Task<CallToolResult> UpdateToken(
-        ITokenLibraryService tokens, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the token to change (tokenId).")] long tokenId,
         [Description("Token name (required, up to 260 characters).")] string name,
         [Description("Optional free text describing the token.")] string? description = null,
@@ -91,10 +90,10 @@ public static class TokenTools
         [Description("Hexes the token occupies when down. Only used with downImage; default 2.")] int? downSpace = null,
         [Description("Image of the token standing. " + McpDocs.IMAGE_FILE)] string? upImage = null,
         [Description("Optional image of the token lying down. " + McpDocs.IMAGE_FILE)] string? downImage = null) =>
-        McpToolRunner.RunAsync(() => tokens.UpdateAsync(McpUser.Id(http), tokenId, new TokenInsertInfo
+        api.SendAsync(HttpMethod.Put, $"/api/token/{tokenId}", new TokenInsertInfo
         {
             Name = name, Description = description, UpSpace = upSpace, DownSpace = downSpace, UpImage = upImage, DownImage = downImage
-        }));
+        });
 
     [McpServerTool(Name = "delete_token", Title = "Delete token", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/token/{id}")]
@@ -106,7 +105,7 @@ public static class TokenTools
         Related tools: list_tokens (mine=true).
         """)]
     public static Task<CallToolResult> DeleteToken(
-        ITokenLibraryService tokens, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the token to delete (tokenId).")] long tokenId) =>
-        McpToolRunner.RunAsync(() => tokens.DeleteAsync(McpUser.Id(http), tokenId));
+        api.SendAsync(HttpMethod.Delete, $"/api/token/{tokenId}");
 }

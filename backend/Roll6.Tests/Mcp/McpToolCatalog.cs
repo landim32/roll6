@@ -4,14 +4,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using ModelContextProtocol.Server;
 using Roll6.API.Controllers;
-using Roll6.API.Mcp;
+using Roll6.Mcp;
 
 namespace Roll6.Tests.Mcp;
 
-/// <summary>Reflection helpers shared by the MCP tests: the API operations and the MCP tools.</summary>
+/// <summary>Reflection helpers shared by the MCP tests: the API operations (Roll6.API) and the MCP tools (Roll6.Mcp).</summary>
 public static class McpToolCatalog
 {
     public static readonly Assembly API = typeof(ApiControllerBase).Assembly;
+    public static readonly Assembly MCP = typeof(Roll6Guide).Assembly;
 
     /// <summary>Operations that need a human login session (019) and are not exposed as tools.</summary>
     public static readonly HashSet<string> EXCLUDED = new()
@@ -42,7 +43,7 @@ public static class McpToolCatalog
         .Select(StripConstraints)
         .ToList();
 
-    public static List<Tool> Tools() => API.GetTypes()
+    public static List<Tool> Tools() => MCP.GetTypes()
         .Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() != null)
         .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Static))
         .Select(m => (Method: m, Attribute: m.GetCustomAttribute<McpServerToolAttribute>()))

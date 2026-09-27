@@ -1,9 +1,8 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>The current user (020). Registering, logging in and changing name/password need a human login.</summary>
 [McpServerToolType]
@@ -19,6 +18,7 @@ public static class UserTools
         Common errors: none besides authentication.
         Related tools: list_campaigns (mine=true), list_my_characters.
         """)]
-    public static Task<CallToolResult> GetMyProfile(IUserService users, IHttpContextAccessor http) =>
-        McpToolRunner.RunAsync(() => users.GetMeAsync(McpUser.Id(http)));
+    public static Task<CallToolResult> GetMyProfile(
+        Roll6ApiClient api) =>
+        api.SendAsync(HttpMethod.Get, "/api/user/me");
 }

@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.MapModel;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>Map models: the reusable image + hex grid layout (020). Mirrors MapModelController.</summary>
 [McpServerToolType]
@@ -33,12 +32,12 @@ public static class MapModelTools
         Related tools: add_map_to_campaign, create_map_model.
         """)]
     public static Task<CallToolResult> ListMapModels(
-        IMapModelService models, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PAGE)] int page = 1,
         [Description(McpDocs.PAGE_SIZE)] int pageSize = 20,
         [Description(McpDocs.SEARCH)] string? search = null,
         [Description(McpDocs.MINE)] bool mine = false) =>
-        McpToolRunner.RunAsync(() => models.ListAsync(McpDocs.Page(page, pageSize, search), mine ? McpUser.Id(http) : null));
+        api.SendAsync(HttpMethod.Get, "/api/mapmodel", null, ("page", page), ("pageSize", pageSize), ("search", search), ("mine", mine));
 
     [McpServerTool(Name = "get_map_model", Title = "Get map model", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/mapmodel/{id}")]
@@ -50,9 +49,9 @@ public static class MapModelTools
         Related tools: update_map_model.
         """)]
     public static Task<CallToolResult> GetMapModel(
-        IMapModelService models,
+        Roll6ApiClient api,
         [Description("Id of the map model (mapModelId from list_map_models or a campaign map's mapModelId).")] long mapModelId) =>
-        McpToolRunner.RunAsync(() => models.GetByIdAsync(mapModelId));
+        api.SendAsync(HttpMethod.Get, $"/api/mapmodel/{mapModelId}");
 
     [McpServerTool(Name = "create_map_model", Title = "Create map model", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/mapmodel")]
@@ -65,7 +64,7 @@ public static class MapModelTools
         Related tools: upload_image, add_map_to_campaign.
         """)]
     public static Task<CallToolResult> CreateMapModel(
-        IMapModelService models, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Map name (required, up to 260 characters). Example: \"Goblin cave\".")] string name,
         [Description("Optional description of the map.")] string? description = null,
         [Description("Background image. " + McpDocs.IMAGE_FILE)] string? image = null,
@@ -75,11 +74,11 @@ public static class MapModelTools
         [Description("Display height of the background in px (1 to 20000). Send together with imageWidth, or omit both.")] int? imageHeight = null,
         [Description("Vertical offset of the background in px (-20000 to 20000; negative moves it down). Default 0.")] int? imageTop = null,
         [Description("Horizontal offset of the background in px (-20000 to 20000; negative moves it right). Default 0.")] int? imageLeft = null) =>
-        McpToolRunner.RunAsync(() => models.CreateAsync(McpUser.Id(http), new MapModelInsertInfo
+        api.SendAsync(HttpMethod.Post, "/api/mapmodel", new MapModelInsertInfo
         {
             Name = name, Description = description, Image = image, GridWidth = gridWidth, GridHeight = gridHeight,
             ImageWidth = imageWidth, ImageHeight = imageHeight, ImageTop = imageTop, ImageLeft = imageLeft
-        }));
+        });
 
     [McpServerTool(Name = "update_map_model", Title = "Update map model", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/mapmodel/{id}")]
@@ -93,7 +92,7 @@ public static class MapModelTools
         Related tools: get_map_model.
         """)]
     public static Task<CallToolResult> UpdateMapModel(
-        IMapModelService models, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the map model to change (mapModelId).")] long mapModelId,
         [Description("Map name (required, up to 260 characters).")] string name,
         [Description("Optional description of the map.")] string? description = null,
@@ -104,11 +103,11 @@ public static class MapModelTools
         [Description("Display height of the background in px (1 to 20000); together with imageWidth.")] int? imageHeight = null,
         [Description("Vertical offset of the background in px (-20000 to 20000).")] int? imageTop = null,
         [Description("Horizontal offset of the background in px (-20000 to 20000).")] int? imageLeft = null) =>
-        McpToolRunner.RunAsync(() => models.UpdateAsync(McpUser.Id(http), mapModelId, new MapModelInsertInfo
+        api.SendAsync(HttpMethod.Put, $"/api/mapmodel/{mapModelId}", new MapModelInsertInfo
         {
             Name = name, Description = description, Image = image, GridWidth = gridWidth, GridHeight = gridHeight,
             ImageWidth = imageWidth, ImageHeight = imageHeight, ImageTop = imageTop, ImageLeft = imageLeft
-        }));
+        });
 
     [McpServerTool(Name = "delete_map_model", Title = "Delete map model", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/mapmodel/{id}")]
@@ -120,7 +119,7 @@ public static class MapModelTools
         Related tools: list_map_models (mine=true).
         """)]
     public static Task<CallToolResult> DeleteMapModel(
-        IMapModelService models, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the map model to delete (mapModelId).")] long mapModelId) =>
-        McpToolRunner.RunAsync(() => models.DeleteAsync(McpUser.Id(http), mapModelId));
+        api.SendAsync(HttpMethod.Delete, $"/api/mapmodel/{mapModelId}");
 }

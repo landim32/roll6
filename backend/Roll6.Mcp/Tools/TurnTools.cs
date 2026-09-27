@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.Turn;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>Turn entries (020). Mirrors TurnController; reading the turn and finishing it are campaign tools.</summary>
 [McpServerToolType]
@@ -29,10 +28,10 @@ public static class TurnTools
         Related tools: list_map_tokens (mapTokenId), get_turn_state.
         """)]
     public static Task<CallToolResult> ActInTurn(
-        ITurnService turns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_TOKEN_ID + " Must be a character or NPC piece.")] long mapTokenId,
         [Description("What the piece does, in plain text (required, up to 2000 characters). Example: \"Casts a fireball at the orcs\".")] string description) =>
-        McpToolRunner.RunAsync(() => turns.ActAsync(McpUser.Id(http), new TurnActInfo { MapTokenId = mapTokenId, Description = description }));
+        api.SendAsync(HttpMethod.Post, "/api/turn/action", new TurnActInfo { MapTokenId = mapTokenId, Description = description });
 
     [McpServerTool(Name = "reset_turn", Title = "Reset piece turn", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("POST", "/api/turn/reset")]
@@ -45,9 +44,9 @@ public static class TurnTools
         Related tools: get_turn_state.
         """)]
     public static Task<CallToolResult> ResetTurn(
-        ITurnService turns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_TOKEN_ID)] long mapTokenId) =>
-        McpToolRunner.RunAsync(() => turns.ResetAsync(McpUser.Id(http), new TurnPieceInfo { MapTokenId = mapTokenId }));
+        api.SendAsync(HttpMethod.Post, "/api/turn/reset", new TurnPieceInfo { MapTokenId = mapTokenId });
 
     [McpServerTool(Name = "create_turn_entry", Title = "Create turn entry", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/turn")]
@@ -61,7 +60,7 @@ public static class TurnTools
         Related tools: get_turn_state, delete_turn_entry.
         """)]
     public static Task<CallToolResult> CreateTurnEntry(
-        ITurnService turns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("1 Movement, 2 Action, 3 ActionResult.")] int turnType,
         [Description("Character the entry belongs to (characterId). Give this or npcId.")] long? characterId = null,
@@ -76,12 +75,12 @@ public static class TurnTools
         [Description("Movement only: column after the move.")] int? x = null,
         [Description("Movement only: row after the move.")] int? y = null,
         [Description("Movement only: facing after the move (0-5).")] int? look = null) =>
-        McpToolRunner.RunAsync(() => turns.CreateAsync(McpUser.Id(http), new TurnInsertInfo
+        api.SendAsync(HttpMethod.Post, "/api/turn", new TurnInsertInfo
         {
             CampaignId = campaignId, TurnType = turnType, CharacterId = characterId, NpcId = npcId, MapNpcId = mapNpcId,
             Description = description, TurnNo = turnNo, MapId = mapId, BeforeX = beforeX, BeforeY = beforeY,
             BeforeLook = beforeLook, X = x, Y = y, Look = look
-        }));
+        });
 
     [McpServerTool(Name = "delete_turn_entry", Title = "Delete turn entry", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/turn/{id}")]
@@ -94,7 +93,7 @@ public static class TurnTools
         Related tools: get_turn_state, list_turn_entries (turnId).
         """)]
     public static Task<CallToolResult> DeleteTurnEntry(
-        ITurnService turns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the entry (turnId from get_turn_state or list_turn_entries).")] long turnId) =>
-        McpToolRunner.RunAsync(() => turns.DeleteAsync(McpUser.Id(http), turnId));
+        api.SendAsync(HttpMethod.Delete, $"/api/turn/{turnId}");
 }

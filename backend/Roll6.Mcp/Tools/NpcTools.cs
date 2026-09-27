@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.Npc;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>The master's NPC library (020). Mirrors NpcController: each NPC is read and changed only by its owner.</summary>
 [McpServerToolType]
@@ -27,11 +26,11 @@ public static class NpcTools
         Related tools: create_npc, add_npc_to_campaign.
         """)]
     public static Task<CallToolResult> ListMyNpcs(
-        INpcService npcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PAGE)] int page = 1,
         [Description(McpDocs.PAGE_SIZE)] int pageSize = 20,
         [Description(McpDocs.SEARCH)] string? search = null) =>
-        McpToolRunner.RunAsync(() => npcs.ListAsync(McpUser.Id(http), McpDocs.Page(page, pageSize, search)));
+        api.SendAsync(HttpMethod.Get, "/api/npc", null, ("page", page), ("pageSize", pageSize), ("search", search));
 
     [McpServerTool(Name = "get_npc", Title = "Get NPC", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/npc/{id}")]
@@ -43,9 +42,9 @@ public static class NpcTools
         Related tools: update_npc.
         """)]
     public static Task<CallToolResult> GetNpc(
-        INpcService npcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the NPC (npcId from list_my_npcs).")] long npcId) =>
-        McpToolRunner.RunAsync(() => npcs.GetByIdAsync(McpUser.Id(http), npcId));
+        api.SendAsync(HttpMethod.Get, $"/api/npc/{npcId}");
 
     [McpServerTool(Name = "create_npc", Title = "Create NPC", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/npc")]
@@ -59,7 +58,7 @@ public static class NpcTools
         Related tools: list_tokens, upload_image, add_npc_to_campaign.
         """)]
     public static Task<CallToolResult> CreateNpc(
-        INpcService npcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Library token that draws the NPC on maps (tokenId from list_tokens). Required.")] long tokenId,
         [Description("NPC name (required, up to 260 characters). Example: \"Goblin\".")] string name,
         [Description("Base life points (0 or more). Example: 7.")] int life,
@@ -67,10 +66,10 @@ public static class NpcTools
         [Description("Base movement points per turn (0 or more). Example: 6.")] int move,
         [Description("NPC sheet in markdown (up to 20000 characters). Optional.")] string? sheet = null,
         [Description("NPC picture. " + McpDocs.IMAGE_FILE)] string? image = null) =>
-        McpToolRunner.RunAsync(() => npcs.CreateAsync(McpUser.Id(http), new NpcInsertInfo
+        api.SendAsync(HttpMethod.Post, "/api/npc", new NpcInsertInfo
         {
             TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image
-        }));
+        });
 
     [McpServerTool(Name = "update_npc", Title = "Update NPC", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/npc/{id}")]
@@ -84,7 +83,7 @@ public static class NpcTools
         Related tools: get_npc, update_map_npc.
         """)]
     public static Task<CallToolResult> UpdateNpc(
-        INpcService npcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the NPC to change (npcId).")] long npcId,
         [Description("Library token that draws the NPC on maps (tokenId). Required.")] long tokenId,
         [Description("NPC name (required, up to 260 characters).")] string name,
@@ -93,10 +92,10 @@ public static class NpcTools
         [Description("Base movement points per turn (0 or more).")] int move,
         [Description("NPC sheet in markdown (up to 20000 characters). Optional.")] string? sheet = null,
         [Description("NPC picture. " + McpDocs.IMAGE_FILE)] string? image = null) =>
-        McpToolRunner.RunAsync(() => npcs.UpdateAsync(McpUser.Id(http), npcId, new NpcInsertInfo
+        api.SendAsync(HttpMethod.Put, $"/api/npc/{npcId}", new NpcInsertInfo
         {
             TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image
-        }));
+        });
 
     [McpServerTool(Name = "delete_npc", Title = "Delete NPC", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/npc/{id}")]
@@ -108,7 +107,7 @@ public static class NpcTools
         Related tools: remove_npc_from_campaign.
         """)]
     public static Task<CallToolResult> DeleteNpc(
-        INpcService npcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the NPC to delete (npcId).")] long npcId) =>
-        McpToolRunner.RunAsync(() => npcs.DeleteAsync(McpUser.Id(http), npcId));
+        api.SendAsync(HttpMethod.Delete, $"/api/npc/{npcId}");
 }
