@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.MapToken;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>Pieces on campaign maps (020). Mirrors MapTokenController.</summary>
 [McpServerToolType]
@@ -27,7 +26,7 @@ public static class MapTokenTools
         Related tools: list_tokens, list_map_tokens, move_map_token.
         """)]
     public static Task<CallToolResult> AddObjectToMap(
-        IMapTokenService pieces, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId,
         [Description("Library token that draws the object (tokenId from list_tokens).")] long tokenId,
         [Description(McpDocs.X)] int x,
@@ -39,11 +38,11 @@ public static class MapTokenTools
         [Description("Life of the object (for breakable things); default 0.")] int life = 0,
         [Description("Energy of the object; default 0.")] int energy = 0,
         [Description("Movement points of the object; default 0 (objects move freely for the master).")] int move = 0) =>
-        McpToolRunner.RunAsync(() => pieces.CreateAsync(McpUser.Id(http), new MapTokenInsertInfo
+        api.SendAsync(HttpMethod.Post, "/api/maptoken", new MapTokenInsertInfo
         {
             MapId = mapId, TokenId = tokenId, Name = name, TokenType = 4, Sheet = sheet, Life = life, Energy = energy,
             Status = status, Move = move, X = x, Y = y, Look = look
-        }));
+        });
 
     [McpServerTool(Name = "place_character_on_map", Title = "Place character on map", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/maptoken/character")]
@@ -58,16 +57,16 @@ public static class MapTokenTools
         Related tools: list_campaign_characters (campaignCharacterId, characterTokenId), move_map_token.
         """)]
     public static Task<CallToolResult> PlaceCharacterOnMap(
-        IMapTokenService pieces, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId,
         [Description(McpDocs.PARTICIPATION_ID + " Must be approved in the map's campaign.")] long campaignCharacterId,
         [Description(McpDocs.X)] int x,
         [Description(McpDocs.Y)] int y,
         [Description("Token to use only when the character has none (tokenId from list_tokens); ignored otherwise.")] long? tokenId = null) =>
-        McpToolRunner.RunAsync(() => pieces.PlaceCharacterAsync(McpUser.Id(http), new MapTokenCharacterInsertInfo
+        api.SendAsync(HttpMethod.Post, "/api/maptoken/character", new MapTokenCharacterInsertInfo
         {
             MapId = mapId, CampaignCharacterId = campaignCharacterId, TokenId = tokenId, X = x, Y = y
-        }));
+        });
 
     [McpServerTool(Name = "move_map_token", Title = "Move piece", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/maptoken/{id}/position")]
@@ -87,12 +86,12 @@ public static class MapTokenTools
         Related tools: list_map_tokens (ids and positions), get_map (grid size), get_turn_state, reset_turn.
         """)]
     public static Task<CallToolResult> MoveMapToken(
-        IMapTokenService pieces, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_TOKEN_ID)] long mapTokenId,
         [Description("Destination column. " + McpDocs.X)] int x,
         [Description("Destination row. " + McpDocs.Y)] int y,
         [Description(McpDocs.LOOK_OPTIONAL)] int? look = null) =>
-        McpToolRunner.RunAsync(() => pieces.MoveAsync(McpUser.Id(http), mapTokenId, new MapTokenPositionInfo { X = x, Y = y, Look = look }));
+        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/position", new MapTokenPositionInfo { X = x, Y = y, Look = look });
 
     [McpServerTool(Name = "change_map_token_image", Title = "Change piece token", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/maptoken/{id}/token")]
@@ -104,10 +103,10 @@ public static class MapTokenTools
         Related tools: list_tokens.
         """)]
     public static Task<CallToolResult> ChangeMapTokenImage(
-        IMapTokenService pieces, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_TOKEN_ID)] long mapTokenId,
         [Description("New library token (tokenId from list_tokens).")] long tokenId) =>
-        McpToolRunner.RunAsync(() => pieces.ChangeTokenAsync(McpUser.Id(http), mapTokenId, new MapTokenTokenInfo { TokenId = tokenId }));
+        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/token", new MapTokenTokenInfo { TokenId = tokenId });
 
     [McpServerTool(Name = "update_map_token", Title = "Update piece", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/maptoken/{id}")]
@@ -121,7 +120,7 @@ public static class MapTokenTools
         Related tools: move_map_token (normal moves), list_map_tokens.
         """)]
     public static Task<CallToolResult> UpdateMapToken(
-        IMapTokenService pieces, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_TOKEN_ID)] long mapTokenId,
         [Description("Piece name (required, up to 260 characters).")] string name,
         [Description("Piece type: 1 Character, 2 Npc, 4 Object. Keep the current one.")] int tokenType,
@@ -133,11 +132,11 @@ public static class MapTokenTools
         [Description("Life value stored on the piece.")] int life = 0,
         [Description("Energy value stored on the piece.")] int energy = 0,
         [Description("Movement points stored on the piece.")] int move = 0) =>
-        McpToolRunner.RunAsync(() => pieces.UpdateAsync(McpUser.Id(http), mapTokenId, new MapTokenUpdateInfo
+        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}", new MapTokenUpdateInfo
         {
             Name = name, TokenType = tokenType, Sheet = sheet, Life = life, Energy = energy, Status = status, Move = move,
             X = x, Y = y, Look = look
-        }));
+        });
 
     [McpServerTool(Name = "delete_map_token", Title = "Delete piece", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/maptoken/{id}")]
@@ -150,7 +149,7 @@ public static class MapTokenTools
         Related tools: list_map_tokens.
         """)]
     public static Task<CallToolResult> DeleteMapToken(
-        IMapTokenService pieces, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_TOKEN_ID)] long mapTokenId) =>
-        McpToolRunner.RunAsync(() => pieces.DeleteAsync(McpUser.Id(http), mapTokenId));
+        api.SendAsync(HttpMethod.Delete, $"/api/maptoken/{mapTokenId}");
 }

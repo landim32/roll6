@@ -1,8 +1,10 @@
-# Production environment (ASPNETCORE_ENVIRONMENT=Production).
-# SSL is terminated by Caddy (automatic Let's Encrypt) in front of the web container (nginx serving the
-# SPA and proxying /api to the API). The API and database are not exposed directly.
+# Production environment (ASPNETCORE_ENVIRONMENT=Production), same layout as the other Emagine apps (AvaBot):
+# HTTPS is terminated by Cloudflare and the server's shared nginx, which also serves the built SPA (frontend
+# `npm run build` with .env.production → same-origin /api) and proxies /api and /hubs to roll6-api:8080 and /mcp to
+# roll6-mcp:8080 over the shared external network "emagine-network". No port is published here, and the database is
+# external (ROLL6_CONNECTION_STRING).
 # Usage: docker compose --env-file .env.prod -f docker-compose-prod.yml up --build -d
-# Fixed project name: containers, network and volumes are prefixed "roll6" whatever the folder is called.
+# Fixed project name: containers and the internal network are prefixed "roll6" whatever the folder is called.
 name: roll6
 
 services:
@@ -12,6 +14,8 @@ services:
       dockerfile: Dockerfile
     container_name: roll6-api
     restart: unless-stopped
+    expose:
+      - "8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
@@ -20,73 +24,34 @@ services:
       S3__Folder: roll6
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-    depends_on:
-      db:
-        condition: service_healthy
     networks:
       - roll6-network
-      - roll6-external
+      # Shared network: the server's nginx reaches roll6-api:8080 (/api, /hubs) and the API reaches an external
+      # database running on it.
+      - emagine-network
 
-  db:
-    image: postgres:17-alpine
-    container_name: roll6-db
-    restart: unless-stopped
-    # No port exposed externally — only reachable from the internal network.
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - roll6-network
-
-  web:
+  mcp:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ""
-    container_name: roll6-web
+      context: ./backend
+      dockerfile: Roll6.Mcp/Dockerfile
+    container_name: roll6-mcp
     restart: unless-stopped
-    # Not exposed: only Caddy reaches it.
+    expose:
+      - "8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      # MCP tools call the API with the caller's own API key; no database/storage secrets here.
+      Roll6Api__BaseUrl: http://api:8080
     depends_on:
       - api
     networks:
       - roll6-network
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: roll6-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      # Site address used by the Caddyfile ({$ROLL6_DOMAIN}), e.g. roll6.example.com.
-      ROLL6_DOMAIN: ${ROLL6_DOMAIN:?ROLL6_DOMAIN is required}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - web
-    networks:
-      - roll6-network
-      - roll6-external
-
-volumes:
-  postgres_data:
-  caddy_data:
-  caddy_config:
+      # Shared network: the server's nginx reaches roll6-mcp:8080 (/mcp).
+      - emagine-network
 
 networks:
   roll6-network:
     driver: bridge
-  roll6-external:
+  emagine-network:
     external: true

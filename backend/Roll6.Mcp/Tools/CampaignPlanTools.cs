@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.CampaignPlan;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>The master's secret campaign plan (020). Mirrors CampaignPlanController; the list is list_campaign_plans.</summary>
 [McpServerToolType]
@@ -27,9 +26,9 @@ public static class CampaignPlanTools
         Related tools: list_campaign_plans, update_campaign_plan.
         """)]
     public static Task<CallToolResult> GetCampaignPlan(
-        ICampaignPlanService plans, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the plan entry (campaignPlanId from list_campaign_plans).")] long campaignPlanId) =>
-        McpToolRunner.RunAsync(() => plans.GetByIdAsync(McpUser.Id(http), campaignPlanId));
+        api.SendAsync(HttpMethod.Get, $"/api/campaignplan/{campaignPlanId}");
 
     [McpServerTool(Name = "create_campaign_plan", Title = "Create campaign plan entry", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaignplan")]
@@ -41,11 +40,11 @@ public static class CampaignPlanTools
         Related tools: upload_image, list_campaign_plans.
         """)]
     public static Task<CallToolResult> CreateCampaignPlan(
-        ICampaignPlanService plans, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Entry title (required, up to 260 characters). Example: \"Chapter 1 - The road\".")] string title,
         [Description(DESCRIPTION)] string? description = null) =>
-        McpToolRunner.RunAsync(() => plans.CreateAsync(McpUser.Id(http), new CampaignPlanInsertInfo { CampaignId = campaignId, Title = title, Description = description }));
+        api.SendAsync(HttpMethod.Post, "/api/campaignplan", new CampaignPlanInsertInfo { CampaignId = campaignId, Title = title, Description = description });
 
     [McpServerTool(Name = "update_campaign_plan", Title = "Update campaign plan entry", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaignplan/{id}")]
@@ -57,11 +56,11 @@ public static class CampaignPlanTools
         Related tools: get_campaign_plan.
         """)]
     public static Task<CallToolResult> UpdateCampaignPlan(
-        ICampaignPlanService plans, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the plan entry (campaignPlanId).")] long campaignPlanId,
         [Description("Entry title (required, up to 260 characters).")] string title,
         [Description(DESCRIPTION)] string? description = null) =>
-        McpToolRunner.RunAsync(() => plans.UpdateAsync(McpUser.Id(http), campaignPlanId, new CampaignPlanUpdateInfo { Title = title, Description = description }));
+        api.SendAsync(HttpMethod.Put, $"/api/campaignplan/{campaignPlanId}", new CampaignPlanUpdateInfo { Title = title, Description = description });
 
     [McpServerTool(Name = "delete_campaign_plan", Title = "Delete campaign plan entry", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaignplan/{id}")]
@@ -73,7 +72,7 @@ public static class CampaignPlanTools
         Related tools: list_campaign_plans.
         """)]
     public static Task<CallToolResult> DeleteCampaignPlan(
-        ICampaignPlanService plans, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the plan entry (campaignPlanId).")] long campaignPlanId) =>
-        McpToolRunner.RunAsync(() => plans.DeleteAsync(McpUser.Id(http), campaignPlanId));
+        api.SendAsync(HttpMethod.Delete, $"/api/campaignplan/{campaignPlanId}");
 }

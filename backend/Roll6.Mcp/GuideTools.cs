@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
 
-namespace Roll6.API.Mcp;
+namespace Roll6.Mcp;
 
 /// <summary>The Roll6 guide as a tool, for clients that don't read resources (020).</summary>
 [McpServerToolType]

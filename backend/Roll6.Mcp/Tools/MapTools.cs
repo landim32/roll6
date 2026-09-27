@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.Map;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>Campaign maps: a map model used in a campaign (020). Mirrors MapController.</summary>
 [McpServerToolType]
@@ -26,9 +25,9 @@ public static class MapTools
         Related tools: list_map_tokens, list_campaign_maps.
         """)]
     public static Task<CallToolResult> GetMap(
-        IMapService maps, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId) =>
-        McpToolRunner.RunAsync(() => maps.GetByIdAsync(McpUser.Id(http), mapId));
+        api.SendAsync(HttpMethod.Get, $"/api/map/{mapId}");
 
     [McpServerTool(Name = "add_map_to_campaign", Title = "Add map to campaign", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/map")]
@@ -41,10 +40,10 @@ public static class MapTools
         Related tools: list_map_models, create_map_model, set_current_map.
         """)]
     public static Task<CallToolResult> AddMapToCampaign(
-        IMapService maps, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Id of the map model (mapModelId from list_map_models).")] long mapModelId) =>
-        McpToolRunner.RunAsync(() => maps.CreateAsync(McpUser.Id(http), new MapInsertInfo { CampaignId = campaignId, MapModelId = mapModelId }));
+        api.SendAsync(HttpMethod.Post, "/api/map", new MapInsertInfo { CampaignId = campaignId, MapModelId = mapModelId });
 
     [McpServerTool(Name = "update_map", Title = "Rename or archive map", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/map/{id}")]
@@ -57,11 +56,11 @@ public static class MapTools
         Related tools: get_map.
         """)]
     public static Task<CallToolResult> UpdateMap(
-        IMapService maps, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId,
         [Description("Map name (required, up to 260 characters). Send the current name to keep it.")] string name,
         [Description("1 = active, 2 = archived.")] int status) =>
-        McpToolRunner.RunAsync(() => maps.UpdateAsync(McpUser.Id(http), mapId, new MapUpdateInfo { Name = name, Status = status }));
+        api.SendAsync(HttpMethod.Put, $"/api/map/{mapId}", new MapUpdateInfo { Name = name, Status = status });
 
     [McpServerTool(Name = "delete_map", Title = "Delete map", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/map/{id}")]
@@ -74,9 +73,9 @@ public static class MapTools
         Related tools: list_campaign_maps.
         """)]
     public static Task<CallToolResult> DeleteMap(
-        IMapService maps, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId) =>
-        McpToolRunner.RunAsync(() => maps.DeleteAsync(McpUser.Id(http), mapId));
+        api.SendAsync(HttpMethod.Delete, $"/api/map/{mapId}");
 
     [McpServerTool(Name = "list_map_tokens", Title = "List map pieces", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/map/{id}/token")]
@@ -90,9 +89,9 @@ public static class MapTools
         Related tools: move_map_token, act_in_turn, reset_turn, get_map (grid size).
         """)]
     public static Task<CallToolResult> ListMapTokens(
-        IMapTokenService pieces, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId) =>
-        McpToolRunner.RunAsync(() => pieces.ListByMapAsync(McpUser.Id(http), mapId));
+        api.SendAsync(HttpMethod.Get, $"/api/map/{mapId}/token");
 
     [McpServerTool(Name = "list_map_npcs", Title = "List map NPC occurrences", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/map/{id}/npc")]
@@ -105,7 +104,7 @@ public static class MapTools
         Related tools: update_map_npc, delete_map_npc, place_npc_on_map.
         """)]
     public static Task<CallToolResult> ListMapNpcs(
-        IMapNpcService mapNpcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId) =>
-        McpToolRunner.RunAsync(() => mapNpcs.ListByMapAsync(McpUser.Id(http), mapId));
+        api.SendAsync(HttpMethod.Get, $"/api/map/{mapId}/npc");
 }

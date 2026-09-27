@@ -1,6 +1,6 @@
 using Roll6.DTO.Common;
 
-namespace Roll6.API.Mcp;
+namespace Roll6.Mcp;
 
 /// <summary>Parameter descriptions shared by many tools (020), so they are written — and fixed — once.</summary>
 public static class McpDocs

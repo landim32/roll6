@@ -1,11 +1,10 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.Campaign;
 using Roll6.DTO.Turn;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>Campaigns and what hangs from them (020). Mirrors CampaignController.</summary>
 [McpServerToolType]
@@ -27,12 +26,12 @@ public static class CampaignTools
         Related tools: get_campaign, create_campaign, request_campaign_access.
         """)]
     public static Task<CallToolResult> ListCampaigns(
-        ICampaignService campaigns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PAGE)] int page = 1,
         [Description(McpDocs.PAGE_SIZE)] int pageSize = 20,
         [Description(McpDocs.SEARCH)] string? search = null,
         [Description("true = only campaigns where the current user is the master; false (default) = all campaigns.")] bool mine = false) =>
-        McpToolRunner.RunAsync(() => campaigns.ListAsync(McpDocs.Page(page, pageSize, search), mine ? McpUser.Id(http) : null));
+        api.SendAsync(HttpMethod.Get, "/api/campaign", null, ("page", page), ("pageSize", pageSize), ("search", search), ("mine", mine));
 
     [McpServerTool(Name = "get_campaign", Title = "Get campaign", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}")]
@@ -44,9 +43,9 @@ public static class CampaignTools
         Related tools: list_campaign_maps, list_campaign_characters, get_turn_state.
         """)]
     public static Task<CallToolResult> GetCampaign(
-        ICampaignService campaigns,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
-        McpToolRunner.RunAsync(() => campaigns.GetByIdAsync(campaignId));
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}");
 
     [McpServerTool(Name = "create_campaign", Title = "Create campaign", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaign")]
@@ -58,10 +57,10 @@ public static class CampaignTools
         Related tools: create_map_model, add_map_to_campaign, invite_character.
         """)]
     public static Task<CallToolResult> CreateCampaign(
-        ICampaignService campaigns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Campaign name (required, up to 260 characters). Example: \"The Lost Mine\".")] string name,
         [Description("true = access requests are approved immediately; false (default) = the master approves each one.")] bool? open = null) =>
-        McpToolRunner.RunAsync(() => campaigns.CreateAsync(McpUser.Id(http), new CampaignInsertInfo { Name = name, Open = open }));
+        api.SendAsync(HttpMethod.Post, "/api/campaign", new CampaignInsertInfo { Name = name, Open = open });
 
     [McpServerTool(Name = "rename_campaign", Title = "Rename campaign", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/name")]
@@ -73,10 +72,10 @@ public static class CampaignTools
         Related tools: set_campaign_open.
         """)]
     public static Task<CallToolResult> RenameCampaign(
-        ICampaignService campaigns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("New name (required, up to 260 characters).")] string name) =>
-        McpToolRunner.RunAsync(() => campaigns.RenameAsync(McpUser.Id(http), campaignId, new CampaignInsertInfo { Name = name }));
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/name", new CampaignInsertInfo { Name = name });
 
     [McpServerTool(Name = "set_campaign_open", Title = "Open or close campaign", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/open")]
@@ -88,10 +87,10 @@ public static class CampaignTools
         Related tools: approve_access_request.
         """)]
     public static Task<CallToolResult> SetCampaignOpen(
-        ICampaignService campaigns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("true = open campaign, false = closed campaign.")] bool open) =>
-        McpToolRunner.RunAsync(() => campaigns.SetOpenAsync(McpUser.Id(http), campaignId, new CampaignOpenInfo { Open = open }));
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/open", new CampaignOpenInfo { Open = open });
 
     [McpServerTool(Name = "delete_campaign", Title = "Delete campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaign/{id}")]
@@ -104,9 +103,9 @@ public static class CampaignTools
         Related tools: list_campaign_maps, delete_map.
         """)]
     public static Task<CallToolResult> DeleteCampaign(
-        ICampaignService campaigns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
-        McpToolRunner.RunAsync(() => campaigns.DeleteAsync(McpUser.Id(http), campaignId));
+        api.SendAsync(HttpMethod.Delete, $"/api/campaign/{campaignId}");
 
     [McpServerTool(Name = "set_current_map", Title = "Set current map", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/current-map")]
@@ -118,10 +117,10 @@ public static class CampaignTools
         Related tools: list_campaign_maps, add_map_to_campaign.
         """)]
     public static Task<CallToolResult> SetCurrentMap(
-        ICampaignService campaigns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Map to follow (mapId of a non-deleted map of this campaign); null clears the current map.")] long? mapId) =>
-        McpToolRunner.RunAsync(() => campaigns.SetCurrentMapAsync(McpUser.Id(http), campaignId, new CampaignCurrentMapInfo { MapId = mapId }));
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/current-map", new CampaignCurrentMapInfo { MapId = mapId });
 
     [McpServerTool(Name = "list_campaign_maps", Title = "List campaign maps", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/map")]
@@ -135,11 +134,11 @@ public static class CampaignTools
         Related tools: get_map, list_map_tokens, set_current_map.
         """)]
     public static Task<CallToolResult> ListCampaignMaps(
-        IMapService maps, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description(McpDocs.PAGE)] int page = 1,
         [Description(McpDocs.PAGE_SIZE)] int pageSize = 20) =>
-        McpToolRunner.RunAsync(() => maps.ListByCampaignAsync(McpUser.Id(http), campaignId, McpDocs.Page(page, pageSize, null)));
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/map", null, ("page", page), ("pageSize", pageSize));
 
     [McpServerTool(Name = "list_campaign_characters", Title = "List campaign characters", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/character")]
@@ -155,9 +154,9 @@ public static class CampaignTools
         Related tools: approve_access_request, get_participation, place_character_on_map.
         """)]
     public static Task<CallToolResult> ListCampaignCharacters(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
-        McpToolRunner.RunAsync(() => participations.ListByCampaignAsync(McpUser.Id(http), campaignId));
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/character");
 
     [McpServerTool(Name = "list_campaign_npcs", Title = "List campaign NPCs", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/npc")]
@@ -169,9 +168,9 @@ public static class CampaignTools
         Related tools: add_npc_to_campaign, place_npc_on_map, list_map_npcs.
         """)]
     public static Task<CallToolResult> ListCampaignNpcs(
-        ICampaignNpcService campaignNpcs, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
-        McpToolRunner.RunAsync(() => campaignNpcs.ListByCampaignAsync(McpUser.Id(http), campaignId));
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/npc");
 
     [McpServerTool(Name = "list_campaign_plans", Title = "List campaign plans", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/plan")]
@@ -183,9 +182,9 @@ public static class CampaignTools
         Related tools: get_campaign_plan, create_campaign_plan.
         """)]
     public static Task<CallToolResult> ListCampaignPlans(
-        ICampaignPlanService plans, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
-        McpToolRunner.RunAsync(() => plans.ListAsync(McpUser.Id(http), campaignId));
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/plan");
 
     [McpServerTool(Name = "get_turn_state", Title = "Get turn state", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/turn")]
@@ -199,9 +198,9 @@ public static class CampaignTools
         Related tools: act_in_turn, move_map_token, finish_turn, list_turn_entries.
         """)]
     public static Task<CallToolResult> GetTurnState(
-        ITurnService turns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
-        McpToolRunner.RunAsync(() => turns.GetStateAsync(McpUser.Id(http), campaignId));
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/turn");
 
     [McpServerTool(Name = "list_turn_entries", Title = "List turn entries", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/turn/{turnNo}")]
@@ -214,10 +213,10 @@ public static class CampaignTools
         Related tools: get_turn_state.
         """)]
     public static Task<CallToolResult> ListTurnEntries(
-        ITurnService turns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Turn number, starting at 1 (get_campaign.currentTurn is the one in progress). Example: 3.")] int turnNo) =>
-        McpToolRunner.RunAsync(() => turns.ListAsync(McpUser.Id(http), campaignId, turnNo));
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/turn/{turnNo}");
 
     [McpServerTool(Name = "finish_turn", Title = "Finish turn", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaign/{id}/turn/finish")]
@@ -231,8 +230,8 @@ public static class CampaignTools
         Related tools: get_turn_state, list_turn_entries.
         """)]
     public static Task<CallToolResult> FinishTurn(
-        ITurnService turns, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("true = finish even if some characters haven't acted; false (default) = only report who is missing.")] bool force = false) =>
-        McpToolRunner.RunAsync(() => turns.FinishAsync(McpUser.Id(http), campaignId, new TurnFinishInfo { Force = force }));
+        api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/finish", new TurnFinishInfo { Force = force });
 }

@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.CampaignCharacter;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>Characters' participation in campaigns (020). Mirrors CampaignCharacterController.</summary>
 [McpServerToolType]
@@ -26,11 +25,10 @@ public static class ParticipationTools
         Related tools: list_campaigns, list_my_characters, list_my_participations.
         """)]
     public static Task<CallToolResult> RequestCampaignAccess(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Id of the current user's character (characterId from list_my_characters).")] long characterId) =>
-        McpToolRunner.RunAsync(() => participations.RequestAccessAsync(McpUser.Id(http),
-            new CampaignCharacterRequestInfo { CampaignId = campaignId, CharacterId = characterId }));
+        api.SendAsync(HttpMethod.Post, "/api/campaigncharacter/request", new CampaignCharacterRequestInfo { CampaignId = campaignId, CharacterId = characterId });
 
     [McpServerTool(Name = "invite_character", Title = "Invite character", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaigncharacter/invite")]
@@ -43,11 +41,10 @@ public static class ParticipationTools
         Related tools: search_characters, list_campaign_characters.
         """)]
     public static Task<CallToolResult> InviteCharacter(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Id of the character to invite (characterId from search_characters).")] long characterId) =>
-        McpToolRunner.RunAsync(() => participations.InviteAsync(McpUser.Id(http),
-            new CampaignCharacterRequestInfo { CampaignId = campaignId, CharacterId = characterId }));
+        api.SendAsync(HttpMethod.Post, "/api/campaigncharacter/invite", new CampaignCharacterRequestInfo { CampaignId = campaignId, CharacterId = characterId });
 
     [McpServerTool(Name = "list_my_invites", Title = "List my invites", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaigncharacter/invites")]
@@ -58,8 +55,9 @@ public static class ParticipationTools
         Common errors: none.
         Related tools: accept_invite, decline_invite.
         """)]
-    public static Task<CallToolResult> ListMyInvites(ICampaignCharacterService participations, IHttpContextAccessor http) =>
-        McpToolRunner.RunAsync(() => participations.ListInvitesAsync(McpUser.Id(http)));
+    public static Task<CallToolResult> ListMyInvites(
+        Roll6ApiClient api) =>
+        api.SendAsync(HttpMethod.Get, "/api/campaigncharacter/invites");
 
     [McpServerTool(Name = "accept_invite", Title = "Accept invite", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaigncharacter/{id}/accept")]
@@ -72,9 +70,9 @@ public static class ParticipationTools
         Related tools: list_my_invites.
         """)]
     public static Task<CallToolResult> AcceptInvite(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PARTICIPATION_ID)] long campaignCharacterId) =>
-        McpToolRunner.RunAsync(() => participations.AcceptInviteAsync(McpUser.Id(http), campaignCharacterId));
+        api.SendAsync(HttpMethod.Post, $"/api/campaigncharacter/{campaignCharacterId}/accept");
 
     [McpServerTool(Name = "decline_invite", Title = "Decline invite", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaigncharacter/{id}/decline")]
@@ -86,9 +84,9 @@ public static class ParticipationTools
         Related tools: list_my_invites.
         """)]
     public static Task<CallToolResult> DeclineInvite(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PARTICIPATION_ID)] long campaignCharacterId) =>
-        McpToolRunner.RunAsync(() => participations.DeclineInviteAsync(McpUser.Id(http), campaignCharacterId));
+        api.SendAsync(HttpMethod.Post, $"/api/campaigncharacter/{campaignCharacterId}/decline");
 
     [McpServerTool(Name = "approve_access_request", Title = "Approve access request", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaigncharacter/{id}/approve")]
@@ -101,9 +99,9 @@ public static class ParticipationTools
         Related tools: list_campaign_characters (status 2 = requested), place_character_on_map.
         """)]
     public static Task<CallToolResult> ApproveAccessRequest(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PARTICIPATION_ID)] long campaignCharacterId) =>
-        McpToolRunner.RunAsync(() => participations.ApproveRequestAsync(McpUser.Id(http), campaignCharacterId));
+        api.SendAsync(HttpMethod.Post, $"/api/campaigncharacter/{campaignCharacterId}/approve");
 
     [McpServerTool(Name = "deny_access_request", Title = "Deny access request", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaigncharacter/{id}/deny")]
@@ -115,9 +113,9 @@ public static class ParticipationTools
         Related tools: list_campaign_characters.
         """)]
     public static Task<CallToolResult> DenyAccessRequest(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PARTICIPATION_ID)] long campaignCharacterId) =>
-        McpToolRunner.RunAsync(() => participations.DenyRequestAsync(McpUser.Id(http), campaignCharacterId));
+        api.SendAsync(HttpMethod.Post, $"/api/campaigncharacter/{campaignCharacterId}/deny");
 
     [McpServerTool(Name = "list_my_participations", Title = "List my participations", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaigncharacter/mine")]
@@ -130,9 +128,9 @@ public static class ParticipationTools
         Related tools: request_campaign_access.
         """)]
     public static Task<CallToolResult> ListMyParticipations(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
-        McpToolRunner.RunAsync(() => participations.ListMineAsync(McpUser.Id(http), campaignId));
+        api.SendAsync(HttpMethod.Get, "/api/campaigncharacter/mine", null, ("campaignId", campaignId));
 
     [McpServerTool(Name = "get_participation", Title = "Get participation", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaigncharacter/{id}")]
@@ -144,9 +142,9 @@ public static class ParticipationTools
         Related tools: update_participation.
         """)]
     public static Task<CallToolResult> GetParticipation(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PARTICIPATION_ID)] long campaignCharacterId) =>
-        McpToolRunner.RunAsync(() => participations.GetByIdAsync(McpUser.Id(http), campaignCharacterId));
+        api.SendAsync(HttpMethod.Get, $"/api/campaigncharacter/{campaignCharacterId}");
 
     [McpServerTool(Name = "update_participation", Title = "Update participation", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaigncharacter/{id}")]
@@ -160,16 +158,16 @@ public static class ParticipationTools
         Related tools: get_participation (read current values first).
         """)]
     public static Task<CallToolResult> UpdateParticipation(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PARTICIPATION_ID)] long campaignCharacterId,
         [Description("Current life, at most totalLife; 0 or negative means fallen. Example: 6.")] int currentLife,
         [Description("Current energy, at most totalEnergy; may be 0 or negative. Example: 3.")] int currentEnergy,
         [Description("Free-text status shown on the character (up to 260 characters), e.g. \"poisoned\". Null clears it.")] string? characterStatus = null,
         [Description("Campaign sheet in markdown (up to 20000 characters). Send the current sheet to keep it.")] string? sheet = null) =>
-        McpToolRunner.RunAsync(() => participations.UpdateAsync(McpUser.Id(http), campaignCharacterId, new CampaignCharacterUpdateInfo
+        api.SendAsync(HttpMethod.Put, $"/api/campaigncharacter/{campaignCharacterId}", new CampaignCharacterUpdateInfo
         {
             CurrentLife = currentLife, CurrentEnergy = currentEnergy, CharacterStatus = characterStatus, Sheet = sheet
-        }));
+        });
 
     [McpServerTool(Name = "remove_participation", Title = "Remove character from campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaigncharacter/{id}")]
@@ -182,7 +180,7 @@ public static class ParticipationTools
         Related tools: list_campaign_characters.
         """)]
     public static Task<CallToolResult> RemoveParticipation(
-        ICampaignCharacterService participations, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description(McpDocs.PARTICIPATION_ID)] long campaignCharacterId) =>
-        McpToolRunner.RunAsync(() => participations.RemoveAsync(McpUser.Id(http), campaignCharacterId));
+        api.SendAsync(HttpMethod.Delete, $"/api/campaigncharacter/{campaignCharacterId}");
 }

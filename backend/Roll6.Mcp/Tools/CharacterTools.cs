@@ -1,10 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Roll6.Domain.Interfaces;
 using Roll6.DTO.Character;
 
-namespace Roll6.API.Mcp.Tools;
+namespace Roll6.Mcp.Tools;
 
 /// <summary>Player characters (020). Mirrors CharacterController: only the owner reads and changes a character.</summary>
 [McpServerToolType]
@@ -26,8 +25,9 @@ public static class CharacterTools
         Common errors: none.
         Related tools: create_character, request_campaign_access, list_my_participations.
         """)]
-    public static Task<CallToolResult> ListMyCharacters(ICharacterService characters, IHttpContextAccessor http) =>
-        McpToolRunner.RunAsync(() => characters.ListAsync(McpUser.Id(http)));
+    public static Task<CallToolResult> ListMyCharacters(
+        Roll6ApiClient api) =>
+        api.SendAsync(HttpMethod.Get, "/api/character");
 
     [McpServerTool(Name = "search_characters", Title = "Search characters", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/character/search")]
@@ -40,11 +40,11 @@ public static class CharacterTools
         Related tools: invite_character.
         """)]
     public static Task<CallToolResult> SearchCharacters(
-        ICharacterService characters,
+        Roll6ApiClient api,
         [Description(McpDocs.PAGE)] int page = 1,
         [Description(McpDocs.PAGE_SIZE)] int pageSize = 20,
         [Description(McpDocs.SEARCH)] string? search = null) =>
-        McpToolRunner.RunAsync(() => characters.SearchAsync(McpDocs.Page(page, pageSize, search)));
+        api.SendAsync(HttpMethod.Get, "/api/character/search", null, ("page", page), ("pageSize", pageSize), ("search", search));
 
     [McpServerTool(Name = "get_character", Title = "Get character", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/character/{id}")]
@@ -56,9 +56,9 @@ public static class CharacterTools
         Related tools: update_character, get_participation.
         """)]
     public static Task<CallToolResult> GetCharacter(
-        ICharacterService characters, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the character (characterId from list_my_characters).")] long characterId) =>
-        McpToolRunner.RunAsync(() => characters.GetByIdAsync(McpUser.Id(http), characterId));
+        api.SendAsync(HttpMethod.Get, $"/api/character/{characterId}");
 
     [McpServerTool(Name = "create_character", Title = "Create character", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/character")]
@@ -71,7 +71,7 @@ public static class CharacterTools
         Related tools: upload_image, list_tokens, request_campaign_access.
         """)]
     public static Task<CallToolResult> CreateCharacter(
-        ICharacterService characters, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Character name (required, up to 260 characters). Example: \"Aria\".")] string name,
         [Description("Total life points (0 or more). Example: 10.")] int life,
         [Description("Total energy points (0 or more). Example: 5.")] int energy,
@@ -79,10 +79,10 @@ public static class CharacterTools
         [Description(McpDocs.SHEET)] string? sheet = null,
         [Description("Character picture. " + McpDocs.IMAGE_FILE)] string? image = null,
         [Description("Optional library token that draws the character on maps (tokenId from list_tokens).")] long? tokenId = null) =>
-        McpToolRunner.RunAsync(() => characters.CreateAsync(McpUser.Id(http), new CharacterInsertInfo
+        api.SendAsync(HttpMethod.Post, "/api/character", new CharacterInsertInfo
         {
             Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, TokenId = tokenId
-        }));
+        });
 
     [McpServerTool(Name = "update_character", Title = "Update character", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/character/{id}")]
@@ -96,7 +96,7 @@ public static class CharacterTools
         Related tools: get_character, update_participation (campaign values).
         """)]
     public static Task<CallToolResult> UpdateCharacter(
-        ICharacterService characters, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the character to change (characterId).")] long characterId,
         [Description("Character name (required, up to 260 characters).")] string name,
         [Description("Total life points (0 or more).")] int life,
@@ -105,10 +105,10 @@ public static class CharacterTools
         [Description(McpDocs.SHEET)] string? sheet = null,
         [Description("Character picture. " + McpDocs.IMAGE_FILE)] string? image = null,
         [Description("Library token that draws the character on maps (tokenId). Null removes it.")] long? tokenId = null) =>
-        McpToolRunner.RunAsync(() => characters.UpdateAsync(McpUser.Id(http), characterId, new CharacterInsertInfo
+        api.SendAsync(HttpMethod.Put, $"/api/character/{characterId}", new CharacterInsertInfo
         {
             Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, TokenId = tokenId
-        }));
+        });
 
     [McpServerTool(Name = "delete_character", Title = "Delete character", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/character/{id}")]
@@ -121,7 +121,7 @@ public static class CharacterTools
         Related tools: list_my_characters.
         """)]
     public static Task<CallToolResult> DeleteCharacter(
-        ICharacterService characters, IHttpContextAccessor http,
+        Roll6ApiClient api,
         [Description("Id of the character to delete (characterId).")] long characterId) =>
-        McpToolRunner.RunAsync(() => characters.DeleteAsync(McpUser.Id(http), characterId));
+        api.SendAsync(HttpMethod.Delete, $"/api/character/{characterId}");
 }

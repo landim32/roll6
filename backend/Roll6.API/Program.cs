@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.OpenApi.Models;
-using ModelContextProtocol.Protocol;
-using Roll6.API.Mcp;
 using Roll6.Application;
 using Roll6.Application.Realtime;
 
@@ -10,18 +8,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureServices(builder.Configuration);
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddControllers();
-
-// MCP server (020): the API's operations as tools for AI assistants, at /mcp (Streamable HTTP), acting as the
-// owner of the API key (019) or JWT. Tools call the same domain services as the controllers.
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddMcpServer(options =>
-    {
-        options.ServerInfo = new Implementation { Name = "roll6", Version = "1.0.0", Title = "Roll6 virtual tabletop" };
-        options.ServerInstructions = Roll6Guide.INSTRUCTIONS;
-    })
-    .WithHttpTransport()
-    .WithToolsFromAssembly(typeof(Roll6Guide).Assembly, McpToolRunner.JSON)
-    .WithResourcesFromAssembly(typeof(Roll6Guide).Assembly);
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -92,6 +78,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<TableHub>("/hubs/table");
-app.MapMcp("/mcp").RequireAuthorization();
 
 app.Run();

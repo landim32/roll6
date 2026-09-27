@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
   // Dev server proxy: with VITE_API_URL empty the app calls /api on its own origin and Vite
   // forwards it here — same setup as nginx in Docker, so no CORS is needed against any API.
   const apiProxy = env.VITE_API_PROXY || 'http://localhost:5119'
+  // MCP server (020, separate project: dotnet run --project Roll6.Mcp).
+  const mcpProxy = env.VITE_MCP_PROXY || 'http://localhost:5129'
 
   return {
     plugins: [react()],
@@ -18,7 +20,7 @@ export default defineConfig(({ mode }) => {
         // Real-time table events (SignalR, WebSocket upgrade).
         '/hubs': { target: apiProxy, changeOrigin: true, ws: true },
         // MCP server for AI assistants (020, Streamable HTTP).
-        '/mcp': { target: apiProxy, changeOrigin: true },
+        '/mcp': { target: mcpProxy, changeOrigin: true },
       },
     },
     test: { environment: 'node', include: ['src/**/*.test.ts'] },

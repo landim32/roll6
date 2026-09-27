@@ -1,4 +1,4 @@
-namespace Roll6.API.Mcp;
+namespace Roll6.Mcp;
 
 /// <summary>
 /// The REST operation an MCP tool mirrors (020). The coverage test matches these against the controllers, so
