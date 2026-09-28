@@ -31,15 +31,17 @@ export const validateCampaignArea = ({ characterStatus, sheet }: { characterStat
   return null;
 };
 
-/** API payload from valid values: numbers, trimmed status and blank texts as null. */
-export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, sheet }: {
+/** API payload from valid values: numbers, trimmed status and blank texts as null; no token keeps the current one. */
+export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, sheet, tokenId = null }: {
   currentLife: string;
   currentEnergy: string;
   characterStatus: string;
   sheet: string;
+  tokenId?: number | null;
 }): CampaignCharacterUpdateInfo => ({
   currentLife: Number(currentLife),
   currentEnergy: Number(currentEnergy),
   characterStatus: characterStatus.trim() || null,
   sheet: sheet.trim() ? sheet : null,
+  tokenId,
 });

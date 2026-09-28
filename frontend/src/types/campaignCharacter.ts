@@ -46,9 +46,14 @@ export interface CampaignCharacterRequestInfo {
   characterId: number;
 }
 
-/** A participation with the campaign sheet (the lists leave it out). */
+/** A participation with the campaign notes (the lists leave them out). */
 export interface CampaignCharacterDetailInfo extends CampaignCharacterInfo {
+  /** Campaign notes ("Anotações da Campanha"): only what changed in this campaign. */
   sheet: string | null;
+  /** The character's own sheet, read-only here (only the owner changes it). */
+  characterSheet: string | null;
+  characterTokenName: string | null;
+  characterTokenImageUrl: string | null;
   /** The character's sheet file (022), the same in every campaign. */
   sheetFileUrl: string | null;
   sheetFileType: SheetFileType | null;
@@ -60,4 +65,6 @@ export interface CampaignCharacterUpdateInfo {
   currentEnergy: number;
   characterStatus: string | null;
   sheet: string | null;
+  /** New token of the character (saved on the character); null keeps the current one. */
+  tokenId: number | null;
 }

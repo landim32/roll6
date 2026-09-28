@@ -25,6 +25,7 @@ public class CampaignCharacterServiceTests
     private readonly Mock<ICharacterRepository<Character>> _characterRepository = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
+    private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
@@ -56,7 +57,7 @@ public class CampaignCharacterServiceTests
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string?>())).Returns((string? file) => file == null ? null : $"https://cdn/{file}");
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
-            _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object,
+            _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _tokenRepository.Object, _unitOfWork.Object,
             _imageStorage.Object, _notifier.Object);
     }
 
@@ -314,13 +315,13 @@ public class CampaignCharacterServiceTests
 
 
     [Fact]
-    public async Task ApproveRequest_CopiesTheCharacterSheet()
+    public async Task ApproveRequest_StartsWithEmptyCampaignNotes()
     {
         SetupParticipation(84, CLOSED_CAMPAIGN, CampaignCharacterStatus.RequestedAccess);
 
         await _service.ApproveRequestAsync(MASTER_ID, 84);
 
-        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(p => p.Sheet == "Força 3" && p.CharacterStatus == null)), Times.Once);
+        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(p => p.Sheet == null && p.CharacterStatus == null)), Times.Once);
     }
 
     private static CampaignCharacterUpdateInfo Play(int life = -2, int energy = 6) =>
@@ -383,6 +384,53 @@ public class CampaignCharacterServiceTests
 
         result.Sheet.Should().Be("Ficha da campanha");
         result.CharacterStatus.Should().Be("ferido");
+        result.CharacterSheet.Should().Be("Força 3");
+    }
+
+    [Fact]
+    public async Task GetById_ReturnsTheCharactersToken()
+    {
+        SetupParticipation(87, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        _characterRepository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(
+            new Character { CharacterId = CHARACTER, UserId = PLAYER_ID, Name = "Thorin", Life = 12, Energy = 6, TokenId = 7 });
+        _tokenRepository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(new Token { TokenId = 7, Name = "Anão", UpImage = "anao.webp" });
+
+        var result = await _service.GetByIdAsync(MASTER_ID, 87);
+
+        result.CharacterTokenName.Should().Be("Anão");
+        result.CharacterTokenImageUrl.Should().Be("https://cdn/anao.webp");
+    }
+
+    // ---- token chosen in the "Nesta campanha" area ----
+
+    [Theory]
+    [InlineData(PLAYER_ID)]
+    [InlineData(MASTER_ID)]
+    public async Task Update_WithToken_SavesItOnTheCharacter(long userId)
+    {
+        SetupParticipation(88, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        _tokenRepository.Setup(r => r.GetByIdAsync(9)).ReturnsAsync(new Token { TokenId = 9, Name = "Guerreiro" });
+        var info = Play();
+        info.TokenId = 9;
+
+        await _service.UpdateAsync(userId, 88, info);
+
+        _characterRepository.Verify(r => r.UpdateAsync(It.Is<Character>(c => c.TokenId == 9)), Times.Once);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_UnknownToken_ThrowsWithoutSaving()
+    {
+        SetupParticipation(89, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        var info = Play();
+        info.TokenId = 404;
+
+        var act = () => _service.UpdateAsync(MASTER_ID, 89, info);
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+        _characterRepository.Verify(r => r.UpdateAsync(It.IsAny<Character>()), Times.Never);
     }
 
     [Fact]

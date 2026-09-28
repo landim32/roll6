@@ -62,8 +62,8 @@ public static class ParticipationTools
     [McpServerTool(Name = "accept_invite", Title = "Accept invite", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaigncharacter/{id}/accept")]
     [Description($$"""
-        What it does: accepts a campaign invite; the character becomes approved (current life/energy reset to the totals
-        and the sheet copied to the campaign).
+        What it does: accepts a campaign invite; the character becomes approved (current life/energy reset to the totals,
+        status and campaign notes cleared).
         Who can use it: the owner of the invited character.
         {{RETURNS}}
         Common errors: 403 not your character, 404 not found, 409 not an open invite.
@@ -92,7 +92,7 @@ public static class ParticipationTools
     [ApiOperation("POST", "/api/campaigncharacter/{id}/approve")]
     [Description($$"""
         What it does: approves a character's access request; it joins the party (current life/energy reset to the totals,
-        sheet copied to the campaign).
+        status and campaign notes cleared).
         Who can use it: only the master.
         {{RETURNS}}
         Common errors: 403 not the master, 404 not found, 409 not a pending request.
@@ -135,9 +135,12 @@ public static class ParticipationTools
     [McpServerTool(Name = "get_participation", Title = "Get participation", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaigncharacter/{id}")]
     [Description("""
-        What it does: returns one participation with the campaign sheet (markdown) of the character.
+        What it does: returns one participation with its campaign notes (`sheet`, markdown). The notes hold only what
+        changed in this campaign compared to the character's sheet (e.g. "lost the long sword"); read the character's
+        own sheet with get_character (owner) for everything else.
         Who can use it: the master, the character's owner and approved participants of the campaign.
-        Returns: the participation plus sheet.
+        Returns: the participation plus sheet (the campaign notes), characterSheet (the character's own sheet, read-only
+        here), characterTokenName/characterTokenImageUrl and the character's sheetFileUrl/sheetFileType.
         Common errors: 403 not allowed, 404 not found.
         Related tools: update_participation.
         """)]
@@ -150,12 +153,15 @@ public static class ParticipationTools
     [ApiOperation("PUT", "/api/campaigncharacter/{id}")]
     [Description("""
         What it does: changes the campaign values of an approved character: current life and energy (up to the totals;
-        0 or less = fallen), free-text status (e.g. "poisoned") and the campaign sheet. The character's pieces show them at
-        once for everyone.
+        0 or less = fallen), free-text status (e.g. "poisoned") and the campaign notes (`sheet`). The notes are NOT a copy
+        of the character sheet: write only the differences caused by this campaign — items lost or gained, injuries,
+        changed attributes (e.g. "- Lost the long sword in the goblin cave"). The character's own sheet never changes
+        here. Optionally sets the character's token (saved on the character, used when it is placed on any map; the
+        master's only change to someone else's character). The character's pieces show these values at once for everyone.
         Who can use it: the character's owner or the master.
         Returns: the updated participation plus sheet.
-        Common errors: 403 not allowed, 404 not found, 400 above the totals or too long, 409 not approved.
-        Related tools: get_participation (read current values first).
+        Common errors: 403 not allowed, 404 participation or token not found, 400 above the totals or too long, 409 not approved.
+        Related tools: get_participation (read current values first), list_tokens.
         """)]
     public static Task<CallToolResult> UpdateParticipation(
         Roll6ApiClient api,
@@ -163,10 +169,11 @@ public static class ParticipationTools
         [Description("Current life, at most totalLife; 0 or negative means fallen. Example: 6.")] int currentLife,
         [Description("Current energy, at most totalEnergy; may be 0 or negative. Example: 3.")] int currentEnergy,
         [Description("Free-text status shown on the character (up to 260 characters), e.g. \"poisoned\". Null clears it.")] string? characterStatus = null,
-        [Description("Campaign sheet in markdown (up to 20000 characters). Send the current sheet to keep it.")] string? sheet = null) =>
+        [Description("Campaign notes in markdown (up to 20000 characters): only what changed in this campaign compared to the character's sheet, e.g. \"- Lost the long sword\". Send the current notes (from get_participation) to keep them; null clears them.")] string? sheet = null,
+        [Description("Optional new token for the character (tokenId from list_tokens); null keeps the current token.")] long? tokenId = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaigncharacter/{campaignCharacterId}", new CampaignCharacterUpdateInfo
         {
-            CurrentLife = currentLife, CurrentEnergy = currentEnergy, CharacterStatus = characterStatus, Sheet = sheet
+            CurrentLife = currentLife, CurrentEnergy = currentEnergy, CharacterStatus = characterStatus, Sheet = sheet, TokenId = tokenId
         });
 
     [McpServerTool(Name = "remove_participation", Title = "Remove character from campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

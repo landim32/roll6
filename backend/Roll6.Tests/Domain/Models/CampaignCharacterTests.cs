@@ -45,7 +45,7 @@ public class CampaignCharacterTests
             participation.CharacterId.Should().Be(Hero.CharacterId);
             participation.CurrentLife.Should().Be(LIFE);
             participation.CurrentEnergy.Should().Be(ENERGY);
-            participation.Sheet.Should().Be(SHEET);
+            participation.Sheet.Should().BeNull("the campaign notes start empty");
             participation.CharacterStatus.Should().BeNull();
         }
     }
@@ -136,7 +136,7 @@ public class CampaignCharacterTests
         {
             participation.CurrentLife.Should().Be(LIFE);
             participation.CurrentEnergy.Should().Be(ENERGY);
-            participation.Sheet.Should().Be(SHEET);
+            participation.Sheet.Should().BeNull("the campaign notes start empty");
             participation.CharacterStatus.Should().BeNull();
         }
     }

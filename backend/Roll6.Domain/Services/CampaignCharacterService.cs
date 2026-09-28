@@ -19,6 +19,7 @@ public class CampaignCharacterService : ICampaignCharacterService
     private readonly ICharacterRepository<Character> _characterRepository;
     private readonly IUserRepository<User> _userRepository;
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
+    private readonly ITokenRepository<Token> _tokenRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IImageStorageAppService _imageStorage;
     private readonly IRealtimeNotifier _notifier;
@@ -29,12 +30,14 @@ public class CampaignCharacterService : ICampaignCharacterService
         ICharacterRepository<Character> characterRepository,
         IUserRepository<User> userRepository,
         IMapTokenRepository<MapToken> mapTokenRepository,
+        ITokenRepository<Token> tokenRepository,
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
         IRealtimeNotifier notifier)
     {
         _notifier = notifier;
         _mapTokenRepository = mapTokenRepository;
+        _tokenRepository = tokenRepository;
         _unitOfWork = unitOfWork;
         _repository = repository;
         _campaignRepository = campaignRepository;
@@ -132,7 +135,7 @@ public class CampaignCharacterService : ICampaignCharacterService
         throw new UnauthorizedAccessException("Apenas o mestre ou participantes aprovados podem ver os personagens da campanha.");
     }
 
-    /// <summary>The participation with its sheet: the master, the character owner or any approved participant.</summary>
+    /// <summary>The participation with its campaign notes: the master, the character owner or any approved participant.</summary>
     public async Task<CampaignCharacterDetailInfo> GetByIdAsync(long userId, long campaignCharacterId)
     {
         var participation = await GetParticipationAsync(campaignCharacterId);
@@ -144,7 +147,10 @@ public class CampaignCharacterService : ICampaignCharacterService
         return await MapToDetailAsync(participation);
     }
 
-    /// <summary>Current life/energy, status and campaign sheet; the character owner or the campaign master (010 FR-007).</summary>
+    /// <summary>
+    /// Current life/energy, status, campaign notes and the character's token; the character owner or the campaign
+    /// master (010 FR-007). The token is saved on the character (the master's only change to someone else's character).
+    /// </summary>
     public async Task<CampaignCharacterDetailInfo> UpdateAsync(long userId, long campaignCharacterId, CampaignCharacterUpdateInfo info)
     {
         var participation = await GetParticipationAsync(campaignCharacterId);
@@ -154,7 +160,16 @@ public class CampaignCharacterService : ICampaignCharacterService
             throw new UnauthorizedAccessException("Apenas o dono do personagem ou o mestre da campanha podem alterar os dados na campanha.");
 
         participation.UpdatePlay(info.CurrentLife, info.CurrentEnergy, info.CharacterStatus, info.Sheet, character.Life, character.Energy);
-        var result = await MapToDetailAsync(await _repository.UpdateAsync(participation));
+        if (info.TokenId.HasValue && await _tokenRepository.GetByIdAsync(info.TokenId.Value) == null)
+            throw new KeyNotFoundException("Token não encontrado.");
+        var tokenChanged = info.TokenId.HasValue && character.ChangeToken(info.TokenId.Value);
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            if (tokenChanged)
+                await _characterRepository.UpdateAsync(character);
+            await _repository.UpdateAsync(participation);
+        });
+        var result = await MapToDetailAsync(participation);
         // Character pieces show the participation's vitals/status.
         await PublishPartyAsync(campaign.CampaignId, userId, piecesToo: true);
         return result;
@@ -211,8 +226,10 @@ public class CampaignCharacterService : ICampaignCharacterService
     private async Task<CampaignCharacterDetailInfo> MapToDetailAsync(CampaignCharacter participation)
     {
         var info = (await MapToDtoAsync(new[] { participation })).Single();
-        // The sheet file belongs to the character (022): every campaign shows the same, latest file.
-        var sheetFile = (await _characterRepository.GetByIdAsync(participation.CharacterId))?.SheetFile;
+        // The sheet, its file (022) and the token belong to the character: every campaign shows the same, latest ones.
+        var character = await _characterRepository.GetByIdAsync(participation.CharacterId);
+        var sheetFile = character?.SheetFile;
+        var token = character?.TokenId is long tokenId ? await _tokenRepository.GetByIdAsync(tokenId) : null;
         return new CampaignCharacterDetailInfo
         {
             CampaignCharacterId = info.CampaignCharacterId,
@@ -235,6 +252,9 @@ public class CampaignCharacterService : ICampaignCharacterService
             CreatedAt = info.CreatedAt,
             UpdatedAt = info.UpdatedAt,
             Sheet = participation.Sheet,
+            CharacterSheet = character?.Sheet,
+            CharacterTokenName = token?.Name,
+            CharacterTokenImageUrl = _imageStorage.GetUrl(token?.UpImage),
             SheetFileUrl = _imageStorage.GetUrl(sheetFile),
             SheetFileType = SheetFiles.TypeOf(sheetFile)
         };

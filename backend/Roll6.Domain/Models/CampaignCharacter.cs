@@ -10,7 +10,7 @@ namespace Roll6.Domain.Models;
 /// request → Approved (open campaign) or RequestedAccess (closed);
 /// Invited → Approved/Denied by the character owner; RequestedAccess → Approved/Denied by the master.
 /// Holds what belongs to the character in this campaign: current life/energy (totals live in <see cref="Character"/>),
-/// the character status and the campaign's copy of the sheet. The owner or the master may change them.
+/// the character status and the campaign notes. The owner or the master may change them.
 /// </summary>
 public class CampaignCharacter
 {
@@ -24,7 +24,10 @@ public class CampaignCharacter
     /// <summary>Free-text condition in this campaign ("envenenado"); not the participation <see cref="Status"/>.</summary>
     public string? CharacterStatus { get; set; }
 
-    /// <summary>The campaign's sheet: a copy of the character's sheet taken when joining, independent afterwards.</summary>
+    /// <summary>
+    /// Campaign notes ("Anotações da Campanha"): only what changed in this campaign compared to the character's sheet
+    /// (e.g. the sword lost in combat). Starts empty; the character's sheet stays the reference.
+    /// </summary>
     public string? Sheet { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -88,7 +91,7 @@ public class CampaignCharacter
 
     /// <summary>
     /// What changes during play: current life/energy (never above the totals, may be negative = fallen),
-    /// the character status and the campaign sheet. Only while approved.
+    /// the character status and the campaign notes. Only while approved.
     /// </summary>
     public void UpdatePlay(int currentLife, int currentEnergy, string? characterStatus, string? sheet, int totalLife, int totalEnergy)
     {
@@ -128,14 +131,14 @@ public class CampaignCharacter
     }
 
     /// <summary>
-    /// Fresh start in the campaign (010 FR-003): current values at the character's totals, a copy of its sheet
+    /// Fresh start in the campaign (010 FR-003): current values at the character's totals, no campaign notes
     /// and no status. Done when the participation is created or becomes approved.
     /// </summary>
     private void ResetFrom(Character character)
     {
         CurrentLife = character.Life;
         CurrentEnergy = character.Energy;
-        Sheet = character.Sheet;
+        Sheet = null;
         CharacterStatus = null;
     }
 
