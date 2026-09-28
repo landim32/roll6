@@ -102,7 +102,10 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
           <>
             <button type="button" className="btn btn-outline-danger me-auto" onClick={() => setConfirmRemove(true)} disabled={busy || !saved}>{t('npcs.remove')}</button>
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
-            <button type="submit" form="npc-edit-form" className="btn btn-primary" disabled={busy || !saved}>{t('common.save')}</button>
+            <button type="submit" form="npc-edit-form" className="btn btn-primary" disabled={busy || !saved}>
+              {busy && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+              {t('common.save')}
+            </button>
           </>
         )}
       >
@@ -117,7 +120,8 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
               onRemoveImage={() => setKeepImage(false)}
               token={token}
               onToken={setToken}
-          onPickingTokenChange={setPickingToken}
+              onPickingTokenChange={setPickingToken}
+              editing
             />
           </form>
         )}

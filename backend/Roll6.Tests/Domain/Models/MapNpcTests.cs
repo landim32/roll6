@@ -7,12 +7,12 @@ namespace Roll6.Tests.Domain.Models;
 public class MapNpcTests
 {
     [Fact]
-    public void FromNpc_CopiesNameLifeAndEnergy()
+    public void FromNpc_CopiesNameLifeEnergyAndStatus()
     {
-        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7, Energy = 2 });
+        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7, Energy = 2, Status = "ferido" });
 
         (mapNpc.MapId, mapNpc.NpcId, mapNpc.Name, mapNpc.Life, mapNpc.Energy, mapNpc.Status)
-            .Should().Be((30L, 8L, "Goblin", 7, 2, (string?)null));
+            .Should().Be((30L, 8L, "Goblin", 7, 2, "ferido"));
     }
 
     [Fact]

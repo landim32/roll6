@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyNpcForm, MAX_NPC_NAME, MAX_NPC_SHEET, toNpcForm, toNpcInsert, validateNpcForm } from './npcForm';
+import { emptyNpcForm, MAX_NPC_NAME, MAX_NPC_SHEET, MAX_NPC_STATUS, toNpcForm, toNpcInsert, validateNpcForm } from './npcForm';
 import type { NpcInfo } from '../types/npc';
 
 const form = (changes = {}) => ({ ...emptyNpcForm(), name: 'Goblin', ...changes });
@@ -11,6 +11,7 @@ describe('validateNpcForm', () => {
     [{ life: '1.5' }, 'notInteger'],
     [{ energy: 'abc' }, 'notInteger'],
     [{ move: '-1' }, 'negative'],
+    [{ status: 'x'.repeat(MAX_NPC_STATUS + 1) }, 'statusTooLong'],
     [{ sheet: 'x'.repeat(MAX_NPC_SHEET + 1) }, 'sheetTooLong'],
   ])('rejects %j with %s', (changes, error) => {
     expect(validateNpcForm(form(changes), 5)).toBe(error);
@@ -27,13 +28,13 @@ describe('validateNpcForm', () => {
 
 describe('toNpcInsert / toNpcForm', () => {
   it('builds the payload', () => {
-    expect(toNpcInsert(form({ name: ' Goblin ', life: '7', energy: '', move: '6', sheet: ' ' }), null, 5)).toEqual({
-      tokenId: 5, name: 'Goblin', life: 7, energy: 0, move: 6, sheet: null, image: null,
+    expect(toNpcInsert(form({ name: ' Goblin ', life: '7', energy: '', move: '6', status: ' ferido ', sheet: ' ' }), null, 5)).toEqual({
+      tokenId: 5, name: 'Goblin', life: 7, energy: 0, move: 6, sheet: null, status: 'ferido', image: null,
     });
   });
 
   it('fills the form from a saved NPC', () => {
-    const npc = { name: 'Goblin', life: 7, energy: 2, move: 6, sheet: null } as NpcInfo;
-    expect(toNpcForm(npc)).toEqual({ name: 'Goblin', life: '7', energy: '2', move: '6', sheet: '' });
+    const npc = { name: 'Goblin', life: 7, energy: 2, move: 6, sheet: null, status: null } as NpcInfo;
+    expect(toNpcForm(npc)).toEqual({ name: 'Goblin', life: '7', energy: '2', move: '6', status: '', sheet: '' });
   });
 });

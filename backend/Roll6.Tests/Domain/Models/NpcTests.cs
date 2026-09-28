@@ -30,6 +30,24 @@ public class NpcTests
     }
 
     [Fact]
+    public void Update_StoresTheTrimmedStatus()
+    {
+        var npc = new Npc();
+
+        npc.Update(5, "Goblin", 7, 2, 6, null, null, " ferido ");
+
+        npc.Status.Should().Be("ferido");
+    }
+
+    [Fact]
+    public void Update_TooLongStatus_Throws()
+    {
+        var act = () => new Npc().Update(5, "Goblin", 1, 1, 1, null, null, new string('x', 261));
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("status");
+    }
+
+    [Fact]
     public void Update_TooLongSheetOrInvalidImage_Throws()
     {
         var longSheet = () => new Npc().Update(5, "Goblin", 1, 1, 1, new string('x', 20001), null);

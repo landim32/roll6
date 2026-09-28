@@ -23,6 +23,10 @@ public class NpcInsertInfo
     [JsonPropertyName("sheet")]
     public string? Sheet { get; set; }
 
+    /// <summary>Free-text condition (up to 260); copied to each new map occurrence.</summary>
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
     [JsonPropertyName("image")]
     public string? Image { get; set; }
 }

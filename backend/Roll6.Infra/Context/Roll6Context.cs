@@ -222,6 +222,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Move).HasColumnName("move");
             entity.Property(e => e.Sheet).HasColumnName("sheet").HasMaxLength(20000);
             entity.Property(e => e.Image).HasColumnName("image").HasMaxLength(260);
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_npc");
