@@ -5,7 +5,7 @@ meta {
 }
 
 delete {
-  url: {{baseUrl}}/api/campaigncharacter/{{inviteId}}
+  url: {{baseUrl}}/api/campaigncharacter/{{requestId}}
   body: none
   auth: inherit
 }
@@ -15,5 +15,5 @@ assert {
 }
 
 docs {
-  Master only: removes the character from the campaign; the character itself is kept.
+  Master only; removes the participation (and its pieces), keeps the character.
 }

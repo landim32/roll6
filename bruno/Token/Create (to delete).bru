@@ -1,7 +1,7 @@
 meta {
   name: Create (to delete)
   type: http
-  seq: 7
+  seq: 8
 }
 
 post {
@@ -12,12 +12,12 @@ post {
 
 body:json {
   {
-    "name": "Token descartável",
-    "description": null,
-    "upSpace": null,
-    "downSpace": null,
-    "upImage": null,
-    "downImage": null
+    "name": "Temporário",
+    "description": "Goblin com lança",
+    "upSpace": 1,
+    "downSpace": 2,
+    "upImage": "{{imageFileName}}",
+    "downImage": "{{imageFileName}}"
   }
 }
 
@@ -27,6 +27,6 @@ assert {
 
 script:post-response {
   if (res.status === 200 || res.status === 201) {
-    bru.setVar("tokenIdToDelete", res.body.tokenId);
+    bru.setVar("tempTokenId", res.body.tokenId);
   }
 }

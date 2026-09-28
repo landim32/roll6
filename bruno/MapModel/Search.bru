@@ -1,19 +1,17 @@
 meta {
   name: Search
   type: http
-  seq: 3
+  seq: 5
 }
 
 get {
-  url: {{baseUrl}}/api/mapmodel?page=1&pageSize=20&search=masm
+  url: {{baseUrl}}/api/mapmodel?search=tav
   body: none
   auth: inherit
 }
 
 params:query {
-  page: 1
-  pageSize: 20
-  search: masm
+  search: tav
 }
 
 assert {

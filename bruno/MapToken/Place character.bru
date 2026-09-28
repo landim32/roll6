@@ -1,0 +1,35 @@
+meta {
+  name: Place character
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/maptoken/character
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "mapId": {{mapId}},
+    "campaignCharacterId": {{campaignCharacterId}},
+    "tokenId": null,
+    "x": 5,
+    "y": 5
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("characterMapTokenId", res.body.mapTokenId);
+  }
+}
+
+docs {
+  Uses the character's token (or the informed one, saved on the character when it had none).
+}

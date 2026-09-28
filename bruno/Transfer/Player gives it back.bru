@@ -1,0 +1,25 @@
+meta {
+  name: Player gives it back
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/character/{{characterId}}/transfer
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{playerToken}}
+}
+
+body:json {
+  {
+    "email": "{{email}}"
+  }
+}
+
+assert {
+  res.status: eq 204
+}

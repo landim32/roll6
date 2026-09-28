@@ -1,7 +1,7 @@
 meta {
   name: Create (to delete)
   type: http
-  seq: 5
+  seq: 6
 }
 
 post {
@@ -12,13 +12,14 @@ post {
 
 body:json {
   {
-    "name": "Personagem descartável",
+    "name": "Temporário",
     "sheet": "## Thorin\n- Anão guerreiro\n- Nível 3",
     "life": 28,
     "energy": 10,
-    "status": null,
     "move": 5,
-    "image": null
+    "image": "{{imageFileName}}",
+    "tokenId": {{tokenId}},
+    "sheetFile": null
   }
 }
 
@@ -28,6 +29,6 @@ assert {
 
 script:post-response {
   if (res.status === 200 || res.status === 201) {
-    bru.setVar("characterIdToDelete", res.body.characterId);
+    bru.setVar("tempCharacterId", res.body.characterId);
   }
 }

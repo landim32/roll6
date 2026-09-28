@@ -1,0 +1,23 @@
+meta {
+  name: Player lists own participations
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/campaigncharacter/mine?campaignId={{campaignId}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  campaignId: {{campaignId}}
+}
+
+auth:bearer {
+  token: {{playerToken}}
+}
+
+assert {
+  res.status: eq 200
+}

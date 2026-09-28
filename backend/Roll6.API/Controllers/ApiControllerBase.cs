@@ -11,8 +11,18 @@ public abstract class ApiControllerBase : ControllerBase
 {
     protected long CurrentUserId => User.GetUserId();
 
+    private string ActionName => $"{ControllerContext.ActionDescriptor.ControllerName}.{ControllerContext.ActionDescriptor.ActionName}";
+
+    private ILogger Logger => HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+
     protected IActionResult HandleException(Exception ex)
     {
+        // Expected refusals are logged briefly; anything else (database down, storage, bugs) with the full exception.
+        if (ex is DomainValidationException or UnauthorizedAccessException or KeyNotFoundException or ConflictException)
+            Logger.LogInformation("{Action} refused: {Error} ({Message})", ActionName, ex.GetType().Name, ex.Message);
+        else
+            Logger.LogError(ex, "{Action} failed", ActionName);
+
         switch (ex)
         {
             case DomainValidationException validation:

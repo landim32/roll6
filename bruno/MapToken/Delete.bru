@@ -1,11 +1,11 @@
 meta {
   name: Delete
   type: http
-  seq: 4
+  seq: 10
 }
 
 delete {
-  url: {{baseUrl}}/api/maptoken/{{mapTokenIdToDelete}}
+  url: {{baseUrl}}/api/maptoken/{{tempMapTokenId}}
   body: none
   auth: inherit
 }

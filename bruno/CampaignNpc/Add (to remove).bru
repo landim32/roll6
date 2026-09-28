@@ -1,0 +1,28 @@
+meta {
+  name: Add (to remove)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/campaignnpc
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "campaignId": {{campaignId}},
+    "npcId": {{secondNpcId}}
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("tempCampaignNpcId", res.body.campaignNpcId);
+  }
+}

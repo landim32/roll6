@@ -1,0 +1,21 @@
+meta {
+  name: State
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/turn
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("turnNo", res.body.turnNo);
+  }
+}

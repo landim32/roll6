@@ -1,11 +1,11 @@
 meta {
   name: Delete
   type: http
-  seq: 6
+  seq: 7
 }
 
 delete {
-  url: {{baseUrl}}/api/character/{{characterIdToDelete}}
+  url: {{baseUrl}}/api/character/{{tempCharacterId}}
   body: none
   auth: inherit
 }

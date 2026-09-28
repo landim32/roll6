@@ -1,0 +1,31 @@
+meta {
+  name: Player moves own character
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/maptoken/{{playerMapTokenId}}/position
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{playerToken}}
+}
+
+body:json {
+  {
+    "x": 8,
+    "y": 4,
+    "look": 0
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  One step ahead from look 3 needs turning: cost is re-checked by the API. Records the Movement of the turn.
+}

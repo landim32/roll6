@@ -1,0 +1,25 @@
+meta {
+  name: Finish
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/turn/finish
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "force": true
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Without `force` the answer lists the approved characters that have not acted yet (finished = false).
+}

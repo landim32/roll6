@@ -1,0 +1,21 @@
+meta {
+  name: Transfer to player
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/character/{{characterId}}/transfer
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "{{playerEmail}}"
+  }
+}
+
+assert {
+  res.status: eq 204
+}

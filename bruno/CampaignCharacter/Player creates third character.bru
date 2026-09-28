@@ -1,0 +1,38 @@
+meta {
+  name: Player creates third character
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/character
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{playerToken}}
+}
+
+body:json {
+  {
+    "name": "Vex",
+    "sheet": null,
+    "life": 12,
+    "energy": 6,
+    "move": 5,
+    "image": null,
+    "tokenId": {{tokenId}},
+    "sheetFile": null
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("thirdCharacterId", res.body.characterId);
+  }
+}

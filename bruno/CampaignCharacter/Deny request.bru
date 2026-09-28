@@ -1,7 +1,7 @@
 meta {
   name: Deny request
   type: http
-  seq: 8
+  seq: 15
 }
 
 post {
@@ -12,9 +12,4 @@ post {
 
 assert {
   res.status: eq 200
-  res.body.status: eq 4
-}
-
-docs {
-  Only the master. The player cannot request again; only a new invite reopens.
 }

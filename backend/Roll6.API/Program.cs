@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.OpenApi.Models;
+using Roll6.API.Extensions;
 using Roll6.Application;
 using Roll6.Application.Realtime;
 
@@ -42,7 +43,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// The reverse proxy (Caddy) terminates SSL in Production and forwards the original scheme/client IP.
+// The reverse proxy (Cloudflare + the server's nginx) terminates SSL in Production and forwards the original scheme/client IP.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -61,6 +62,8 @@ var app = builder.Build();
 await app.Services.ApplyMigrationsAsync(app.Configuration);
 
 app.UseForwardedHeaders();
+// After the forwarded headers, so the client IP is the real one.
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
 {

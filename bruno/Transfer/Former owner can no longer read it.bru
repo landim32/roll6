@@ -1,0 +1,15 @@
+meta {
+  name: Former owner can no longer read it
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/character/{{characterId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 403
+}

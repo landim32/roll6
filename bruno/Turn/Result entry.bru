@@ -1,0 +1,38 @@
+meta {
+  name: Result entry
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/turn
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "campaignId": {{campaignId}},
+    "mapId": {{mapId}},
+    "turnNo": null,
+    "turnType": 3,
+    "characterId": {{playerCharacterId}},
+    "npcId": null,
+    "mapNpcId": null,
+    "description": "Acerto: 6 de dano."
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("turnId", res.body.turnId);
+  }
+}
+
+docs {
+  Master only; turnType 1 Movement, 2 Action, 3 ActionResult. `turnNo` null = current turn.
+}

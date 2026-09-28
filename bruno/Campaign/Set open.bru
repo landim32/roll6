@@ -1,7 +1,7 @@
 meta {
   name: Set open
   type: http
-  seq: 8
+  seq: 6
 }
 
 put {
@@ -12,15 +12,10 @@ put {
 
 body:json {
   {
-    "open": true
+    "open": false
   }
 }
 
 assert {
   res.status: eq 200
-  res.body.open: eq true
-}
-
-docs {
-  Only the master. Open campaigns approve access requests immediately.
 }

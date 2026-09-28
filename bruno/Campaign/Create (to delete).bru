@@ -1,7 +1,7 @@
 meta {
   name: Create (to delete)
   type: http
-  seq: 6
+  seq: 7
 }
 
 post {
@@ -12,7 +12,8 @@ post {
 
 body:json {
   {
-    "name": "Campanha descartável"
+    "name": "Temporária",
+    "open": true
   }
 }
 
@@ -22,6 +23,6 @@ assert {
 
 script:post-response {
   if (res.status === 200 || res.status === 201) {
-    bru.setVar("campaignIdToDelete", res.body.campaignId);
+    bru.setVar("tempCampaignId", res.body.campaignId);
   }
 }

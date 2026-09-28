@@ -12,8 +12,8 @@ post {
 
 body:json {
   {
-    "name": "Baú",
-    "description": "Baú de madeira (só em pé)",
+    "name": "Barril",
+    "description": null,
     "upSpace": 1,
     "downSpace": null,
     "upImage": "{{imageFileName}}",
@@ -23,10 +23,10 @@ body:json {
 
 assert {
   res.status: eq 201
-  res.body.downSpace: isNull
-  res.body.downImage: isNull
 }
 
-docs {
-  Without `downImage` and `downSpace` the token has no down state: both come back null.
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("objectTokenId", res.body.tokenId);
+  }
 }

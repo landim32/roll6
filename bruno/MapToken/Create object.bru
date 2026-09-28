@@ -1,0 +1,38 @@
+meta {
+  name: Create object
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/maptoken
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "mapId": {{mapId}},
+    "tokenId": {{objectTokenId}},
+    "name": "Barril",
+    "tokenType": 4,
+    "sheet": null,
+    "life": 0,
+    "energy": 0,
+    "status": null,
+    "move": 0,
+    "x": 2,
+    "y": 2,
+    "look": 3
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("mapTokenId", res.body.mapTokenId);
+  }
+}

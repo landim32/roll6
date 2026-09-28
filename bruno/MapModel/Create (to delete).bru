@@ -1,7 +1,7 @@
 meta {
   name: Create (to delete)
   type: http
-  seq: 6
+  seq: 7
 }
 
 post {
@@ -12,9 +12,15 @@ post {
 
 body:json {
   {
-    "name": "Modelo descartável",
-    "description": null,
-    "image": null
+    "name": "Temporário",
+    "description": "Mapa da taverna",
+    "image": "{{imageFileName}}",
+    "gridWidth": 20,
+    "gridHeight": 15,
+    "imageWidth": 1600,
+    "imageHeight": 1200,
+    "imageTop": 0,
+    "imageLeft": 0
   }
 }
 
@@ -24,6 +30,6 @@ assert {
 
 script:post-response {
   if (res.status === 200 || res.status === 201) {
-    bru.setVar("mapModelIdToDelete", res.body.mapModelId);
+    bru.setVar("tempMapModelId", res.body.mapModelId);
   }
 }

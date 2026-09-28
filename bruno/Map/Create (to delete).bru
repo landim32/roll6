@@ -1,7 +1,7 @@
 meta {
   name: Create (to delete)
   type: http
-  seq: 5
+  seq: 6
 }
 
 post {
@@ -23,6 +23,6 @@ assert {
 
 script:post-response {
   if (res.status === 200 || res.status === 201) {
-    bru.setVar("mapIdToDelete", res.body.mapId);
+    bru.setVar("tempMapId", res.body.mapId);
   }
 }

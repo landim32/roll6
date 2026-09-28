@@ -1,0 +1,33 @@
+meta {
+  name: Create (for campaign removal)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/npc
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "tokenId": {{tokenId}},
+    "name": "Lobo",
+    "life": 7,
+    "energy": 2,
+    "move": 6,
+    "sheet": "## Goblin\n- Lança",
+    "image": "{{imageFileName}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("secondNpcId", res.body.npcId);
+  }
+}

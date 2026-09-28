@@ -1,0 +1,31 @@
+meta {
+  name: Register player
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/user
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Jogador",
+    "email": "{{playerEmail}}",
+    "password": "{{password}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:pre-request {
+  bru.setVar("playerEmail", `player-${Date.now()}@roll6.test`);
+}
+
+docs {
+  Second user (player) with a random e-mail; used by the participation, turn and transfer folders.
+}
