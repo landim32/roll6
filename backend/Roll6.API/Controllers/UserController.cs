@@ -10,10 +10,12 @@ namespace Roll6.API.Controllers;
 public class UserController : ApiControllerBase
 {
     private readonly IUserService _userService;
+    private readonly ILogger<UserController> _logger;
 
-    public UserController(IUserService userService)
+    public UserController(IUserService userService, ILogger<UserController> logger)
     {
         _userService = userService;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -41,7 +43,10 @@ public class UserController : ApiControllerBase
         {
             var result = await _userService.LoginAsync(info);
             if (result == null)
+            {
+                _logger.LogWarning("Login failed for {Email}", info.Email?.Trim().ToLowerInvariant());
                 return Problem(detail: "E-mail ou senha inválidos.", statusCode: StatusCodes.Status401Unauthorized);
+            }
             return Ok(result);
         }
         catch (Exception ex)

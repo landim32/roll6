@@ -14,6 +14,12 @@ services:
       dockerfile: Dockerfile
     container_name: roll6-api
     restart: unless-stopped
+    # `docker logs roll6-api`: one line per request plus errors with the exception; rotated to keep the disk safe.
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     expose:
       - "8080"
     environment:
@@ -36,6 +42,7 @@ services:
       dockerfile: Roll6.Mcp/Dockerfile
     container_name: roll6-mcp
     restart: unless-stopped
+    logging: *logging
     expose:
       - "8080"
     environment:
