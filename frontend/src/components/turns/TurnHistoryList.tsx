@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { actionLines } from '../../lib/turnHistory';
+import { turnLogMarkdown } from '../../lib/turnHistory';
 import type { TurnHistoryState } from '../../hooks/useTurnHistory';
+
+const MarkdownView = lazy(() => import('../ui/MarkdownView'));
 
 interface TurnHistoryListProps {
   history: TurnHistoryState;
@@ -17,8 +19,8 @@ const formatTime = (value: string | null) => {
 };
 
 /**
- * Finished turns, newest first (028): one block per turn with its actions as plain text, more loaded when the end of
- * the list shows up, and newer turns added at the top without moving whoever is reading older ones ("Novidades").
+ * Finished turns, newest first (028): one block per turn with its actions rendered as markdown, more loaded when the
+ * end of the list shows up, and newer turns added at the top without moving whoever is reading older ones ("Novidades").
  */
 export const TurnHistoryList = ({ history, compact = false }: TurnHistoryListProps) => {
   const { t } = useTranslation();
@@ -75,7 +77,9 @@ export const TurnHistoryList = ({ history, compact = false }: TurnHistoryListPro
               <strong>{t('turnConsole.turn', { no: item.turnNo })}</strong>
               {formatTime(item.finishedAt) && <small className="text-body-secondary ms-2">{formatTime(item.finishedAt)}</small>}
             </header>
-            {actionLines(item.actions).map((line, index) => <div key={index} className="stm-turn-history-line">{line}</div>)}
+            <Suspense fallback={<div className="stm-turn-history-raw">{item.actions}</div>}>
+              <MarkdownView value={turnLogMarkdown(item.actions)} emptyText="" />
+            </Suspense>
           </section>
         ))}
         {!loading && !error && done && items.length === 0 && <p className="text-body-secondary mb-0">{t('turnConsole.empty')}</p>}

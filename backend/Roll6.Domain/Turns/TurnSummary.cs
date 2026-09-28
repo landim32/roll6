@@ -79,12 +79,25 @@ public static class TurnSummary
             TurnType.Movement => $"{actor}: {Movement(line)}",
             TurnType.Action => $"{actor}: \"{Escape(line.Description)}\"",
             TurnType.ActionResult => $"{author ?? actor}: Resultado para {actor}: {Escape(line.Description)}",
-            TurnType.Narration => $"{author ?? "GM"}: Narração: {Escape(line.Description)}",
+            TurnType.Narration => Narration(author, line.Description),
             TurnType.CharacterUpdate => author == null
                 ? $"{actor}: Alterou: {Changes(line)}"
                 : $"{author}: Alterou {actor}: {Changes(line)}",
             _ => $"{actor}: {Escape(line.Description)}"
         };
+    }
+
+    /// <summary>
+    /// The master writes the narration as markdown. The name stays escaped; the text keeps its lines
+    /// (emphasis, rules, lists) and a trailing blank line so the next entry is not pulled into it.
+    /// </summary>
+    private static string Narration(string? author, string? description)
+    {
+        var label = $"{author ?? "GM"}:";
+        var body = description?.ReplaceLineEndings("\n").Trim();
+        if (string.IsNullOrEmpty(body))
+            return label;
+        return label + "\n\n" + body + "\n";
     }
 
     private static string Movement(SummaryLine line)

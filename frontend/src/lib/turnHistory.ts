@@ -10,9 +10,12 @@ export const mergeTurnPages = (current: TurnHistoryItemInfo[], incoming: TurnHis
   return [...byTurn.values()].sort((a, b) => b.turnNo - a.turnNo);
 };
 
-/** The action lines of a turn without the "## Ações" heading and blank lines. */
-export const actionLines = (actions: string): string[] =>
-  actions.split('\n').map((line) => line.trimEnd()).filter((line) => line !== '' && !line.startsWith('## '));
+/**
+ * The turn log is one entry per line. A markdown renderer folds a single newline into a space, so each line
+ * becomes a hard break (two trailing spaces) and a blank line stays a paragraph break.
+ */
+export const turnLogMarkdown = (actions: string): string =>
+  actions.replace(/\r\n/g, '\n').replace(/([^\n])\n(?!\n)/g, '$1  \n');
 
 /** How many finished turns are newer than the newest one loaded (turn in progress = turnNo). */
 export const newTurnsCount = (newestLoaded: number | null, turnNo: number): number =>
