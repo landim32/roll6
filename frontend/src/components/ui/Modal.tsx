@@ -9,17 +9,23 @@ interface ModalProps {
   large?: boolean;
   children: ReactNode;
   footer?: ReactNode;
+  /**
+   * Hides the dialog but keeps it open and mounted (typed values survive), e.g. while a picker opened from it is
+   * shown: only one modal is visible at a time.
+   */
+  hidden?: boolean;
 }
 
 /**
  * Base modal: Radix Dialog (focus trap, Esc, a11y) styled with Bootstrap's modal classes in the
  * dark theme. Every window besides the map opens through it.
  */
-export const Modal = ({ open, onOpenChange, title, large = false, children, footer }: ModalProps) => (
+export const Modal = ({ open, onOpenChange, title, large = false, children, footer, hidden = false }: ModalProps) => (
   <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="stm-modal-overlay" />
+      <DialogPrimitive.Overlay className="stm-modal-overlay" hidden={hidden} />
       <DialogPrimitive.Content
+        hidden={hidden}
         className={`modal-content stm-modal-content${large ? ' stm-modal-lg' : ''}`}
         aria-describedby={undefined}
       >

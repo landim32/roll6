@@ -88,21 +88,26 @@ public class MapTokenService : IMapTokenService
 
     /// <summary>
     /// Places a campaign character: its own token, or — when it has none — the informed one, which is then
-    /// saved on the character too (011 FR-015), in the same transaction.
+    /// saved on the character too (011 FR-015), in the same transaction. The master places any approved
+    /// character; a player only his own (e.g. entering a map), later moves follow the turn rules (015/016).
     /// </summary>
     public async Task<MapTokenInfo> PlaceCharacterAsync(long userId, MapTokenCharacterInsertInfo info)
     {
-        var map = await EnsureMapOwnerAsync(userId, info.MapId);
+        var map = await _mapRepository.GetByIdAsync(info.MapId)
+            ?? throw new KeyNotFoundException("Mapa não encontrado.");
+        map.EnsureNotDeleted();
         var participation = await _campaignCharacterRepository.GetByIdAsync(info.CampaignCharacterId)
             ?? throw new KeyNotFoundException("Participação não encontrada.");
+        var character = await _characterRepository.GetByIdAsync(participation.CharacterId)
+            ?? throw new KeyNotFoundException("Personagem não encontrado.");
+        if (map.UserId != userId && character.UserId != userId)
+            throw new UnauthorizedAccessException("Você só pode colocar os seus personagens no mapa.");
         if (participation.CampaignId != map.CampaignId || participation.Status != CampaignCharacterStatus.Approved)
             throw new ConflictException("Só personagens aprovados nesta campanha podem ser colocados no mapa.");
         if (await _repository.GetByMapAndCampaignCharacterAsync(map.MapId, participation.CampaignCharacterId) != null)
             throw new ConflictException("O personagem já está neste mapa.");
         await EnsureFreeHexAsync(map, info.X, info.Y, null);
 
-        var character = await _characterRepository.GetByIdAsync(participation.CharacterId)
-            ?? throw new KeyNotFoundException("Personagem não encontrado.");
         var tokenId = character.TokenId ?? info.TokenId
             ?? throw new DomainValidationException("tokenId", "Escolha um token para o personagem.");
         await GetTokenAsync(tokenId);

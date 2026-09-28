@@ -4,36 +4,30 @@ import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { StatusBadge } from '../ui/StatusBadge';
-import { TransferCharacterModal } from './TransferCharacterModal';
 import { useCharacter } from '../../hooks/useCharacter';
 import { participationAction } from '../../lib/characterSelection';
 import type { CharacterInfo } from '../../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../../types/campaignCharacter';
+import { TransferIcon } from '../ui/icons';
 
 interface SelectCharacterModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Opens "Incluir Personagem" (empty state). */
   onInclude: () => void;
+  /** Opens the transfer modal for the character; this modal closes first (one modal at a time). */
+  onTransfer: (character: CharacterInfo) => void;
 }
-
-/** Two opposite arrows (Bootstrap Icons "arrow-left-right"). */
-const TransferIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path fillRule="evenodd" d="M1 11.5a.5.5 0 0 0 .5.5h11.793l-3.147 3.146a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 11H1.5a.5.5 0 0 0-.5.5m14-7a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 1 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 4H14.5a.5.5 0 0 1 .5.5" />
-  </svg>
-);
 
 const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** The user's characters with their status in the current campaign and the action for each (FR-013/014). */
-export const SelectCharacterModal = ({ open, onOpenChange, onInclude }: SelectCharacterModalProps) => {
+export const SelectCharacterModal = ({ open, onOpenChange, onInclude, onTransfer }: SelectCharacterModalProps) => {
   const { t } = useTranslation();
   const {
     myCharacters, myParticipations, currentSelection, loading, refresh, select, requestAccess, acceptInvite, declineInvite,
   } = useCharacter();
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [transferring, setTransferring] = useState<CharacterInfo | null>(null);
 
   useEffect(() => {
     if (open) void refresh();
@@ -121,19 +115,14 @@ export const SelectCharacterModal = ({ open, onOpenChange, onInclude }: SelectCh
               <div className="stm-character-actions">
                 {renderActions(character)}
                 <button type="button" className="btn btn-sm btn-outline-secondary" disabled={busyId === character.characterId}
-                  title={t('transfer.action')} aria-label={t('transfer.action')} onClick={() => setTransferring(character)}>
-                  <TransferIcon />
+                  title={t('transfer.action')} aria-label={t('transfer.action')} onClick={() => { onOpenChange(false); onTransfer(character); }}>
+                  <TransferIcon size={14} />
                 </button>
               </div>
             </li>
           ))}
         </ul>
       )}
-      <TransferCharacterModal
-        open={transferring !== null}
-        onOpenChange={(value) => { if (!value) setTransferring(null); }}
-        character={transferring}
-      />
     </Modal>
   );
 };

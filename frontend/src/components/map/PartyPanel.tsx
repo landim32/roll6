@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useMapToken } from '../../hooks/useMapToken';
-import { participationMode } from '../../lib/campaignCharacterForm';
+import { PARTICIPATION_MODE, participationMode } from '../../lib/campaignCharacterForm';
 import type { ParticipationMode } from '../../lib/campaignCharacterForm';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 
@@ -23,7 +23,7 @@ export const PartyPanel = ({ onOpen }: PartyPanelProps) => {
   const { session } = useAuth();
   const { isMaster } = useCampaign();
   const { party, currentSelection } = useCharacter();
-  const { canPlace } = useMapToken();
+  const { canPlace, canPlaceOwn } = useMapToken();
 
   if (party.length === 0) return null;
 
@@ -44,7 +44,8 @@ export const PartyPanel = ({ onOpen }: PartyPanelProps) => {
             current={currentSelection === member.characterId}
             mode={mode}
             onOpen={() => onOpen(member, mode)}
-            draggable={canPlace}
+            // The master drags any card; a player only his own characters' cards.
+            draggable={canPlace || (canPlaceOwn && mode === PARTICIPATION_MODE.owner)}
           />
         );
       })}

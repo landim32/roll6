@@ -252,6 +252,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
       onOpenChange={onOpenChange}
       title={t(title)}
       large
+      hidden={pickingToken}
       footer={isViewer ? (
         <button type="button" className="btn btn-secondary" onClick={() => onOpenChange(false)}>{t('common.close')}</button>
       ) : (

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { CharacterAvatar } from './CharacterAvatar';
 import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES } from '../../Services/imageService';
 import type { CropArea } from '../../lib/cropImage';
+import { ImageIcon, RotateRightIcon, TrashIcon, UndoIcon } from './icons';
 
 /** Source image and the chosen area; the caller crops it (lib/cropImage) only when saving. */
 export interface ImageCrop {
@@ -41,20 +42,6 @@ interface ImageCropperProps {
   /** Called when the cropper opens (a file was chosen) or closes, e.g. to give it the full width. */
   onCroppingChange?: (cropping: boolean) => void;
 }
-
-const ImageIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0" />
-    <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1z" />
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
-    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
-  </svg>
-);
 
 /** Below 1 the image shrinks inside the frame; the uncovered part is saved transparent. */
 const MIN_ZOOM = 0.2;
@@ -121,12 +108,12 @@ export const ImageCropper = ({
           <div className="d-flex flex-column gap-1">
             <button type="button" className="btn btn-sm btn-outline-primary" aria-label={pickLabel} title={pickLabel}
               onClick={() => input.current?.click()}>
-              <ImageIcon />
+              <ImageIcon size={14} />
             </button>
             {hasCurrent && onRemoveCurrent && (
               <button type="button" className="btn btn-sm btn-outline-danger" aria-label={t('characterForm.removeImage')}
                 title={t('characterForm.removeImage')} onClick={onRemoveCurrent}>
-                <TrashIcon />
+                <TrashIcon size={14} />
               </button>
             )}
           </div>
@@ -171,11 +158,11 @@ export const ImageCropper = ({
             <div className="d-flex align-items-center gap-2 mt-2">
               <label className="form-label mb-0 small" htmlFor={`${id}-rotation`}>{t('image.rotation')}</label>
               <button type="button" className="btn btn-sm btn-outline-secondary" aria-label={t('image.rotateLeft')} title={t('image.rotateLeft')}
-                onClick={() => setRotation((r) => normalizeRotation(r - 90))}>↺</button>
+                onClick={() => setRotation((r) => normalizeRotation(r - 90))}><UndoIcon size={14} /></button>
               <input id={`${id}-rotation`} type="range" className="form-range flex-grow-1" min={-MAX_ROTATION} max={MAX_ROTATION} step={1}
                 value={rotation} onChange={(e) => setRotation(Number(e.target.value))} />
               <button type="button" className="btn btn-sm btn-outline-secondary" aria-label={t('image.rotateRight')} title={t('image.rotateRight')}
-                onClick={() => setRotation((r) => normalizeRotation(r + 90))}>↻</button>
+                onClick={() => setRotation((r) => normalizeRotation(r + 90))}><RotateRightIcon size={14} /></button>
               <small className="text-body-secondary text-nowrap" style={{ minWidth: '3.5em' }}>{rotation}°</small>
             </div>
           )}

@@ -236,6 +236,7 @@
   },
   "mapTokens": {
     "hexOccupied": "O hex precisa estar livre.",
+    "useMove": "{{name}} já está no mapa: use \"Mover\" no menu da peça.",
     "chooseCharacterToken": "Escolher token de {{name}}",
     "deleteTitle": "Excluir token",
     "deleteMessage": "Excluir {{name}} do mapa? A peça sai deste mapa; o token continua na biblioteca."

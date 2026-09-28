@@ -62,7 +62,7 @@ const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y ==
 export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, picking = false }: MapCanvasProps) => {
   const { t } = useTranslation();
   const { draft, hexSize, view, panBy, zoomIn, zoomOut, resizeMode, canEdit, setImageLayout } = useMapEditor();
-  const { mapTokens, canPlace, placeCharacter, moveToken } = useMapToken();
+  const { mapTokens, canPlace, canPlaceOwn, placeCharacter, moveToken } = useMapToken();
   const { party } = useCharacter();
   const { session } = useAuth();
   const movement = useTokenMovement();
@@ -213,8 +213,12 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
 
   /** Party cards move/place a character; NPC cards add a new piece (014). */
   const isNpcDrag = (event: ReactDragEvent<SVGSVGElement>) => event.dataTransfer.types.includes(NPC_DRAG_TYPE);
-  const acceptsDrag = (event: ReactDragEvent<SVGSVGElement>) =>
-    canPlace && (event.dataTransfer.types.includes(PARTICIPATION_DRAG_TYPE) || isNpcDrag(event));
+  const acceptsDrag = (event: ReactDragEvent<SVGSVGElement>) => {
+    const isParticipation = event.dataTransfer.types.includes(PARTICIPATION_DRAG_TYPE);
+    if (canPlace) return isParticipation || isNpcDrag(event);
+    // Players only drag the cards of their own characters (the only draggable ones for them).
+    return canPlaceOwn && isParticipation;
+  };
 
   const onDragOver = (event: ReactDragEvent<SVGSVGElement>) => {
     if (!acceptsDrag(event)) return;
@@ -250,6 +254,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
     const id = Number(event.dataTransfer.getData(PARTICIPATION_DRAG_TYPE));
     const participation = party.find((p) => p.campaignCharacterId === id);
     if (!participation || !hex) return;
+    if (!canPlace && participation.characterOwnerId !== session?.user.userId) return;
 
     const action = characterDropAction({ hex, tokens: mapTokens, participation });
     try {
@@ -258,6 +263,11 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
           toast.warning(t('mapTokens.hexOccupied'));
           break;
         case 'move':
+          // Players move a piece already on the map with "Mover" (turn and move limits).
+          if (!canPlace) {
+            toast.info(t('mapTokens.useMove', { name: participation.characterName }));
+            break;
+          }
           await moveToken(action.mapTokenId, hex.x, hex.y);
           void refreshTurn();
           break;

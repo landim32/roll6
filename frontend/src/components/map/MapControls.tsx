@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { MAX_ZOOM, MIN_ZOOM } from '../../Contexts/MapEditorContext';
 import { useMapEditor } from '../../hooks/useMapEditor';
+import { ImageIcon, MinusIcon, PlusIcon, ResizeIcon } from '../ui/icons';
 
 interface MapControlsProps {
   onOpenImage: () => void;
@@ -26,13 +27,13 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   return (
     <div className="stm-controls">
       <button type="button" className="btn btn-secondary" title={t('map.zoomIn')} aria-label={t('map.zoomIn')}
-        disabled={view.zoom >= MAX_ZOOM} onClick={() => zoomIn(...center())}>+</button>
+        disabled={view.zoom >= MAX_ZOOM} onClick={() => zoomIn(...center())}><PlusIcon size={20} /></button>
       <button type="button" className="btn btn-secondary" title={t('map.zoomOut')} aria-label={t('map.zoomOut')}
-        disabled={view.zoom <= MIN_ZOOM} onClick={() => zoomOut(...center())}>−</button>
+        disabled={view.zoom <= MIN_ZOOM} onClick={() => zoomOut(...center())}><MinusIcon size={20} /></button>
       <button type="button" className="btn btn-secondary" title={t('map.image')} aria-label={t('map.image')}
-        disabled={!canEdit} onClick={onOpenImage}>🖼</button>
+        disabled={!canEdit} onClick={onOpenImage}><ImageIcon size={20} /></button>
       <button type="button" className={`btn ${resizeMode ? 'btn-warning' : 'btn-secondary'}`} title={t('map.resize')}
-        aria-label={t('map.resize')} aria-pressed={resizeMode} disabled={!canEdit} onClick={onToggleResize}>⤡</button>
+        aria-label={t('map.resize')} aria-pressed={resizeMode} disabled={!canEdit} onClick={onToggleResize}><ResizeIcon size={20} /></button>
     </div>
   );
 };
