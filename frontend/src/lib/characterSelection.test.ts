@@ -8,7 +8,7 @@ import type { CampaignCharacterInfo, CampaignCharacterStatus } from '../types/ca
 
 const character = (characterId: number, name: string): CharacterInfo => ({
   characterId, userId: 1, name, sheet: null, life: 0, energy: 0, move: 0,
-  image: null, imageUrl: null, tokenId: null, tokenName: null, tokenImageUrl: null, createdAt: '', updatedAt: '',
+  image: null, imageUrl: null, sheetFile: null, sheetFileUrl: null, sheetFileType: null, tokenId: null, tokenName: null, tokenImageUrl: null, createdAt: '', updatedAt: '',
 });
 
 const participation = (characterId: number, status: CampaignCharacterStatus): CampaignCharacterInfo => ({

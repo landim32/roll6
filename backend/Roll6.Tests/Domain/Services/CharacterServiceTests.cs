@@ -273,4 +273,29 @@ public class CharacterServiceTests
         _notifier.Verify(n => n.RemoveUserFromCampaignAsync(OWNER, 20), Times.Once);
         _notifier.Verify(n => n.RemoveUserFromCampaignAsync(OWNER, It.IsIn(21L, 22L)), Times.Never);
     }
+
+    // ---- 022: sheet file ----
+
+    [Fact]
+    public async Task CreateAndUpdate_KeepTheSheetFileAndReturnItsUrlAndType()
+    {
+        _repository.Setup(r => r.InsertAsync(It.IsAny<Character>())).ReturnsAsync((Character c) => c);
+        const string pdf = "0123456789abcdef0123456789abcdef.pdf";
+
+        var created = await _service.CreateAsync(OWNER, new CharacterInsertInfo { Name = "Aria", Life = 1, Energy = 1, Move = 1, SheetFile = pdf });
+
+        created.SheetFile.Should().Be(pdf);
+        created.SheetFileUrl.Should().Be("https://cdn/" + pdf);
+        created.SheetFileType.Should().Be("pdf");
+
+        const string png = "0123456789abcdef0123456789abcdef.png";
+        var updated = await _service.UpdateAsync(OWNER, CHARACTER, new CharacterInsertInfo { Name = "Aria", Life = 1, Energy = 1, Move = 1, SheetFile = png });
+        updated.SheetFileType.Should().Be("image");
+        _repository.Verify(r => r.UpdateAsync(It.Is<Character>(c => c.SheetFile == png)), Times.Once);
+
+        var removed = await _service.UpdateAsync(OWNER, CHARACTER, new CharacterInsertInfo { Name = "Aria", Life = 1, Energy = 1, Move = 1 });
+        removed.SheetFile.Should().BeNull();
+        removed.SheetFileUrl.Should().BeNull();
+        removed.SheetFileType.Should().BeNull();
+    }
 }

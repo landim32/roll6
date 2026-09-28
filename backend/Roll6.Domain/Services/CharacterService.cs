@@ -93,7 +93,7 @@ public class CharacterService : ICharacterService
     {
         var token = await GetTokenAsync(info.TokenId);
         var character = new Character { UserId = userId };
-        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image, info.TokenId);
+        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image, info.TokenId, info.SheetFile);
         character.CreatedAt = character.UpdatedAt;
         return MapToDto(await _repository.InsertAsync(character), token);
     }
@@ -102,7 +102,7 @@ public class CharacterService : ICharacterService
     {
         var character = await GetOwnedAsync(userId, characterId);
         var token = await GetTokenAsync(info.TokenId);
-        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image, info.TokenId);
+        character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image, info.TokenId, info.SheetFile);
         Character saved = character;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
@@ -201,6 +201,9 @@ public class CharacterService : ICharacterService
         Move = character.Move,
         Image = character.Image,
         ImageUrl = _imageStorage.GetUrl(character.Image),
+        SheetFile = character.SheetFile,
+        SheetFileUrl = _imageStorage.GetUrl(character.SheetFile),
+        SheetFileType = SheetFiles.TypeOf(character.SheetFile),
         TokenId = character.TokenId,
         TokenName = token?.Name,
         TokenImageUrl = _imageStorage.GetUrl(token?.UpImage),

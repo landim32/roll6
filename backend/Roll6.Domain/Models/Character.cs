@@ -13,6 +13,9 @@ public class Character
     public int Move { get; set; }
     public string? Image { get; set; }
 
+    /// <summary>Sheet as an uploaded image or PDF, stored exactly as sent (022); only the file name.</summary>
+    public string? SheetFile { get; set; }
+
     /// <summary>Library token placed on the map when the character is dragged there (optional).</summary>
     public long? TokenId { get; set; }
 
@@ -23,7 +26,7 @@ public class Character
     /// Life and energy are the character's totals (≥ 0); current values, the status and the campaign's copy of
     /// the sheet live in each campaign participation. Only the owner changes the character.
     /// </summary>
-    public void Update(string? name, string? sheet, int life, int energy, int move, string? image, long? tokenId)
+    public void Update(string? name, string? sheet, int life, int energy, int move, string? image, long? tokenId, string? sheetFile = null)
     {
         Name = Guard.RequiredText(name, "name", 260);
         Sheet = Guard.OptionalText(sheet, "sheet", 20000);
@@ -32,6 +35,7 @@ public class Character
         Move = Guard.NonNegative(move, "move");
         Image = Guard.ImageFileName(image, "image");
         TokenId = tokenId;
+        SheetFile = Guard.SheetFileName(sheetFile, "sheetFile");
         UpdatedAt = DateTime.UtcNow;
     }
 

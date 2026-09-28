@@ -93,6 +93,24 @@
     "emptyCampaign": "Nenhum personagem na campanha.",
     "emptySearch": "Nenhum personagem encontrado."
   },
+  "sheetFile": {
+    "tab": "Ficha em arquivo",
+    "hint": "Imagem (PNG, JPG, WebP) ou PDF, até 10 MB. O arquivo é guardado como está, sem recorte.",
+    "choose": "Escolher arquivo",
+    "replace": "Trocar",
+    "remove": "Remover",
+    "current": "Ficha atual",
+    "image": "Imagem",
+    "pdf": "PDF",
+    "uploading": "Enviando…",
+    "imageAlt": "Ficha do personagem",
+    "openFullSize": "Abrir em tamanho real",
+    "openPdf": "Abrir ficha (PDF)",
+    "errors": {
+      "type": "Formato não suportado. Use PNG, JPG, WebP ou PDF.",
+      "tooLarge": "O arquivo deve ter no máximo 10 MB."
+    }
+  },
   "characterForm": {
     "title": "Incluir Personagem",
     "name": "Nome",

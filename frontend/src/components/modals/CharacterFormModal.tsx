@@ -7,6 +7,9 @@ import { Tabs } from '../ui/Tabs';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { ImageCropper } from '../ui/ImageCropper';
 import { TokenModal } from './TokenModal';
+import { SheetFileField } from '../characters/SheetFileField';
+import type { SheetFileValue } from '../characters/SheetFileField';
+import { SheetFileView } from '../characters/SheetFileView';
 import type { ImageCrop } from '../ui/ImageCropper';
 import { useCharacter } from '../../hooks/useCharacter';
 import { imageService } from '../../Services/imageService';
@@ -74,6 +77,9 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
   /** The character's own token (011 US5): chosen in the tokens modal, saved with the character. */
   const [token, setToken] = useState<{ tokenId: number; name: string; imageUrl: string | null } | null>(null);
   const [pickingToken, setPickingToken] = useState(false);
+  /** The character's sheet file (022): uploaded on choice, saved with the character. */
+  const [sheetFile, setSheetFile] = useState<SheetFileValue | null>(null);
+  const [uploadingSheet, setUploadingSheet] = useState(false);
 
   const participationId = editing?.participation.campaignCharacterId ?? null;
   const mode = editing?.mode ?? null;
@@ -91,6 +97,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
     setKeptImage(null);
     setForm(emptyCharacterForm());
     setToken(null);
+    setSheetFile(null);
     if (!editing) return;
     let cancelled = false;
     const loadCharacter = isOwner ? getCharacter(editing.participation.characterId) : Promise.resolve(null);
@@ -108,6 +115,9 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
           setKeptImage(character.image ? { file: character.image, url: character.imageUrl } : null);
           setToken(character.tokenId !== null
             ? { tokenId: character.tokenId, name: character.tokenName ?? '', imageUrl: character.tokenImageUrl }
+            : null);
+          setSheetFile(character.sheetFile && character.sheetFileType
+            ? { fileName: character.sheetFile, url: character.sheetFileUrl, type: character.sheetFileType, originalName: null }
             : null);
         }
       })
@@ -139,7 +149,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
   };
 
   const saveParticipation = async (before: CampaignCharacterDetailInfo) => {
-    const draft = isOwner ? toCharacterInsert(form, null, token?.tokenId ?? null) : null;
+    const draft = isOwner ? toCharacterInsert(form, null, token?.tokenId ?? null, sheetFile?.fileName ?? null) : null;
     const totalLife = draft?.life ?? before.totalLife;
     const totalEnergy = draft?.energy ?? before.totalEnergy;
     const vitals = vitalsToSave(before, totalLife, totalEnergy);
@@ -175,7 +185,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (loading || isViewer) return;
+    if (loading || isViewer || uploadingSheet) return;
     if (characterEditable) {
       const error = validateCharacterForm(form);
       if (error) {
@@ -190,7 +200,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
     setSaving(true);
     try {
       const image = crop ? (await imageService.upload(await cropToFile(crop.src, crop.area, { rotation: crop.rotation }))).fileName : null;
-      const { character, participation, requestError } = await createCharacter(toCharacterInsert(form, image, token?.tokenId ?? null));
+      const { character, participation, requestError } = await createCharacter(toCharacterInsert(form, image, token?.tokenId ?? null, sheetFile?.fileName ?? null));
       const name = character.name;
       if (requestError) toast.warning(t('toast.characterRequestFailed', { name, error: requestError }));
       else if (!participation) toast.success(t('toast.characterCreated', { name }));
@@ -223,6 +233,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
   const tabs = [
     { key: 'data', label: t('characterForm.dataTab') },
     ...(characterEditable ? [{ key: 'sheet', label: t('characterForm.sheetTab') }] : []),
+    ...(characterEditable || detail?.sheetFileUrl ? [{ key: 'sheetFile', label: t('sheetFile.tab') }] : []),
     ...(editing ? [{ key: 'campaignSheet', label: t('characterForm.campaignSheetTab') }] : []),
   ];
 
@@ -239,7 +250,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
       ) : (
         <>
           <button type="button" className="btn btn-secondary" onClick={() => onOpenChange(false)} disabled={saving}>{t('common.cancel')}</button>
-          <button type="submit" form="character-form" className="btn btn-primary" disabled={saving || loading}>{t('common.save')}</button>
+          <button type="submit" form="character-form" className="btn btn-primary" disabled={saving || loading || uploadingSheet}>{t('common.save')}</button>
         </>
       )}
     >
@@ -332,6 +343,16 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
                   <MarkdownEditor id="character-sheet" value={form.sheet} onChange={set('sheet')} maxLength={MAX_CHARACTER_SHEET} />
                 </Suspense>
                 <div className="form-text">{t('characterForm.sheetHint')}</div>
+              </div>
+            )}
+            {characterEditable ? (
+              <div hidden={tab !== 'sheetFile'}>
+                <label className="form-label" htmlFor="character-sheet-file">{t('sheetFile.tab')}</label>
+                <SheetFileField id="character-sheet-file" value={sheetFile} onChange={setSheetFile} onUploadingChange={setUploadingSheet} />
+              </div>
+            ) : detail?.sheetFileUrl && detail.sheetFileType && (
+              <div hidden={tab !== 'sheetFile'}>
+                <SheetFileView url={detail.sheetFileUrl} type={detail.sheetFileType} />
               </div>
             )}
             {editing && (

@@ -211,6 +211,8 @@ public class CampaignCharacterService : ICampaignCharacterService
     private async Task<CampaignCharacterDetailInfo> MapToDetailAsync(CampaignCharacter participation)
     {
         var info = (await MapToDtoAsync(new[] { participation })).Single();
+        // The sheet file belongs to the character (022): every campaign shows the same, latest file.
+        var sheetFile = (await _characterRepository.GetByIdAsync(participation.CharacterId))?.SheetFile;
         return new CampaignCharacterDetailInfo
         {
             CampaignCharacterId = info.CampaignCharacterId,
@@ -232,7 +234,9 @@ public class CampaignCharacterService : ICampaignCharacterService
             CharacterTokenId = info.CharacterTokenId,
             CreatedAt = info.CreatedAt,
             UpdatedAt = info.UpdatedAt,
-            Sheet = participation.Sheet
+            Sheet = participation.Sheet,
+            SheetFileUrl = _imageStorage.GetUrl(sheetFile),
+            SheetFileType = SheetFiles.TypeOf(sheetFile)
         };
     }
 

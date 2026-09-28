@@ -25,7 +25,7 @@ describe('validateCharacterForm', () => {
 describe('toCharacterInsert', () => {
   it('trims, converts numbers and turns empty texts into null', () => {
     expect(toCharacterInsert(form({ name: ' Aria ', life: '12', energy: '', move: '6', sheet: '' }), null, null)).toEqual({
-      name: 'Aria', life: 12, energy: 0, move: 6, sheet: null, image: null, tokenId: null,
+      name: 'Aria', life: 12, energy: 0, move: 6, sheet: null, image: null, tokenId: null, sheetFile: null,
     });
   });
 
@@ -34,5 +34,9 @@ describe('toCharacterInsert', () => {
     expect(result.tokenId).toBe(7);
     expect(result.sheet).toBe('Força 3\nDestreza 2');
     expect(result.image).toBe('abc.png');
+  });
+
+  it('keeps the sheet file name', () => {
+    expect(toCharacterInsert(form({}), null, null, 'abc.pdf').sheetFile).toBe('abc.pdf');
   });
 });

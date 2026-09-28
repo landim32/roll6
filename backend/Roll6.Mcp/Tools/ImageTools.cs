@@ -13,7 +13,8 @@ public static class ImageTools
         [".png"] = "image/png",
         [".jpg"] = "image/jpeg",
         [".jpeg"] = "image/jpeg",
-        [".webp"] = "image/webp"
+        [".webp"] = "image/webp",
+        [".pdf"] = "application/pdf"
     };
 
     [McpServerTool(Name = "upload_image", Title = "Upload image", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -32,6 +33,29 @@ public static class ImageTools
         [Description("Original file name, used to infer the type from the extension (.png, .jpg, .jpeg, .webp). Example: \"goblin.png\".")] string fileName,
         [Description("File content encoded in base64 (a data: URL prefix is accepted). Up to 10 MB of binary content.")] string contentBase64,
         [Description("MIME type (image/png, image/jpeg or image/webp). Optional: inferred from fileName when omitted.")] string? contentType = null)
+        => await UploadAsync(api, "/api/image", fileName, contentBase64, contentType, "image");
+
+    [McpServerTool(Name = "upload_document", Title = "Upload sheet file", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
+    [ApiOperation("POST", "/api/document")]
+    [Description("""
+        What it does: stores a character sheet file — an image (png, jpg, webp) or a PDF — exactly as sent (no crop,
+        resize or conversion) and returns its file name, to be saved in the character's sheetFile.
+        Who can use it: any authenticated user.
+        Returns: { fileName, url, type } where type is "image" or "pdf". Save fileName (e.g. "3f2a…c9.pdf") with
+        create_character or update_character (sheetFile); url is temporary (expires) — never store it.
+        Common errors: 400 invalid base64, unsupported type (only png, jpg, webp, pdf), content that does not match the
+        type, or larger than 10 MB.
+        Related tools: create_character, update_character, get_character.
+        """)]
+    public static async Task<CallToolResult> UploadDocument(
+        Roll6ApiClient api,
+        [Description("Original file name, used to infer the type from the extension (.png, .jpg, .jpeg, .webp, .pdf). Example: \"ficha.pdf\".")] string fileName,
+        [Description("File content encoded in base64 (a data: URL prefix is accepted). Up to 10 MB of binary content.")] string contentBase64,
+        [Description("MIME type (image/png, image/jpeg, image/webp or application/pdf). Optional: inferred from fileName when omitted.")] string? contentType = null)
+        => await UploadAsync(api, "/api/document", fileName, contentBase64, contentType, "document");
+
+    private static async Task<CallToolResult> UploadAsync(Roll6ApiClient api, string path, string? fileName,
+        string contentBase64, string? contentType, string fallbackName)
     {
         byte[] bytes;
         try
@@ -49,6 +73,6 @@ public static class ImageTools
         var type = !string.IsNullOrWhiteSpace(contentType)
             ? contentType
             : CONTENT_TYPES.GetValueOrDefault(Path.GetExtension(fileName ?? string.Empty));
-        return await api.PostFileAsync("/api/image", bytes, fileName ?? "image", type);
+        return await api.PostFileAsync(path, bytes, fileName ?? fallbackName, type);
     }
 }
