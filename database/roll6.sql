@@ -978,5 +978,20 @@ BEGIN
     VALUES ('20260928122310_AddTurnAuthorMovedChanges', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928130000_AddNpcStatus') THEN
+    ALTER TABLE npcs ADD status character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928130000_AddNpcStatus') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260928130000_AddNpcStatus', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

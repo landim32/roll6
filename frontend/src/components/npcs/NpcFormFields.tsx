@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { ImageCropper } from '../ui/ImageCropper';
 import type { ImageCrop } from '../ui/ImageCropper';
+import { Tabs } from '../ui/Tabs';
 import { TokenModal } from '../modals/TokenModal';
-import { MAX_NPC_NAME, MAX_NPC_SHEET } from '../../lib/npcForm';
+import { MAX_NPC_NAME, MAX_NPC_SHEET, MAX_NPC_STATUS } from '../../lib/npcForm';
 import type { NpcForm } from '../../lib/npcForm';
 
 // The markdown editor is heavy: loaded only when the form is shown.
@@ -29,15 +30,23 @@ interface NpcFormFieldsProps {
   onToken: (token: NpcTokenChoice | null) => void;
   /** The tokens modal opened/closed: the form's modal hides meanwhile (one modal at a time). */
   onPickingTokenChange?: (picking: boolean) => void;
+  /** Editing a saved NPC: the sheet opens as preview only (a new one opens with the editor). */
+  editing?: boolean;
 }
 
 /**
- * Fields of an NPC, shared by "Novo NPC" and "Editar NPC": name, round picture, required token (picked in
- * the tokens modal), life, energy, move and the markdown sheet.
+ * Fields of an NPC, shared by "Novo NPC" and "Editar NPC", laid out like the character form: tab "Dados" (name with
+ * the round picture on the same line, status, required token picked in the tokens modal, life, energy, move) and
+ * tab "Ficha" (markdown).
  */
-export const NpcFormFields = ({ idPrefix, form, onField, onImageCrop, currentImage, onRemoveImage, token, onToken, onPickingTokenChange }: NpcFormFieldsProps) => {
+export const NpcFormFields = ({
+  idPrefix, form, onField, onImageCrop, currentImage, onRemoveImage, token, onToken, onPickingTokenChange, editing = false,
+}: NpcFormFieldsProps) => {
   const { t } = useTranslation();
+  const [tab, setTab] = useState('data');
   const [pickingToken, setPickingTokenState] = useState(false);
+  /** A new picture is being cropped: the picture area takes the whole line. */
+  const [cropping, setCropping] = useState(false);
   const setPickingToken = (picking: boolean) => {
     setPickingTokenState(picking);
     onPickingTokenChange?.(picking);
@@ -52,45 +61,66 @@ export const NpcFormFields = ({ idPrefix, form, onField, onImageCrop, currentIma
   );
 
   return (
-    <div className="row g-3">
-      <div className="col-12">
-        <label className="form-label" htmlFor={id('name')}>{t('npcs.name')}</label>
-        <input id={id('name')} className="form-control" maxLength={MAX_NPC_NAME} value={form.name} onChange={(e) => onField('name', e.target.value)} />
-      </div>
-      <div className="col-12">
-        <label className="form-label" htmlFor={id('image')}>{t('npcs.image')}</label>
-        <ImageCropper
-          id={id('image')}
-          onChange={onImageCrop}
-          hasCurrent={!!currentImage}
-          currentUrl={currentImage?.url}
-          currentName={currentImage?.name ?? form.name}
-          onRemoveCurrent={onRemoveImage}
-        />
-      </div>
-      <div className="col-12">
-        <span className="form-label d-block">{t('npcs.token')}</span>
-        <div className="d-flex align-items-center gap-2">
-          {token && <CharacterAvatar name={token.name} imageUrl={token.imageUrl} size={40} />}
-          <span className={token ? '' : 'text-body-secondary'}>{token ? token.name : t('npcs.noToken')}</span>
-          <button type="button" className="btn btn-outline-secondary btn-sm ms-auto" onClick={() => setPickingToken(true)}>{t('npcs.chooseToken')}</button>
+    <>
+      <Tabs
+        tabs={[{ key: 'data', label: t('npcs.dataTab') }, { key: 'sheet', label: t('npcs.sheet') }]}
+        active={tab}
+        onChange={setTab}
+      />
+      {/* Tabs stay mounted (hidden) so the chosen crop and the sheet survive tab switches. */}
+      <div className="row g-3" hidden={tab !== 'data'}>
+        <div className="col-12">
+          <div className="d-flex flex-wrap align-items-end gap-3">
+            <div className="flex-grow-1" style={{ minWidth: '12rem' }}>
+              <label className="form-label" htmlFor={id('name')}>{t('npcs.name')}</label>
+              <input id={id('name')} className="form-control" maxLength={MAX_NPC_NAME} value={form.name} onChange={(e) => onField('name', e.target.value)} />
+            </div>
+            <div className={cropping ? 'w-100' : undefined}>
+              <label className="form-label d-block" htmlFor={id('image')}>{t('npcs.image')}</label>
+              <ImageCropper
+                id={id('image')}
+                compact
+                onChange={onImageCrop}
+                onCroppingChange={setCropping}
+                hasCurrent={!!currentImage}
+                currentUrl={currentImage?.url}
+                currentName={currentImage?.name ?? form.name}
+                onRemoveCurrent={onRemoveImage}
+              />
+            </div>
+          </div>
         </div>
+        <div className="col-12">
+          <label className="form-label" htmlFor={id('status')}>{t('npcs.status')}</label>
+          <input id={id('status')} className="form-control" maxLength={MAX_NPC_STATUS} value={form.status} onChange={(e) => onField('status', e.target.value)} />
+          <div className="form-text">{t('npcs.statusHint')}</div>
+        </div>
+        <div className="col-12">
+          <span className="form-label d-block">{t('npcs.token')}</span>
+          <div className="d-flex align-items-center gap-2">
+            {token && <CharacterAvatar name={token.name} imageUrl={token.imageUrl} size={40} />}
+            <span className={token ? '' : 'text-body-secondary'}>{token ? token.name : t('npcs.noToken')}</span>
+            <button type="button" className="btn btn-outline-secondary btn-sm ms-auto" onClick={() => setPickingToken(true)}>{t('npcs.chooseToken')}</button>
+          </div>
+        </div>
+        {numberField('life')}
+        {numberField('energy')}
+        {numberField('move')}
       </div>
-      {numberField('life')}
-      {numberField('energy')}
-      {numberField('move')}
-      <div className="col-12">
+      <div hidden={tab !== 'sheet'}>
         <label className="form-label" htmlFor={id('sheet')}>{t('npcs.sheet')}</label>
         <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
-          <MarkdownEditor id={id('sheet')} value={form.sheet} onChange={(value) => onField('sheet', value)} maxLength={MAX_NPC_SHEET} height={240} />
+          <MarkdownEditor id={id('sheet')} value={form.sheet} onChange={(value) => onField('sheet', value)} maxLength={MAX_NPC_SHEET}
+            initialMode={editing ? 'preview' : 'live'} />
         </Suspense>
+        <div className="form-text">{t('characterForm.sheetHint')}</div>
       </div>
       <TokenModal
         open={pickingToken}
         onOpenChange={setPickingToken}
         onSelect={(chosen) => onToken({ tokenId: chosen.tokenId, name: chosen.name, imageUrl: chosen.upImageUrl })}
       />
-    </div>
+    </>
   );
 };
 

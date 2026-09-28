@@ -14,6 +14,8 @@ export interface NpcInfo {
   energy: number;
   move: number;
   sheet: string | null;
+  /** Free-text condition; each new map occurrence starts with it. */
+  status: string | null;
   /** Stored file name ({guid}.{ext}). */
   image: string | null;
   imageUrl: string | null;
@@ -29,6 +31,7 @@ export interface NpcInsertInfo {
   energy: number;
   move: number;
   sheet: string | null;
+  status: string | null;
   image: string | null;
 }
 

@@ -3,6 +3,7 @@ import type { NpcInfo, NpcInsertInfo } from '../types/npc';
 /** Same limits as the backend Npc.Update. */
 export const MAX_NPC_NAME = 260;
 export const MAX_NPC_SHEET = 20000;
+export const MAX_NPC_STATUS = 260;
 
 /** Form values as typed (numbers stay strings until validated). */
 export interface NpcForm {
@@ -10,12 +11,13 @@ export interface NpcForm {
   life: string;
   energy: string;
   move: string;
+  status: string;
   sheet: string;
 }
 
-export type NpcFormError = 'nameRequired' | 'nameTooLong' | 'notInteger' | 'negative' | 'sheetTooLong' | 'tokenRequired';
+export type NpcFormError = 'nameRequired' | 'nameTooLong' | 'notInteger' | 'negative' | 'statusTooLong' | 'sheetTooLong' | 'tokenRequired';
 
-export const emptyNpcForm = (): NpcForm => ({ name: '', life: '0', energy: '0', move: '0', sheet: '' });
+export const emptyNpcForm = (): NpcForm => ({ name: '', life: '0', energy: '0', move: '0', status: '', sheet: '' });
 
 /** Form filled with a saved NPC (edit). */
 export const toNpcForm = (npc: NpcInfo): NpcForm => ({
@@ -23,6 +25,7 @@ export const toNpcForm = (npc: NpcInfo): NpcForm => ({
   life: String(npc.life),
   energy: String(npc.energy),
   move: String(npc.move),
+  status: npc.status ?? '',
   sheet: npc.sheet ?? '',
 });
 
@@ -36,6 +39,7 @@ export const validateNpcForm = (form: NpcForm, tokenId: number | null): NpcFormE
   const numbers = [form.life, form.energy, form.move].map(toNumber);
   if (numbers.some((n) => !Number.isInteger(n))) return 'notInteger';
   if (numbers.some((n) => n < 0)) return 'negative';
+  if (form.status.trim().length > MAX_NPC_STATUS) return 'statusTooLong';
   if (form.sheet.length > MAX_NPC_SHEET) return 'sheetTooLong';
   if (tokenId === null) return 'tokenRequired';
   return null;
@@ -49,5 +53,6 @@ export const toNpcInsert = (form: NpcForm, image: string | null, tokenId: number
   energy: toNumber(form.energy),
   move: toNumber(form.move),
   sheet: form.sheet.trim() ? form.sheet : null,
+  status: form.status.trim() || null,
   image,
 });

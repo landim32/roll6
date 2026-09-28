@@ -18,11 +18,14 @@ public class Npc
     public int Move { get; set; }
     public string? Sheet { get; set; }
     public string? Image { get; set; }
+
+    /// <summary>Free-text condition ("ferido"); each new map occurrence starts with it.</summary>
+    public string? Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>Only the owner changes an NPC (checked by the service); same limits as a character.</summary>
-    public void Update(long tokenId, string? name, int life, int energy, int move, string? sheet, string? image)
+    public void Update(long tokenId, string? name, int life, int energy, int move, string? sheet, string? image, string? status = null)
     {
         if (tokenId <= 0)
             throw new DomainValidationException("tokenId", "O token é obrigatório.");
@@ -33,6 +36,7 @@ public class Npc
         Move = Guard.NonNegative(move, "move");
         Sheet = Guard.OptionalText(sheet, "sheet", 20000);
         Image = Guard.ImageFileName(image, "image");
+        Status = Guard.OptionalText(status, "status", 260);
         UpdatedAt = DateTime.UtcNow;
     }
 }

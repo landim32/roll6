@@ -207,6 +207,9 @@
     "energy": "Energia",
     "move": "Movimento",
     "sheet": "Ficha",
+    "dataTab": "Dados",
+    "status": "Status",
+    "statusHint": "Cada nova peça do NPC no mapa começa com este status.",
     "remove": "Retirar da campanha",
     "removeTitle": "Retirar NPC",
     "removeMessage": "Retirar {{name}} da campanha? As peças dele saem dos mapas da campanha; o NPC continua na sua biblioteca.",
@@ -215,6 +218,7 @@
       "nameTooLong": "O nome deve ter no máximo 260 caracteres.",
       "notInteger": "Vida, energia e movimento devem ser números inteiros.",
       "negative": "Vida, energia e movimento não podem ser negativos.",
+      "statusTooLong": "O status pode ter no máximo 260 caracteres.",
       "sheetTooLong": "A ficha deve ter no máximo 20.000 caracteres.",
       "tokenRequired": "Escolha um token para o NPC."
     }

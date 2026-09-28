@@ -11,8 +11,8 @@ public static class NpcTools
 {
     private const string FIELDS = """
         Fields: tokenId (required: library token that draws the NPC on maps), name (required, up to 260), life, energy
-        and move (base values, 0 or more; each map occurrence copies them and can change its own), sheet (markdown) and
-        image (picture from upload_image).
+        and move (base values, 0 or more; each map occurrence copies them and can change its own), status (free text up
+        to 260, e.g. "wounded"; copied to each new map occurrence), sheet (markdown) and image (picture from upload_image).
         """;
 
     [McpServerTool(Name = "list_my_npcs", Title = "List my NPCs", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -20,7 +20,7 @@ public static class NpcTools
     [Description("""
         What it does: lists the NPCs of the current user's library, paged and searchable by name.
         Who can use it: any authenticated user; only his own NPCs.
-        Returns: { items: [{ npcId, userId, tokenId, tokenName, tokenImageUrl, name, life, energy, move, sheet, image,
+        Returns: { items: [{ npcId, userId, tokenId, tokenName, tokenImageUrl, name, life, energy, move, sheet, status, image,
         imageUrl, createdAt, updatedAt }], page, pageSize, totalCount }.
         Common errors: none.
         Related tools: create_npc, add_npc_to_campaign.
@@ -65,17 +65,18 @@ public static class NpcTools
         [Description("Base energy points (0 or more). Example: 2.")] int energy,
         [Description("Base movement points per turn (0 or more). Example: 6.")] int move,
         [Description("NPC sheet in markdown (up to 20000 characters). Optional.")] string? sheet = null,
-        [Description("NPC picture. " + McpDocs.IMAGE_FILE)] string? image = null) =>
+        [Description("NPC picture. " + McpDocs.IMAGE_FILE)] string? image = null,
+        [Description("Free-text status (up to 260 characters), e.g. \"wounded\". Optional.")] string? status = null) =>
         api.SendAsync(HttpMethod.Post, "/api/npc", new NpcInsertInfo
         {
-            TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image
+            TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, Status = status
         });
 
     [McpServerTool(Name = "update_npc", Title = "Update NPC", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/npc/{id}")]
     [Description($$"""
         What it does: replaces all fields of a library NPC (read it with get_npc and send unchanged values back).
-        Occurrences already placed on maps keep their own name/life/energy (change them with update_map_npc).
+        Occurrences already placed on maps keep their own name/life/energy/status (change them with update_map_npc).
         Who can use it: only the owner.
         {{FIELDS}}
         Returns: the updated NPC.
@@ -91,10 +92,11 @@ public static class NpcTools
         [Description("Base energy points (0 or more).")] int energy,
         [Description("Base movement points per turn (0 or more).")] int move,
         [Description("NPC sheet in markdown (up to 20000 characters). Optional.")] string? sheet = null,
-        [Description("NPC picture. " + McpDocs.IMAGE_FILE)] string? image = null) =>
+        [Description("NPC picture. " + McpDocs.IMAGE_FILE)] string? image = null,
+        [Description("Free-text status (up to 260 characters); send the current one to keep it, null clears it.")] string? status = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/npc/{npcId}", new NpcInsertInfo
         {
-            TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image
+            TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, Status = status
         });
 
     [McpServerTool(Name = "delete_npc", Title = "Delete NPC", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
