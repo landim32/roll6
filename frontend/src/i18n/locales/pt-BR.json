@@ -416,6 +416,19 @@
     "apiKeyRevoked": "Chave \"{{name}}\" revogada.",
     "apiKeyDeleted": "Chave \"{{name}}\" excluída."
   },
+  "turnConsole": {
+    "title": "Turnos",
+    "fullTitle": "Histórico de turnos",
+    "open": "Abrir o console de turnos",
+    "close": "Fechar o console de turnos",
+    "expand": "Ampliar",
+    "turn": "Turno {{no}}",
+    "empty": "Nenhum turno finalizado ainda.",
+    "start": "Início da campanha",
+    "error": "Não foi possível carregar.",
+    "retry": "Tentar de novo",
+    "news": "Novidades"
+  },
   "turnLog": {
     "title": "Resumo do turno",
     "turn": "Turno",

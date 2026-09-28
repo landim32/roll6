@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TurnLogModal } from '../modals/TurnLogModal';
+import { TurnConsole } from './TurnConsole';
+import { ChevronDownIcon, ChevronUpIcon } from '../ui/icons';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useTurn } from '../../hooks/useTurn';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,9 +13,19 @@ interface GridSizeFooterProps {
   onEditGrid: () => void;
 }
 
+const CONSOLE_KEY = 'roll6:console-open';
+
+const readConsoleOpen = () => {
+  try {
+    return localStorage.getItem(CONSOLE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
 /**
- * Footer: current turn and the real-time connection badge (only when not connected) on the left; grid size in
- * hexes (click to edit), hex size, zoom and badges on the right.
+ * Footer: current turn and the real-time connection badge (only when not connected) on the left; the turn console
+ * toggle in the middle (028); grid size in hexes (click to edit), hex size, zoom and badges on the right.
  */
 export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
   const { t } = useTranslation();
@@ -23,6 +35,15 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
   const { status } = useRealtime();
   const offline = !!session && status !== REALTIME_STATUS.connected;
   const [logOpen, setLogOpen] = useState(false);
+  const [consoleOpen, setConsoleOpen] = useState(readConsoleOpen);
+  const toggleConsole = () => {
+    setConsoleOpen((open) => {
+      try {
+        localStorage.setItem(CONSOLE_KEY, String(!open));
+      } catch { /* per-browser convenience only */ }
+      return !open;
+    });
+  };
 
   return (
     <footer className="stm-footer">
@@ -36,6 +57,13 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
           {t(status === REALTIME_STATUS.reconnecting ? 'realtime.reconnecting' : 'realtime.offline')}
         </span>
       )}
+      {turnNo !== null && (
+        <button type="button" className="btn btn-sm stm-console-toggle" aria-expanded={consoleOpen}
+          title={t(consoleOpen ? 'turnConsole.close' : 'turnConsole.open')}
+          aria-label={t(consoleOpen ? 'turnConsole.close' : 'turnConsole.open')} onClick={toggleConsole}>
+          {consoleOpen ? <ChevronDownIcon size={14} /> : <ChevronUpIcon size={14} />}
+        </button>
+      )}
       <div className="stm-footer-info">
         <button type="button" className="btn btn-link" onClick={onEditGrid} disabled={!canEdit}>
           {t('grid.footer', { cols: draft.gridWidth, rows: draft.gridHeight })}
@@ -46,6 +74,7 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
         {!canEdit && <span className="badge text-bg-secondary">{t('menu.readOnly')}</span>}
       </div>
       <TurnLogModal open={logOpen} onOpenChange={setLogOpen} />
+      {turnNo !== null && consoleOpen && <TurnConsole />}
     </footer>
   );
 };

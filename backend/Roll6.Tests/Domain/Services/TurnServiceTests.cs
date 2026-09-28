@@ -591,4 +591,68 @@ public class TurnServiceTests
 
         result.Data.Should().BeEquivalentTo(data, o => o.Excluding(d => d.Actions));
     }
+
+    // ---- 028: turn history ----
+
+    [Fact]
+    public async Task History_NewestFinishedTurnsFirst_PagedByTurnNumber()
+    {
+        _campaign.CurrentTurn = 12;
+        var at = new DateTime(2026, 9, 28, 20, 0, 0);
+        var eleven = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 11, PLAYER, "Ataca");
+        eleven.CreatedAt = at;
+        _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 7, 11)).ReturnsAsync(new List<Turn> { eleven });
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync(new List<Character> { new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria" } });
+
+        var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, null);
+
+        page.Items.Select(i => i.TurnNo).Should().Equal(11, 10, 9, 8, 7);
+        (page.CurrentTurn, page.NextBefore).Should().Be((12, (int?)7));
+        page.Items[0].Actions.Should().Be("## Ações\nAria (User 2): \"Ataca\"\n");
+        page.Items[0].FinishedAt.Should().Be(at);
+        (page.Items[1].Actions, page.Items[1].FinishedAt).Should().Be(("## Ações\nNenhuma ação registrada.\n", (DateTime?)null));
+    }
+
+    [Fact]
+    public async Task History_LastPage_ReachesTurnOne()
+    {
+        _campaign.CurrentTurn = 12;
+        _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 1, 2)).ReturnsAsync(new List<Turn>());
+
+        var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, 3, 5);
+
+        page.Items.Select(i => i.TurnNo).Should().Equal(2, 1);
+        page.NextBefore.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task History_NoFinishedTurn_IsEmpty()
+    {
+        _campaign.CurrentTurn = 1;
+
+        var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, null);
+
+        page.Items.Should().BeEmpty();
+        page.NextBefore.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(50, 20)]
+    public async Task History_LimitIsClamped(int limit, int expected)
+    {
+        _campaign.CurrentTurn = 40;
+        _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, It.IsAny<int>(), 39)).ReturnsAsync(new List<Turn>());
+
+        (await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, limit)).Items.Should().HaveCount(expected);
+    }
+
+    [Fact]
+    public async Task History_InvalidCursorOrOutsider_AreRefused()
+    {
+        (await _service.Invoking(s => s.GetHistoryAsync(MASTER, CAMPAIGN, 0, null)).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("before");
+        await _service.Invoking(s => s.GetHistoryAsync(STRANGER, CAMPAIGN, null, null)).Should().ThrowAsync<UnauthorizedAccessException>();
+    }
 }

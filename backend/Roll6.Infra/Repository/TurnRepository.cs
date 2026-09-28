@@ -28,6 +28,14 @@ public class TurnRepository : ITurnRepository<Turn>
             .ToListAsync();
     }
 
+    public async Task<List<Turn>> ListByCampaignTurnRangeAsync(long campaignId, int fromTurn, int toTurn)
+    {
+        return await _context.Turns.AsNoTracking()
+            .Where(e => e.CampaignId == campaignId && e.TurnNo >= fromTurn && e.TurnNo <= toTurn)
+            .OrderBy(e => e.TurnNo).ThenBy(e => e.CreatedAt).ThenBy(e => e.TurnId)
+            .ToListAsync();
+    }
+
     public async Task<List<Turn>> ListByActorTurnAsync(long campaignId, int turnNo, long? characterId, long? mapNpcId)
     {
         return await ActorTurn(campaignId, turnNo, characterId, mapNpcId).AsNoTracking().ToListAsync();

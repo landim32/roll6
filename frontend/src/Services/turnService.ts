@@ -1,4 +1,4 @@
-import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo, TurnStateInfo, TurnSummaryInfo } from '../types/turn';
+import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo, TurnStateInfo, TurnSummaryInfo, TurnHistoryPageInfo } from '../types/turn';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface TurnServiceConfig {
@@ -34,6 +34,16 @@ class TurnService {
     const query = turnNo === undefined ? '' : `?turnNo=${turnNo}`;
     const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/summary${query}`, { headers: getHeaders(true) });
     return this.handleResponse<TurnSummaryInfo>(response);
+  }
+
+  /** Finished turns, newest first (028); `before` = previous page's `nextBefore`. */
+  async history(campaignId: number, before?: number, limit?: number): Promise<TurnHistoryPageInfo> {
+    const params = new URLSearchParams();
+    if (before !== undefined) params.set('before', String(before));
+    if (limit !== undefined) params.set('limit', String(limit));
+    const query = params.toString() ? `?${params}` : '';
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/history${query}`, { headers: getHeaders(true) });
+    return this.handleResponse<TurnHistoryPageInfo>(response);
   }
 
   /** Records an action of the piece's character/NPC in the current turn. */
