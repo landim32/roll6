@@ -27,6 +27,7 @@ public class CampaignCharacterServiceTests
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly CampaignCharacterService _service;
 
     public CampaignCharacterServiceTests()
@@ -52,10 +53,11 @@ public class CampaignCharacterServiceTests
         _repository.Setup(r => r.InsertAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
         _repository.Setup(r => r.UpdateAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
+        _imageStorage.Setup(s => s.GetUrl(It.IsAny<string?>())).Returns((string? file) => file == null ? null : $"https://cdn/{file}");
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
             _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object,
-            Mock.Of<IImageStorageAppService>(), _notifier.Object);
+            _imageStorage.Object, _notifier.Object);
     }
 
     private static CampaignCharacterRequestInfo Request(long campaignId) => new() { CampaignId = campaignId, CharacterId = CHARACTER };
@@ -391,5 +393,35 @@ public class CampaignCharacterServiceTests
         var act = () => _service.GetByIdAsync(OUTSIDER_ID, 86);
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    // ---- 022: sheet file in the participation detail ----
+
+    [Theory]
+    [InlineData(MASTER_ID, false)]
+    [InlineData(OUTSIDER_ID, true)]
+    public async Task GetById_ReturnsTheCharactersSheetFile(long userId, bool approvedParticipant)
+    {
+        const string pdf = "0123456789abcdef0123456789abcdef.pdf";
+        _characterRepository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(
+            new Character { CharacterId = CHARACTER, UserId = PLAYER_ID, Name = "Thorin", Life = 12, Energy = 6, SheetFile = pdf });
+        SetupParticipation(87, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        _repository.Setup(r => r.HasApprovedCharacterAsync(CLOSED_CAMPAIGN, OUTSIDER_ID)).ReturnsAsync(approvedParticipant);
+
+        var result = await _service.GetByIdAsync(userId, 87);
+
+        result.SheetFileUrl.Should().Be("https://cdn/" + pdf);
+        result.SheetFileType.Should().Be("pdf");
+    }
+
+    [Fact]
+    public async Task GetById_WithoutSheetFile_ReturnsNulls()
+    {
+        SetupParticipation(88, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+
+        var result = await _service.GetByIdAsync(MASTER_ID, 88);
+
+        result.SheetFileUrl.Should().BeNull();
+        result.SheetFileType.Should().BeNull();
     }
 }

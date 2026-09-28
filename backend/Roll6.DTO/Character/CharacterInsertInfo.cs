@@ -25,4 +25,8 @@ public class CharacterInsertInfo
     /// <summary>Library token used when the character is placed on a map (optional).</summary>
     [JsonPropertyName("tokenId")]
     public long? TokenId { get; set; }
+
+    /// <summary>Sheet file (image or PDF) from POST /api/document; null removes it (022).</summary>
+    [JsonPropertyName("sheetFile")]
+    public string? SheetFile { get; set; }
 }

@@ -13,4 +13,7 @@ public interface ICharacterRepository<TModel> where TModel : class
     Task DeleteAsync(long id);
     /// <summary>True when some character uses the token as its own.</summary>
     Task<bool> ExistsByTokenAsync(long tokenId);
+
+    /// <summary>Moves the character to another owner only while it still belongs to fromUserId (021); false otherwise.</summary>
+    Task<bool> TransferAsync(long characterId, long fromUserId, long toUserId);
 }

@@ -1,3 +1,5 @@
+import type { SheetFileType } from './image';
+
 /** Campaign participation types — mirror the backend CampaignCharacter DTOs. */
 
 /** Participation status (backend CampaignCharacterStatus); constants because `enum` is not allowed. */
@@ -47,6 +49,9 @@ export interface CampaignCharacterRequestInfo {
 /** A participation with the campaign sheet (the lists leave it out). */
 export interface CampaignCharacterDetailInfo extends CampaignCharacterInfo {
   sheet: string | null;
+  /** The character's sheet file (022), the same in every campaign. */
+  sheetFileUrl: string | null;
+  sheetFileType: SheetFileType | null;
 }
 
 /** What the owner or the master changes in a participation (current values at most the totals). */

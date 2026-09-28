@@ -34,7 +34,10 @@ public static class Roll6Guide
         - **Tokens**: images used to draw pieces (up image; optional down image). Shared library: anyone can search
           and use them; only the creator changes them.
         - **Characters**: belong to a player (name, picture, token, life, energy, move, markdown sheet). `life` and
-          `energy` are **totals**. A character joins campaigns through a **participation**.
+          `energy` are **totals**. A character joins campaigns through a **participation**. The owner can hand a
+          character to another user by e-mail (`transfer_character`): only the owner changes — participations, campaign
+          values, pieces and turn entries stay exactly as they were. Besides the markdown `sheet`, a character may have a
+          **sheet file** (image or PDF, stored as sent): `upload_document` → `sheetFile` on create/update_character.
         - **NPCs**: belong to a master's library (require a token). The master adds his own NPCs to a campaign
           (campaign NPC) and places **occurrences** on maps (each occurrence has its own name/life/energy/status).
         - **Map models**: the image + grid layout (a reusable map). A **campaign map** is a map model added to a

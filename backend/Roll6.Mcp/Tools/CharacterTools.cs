@@ -68,7 +68,7 @@ public static class CharacterTools
         {{FIELDS}}
         Returns: the created character.
         Common errors: 400 invalid fields (e.g. negative life), 404 unknown tokenId.
-        Related tools: upload_image, list_tokens, request_campaign_access.
+        Related tools: upload_image, upload_document, list_tokens, request_campaign_access.
         """)]
     public static Task<CallToolResult> CreateCharacter(
         Roll6ApiClient api,
@@ -78,10 +78,11 @@ public static class CharacterTools
         [Description("Movement points per turn (0 or more): each step into the hex ahead and each 60° turn costs 1. Example: 5.")] int move,
         [Description(McpDocs.SHEET)] string? sheet = null,
         [Description("Character picture. " + McpDocs.IMAGE_FILE)] string? image = null,
-        [Description("Optional library token that draws the character on maps (tokenId from list_tokens).")] long? tokenId = null) =>
+        [Description("Optional library token that draws the character on maps (tokenId from list_tokens).")] long? tokenId = null,
+        [Description("Optional sheet file (image or PDF): the fileName returned by upload_document.")] string? sheetFile = null) =>
         api.SendAsync(HttpMethod.Post, "/api/character", new CharacterInsertInfo
         {
-            Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, TokenId = tokenId
+            Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, TokenId = tokenId, SheetFile = sheetFile
         });
 
     [McpServerTool(Name = "update_character", Title = "Update character", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -93,7 +94,7 @@ public static class CharacterTools
         {{FIELDS}}
         Returns: the updated character.
         Common errors: 403 not the owner, 404 not found, 400 invalid fields.
-        Related tools: get_character, update_participation (campaign values).
+        Related tools: get_character, upload_document, update_participation (campaign values).
         """)]
     public static Task<CallToolResult> UpdateCharacter(
         Roll6ApiClient api,
@@ -104,10 +105,11 @@ public static class CharacterTools
         [Description("Movement points per turn (0 or more).")] int move,
         [Description(McpDocs.SHEET)] string? sheet = null,
         [Description("Character picture. " + McpDocs.IMAGE_FILE)] string? image = null,
-        [Description("Library token that draws the character on maps (tokenId). Null removes it.")] long? tokenId = null) =>
+        [Description("Library token that draws the character on maps (tokenId). Null removes it.")] long? tokenId = null,
+        [Description("Sheet file (image or PDF): the fileName returned by upload_document, or the current sheetFile from get_character to keep it. Omitting it removes the file.")] string? sheetFile = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/character/{characterId}", new CharacterInsertInfo
         {
-            Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, TokenId = tokenId
+            Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, TokenId = tokenId, SheetFile = sheetFile
         });
 
     [McpServerTool(Name = "delete_character", Title = "Delete character", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
@@ -124,4 +126,23 @@ public static class CharacterTools
         Roll6ApiClient api,
         [Description("Id of the character to delete (characterId).")] long characterId) =>
         api.SendAsync(HttpMethod.Delete, $"/api/character/{characterId}");
+
+    [McpServerTool(Name = "transfer_character", Title = "Transfer character", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
+    [ApiOperation("POST", "/api/character/{id}/transfer")]
+    [Description($$"""
+        What it does: hands one of your characters to another user, identified by the exact e-mail of the account. Only
+        the owner changes: the character keeps its campaigns (and its status in each), current life/energy, campaign
+        status and sheet, pieces on maps (same hex and facing) and turn entries. You lose every owner permission right
+        away (edit, delete, move the piece, act); only the new owner can give it back. {{McpDocs.DESTRUCTIVE}}
+        Who can use it: only the current owner.
+        Returns: { ok: true }.
+        Common errors: 400 invalid e-mail or the e-mail is your own, 403 not the owner, 404 character not found or
+        "Usuário não encontrado." (no account with that e-mail), 409 the character changed owner meanwhile.
+        Related tools: list_my_characters, get_character.
+        """)]
+    public static Task<CallToolResult> TransferCharacter(
+        Roll6ApiClient api,
+        [Description("Id of the character to transfer (characterId, from list_my_characters).")] long characterId,
+        [Description("Exact e-mail of the user who will own the character (case and surrounding spaces are ignored).")] string email) =>
+        api.SendAsync(HttpMethod.Post, $"/api/character/{characterId}/transfer", new CharacterTransferInfo { Email = email });
 }

@@ -875,5 +875,20 @@ BEGIN
     VALUES ('20260926211638_AddApiKeys', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928072746_AddCharacterSheetFile') THEN
+    ALTER TABLE characters ADD sheet_file character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928072746_AddCharacterSheetFile') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260928072746_AddCharacterSheetFile', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

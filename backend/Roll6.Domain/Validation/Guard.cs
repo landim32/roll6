@@ -10,6 +10,9 @@ public static class Guard
     // File names produced by the image upload: {guid:N}.{png|jpg|webp} (the storage folder is not part of it).
     private static readonly Regex IMAGE_FILE_NAME_REGEX = new(@"^[0-9a-f]{32}\.(png|jpg|webp)$", RegexOptions.Compiled);
 
+    // File names produced by the document upload (022): images or PDF, stored as sent.
+    private static readonly Regex SHEET_FILE_NAME_REGEX = new(@"^[0-9a-f]{32}\.(png|jpg|webp|pdf)$", RegexOptions.Compiled);
+
     public static string RequiredText(string? value, string field, int maxLength)
     {
         var trimmed = value?.Trim();
@@ -43,6 +46,15 @@ public static class Guard
         var fileName = OptionalText(value, field, 260);
         if (fileName != null && !IMAGE_FILE_NAME_REGEX.IsMatch(fileName))
             throw new DomainValidationException(field, "Imagem inválida. Use o fileName retornado pelo upload.");
+        return fileName;
+    }
+
+    /// <summary>Accepts only file names returned by the document upload (character sheet file, 022).</summary>
+    public static string? SheetFileName(string? value, string field)
+    {
+        var fileName = OptionalText(value, field, 260);
+        if (fileName != null && !SHEET_FILE_NAME_REGEX.IsMatch(fileName))
+            throw new DomainValidationException(field, "Arquivo inválido. Use o fileName retornado pelo upload.");
         return fileName;
     }
 

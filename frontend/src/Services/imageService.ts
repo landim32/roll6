@@ -1,7 +1,9 @@
-import type { ImageUploadInfo } from '../types/image';
+import type { DocumentUploadInfo, ImageUploadInfo } from '../types/image';
+import { sheetFileMimeType } from '../lib/sheetFile';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 const API_BASE = `${API_URL}/api/image`;
+const DOCUMENT_BASE = `${API_URL}/api/document`;
 
 /** Accepted image types and size (same rules as the backend). */
 export const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -29,6 +31,16 @@ class ImageService {
     body.append('file', file);
     const response = await fetch(API_BASE, { method: 'POST', headers: getHeaders(true, false), body });
     return this.handleResponse<ImageUploadInfo>(response);
+  }
+
+  /** Uploads a character sheet file (image or PDF) exactly as chosen — no crop, no conversion (022). */
+  async uploadDocument(file: File): Promise<DocumentUploadInfo> {
+    // Same bytes; only fills the MIME type some systems leave empty.
+    const typed = file.type ? file : new File([file], file.name, { type: sheetFileMimeType(file) });
+    const body = new FormData();
+    body.append('file', typed);
+    const response = await fetch(DOCUMENT_BASE, { method: 'POST', headers: getHeaders(true, false), body });
+    return this.handleResponse<DocumentUploadInfo>(response);
   }
 }
 

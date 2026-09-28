@@ -49,4 +49,29 @@ public class CharacterTests
         withoutToken.TokenId.Should().Be(9);
         withToken.TokenId.Should().Be(3);
     }
+
+    // ---- 022: sheet file ----
+
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef.pdf")]
+    [InlineData("0123456789abcdef0123456789abcdef.png")]
+    [InlineData(null)]
+    public void Update_ValidSheetFile_IsKept(string? sheetFile)
+    {
+        var character = new Character();
+
+        character.Update("Aria", null, 1, 1, 1, null, null, sheetFile);
+
+        character.SheetFile.Should().Be(sheetFile);
+    }
+
+    [Theory]
+    [InlineData("ficha.pdf")]
+    [InlineData("0123456789abcdef0123456789abcdef.docx")]
+    public void Update_InvalidSheetFile_Throws(string sheetFile)
+    {
+        var act = () => new Character().Update("Aria", null, 1, 1, 1, null, null, sheetFile);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("sheetFile");
+    }
 }

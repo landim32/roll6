@@ -174,6 +174,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Energy).HasColumnName("energy");
             entity.Property(e => e.Move).HasColumnName("move");
             entity.Property(e => e.Image).HasColumnName("image").HasMaxLength(260);
+            entity.Property(e => e.SheetFile).HasColumnName("sheet_file").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_character");

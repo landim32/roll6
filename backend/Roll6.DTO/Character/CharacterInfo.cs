@@ -31,6 +31,18 @@ public class CharacterInfo
     [JsonPropertyName("imageUrl")]
     public string? ImageUrl { get; set; }
 
+    /// <summary>Stored sheet file name (image or PDF, 022).</summary>
+    [JsonPropertyName("sheetFile")]
+    public string? SheetFile { get; set; }
+
+    /// <summary>Presigned URL of the sheet file.</summary>
+    [JsonPropertyName("sheetFileUrl")]
+    public string? SheetFileUrl { get; set; }
+
+    /// <summary>"image" or "pdf" (null without a file).</summary>
+    [JsonPropertyName("sheetFileType")]
+    public string? SheetFileType { get; set; }
+
     [JsonPropertyName("tokenId")]
     public long? TokenId { get; set; }
 

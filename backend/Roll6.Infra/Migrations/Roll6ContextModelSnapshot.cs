@@ -325,6 +325,11 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(20000)")
                         .HasColumnName("sheet");
 
+                    b.Property<string>("SheetFile")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("sheet_file");
+
                     b.Property<long?>("TokenId")
                         .HasColumnType("bigint")
                         .HasColumnName("token_id");
