@@ -10,7 +10,7 @@ const entry = (turnType: TurnType, actor: Partial<TurnInfo>, extra: Partial<Turn
   turnId: nextId++, campaignId: 10, mapId: 30, turnNo: 3, turnType,
   characterId: null, npcId: null, mapNpcId: null, actorName: '',
   beforeX: null, beforeY: null, beforeLook: null, x: null, y: null, look: null,
-  description: null, createdAt: '2026-09-26T00:00:00',
+  description: null, userId: 1, userName: '', moved: null, changes: null, createdAt: '2026-09-26T00:00:00',
   ...actor, ...extra,
 });
 
@@ -116,5 +116,14 @@ describe('trackTurn', () => {
   it('the same turn keeps the record', () => {
     const seen = { known: 5, unread: [4] };
     expect(trackTurn(seen, 5)).toBe(seen);
+  });
+});
+
+describe('character updates (024)', () => {
+  it('do not count as a move or an action', () => {
+    const update = entry(TURN_TYPE.characterUpdate, { characterId: 80 }, { changes: [{ field: 'currentLife', before: '10', after: '6' }] });
+    expect(characterStatus([update], 80)).toBe(TURN_STATUS.none);
+    expect(hasMoved([update], { characterId: 80, mapNpcId: null })).toBe(false);
+    expect(lastActions([update]).size).toBe(0);
   });
 });

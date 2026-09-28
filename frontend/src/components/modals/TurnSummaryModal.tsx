@@ -16,6 +16,7 @@ const typeLabel: Record<number, string> = {
   [TURN_TYPE.movement]: 'turn.movement',
   [TURN_TYPE.action]: 'turn.action',
   [TURN_TYPE.actionResult]: 'turn.result',
+  [TURN_TYPE.characterUpdate]: 'turn.update',
 };
 
 /** Everything done in a turn, in order: moves, actions and action results. */
@@ -38,9 +39,17 @@ export const TurnSummaryModal = ({ turnNo, onClose }: TurnSummaryModalProps) => 
     return () => { alive = false; };
   }, [turnNo, listTurn, t]);
 
-  const describe = (entry: TurnInfo): string => entry.turnType === TURN_TYPE.movement
-    ? t('turn.moved', { fromX: entry.beforeX, fromY: entry.beforeY, x: entry.x, y: entry.y })
-    : entry.description ?? '';
+  const describe = (entry: TurnInfo): string => {
+    if (entry.turnType === TURN_TYPE.movement)
+      return t('turn.moved', { fromX: entry.beforeX, fromY: entry.beforeY, x: entry.x, y: entry.y });
+    if (entry.turnType === TURN_TYPE.characterUpdate) {
+      const changes = (entry.changes ?? []).map((c) => (c.field === 'notes'
+        ? t('turn.fields.notes')
+        : `${t(`turn.fields.${c.field}`, { defaultValue: c.field })}: ${c.before ?? '—'} → ${c.after ?? '—'}`));
+      return `${changes.join('; ')} (${entry.userName})`;
+    }
+    return entry.description ?? '';
+  };
 
   return (
     <Modal open={turnNo !== null} onOpenChange={(value) => { if (!value) onClose(); }} title={t('turn.summaryTitle', { no: turnNo ?? '' })} large>

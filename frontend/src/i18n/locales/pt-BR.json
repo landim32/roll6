@@ -411,8 +411,29 @@
     "apiKeyRevoked": "Chave \"{{name}}\" revogada.",
     "apiKeyDeleted": "Chave \"{{name}}\" excluída."
   },
+  "turnLog": {
+    "title": "Resumo do turno",
+    "turn": "Turno",
+    "current": "{{no}} (em andamento)",
+    "copy": "Copiar",
+    "copied": "Resumo copiado",
+    "copyFailed": "Não foi possível copiar",
+    "open": "Ver o resumo do turno"
+  },
   "turn": {
     "label": "Turno {{no}}",
+    "update": "Alteração",
+    "fields": {
+      "currentLife": "Vida",
+      "currentEnergy": "Energia",
+      "characterStatus": "Status",
+      "status": "Status",
+      "notes": "Anotações alteradas",
+      "name": "Nome",
+      "life": "Vida",
+      "energy": "Energia",
+      "move": "Movimento"
+    },
     "finish": "Finalizar turno",
     "pendingTitle": "Ainda falta agir",
     "pendingMessage": "Estes personagens ainda não agiram neste turno:",

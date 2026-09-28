@@ -26,6 +26,7 @@ public class MapNpcService : IMapNpcService
     private readonly ITokenRepository<Token> _tokenRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITurnRepository<Turn> _turnRepository;
+    private readonly ICampaignRepository<Campaign> _campaignRepository;
     private readonly IImageStorageAppService _imageStorage;
 
     private readonly IRealtimeNotifier _notifier;
@@ -42,9 +43,11 @@ public class MapNpcService : IMapNpcService
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
         ITurnRepository<Turn> turnRepository,
+        ICampaignRepository<Campaign> campaignRepository,
         IRealtimeNotifier notifier)
     {
         _notifier = notifier;
+        _campaignRepository = campaignRepository;
         _turnRepository = turnRepository;
         _repository = repository;
         _mapRepository = mapRepository;
@@ -94,9 +97,34 @@ public class MapNpcService : IMapNpcService
     public async Task<MapNpcInfo> UpdateAsync(long userId, long mapNpcId, MapNpcUpdateInfo info)
     {
         var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
+        var before = (mapNpc.Name, mapNpc.Life, mapNpc.Energy, mapNpc.Status);
         mapNpc.Update(info.Name, info.Life, info.Energy, info.Status);
-        var result = (await MapToDtoAsync(new List<MapNpc> { await _repository.UpdateAsync(mapNpc) })).Single();
+
+        // Every change during the turn is recorded with who made it (024).
+        var changes = TurnChange.Diff(
+            ("name", before.Name, mapNpc.Name),
+            ("life", before.Life, mapNpc.Life),
+            ("energy", before.Energy, mapNpc.Energy),
+            ("status", before.Status, mapNpc.Status));
+        Turn? turn = null;
+        if (changes.Count > 0)
+        {
+            var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
+                ?? throw new KeyNotFoundException("Campanha não encontrada.");
+            turn = Turn.CharacterUpdate(campaign.CampaignId, map.MapId, null, mapNpc.NpcId, mapNpc.MapNpcId, campaign.CurrentTurn, userId, changes);
+        }
+
+        MapNpc saved = mapNpc;
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            saved = await _repository.UpdateAsync(mapNpc);
+            if (turn != null)
+                await _turnRepository.InsertAsync(turn);
+        });
+        var result = (await MapToDtoAsync(new List<MapNpc> { saved })).Single();
         await PublishPiecesChangedAsync(map, userId);
+        if (turn != null)
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, map.CampaignId, userId));
         return result;
     }
 

@@ -28,6 +28,7 @@ public class CampaignCharacterServiceTests
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly CampaignCharacterService _service;
 
@@ -58,7 +59,7 @@ public class CampaignCharacterServiceTests
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
             _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _tokenRepository.Object, _unitOfWork.Object,
-            _imageStorage.Object, _notifier.Object);
+            _imageStorage.Object, _turnRepository.Object, _notifier.Object);
     }
 
     private static CampaignCharacterRequestInfo Request(long campaignId) => new() { CampaignId = campaignId, CharacterId = CHARACTER };
@@ -471,5 +472,63 @@ public class CampaignCharacterServiceTests
 
         result.SheetFileUrl.Should().BeNull();
         result.SheetFileType.Should().BeNull();
+    }
+
+    // ---- 024: character updates in the turn ----
+
+    [Fact]
+    public async Task Update_ByTheMaster_RecordsOneCharacterUpdateWithTheChangedFields()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = 90, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved,
+            CurrentLife = 10, CurrentEnergy = 6, CharacterStatus = "-1 de redutor", Sheet = "anotação"
+        });
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        await _service.UpdateAsync(MASTER_ID, 90, new CampaignCharacterUpdateInfo
+        {
+            CurrentLife = 6, CurrentEnergy = 5, CharacterStatus = "Agachado", Sheet = "anotação"
+        });
+
+        recorded.Should().NotBeNull();
+        (recorded!.TurnType, recorded.UserId, recorded.CharacterId, recorded.CampaignId, recorded.TurnNo)
+            .Should().Be((TurnType.CharacterUpdate, MASTER_ID, (long?)CHARACTER, CLOSED_CAMPAIGN, 1));
+        recorded.Changes!.Select(c => (c.Field, c.Before, c.After)).Should().Equal(
+            ("currentLife", "10", "6"), ("currentEnergy", "6", "5"), ("characterStatus", "-1 de redutor", "Agachado"));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED && e.CampaignId == CLOSED_CAMPAIGN)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_NothingChanged_RecordsNothing()
+    {
+        _repository.Setup(r => r.GetByIdAsync(91)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = 91, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved,
+            CurrentLife = 10, CurrentEnergy = 6, CharacterStatus = null, Sheet = null
+        });
+
+        await _service.UpdateAsync(PLAYER_ID, 91, new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6 });
+
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_OnlyTheNotes_RecordsTheNotesByTheOwner()
+    {
+        _repository.Setup(r => r.GetByIdAsync(92)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = 92, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved,
+            CurrentLife = 10, CurrentEnergy = 6
+        });
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        await _service.UpdateAsync(PLAYER_ID, 92, new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6, Sheet = "Perdeu a espada" });
+
+        recorded!.UserId.Should().Be(PLAYER_ID);
+        recorded.Changes.Should().ContainSingle().Which.Field.Should().Be("notes");
     }
 }

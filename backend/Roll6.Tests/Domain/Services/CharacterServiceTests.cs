@@ -1,3 +1,4 @@
+using Roll6.Domain.Enums;
 using FluentAssertions;
 using Moq;
 using Roll6.Domain.Exceptions;
@@ -297,5 +298,35 @@ public class CharacterServiceTests
         removed.SheetFile.Should().BeNull();
         removed.SheetFileUrl.Should().BeNull();
         removed.SheetFileType.Should().BeNull();
+    }
+
+    // ---- 024: the owner's changes to the character itself ----
+
+    [Fact]
+    public async Task Update_TotalsChanged_RecordsInEveryApprovedCampaign()
+    {
+        _campaignCharacterRepository.Setup(r => r.ListCampaignIdsByCharacterAsync(CHARACTER)).ReturnsAsync(new List<long> { 20, 21, 22 });
+        _campaignCharacterRepository.Setup(r => r.GetAsync(20, CHARACTER)).ReturnsAsync(new CampaignCharacter { CampaignId = 20, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved });
+        _campaignCharacterRepository.Setup(r => r.GetAsync(21, CHARACTER)).ReturnsAsync(new CampaignCharacter { CampaignId = 21, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Invited });
+        _campaignCharacterRepository.Setup(r => r.GetAsync(22, CHARACTER)).ReturnsAsync(new CampaignCharacter { CampaignId = 22, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved });
+        _campaignRepository.Setup(r => r.GetByIdAsync(20)).ReturnsAsync(new Campaign { CampaignId = 20, UserId = MASTER, CurrentTurn = 5, CurrentMapId = 300 });
+        _campaignRepository.Setup(r => r.GetByIdAsync(22)).ReturnsAsync(new Campaign { CampaignId = 22, UserId = MASTER, CurrentTurn = 1 });
+        var recorded = new List<Turn>();
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded.Add(t)).ReturnsAsync((Turn t) => t);
+
+        await _service.UpdateAsync(OWNER, CHARACTER, new CharacterInsertInfo { Name = "Aria", Life = 10, Energy = 6, Move = 1 });
+
+        recorded.Select(t => (t.CampaignId, t.TurnNo, t.MapId, t.UserId)).Should().Equal((20L, 5, (long?)300, OWNER), (22L, 1, (long?)null, OWNER));
+        recorded[0].Changes!.Select(c => (c.Field, c.Before, c.After)).Should().Equal(("life", "12", "10"), ("move", "0", "1"));
+    }
+
+    [Fact]
+    public async Task Update_OnlyPictureOrSheet_RecordsNothing()
+    {
+        _campaignCharacterRepository.Setup(r => r.ListCampaignIdsByCharacterAsync(CHARACTER)).ReturnsAsync(new List<long> { 20 });
+
+        await _service.UpdateAsync(OWNER, CHARACTER, new CharacterInsertInfo { Name = "Aria", Life = 12, Energy = 6, Sheet = "Nova ficha" });
+
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
     }
 }

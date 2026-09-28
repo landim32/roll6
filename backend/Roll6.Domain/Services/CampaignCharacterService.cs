@@ -22,6 +22,7 @@ public class CampaignCharacterService : ICampaignCharacterService
     private readonly ITokenRepository<Token> _tokenRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IRealtimeNotifier _notifier;
 
     public CampaignCharacterService(
@@ -33,9 +34,11 @@ public class CampaignCharacterService : ICampaignCharacterService
         ITokenRepository<Token> tokenRepository,
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
+        ITurnRepository<Turn> turnRepository,
         IRealtimeNotifier notifier)
     {
         _notifier = notifier;
+        _turnRepository = turnRepository;
         _mapTokenRepository = mapTokenRepository;
         _tokenRepository = tokenRepository;
         _unitOfWork = unitOfWork;
@@ -159,7 +162,16 @@ public class CampaignCharacterService : ICampaignCharacterService
         if (character.UserId != userId && campaign.UserId != userId)
             throw new UnauthorizedAccessException("Apenas o dono do personagem ou o mestre da campanha podem alterar os dados na campanha.");
 
+        var before = (participation.CurrentLife, participation.CurrentEnergy, participation.CharacterStatus, participation.Sheet);
         participation.UpdatePlay(info.CurrentLife, info.CurrentEnergy, info.CharacterStatus, info.Sheet, character.Life, character.Energy);
+        // Every change during the turn is recorded with who made it (024).
+        var changes = TurnChange.Diff(
+            ("currentLife", before.CurrentLife, participation.CurrentLife),
+            ("currentEnergy", before.CurrentEnergy, participation.CurrentEnergy),
+            ("characterStatus", before.CharacterStatus, participation.CharacterStatus),
+            ("notes", before.Sheet, participation.Sheet));
+        var turn = changes.Count == 0 ? null
+            : Turn.CharacterUpdate(campaign.CampaignId, campaign.CurrentMapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes);
         if (info.TokenId.HasValue && await _tokenRepository.GetByIdAsync(info.TokenId.Value) == null)
             throw new KeyNotFoundException("Token não encontrado.");
         var tokenChanged = info.TokenId.HasValue && character.ChangeToken(info.TokenId.Value);
@@ -168,10 +180,14 @@ public class CampaignCharacterService : ICampaignCharacterService
             if (tokenChanged)
                 await _characterRepository.UpdateAsync(character);
             await _repository.UpdateAsync(participation);
+            if (turn != null)
+                await _turnRepository.InsertAsync(turn);
         });
         var result = await MapToDetailAsync(participation);
         // Character pieces show the participation's vitals/status.
         await PublishPartyAsync(campaign.CampaignId, userId, piecesToo: true);
+        if (turn != null)
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, campaign.CampaignId, userId));
         return result;
     }
 

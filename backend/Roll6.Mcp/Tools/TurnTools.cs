@@ -33,11 +33,30 @@ public static class TurnTools
         [Description("What the piece does, in plain text (required, up to 2000 characters). Example: \"Casts a fireball at the orcs\".")] string description) =>
         api.SendAsync(HttpMethod.Post, "/api/turn/action", new TurnActInfo { MapTokenId = mapTokenId, Description = description });
 
+    [McpServerTool(Name = "get_turn_summary", Title = "Get turn summary", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/campaign/{id}/turn/summary")]
+    [Description("""
+        What it does: returns everything that happened in a turn as readable markdown (Portuguese), ready to paste in a chat
+        or a campaign log: "## Ações" (moves with from/to, facing and movement points spent, actions in quotes, the master's
+        results, and every change to characters/NPCs with who made it and the values before and after) and "## Posições"
+        (where each character and NPC piece of the turn's map is and where it looks).
+        Who can use it: the campaign master or a player with an approved character in the campaign.
+        Returns: { campaignId, turnNo, markdown }. Without turnNo it is the turn in progress.
+        Common errors: 400 turnNo below 1 or above the current turn, 403 no access to the campaign, 404 campaign not found.
+        Related tools: get_turn_state, list_turn_entries, finish_turn.
+        """)]
+    public static Task<CallToolResult> GetTurnSummary(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("Turn number (1 up to the current turn). Omit it for the turn in progress.")] int? turnNo = null) =>
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/turn/summary", null, ("turnNo", turnNo));
+
     [McpServerTool(Name = "reset_turn", Title = "Reset piece turn", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("POST", "/api/turn/reset")]
     [Description($$"""
-        What it does: deletes all entries of a piece's character/NPC occurrence in the current turn and moves the piece back
-        to where it was before its move (if that hex is still free) — so it can move and act again. {{McpDocs.DESTRUCTIVE}}
+        What it does: deletes the move and the action of a piece's character/NPC occurrence in the current turn (changes to
+        its life/energy/status stay in the log) and moves the piece back to where it was before its move (if that hex is
+        still free) — so it can move and act again. {{McpDocs.DESTRUCTIVE}}
         Who can use it: a player for his own approved character's piece; the master for any character or NPC piece.
         Returns: { removed (entries deleted), reverted (false when the former hex was taken and the piece stayed) }.
         Common errors: 403 not your piece, 400 object piece, 404 not found.

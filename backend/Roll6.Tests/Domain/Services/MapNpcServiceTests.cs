@@ -21,6 +21,7 @@ public class MapNpcServiceTests
     private const long NPC = 8;
 
     private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
+    private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
     private readonly Mock<IMapNpcRepository<MapNpc>> _repository = new();
     private readonly Mock<IMapRepository<Map>> _mapRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
@@ -47,9 +48,10 @@ public class MapNpcServiceTests
         _mapTokenRepository.Setup(r => r.ListByMapNpcIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(() => _insertedPieces.ToList());
         _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token> { new() { TokenId = 5 } });
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
+        _campaignRepository.Setup(r => r.GetByIdAsync(CAMPAIGN)).ReturnsAsync(new Campaign { CampaignId = CAMPAIGN, UserId = MASTER, CurrentTurn = 4 });
         _service = new MapNpcService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _mapTokenRepository.Object,
             _npcRepository.Object, _campaignNpcRepository.Object, _campaignCharacterRepository.Object, _tokenRepository.Object,
-            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object, _notifier.Object);
+            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object, _campaignRepository.Object, _notifier.Object);
     }
 
     private static MapNpcInsertInfo At(int x, int y) => new() { MapId = MAP, NpcId = NPC, X = x, Y = y };
@@ -142,5 +144,31 @@ public class MapNpcServiceTests
 
         _mapTokenRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.Is<IEnumerable<long>>(ids => ids.Single() == 90)), Times.Once);
         _repository.Verify(r => r.DeleteAsync(90), Times.Once);
+    }
+
+    // ---- 024: NPC occurrence updates in the turn ----
+
+    [Fact]
+    public async Task Update_RecordsACharacterUpdateForTheOccurrence()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", Life = 7, Energy = 2 });
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", Life = 3, Energy = 2, Status = "Assustado" });
+
+        (recorded!.TurnType, recorded.UserId, recorded.NpcId, recorded.MapNpcId, recorded.TurnNo, recorded.MapId)
+            .Should().Be((TurnType.CharacterUpdate, MASTER, (long?)NPC, (long?)90, 4, (long?)MAP));
+        recorded.Changes!.Select(c => c.Field).Should().Equal("life", "status");
+    }
+
+    [Fact]
+    public async Task Update_WithoutChanges_RecordsNothing()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", Life = 7, Energy = 2 });
+
+        await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", Life = 7, Energy = 2 });
+
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
     }
 }

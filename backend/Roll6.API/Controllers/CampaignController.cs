@@ -152,6 +152,21 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Readable markdown of a turn (024); without turnNo, the turn in progress.</summary>
+    [HttpGet("{id:long}/turn/summary")]
+    [ProducesResponseType(typeof(TurnSummaryInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTurnSummary(long id, [FromQuery] int? turnNo)
+    {
+        try
+        {
+            return Ok(await _turnService.GetSummaryAsync(CurrentUserId, id, turnNo));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Entries of a turn, oldest first (turn summary).</summary>
     [HttpGet("{id:long}/turn/{turnNo:int}")]
     [ProducesResponseType(typeof(List<TurnInfo>), StatusCodes.Status200OK)]

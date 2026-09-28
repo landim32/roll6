@@ -499,4 +499,31 @@ public class MapTokenServiceTests
         await _service.Invoking(s => s.MoveAsync(3, 42, new MapTokenPositionInfo { X = 2, Y = 1 })).Should().ThrowAsync<UnauthorizedAccessException>();
         await _service.Invoking(s => s.MoveAsync(2, 40, new MapTokenPositionInfo { X = 1, Y = 1 })).Should().ThrowAsync<UnauthorizedAccessException>();
     }
+
+    // ---- 024: author and movement points ----
+
+    [Fact]
+    public async Task Move_Player_RecordsTheAuthorAndThePointsSpent()
+    {
+        AriaPiece();
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 });
+
+        (recorded!.UserId, recorded.Moved).Should().Be((2L, (int?)2));
+    }
+
+    [Fact]
+    public async Task Move_Master_RecordsThePointsSpentEvenBeyondTheMove()
+    {
+        AriaPiece();
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        // From (2, 2) facing north: turn around (3) + 5 steps down = 8.
+        await _service.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 7, Look = 3 });
+
+        (recorded!.UserId, recorded.Moved).Should().Be((1L, (int?)8));
+    }
 }

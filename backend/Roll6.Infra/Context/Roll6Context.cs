@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Models;
@@ -8,6 +10,7 @@ namespace Roll6.Infra.Context;
 public class Roll6Context : DbContext
 {
     private const string TIMESTAMP = "timestamp without time zone";
+    private static readonly JsonSerializerOptions TURN_CHANGE_JSON = new(JsonSerializerDefaults.Web);
 
     public Roll6Context(DbContextOptions<Roll6Context> options) : base(options)
     {
@@ -315,8 +318,22 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Y).HasColumnName("y");
             entity.Property(e => e.Look).HasColumnName("look");
             entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(Turn.MAX_DESCRIPTION);
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Moved).HasColumnName("moved");
+            // Changed fields (024) as a JSON array: [{ "field", "before", "after" }].
+            entity.Property(e => e.Changes).HasColumnName("changes").HasColumnType("jsonb")
+                .HasConversion(
+                    changes => changes == null ? null : JsonSerializer.Serialize(changes, TURN_CHANGE_JSON),
+                    json => json == null ? null : JsonSerializer.Deserialize<List<TurnChange>>(json, TURN_CHANGE_JSON),
+                    new ValueComparer<List<TurnChange>?>(
+                        (a, b) => JsonSerializer.Serialize(a, TURN_CHANGE_JSON) == JsonSerializer.Serialize(b, TURN_CHANGE_JSON),
+                        v => JsonSerializer.Serialize(v, TURN_CHANGE_JSON).GetHashCode(),
+                        v => v == null ? null : v.Select(c => new TurnChange(c.Field, c.Before, c.After)).ToList()));
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasIndex(e => new { e.CampaignId, e.TurnNo }).HasDatabaseName("ix_turns_campaign_turn");
+            entity.HasIndex(e => e.UserId).HasDatabaseName("ix_turns_user");
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_turn");
             entity.HasOne<Campaign>().WithMany().HasForeignKey(e => e.CampaignId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_turn");
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.MapId)
