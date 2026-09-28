@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionLines, mergeTurnPages, newTurnsCount } from './turnHistory';
+import { mergeTurnPages, newTurnsCount, turnLogMarkdown } from './turnHistory';
 
 const item = (turnNo: number, actions = `## Ações\nTurno ${turnNo}\n`) => ({ turnNo, actions, finishedAt: null });
 
@@ -15,11 +15,19 @@ describe('mergeTurnPages', () => {
   });
 });
 
-describe('actionLines', () => {
-  it('drops the heading and blank lines', () => {
-    expect(actionLines('## Ações\nCedric (José): "Ataca"\n\nGM (Ana): Narração: fim\n')).toEqual([
-      'Cedric (José): "Ataca"', 'GM (Ana): Narração: fim',
-    ]);
+describe('turnLogMarkdown', () => {
+  it('keeps each log line when the text is rendered as markdown', () => {
+    expect(turnLogMarkdown('## Ações\nCedric (José): "Ataca"\nGM (Ana): Narração: fim\n')).toBe(
+      '## Ações  \nCedric (José): "Ataca"  \nGM (Ana): Narração: fim  \n',
+    );
+  });
+
+  it('keeps a blank line as a paragraph break', () => {
+    expect(turnLogMarkdown('## Ações\nUma\n\nDuas\n')).toBe('## Ações  \nUma\n\nDuas  \n');
+  });
+
+  it('normalizes Windows line endings', () => {
+    expect(turnLogMarkdown('## Ações\r\nCedric\r\n')).toBe('## Ações  \nCedric  \n');
   });
 });
 

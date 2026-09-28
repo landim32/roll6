@@ -125,7 +125,40 @@ public class TurnSummaryTests
     {
         var line = new SummaryLine { Type = TurnType.Narration, Author = "GM (Rodrigo)", Description = "O goblin *fugiu*." };
 
-        TurnSummary.Build(new[] { line }, Array.Empty<SummaryPosition>()).Should().Contain("GM (Rodrigo): Narração: O goblin \\*fugiu\\*.\n");
+        TurnSummary.Build(new[] { line }, Array.Empty<SummaryPosition>())
+            .Should().Contain("GM (Rodrigo):\n\nO goblin *fugiu*.\n");
+    }
+
+    [Fact]
+    public void Build_Narration_KeepsMarkdownAndDoesNotSwallowTheNextEntry()
+    {
+        var lines = new[]
+        {
+            new SummaryLine
+            {
+                Type = TurnType.Narration,
+                Author = "GM (Rodrigo)",
+                Description = "*TURNO 1 — ARENA*\n\n*Comam* avança.\n\n---\n\n*Resumo*\n\n- Comam: Defesa Total."
+            },
+            Line(TurnType.Action, "Cedric (José)") with { Description = "Ataca" }
+        };
+
+        TurnSummary.BuildActions(lines).Should().Be(string.Join("\n",
+            "## Ações",
+            "GM (Rodrigo):",
+            "",
+            "*TURNO 1 — ARENA*",
+            "",
+            "*Comam* avança.",
+            "",
+            "---",
+            "",
+            "*Resumo*",
+            "",
+            "- Comam: Defesa Total.",
+            "",
+            "Cedric (José): \"Ataca\"",
+            ""));
     }
 
     [Fact]
