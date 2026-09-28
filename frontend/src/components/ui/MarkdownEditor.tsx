@@ -16,13 +16,16 @@ interface MarkdownEditorProps {
   imageUrls?: Record<string, string>;
   /** Cursor position of the textarea, to insert content where the user is typing. */
   onCursorChange?: (position: number) => void;
+  placeholder?: string;
+  /** Mode the editor opens in (the toolbar still switches it): 'live' = text + preview, 'preview' = rendered only. */
+  initialMode?: 'live' | 'edit' | 'preview';
 }
 
 /**
  * Markdown editor with toolbar and live preview, in the app's dark theme. The preview is
  * sanitized (no raw HTML/scripts), since sheets are user content.
  */
-export const MarkdownEditor = ({ id, value, onChange, maxLength, height = 360, imageUrls, onCursorChange }: MarkdownEditorProps) => {
+export const MarkdownEditor = ({ id, value, onChange, maxLength, height = 360, imageUrls, onCursorChange, placeholder, initialMode = 'live' }: MarkdownEditorProps) => {
   const trackCursor = onCursorChange
     ? (event: SyntheticEvent<HTMLTextAreaElement>) => onCursorChange(event.currentTarget.selectionStart ?? 0)
     : undefined;
@@ -35,8 +38,8 @@ export const MarkdownEditor = ({ id, value, onChange, maxLength, height = 360, i
           if (event && onCursorChange) onCursorChange(event.target.selectionStart ?? 0);
         }}
         height={height}
-        preview="live"
-        textareaProps={{ id, maxLength, onSelect: trackCursor, onClick: trackCursor, onKeyUp: trackCursor }}
+        preview={initialMode}
+        textareaProps={{ id, maxLength, placeholder, onSelect: trackCursor, onClick: trackCursor, onKeyUp: trackCursor }}
         previewOptions={imageUrls ? planMarkdownOptions(imageUrls) : { rehypePlugins: [[rehypeSanitize]] }}
       />
     </div>

@@ -50,8 +50,10 @@ public static class Roll6Guide
           Player: `request_campaign_access`, `accept_invite`, `decline_invite`. Master: `invite_character`,
           `approve_access_request`, `deny_access_request`, `remove_participation`.
         - Each participation holds the campaign values of the character: current life/energy (may go to 0 or below =
-          fallen), a free-text status and a campaign copy of the sheet (`update_participation`, by the owner or the
-          master).
+          fallen), a free-text status and the **campaign notes** (`sheet` of the participation, `update_participation`,
+          by the owner or the master). The notes are not a copy of the character's sheet: they start empty when the
+          character joins and record only what changed in this campaign (e.g. the character had a sword and lost it).
+          The character's own sheet stays the reference and is never changed by campaign play.
         - The campaign's **current map** (`set_current_map`, master) is the map all players follow in the app.
 
         ## Hex grid (maps)

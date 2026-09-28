@@ -12,6 +12,7 @@ public static class MapTokenTools
     private const string RETURNS = """
         Returns: the piece { mapTokenId, mapId, tokenId, tokenName, upImageUrl, campaignCharacterId, characterId, mapNpcId,
         npcId, name, tokenType (1 Character, 2 Npc, 4 Object), sheet, life, energy, status, move, x, y, look, … }.
+        Character pieces show the participation's values; their sheet is the campaign notes, not the character sheet.
         """;
 
     [McpServerTool(Name = "add_object_to_map", Title = "Add object to map", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]

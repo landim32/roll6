@@ -14,6 +14,11 @@ public class CampaignCharacterUpdateInfo
     [JsonPropertyName("characterStatus")]
     public string? CharacterStatus { get; set; }
 
+    /// <summary>Campaign notes: only the differences from the character's sheet that happened in this campaign.</summary>
     [JsonPropertyName("sheet")]
     public string? Sheet { get; set; }
+
+    /// <summary>New token of the character (saved on the character, used on every map); null keeps the current one.</summary>
+    [JsonPropertyName("tokenId")]
+    public long? TokenId { get; set; }
 }

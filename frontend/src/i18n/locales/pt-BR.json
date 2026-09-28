@@ -125,7 +125,7 @@
       "notInteger": "Vida, energia e movimento devem ser números inteiros.",
       "negative": "Vida, energia e movimento não podem ser negativos.",
       "characterStatusTooLong": "O status pode ter no máximo 260 caracteres.",
-      "campaignSheetTooLong": "A ficha da campanha pode ter no máximo 20.000 caracteres.",
+      "campaignSheetTooLong": "As anotações da campanha podem ter no máximo 20.000 caracteres.",
       "sheetTooLong": "A ficha deve ter no máximo 20.000 caracteres.",
       "aboveTotal": "O valor atual não pode passar do total.",
       "vitalsNotInteger": "Vida e energia atuais devem ser números inteiros."
@@ -139,8 +139,10 @@
     "editTitle": "Editar Personagem",
     "viewTitle": "Ver Personagem",
     "characterStatus": "Status",
-    "campaignSheetTab": "Ficha da campanha",
-    "campaignSheetHint": "Cópia da ficha feita quando o personagem entrou na campanha; alterações aqui não mudam a ficha original.",
+    "campaignSheetTab": "Anotações da Campanha",
+    "campaignSheetHint": "Anote só o que mudou nesta campanha em relação à ficha do personagem (itens perdidos ou ganhos, ferimentos, atributos alterados). A ficha original não muda.",
+    "campaignSheetPlaceholder": "Ex.: - Perdeu a espada longa na caverna dos goblins.",
+    "campaignSheetEmpty": "Nenhuma anotação nesta campanha.",
     "token": "Token",
     "noToken": "Sem token",
     "chooseToken": "Escolher token",
@@ -152,6 +154,9 @@
     "currentLife": "Vida atual",
     "currentEnergy": "Energia atual",
     "changeImage": "Trocar imagem",
+    "chooseImage": "Escolher imagem",
+    "permanentSection": "Ficha permanente",
+    "permanentHint": "Valores totais do personagem, os mesmos em todas as campanhas.",
     "vitalsHint": "Podem ficar em zero ou negativos (personagem caído), mas não passar do total."
   },
   "tokens": {

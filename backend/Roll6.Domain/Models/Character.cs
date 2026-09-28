@@ -52,4 +52,18 @@ public class Character
         UpdatedAt = DateTime.UtcNow;
         return true;
     }
+
+    /// <summary>
+    /// Token chosen in the "Nesta campanha" area of the character form, by the owner or the campaign master; like
+    /// <see cref="AssignTokenIfMissing"/> it is the character's token, used when it is placed on any map.
+    /// </summary>
+    /// <returns>True when the token changed.</returns>
+    public bool ChangeToken(long tokenId)
+    {
+        if (TokenId == tokenId)
+            return false;
+        TokenId = tokenId;
+        UpdatedAt = DateTime.UtcNow;
+        return true;
+    }
 }

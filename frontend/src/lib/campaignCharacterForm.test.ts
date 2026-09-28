@@ -34,8 +34,12 @@ describe('validateCampaignArea', () => {
 describe('toCampaignUpdate', () => {
   it('converts numbers, trims the status and turns blank texts into null', () => {
     expect(toCampaignUpdate({ currentLife: '-2', currentEnergy: '6', characterStatus: '   ', sheet: ' \n ' })).toEqual({
-      currentLife: -2, currentEnergy: 6, characterStatus: null, sheet: null,
+      currentLife: -2, currentEnergy: 6, characterStatus: null, sheet: null, tokenId: null,
     });
+  });
+
+  it('sends the chosen token', () => {
+    expect(toCampaignUpdate({ currentLife: '1', currentEnergy: '1', characterStatus: '', sheet: '', tokenId: 7 }).tokenId).toBe(7);
   });
 
   it('keeps the sheet as typed', () => {

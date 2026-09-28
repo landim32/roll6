@@ -14,7 +14,7 @@ namespace Roll6.Domain.Services;
 /// <summary>
 /// Pieces on a campaign map. Only the map owner (the campaign master) writes; the master and approved
 /// participants read. A hex holds at most one piece; a character appears at most once per map and its
-/// piece shows the participation's name, vitals, status and sheet.
+/// piece shows the participation's name, vitals, status and campaign notes (as its sheet).
 /// </summary>
 public class MapTokenService : IMapTokenService
 {

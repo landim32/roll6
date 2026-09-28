@@ -52,12 +52,13 @@ const toForm = (c: CharacterInfo): CharacterForm => ({
 });
 
 /**
- * Character form with tabs "Dados" (name, cropped picture, stats), "Ficha" (markdown) and, from a
- * party card, "Ficha da campanha".
+ * Character form with tabs "Dados" (name + picture on one line, "Nesta campanha" = current life/energy, status and
+ * token, "Ficha permanente" = total life/energy and move), "Anotações da Campanha" (only from a party card),
+ * "Ficha" (markdown) and "Ficha em arquivo".
  * Create ("Incluir Personagem"): creates and, with a current campaign, joins it right away —
  * approved for the master (or in open campaigns), otherwise as an access request (008 FR-015/016).
- * Party card (010): the owner changes the character and its data in the campaign; the master only
- * the campaign data (current life/energy, status, campaign sheet); other participants only read.
+ * Party card (010): the owner changes everything; the master only "Nesta campanha" and the campaign notes (the
+ * token is saved on the character); everyone else only reads. Ficha / Ficha em arquivo are read-only for non-owners.
  */
 export const CharacterFormModal = ({ open, onOpenChange, editing = null }: CharacterFormModalProps) => {
   const { t } = useTranslation();
@@ -77,6 +78,8 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
   /** The character's own token (011 US5): chosen in the tokens modal, saved with the character. */
   const [token, setToken] = useState<{ tokenId: number; name: string; imageUrl: string | null } | null>(null);
   const [pickingToken, setPickingToken] = useState(false);
+  /** A new picture is being cropped: the picture area takes the whole line. */
+  const [cropping, setCropping] = useState(false);
   /** The character's sheet file (022): uploaded on choice, saved with the character. */
   const [sheetFile, setSheetFile] = useState<SheetFileValue | null>(null);
   const [uploadingSheet, setUploadingSheet] = useState(false);
@@ -92,6 +95,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
     if (!open) return;
     setTab('data');
     setCrop(null);
+    setCropping(false);
     setOriginal(null);
     setDetail(null);
     setKeptImage(null);
@@ -109,13 +113,14 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
         setCurrentEnergy(String(participation.currentEnergy));
         setCharacterStatus(participation.characterStatus ?? '');
         setCampaignSheet(participation.sheet ?? '');
+        // The token belongs to the character, but the owner and the master both choose it here.
+        setToken(participation.characterTokenId !== null
+          ? { tokenId: participation.characterTokenId, name: participation.characterTokenName ?? '', imageUrl: participation.characterTokenImageUrl }
+          : null);
         if (character) {
           setOriginal(character);
           setForm(toForm(character));
           setKeptImage(character.image ? { file: character.image, url: character.imageUrl } : null);
-          setToken(character.tokenId !== null
-            ? { tokenId: character.tokenId, name: character.tokenName ?? '', imageUrl: character.tokenImageUrl }
-            : null);
           setSheetFile(character.sheetFile && character.sheetFileType
             ? { fileName: character.sheetFile, url: character.sheetFileUrl, type: character.sheetFileType, originalName: null }
             : null);
@@ -173,6 +178,8 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
       }
       await updateParticipation(before.campaignCharacterId, toCampaignUpdate({
         currentLife: vitals.life, currentEnergy: vitals.energy, characterStatus, sheet: campaignSheet,
+        // The owner's token goes with the character (it may be removed); the master changes it here.
+        tokenId: draft ? null : token?.tokenId ?? null,
       }));
       toast.success(t('toast.characterUpdated', { name }));
       onOpenChange(false);
@@ -232,9 +239,9 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
 
   const tabs = [
     { key: 'data', label: t('characterForm.dataTab') },
-    ...(characterEditable ? [{ key: 'sheet', label: t('characterForm.sheetTab') }] : []),
-    ...(characterEditable || detail?.sheetFileUrl ? [{ key: 'sheetFile', label: t('sheetFile.tab') }] : []),
     ...(editing ? [{ key: 'campaignSheet', label: t('characterForm.campaignSheetTab') }] : []),
+    { key: 'sheet', label: t('characterForm.sheetTab') },
+    ...(characterEditable || detail?.sheetFileUrl ? [{ key: 'sheetFile', label: t('sheetFile.tab') }] : []),
   ];
 
   const title = editing === null ? 'characterForm.title' : isViewer ? 'characterForm.viewTitle' : 'characterForm.editTitle';
@@ -250,7 +257,10 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
       ) : (
         <>
           <button type="button" className="btn btn-secondary" onClick={() => onOpenChange(false)} disabled={saving}>{t('common.cancel')}</button>
-          <button type="submit" form="character-form" className="btn btn-primary" disabled={saving || loading || uploadingSheet}>{t('common.save')}</button>
+          <button type="submit" form="character-form" className="btn btn-primary" disabled={saving || loading || uploadingSheet}>
+            {saving && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+            {t('common.save')}
+          </button>
         </>
       )}
     >
@@ -260,36 +270,69 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
           <form id="character-form" onSubmit={onSubmit} noValidate>
             {/* Tabs stay mounted (hidden) so the chosen crop and the sheets survive tab switches. */}
             <div className="row g-3" hidden={tab !== 'data'}>
-              {characterEditable ? (
-                <>
-                  <div className="col-12">
+              <div className="col-12">
+                <div className="d-flex flex-wrap align-items-end gap-3">
+                  <div className="flex-grow-1" style={{ minWidth: '12rem' }}>
                     <label className="form-label" htmlFor="character-name">{t('characterForm.name')}</label>
-                    <input id="character-name" className="form-control" maxLength={MAX_CHARACTER_NAME} autoFocus
-                      value={form.name} onChange={(e) => set('name')(e.target.value)} />
+                    {characterEditable ? (
+                      <input id="character-name" className="form-control" maxLength={MAX_CHARACTER_NAME} autoFocus
+                        value={form.name} onChange={(e) => set('name')(e.target.value)} />
+                    ) : (
+                      <input id="character-name" className="form-control" value={detail?.characterName ?? ''} readOnly disabled />
+                    )}
                   </div>
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="character-image">{t('characterForm.image')}</label>
-                    <ImageCropper
-                      id="character-image"
-                      onChange={setCrop}
-                      hasCurrent={keptImage !== null}
-                      currentUrl={keptImage?.url}
-                      currentName={form.name}
-                      onRemoveCurrent={() => setKeptImage(null)}
-                    />
+                  <div className={cropping ? 'w-100' : undefined}>
+                    <label className="form-label d-block" htmlFor="character-image">{t('characterForm.image')}</label>
+                    {characterEditable ? (
+                      <ImageCropper
+                        id="character-image"
+                        compact
+                        onChange={setCrop}
+                        onCroppingChange={setCropping}
+                        hasCurrent={keptImage !== null}
+                        currentUrl={keptImage?.url}
+                        currentName={form.name}
+                        onRemoveCurrent={() => setKeptImage(null)}
+                      />
+                    ) : (
+                      <CharacterAvatar name={detail?.characterName ?? ''} imageUrl={detail?.characterImageUrl} size={64} />
+                    )}
                   </div>
-                  {numberField('life')}
-                  {numberField('energy')}
-                  {numberField('move')}
+                </div>
+              </div>
+              <fieldset className="col-12" disabled={isViewer}>
+                {editing && <legend className="fs-6 fw-semibold mb-2">{t('characterForm.campaignSection')}</legend>}
+                <div className="row g-3">
+                  {editing && (
+                    <>
+                      <div className="col-6">
+                        <label className="form-label" htmlFor="character-current-life">{t('characterForm.currentLife')}</label>
+                        <input id="character-current-life" type="number" step={1} className="form-control"
+                          value={currentLife} onChange={(e) => setCurrentLife(e.target.value)} />
+                      </div>
+                      <div className="col-6">
+                        <label className="form-label" htmlFor="character-current-energy">{t('characterForm.currentEnergy')}</label>
+                        <input id="character-current-energy" type="number" step={1} className="form-control"
+                          value={currentEnergy} onChange={(e) => setCurrentEnergy(e.target.value)} />
+                      </div>
+                      <div className="col-12">
+                        <label className="form-label" htmlFor="character-status">{t('characterForm.characterStatus')}</label>
+                        <input id="character-status" className="form-control" maxLength={MAX_CHARACTER_STATUS}
+                          value={characterStatus} onChange={(e) => setCharacterStatus(e.target.value)} />
+                      </div>
+                    </>
+                  )}
                   <div className="col-12">
                     <span className="form-label d-block">{t('characterForm.token')}</span>
                     <div className="d-flex align-items-center gap-2">
                       {token && <CharacterAvatar name={token.name} imageUrl={token.imageUrl} size={40} />}
                       <span className={token ? '' : 'text-body-secondary'}>{token ? token.name : t('characterForm.noToken')}</span>
-                      <button type="button" className="btn btn-outline-secondary btn-sm ms-auto" onClick={() => setPickingToken(true)}>
-                        {t('characterForm.chooseToken')}
-                      </button>
-                      {token && (
+                      {!isViewer && (
+                        <button type="button" className="btn btn-outline-secondary btn-sm ms-auto" onClick={() => setPickingToken(true)}>
+                          {t('characterForm.chooseToken')}
+                        </button>
+                      )}
+                      {token && characterEditable && (
                         <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setToken(null)}>
                           {t('characterForm.removeToken')}
                         </button>
@@ -297,52 +340,45 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
                     </div>
                     <div className="form-text">{t('characterForm.tokenHint')}</div>
                   </div>
-                </>
-              ) : detail && (
-                <>
-                  <div className="col-12 d-flex align-items-center gap-3">
-                    <CharacterAvatar name={detail.characterName} imageUrl={detail.characterImageUrl} size={64} />
-                    <div>
-                      <div className="fs-5 fw-semibold">{detail.characterName}</div>
-                      <div className="form-text">{t('characterForm.readOnlyHint')}</div>
-                    </div>
-                  </div>
-                  {readOnlyField('life', t('characterForm.life'), detail.totalLife)}
-                  {readOnlyField('energy', t('characterForm.energy'), detail.totalEnergy)}
-                  {readOnlyField('move', t('characterForm.move'), detail.characterMove)}
-                </>
-              )}
-              {editing && (
-                <fieldset className="col-12" disabled={isViewer}>
-                  <legend className="fs-6 fw-semibold mb-2">{t('characterForm.campaignSection')}</legend>
-                  <div className="row g-3">
-                    <div className="col-6">
-                      <label className="form-label" htmlFor="character-current-life">{t('characterForm.currentLife')}</label>
-                      <input id="character-current-life" type="number" step={1} className="form-control"
-                        value={currentLife} onChange={(e) => setCurrentLife(e.target.value)} />
-                    </div>
-                    <div className="col-6">
-                      <label className="form-label" htmlFor="character-current-energy">{t('characterForm.currentEnergy')}</label>
-                      <input id="character-current-energy" type="number" step={1} className="form-control"
-                        value={currentEnergy} onChange={(e) => setCurrentEnergy(e.target.value)} />
-                    </div>
-                    <div className="col-12">
-                      <label className="form-label" htmlFor="character-status">{t('characterForm.characterStatus')}</label>
-                      <input id="character-status" className="form-control" maxLength={MAX_CHARACTER_STATUS}
-                        value={characterStatus} onChange={(e) => setCharacterStatus(e.target.value)} />
-                    </div>
-                  </div>
-                  {!isViewer && <div className="form-text">{t('characterForm.vitalsHint')}</div>}
-                </fieldset>
-              )}
+                </div>
+                {editing && !isViewer && <div className="form-text">{t('characterForm.vitalsHint')}</div>}
+              </fieldset>
+              <fieldset className="col-12">
+                <legend className="fs-6 fw-semibold mb-2">{t('characterForm.permanentSection')}</legend>
+                <div className="row g-3">
+                  {characterEditable ? (
+                    <>
+                      {numberField('life')}
+                      {numberField('energy')}
+                      {numberField('move')}
+                    </>
+                  ) : detail && (
+                    <>
+                      {readOnlyField('life', t('characterForm.life'), detail.totalLife)}
+                      {readOnlyField('energy', t('characterForm.energy'), detail.totalEnergy)}
+                      {readOnlyField('move', t('characterForm.move'), detail.characterMove)}
+                    </>
+                  )}
+                </div>
+                <div className="form-text">
+                  {t('characterForm.permanentHint')}{!characterEditable && ` ${t('characterForm.readOnlyHint')}`}
+                </div>
+              </fieldset>
             </div>
-            {characterEditable && (
+            {characterEditable ? (
               <div hidden={tab !== 'sheet'}>
                 <label className="form-label" htmlFor="character-sheet">{t('characterForm.sheet')}</label>
                 <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
-                  <MarkdownEditor id="character-sheet" value={form.sheet} onChange={set('sheet')} maxLength={MAX_CHARACTER_SHEET} />
+                  <MarkdownEditor id="character-sheet" value={form.sheet} onChange={set('sheet')} maxLength={MAX_CHARACTER_SHEET}
+                    initialMode={editing ? 'preview' : 'live'} />
                 </Suspense>
                 <div className="form-text">{t('characterForm.sheetHint')}</div>
+              </div>
+            ) : (
+              <div hidden={tab !== 'sheet'}>
+                <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
+                  <MarkdownView value={detail?.characterSheet ?? ''} />
+                </Suspense>
               </div>
             )}
             {characterEditable ? (
@@ -358,10 +394,11 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
             {editing && (
               <div hidden={tab !== 'campaignSheet'}>
                 <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
-                  {isViewer ? <MarkdownView value={campaignSheet} /> : (
+                  {isViewer ? <MarkdownView value={campaignSheet} emptyText={t('characterForm.campaignSheetEmpty')} /> : (
                     <>
                       <label className="form-label" htmlFor="campaign-sheet">{t('characterForm.campaignSheetTab')}</label>
-                      <MarkdownEditor id="campaign-sheet" value={campaignSheet} onChange={setCampaignSheet} maxLength={MAX_CAMPAIGN_SHEET} />
+                      <MarkdownEditor id="campaign-sheet" value={campaignSheet} onChange={setCampaignSheet} maxLength={MAX_CAMPAIGN_SHEET}
+                        placeholder={t('characterForm.campaignSheetPlaceholder')} initialMode="preview" />
                     </>
                   )}
                 </Suspense>
