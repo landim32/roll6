@@ -1,4 +1,4 @@
-import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo, TurnStateInfo } from '../types/turn';
+import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo, TurnStateInfo, TurnSummaryInfo } from '../types/turn';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface TurnServiceConfig {
@@ -27,6 +27,13 @@ class TurnService {
   async list(campaignId: number, turnNo: number): Promise<TurnInfo[]> {
     const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/${turnNo}`, { headers: getHeaders(true) });
     return this.handleResponse<TurnInfo[]>(response);
+  }
+
+  /** Readable markdown of a turn (024); without `turnNo`, the turn in progress. */
+  async summary(campaignId: number, turnNo?: number): Promise<TurnSummaryInfo> {
+    const query = turnNo === undefined ? '' : `?turnNo=${turnNo}`;
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/summary${query}`, { headers: getHeaders(true) });
+    return this.handleResponse<TurnSummaryInfo>(response);
   }
 
   /** Records an action of the piece's character/NPC in the current turn. */

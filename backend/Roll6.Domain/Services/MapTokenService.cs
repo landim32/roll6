@@ -149,7 +149,7 @@ public class MapTokenService : IMapTokenService
         await EnsureFreeHexAsync(map, info.X, info.Y, mapToken.MapTokenId);
 
         // Characters and NPC occurrences move once per turn, and the move is recorded (016); objects don't.
-        var turn = await PrepareMovementTurnAsync(map, mapToken, info.X, info.Y, look);
+        var turn = await PrepareMovementTurnAsync(userId, map, mapToken, info.X, info.Y, look);
         mapToken.MoveTo(info.X, info.Y);
         mapToken.Face(look);
         MapToken saved = mapToken;
@@ -165,8 +165,11 @@ public class MapTokenService : IMapTokenService
         return result;
     }
 
-    /// <summary>The Movement entry of a character/NPC piece, or null for objects; refuses a second move in the turn.</summary>
-    private async Task<Turn?> PrepareMovementTurnAsync(Map map, MapToken mapToken, int x, int y, int look)
+    /// <summary>
+    /// The Movement entry of a character/NPC piece, or null for objects; refuses a second move in the turn. It keeps
+    /// who moved and the movement points spent (024) — also for the master, who is not limited by them.
+    /// </summary>
+    private async Task<Turn?> PrepareMovementTurnAsync(long userId, Map map, MapToken mapToken, int x, int y, int look)
     {
         long? characterId = null;
         long? npcId = null;
@@ -182,8 +185,26 @@ public class MapTokenService : IMapTokenService
         var mapNpcId = characterId == null ? mapToken.MapNpcId : null;
         if (await _turnRepository.ExistsMovementAsync(campaign.CampaignId, campaign.CurrentTurn, characterId, mapNpcId))
             throw new ConflictException("Já se moveu neste turno.");
-        return Turn.Movement(campaign.CampaignId, map.MapId, characterId, npcId, mapNpcId, campaign.CurrentTurn,
-            (mapToken.X, mapToken.Y, mapToken.Look), (x, y, look));
+        var moved = await MovementCostAsync(map, mapToken, x, y, look);
+        return Turn.Movement(campaign.CampaignId, map.MapId, characterId, npcId, mapNpcId, campaign.CurrentTurn, userId,
+            (mapToken.X, mapToken.Y, mapToken.Look), (x, y, look), moved);
+    }
+
+    /// <summary>
+    /// Cheapest cost around the other pieces; when the master jumped over them (no free path) the cost of the path
+    /// ignoring them.
+    /// </summary>
+    private async Task<int?> MovementCostAsync(Map map, MapToken mapToken, int x, int y, int look)
+    {
+        var model = await _mapModelRepository.GetByIdAsync(map.MapModelId);
+        var columns = model?.GridWidth ?? int.MaxValue;
+        var rows = model?.GridHeight ?? int.MaxValue;
+        var others = (await _repository.ListByMapAsync(map.MapId))
+            .Where(t => t.MapTokenId != mapToken.MapTokenId)
+            .Select(t => (t.X, t.Y))
+            .ToHashSet();
+        return HexGrid.MovementCost(mapToken.X, mapToken.Y, mapToken.Look, x, y, look, columns, rows, (hx, hy) => others.Contains((hx, hy)))
+            ?? HexGrid.MovementCost(mapToken.X, mapToken.Y, mapToken.Look, x, y, look, columns, rows, (_, _) => false);
     }
 
     /// <summary>A player moves only his own approved character, within its move.</summary>

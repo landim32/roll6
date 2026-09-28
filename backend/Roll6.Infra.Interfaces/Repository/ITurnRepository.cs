@@ -9,6 +9,8 @@ public interface ITurnRepository<TModel> where TModel : class
     Task<List<TModel>> ListByActorTurnAsync(long campaignId, int turnNo, long? characterId, long? mapNpcId);
     /// <summary>True when the character (or NPC occurrence) already moved in the turn.</summary>
     Task<bool> ExistsMovementAsync(long campaignId, int turnNo, long? characterId, long? mapNpcId);
+    /// <summary>The last Movement of each character / NPC occurrence up to a turn (positions of a finished turn, 024).</summary>
+    Task<List<TModel>> ListLastMovementsAsync(long campaignId, int turnNo);
     Task<TModel> InsertAsync(TModel entity);
     Task DeleteAsync(long id);
     Task DeleteRangeAsync(IEnumerable<long> ids);

@@ -77,6 +77,9 @@ public static class Roll6Guide
         - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move
           once** per turn (moving records a Movement entry) and **act** any number of times (`act_in_turn`, text).
         - `reset_turn` deletes a piece's entries of the current turn and moves it back if the former hex is free.
+        - Every entry records who made it (`userId`/`userName`); moves record the movement points spent (`moved`); any
+          change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the
+          fields before/after. `get_turn_summary` returns the whole turn as readable markdown (actions + positions).
         - `finish_turn` (master) moves to the next turn; without `force` it only lists the approved characters that
           have not acted yet. NPCs never block.
         - `create_turn_entry` / `delete_turn_entry` (master) write entries directly — the only way to record an

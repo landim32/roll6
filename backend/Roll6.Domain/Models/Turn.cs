@@ -5,9 +5,10 @@ using Roll6.Domain.Validation;
 namespace Roll6.Domain.Models;
 
 /// <summary>
-/// One entry of a campaign turn (016): a move (before/after position and facing), an action or an action
-/// result (text). Belongs to exactly one character or NPC; NPC entries made from the map keep the occurrence
-/// (<see cref="MapNpcId"/>) because each piece acts on its own.
+/// One entry of a campaign turn (016): a move (before/after position and facing, movement points spent), an
+/// action or an action result (text), or a character/NPC change (024, list of fields before/after). Belongs to
+/// exactly one character or NPC; NPC entries made from the map keep the occurrence (<see cref="MapNpcId"/>)
+/// because each piece acts on its own. <see cref="UserId"/> is who made it (the master or the character owner).
 /// </summary>
 public class Turn
 {
@@ -28,12 +29,25 @@ public class Turn
     public int? Y { get; set; }
     public int? Look { get; set; }
     public string? Description { get; set; }
+
+    /// <summary>Who made the entry (required, 024).</summary>
+    public long UserId { get; set; }
+
+    /// <summary>Movement points spent by a move (024).</summary>
+    public int? Moved { get; set; }
+
+    /// <summary>Fields changed by a CharacterUpdate (024).</summary>
+    public List<TurnChange>? Changes { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public static Turn Movement(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,
-        (int X, int Y, int Look) before, (int X, int Y, int Look) after)
+        long userId, (int X, int Y, int Look) before, (int X, int Y, int Look) after, int? moved = null)
     {
-        var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, TurnType.Movement);
+        var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, userId, TurnType.Movement);
+        if (moved < 0)
+            throw new DomainValidationException("moved", "Os pontos de movimento não podem ser negativos.");
+        turn.Moved = moved;
         turn.BeforeX = before.X;
         turn.BeforeY = before.Y;
         turn.BeforeLook = CheckLook(before.Look, "beforeLook");
@@ -43,22 +57,38 @@ public class Turn
         return turn;
     }
 
-    public static Turn Action(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo, string? description)
+    public static Turn Action(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,
+        long userId, string? description)
     {
-        var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, TurnType.Action);
+        var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, userId, TurnType.Action);
         turn.Description = RequiredText(description);
         return turn;
     }
 
-    public static Turn ActionResult(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo, string? description)
+    public static Turn ActionResult(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,
+        long userId, string? description)
     {
-        var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, TurnType.ActionResult);
+        var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, userId, TurnType.ActionResult);
         turn.Description = RequiredText(description);
         return turn;
     }
 
-    private static Turn Create(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo, TurnType type)
+    /// <summary>A change to a character/NPC during the turn (024); only built when something changed.</summary>
+    public static Turn CharacterUpdate(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,
+        long userId, IReadOnlyCollection<TurnChange> changes)
     {
+        if (changes.Count == 0)
+            throw new DomainValidationException("changes", "Nenhuma alteração para registrar.");
+        var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, userId, TurnType.CharacterUpdate);
+        turn.Changes = changes.ToList();
+        return turn;
+    }
+
+    private static Turn Create(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,
+        long userId, TurnType type)
+    {
+        if (userId <= 0)
+            throw new DomainValidationException("userId", "Informe quem fez o registro.");
         if (characterId.HasValue == npcId.HasValue)
             throw new DomainValidationException("characterId", "Informe um personagem ou um NPC.");
         if (mapNpcId.HasValue && !npcId.HasValue)
@@ -74,6 +104,7 @@ public class Turn
             MapNpcId = mapNpcId,
             TurnNo = turnNo,
             TurnType = type,
+            UserId = userId,
             CreatedAt = DateTime.UtcNow
         };
     }

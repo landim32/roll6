@@ -33,6 +33,16 @@ public class TurnRepository : ITurnRepository<Turn>
         return await ActorTurn(campaignId, turnNo, characterId, mapNpcId).AsNoTracking().ToListAsync();
     }
 
+    public async Task<List<Turn>> ListLastMovementsAsync(long campaignId, int turnNo)
+    {
+        var lastIds = await _context.Turns
+            .Where(e => e.CampaignId == campaignId && e.TurnNo <= turnNo && e.TurnType == TurnType.Movement)
+            .GroupBy(e => new { e.CharacterId, e.MapNpcId })
+            .Select(g => g.Max(e => e.TurnId))
+            .ToListAsync();
+        return await _context.Turns.AsNoTracking().Where(e => lastIds.Contains(e.TurnId)).ToListAsync();
+    }
+
     public async Task<bool> ExistsMovementAsync(long campaignId, int turnNo, long? characterId, long? mapNpcId)
     {
         return await ActorTurn(campaignId, turnNo, characterId, mapNpcId).AnyAsync(e => e.TurnType == TurnType.Movement);

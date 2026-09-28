@@ -910,5 +910,73 @@ BEGIN
     VALUES ('20260928092117_ClearCopiedCampaignNotes', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928122310_AddTurnAuthorMovedChanges') THEN
+    ALTER TABLE turns ADD changes jsonb;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928122310_AddTurnAuthorMovedChanges') THEN
+    ALTER TABLE turns ADD moved integer;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928122310_AddTurnAuthorMovedChanges') THEN
+    ALTER TABLE turns ADD user_id bigint;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928122310_AddTurnAuthorMovedChanges') THEN
+    UPDATE turns AS t
+    SET user_id = c.user_id
+    FROM characters AS c
+    WHERE t.user_id IS NULL
+      AND t.character_id = c.character_id
+      AND t.turn_type IN (1, 2);
+
+    UPDATE turns AS t
+    SET user_id = cp.user_id
+    FROM campaigns AS cp
+    WHERE t.user_id IS NULL
+      AND t.campaign_id = cp.campaign_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928122310_AddTurnAuthorMovedChanges') THEN
+    ALTER TABLE turns ALTER COLUMN user_id SET NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928122310_AddTurnAuthorMovedChanges') THEN
+    CREATE INDEX ix_turns_user ON turns (user_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928122310_AddTurnAuthorMovedChanges') THEN
+    ALTER TABLE turns ADD CONSTRAINT fk_user_turn FOREIGN KEY (user_id) REFERENCES users (user_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928122310_AddTurnAuthorMovedChanges') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260928122310_AddTurnAuthorMovedChanges', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

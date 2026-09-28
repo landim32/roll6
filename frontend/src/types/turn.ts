@@ -5,11 +5,21 @@ export const TURN_TYPE = {
   movement: 1,
   action: 2,
   actionResult: 3,
+  /** A change to a character/NPC during the turn (024), created by the system. */
+  characterUpdate: 4,
 } as const;
 
 export type TurnType = (typeof TURN_TYPE)[keyof typeof TURN_TYPE];
 
-/** One entry of a campaign turn: a move (before/after), an action or an action result (text). */
+/** One field changed by a CharacterUpdate entry (024). */
+export interface TurnChangeInfo {
+  /** currentLife, currentEnergy, characterStatus, notes, name, life, energy, move or status. */
+  field: string;
+  before: string | null;
+  after: string | null;
+}
+
+/** One entry of a campaign turn: a move (before/after), an action, an action result or a character change. */
 export interface TurnInfo {
   turnId: number;
   campaignId: number;
@@ -29,6 +39,13 @@ export interface TurnInfo {
   y: number | null;
   look: number | null;
   description: string | null;
+  /** Who made the entry (024). */
+  userId: number;
+  userName: string;
+  /** Movement points spent (moves). */
+  moved: number | null;
+  /** Fields changed (CharacterUpdate). */
+  changes: TurnChangeInfo[] | null;
   createdAt: string;
 }
 
@@ -51,4 +68,11 @@ export interface TurnFinishResultInfo {
 export interface TurnResetResultInfo {
   removed: number;
   reverted: boolean;
+}
+
+/** Readable markdown of a turn (024): "## Ações" and "## Posições". */
+export interface TurnSummaryInfo {
+  campaignId: number;
+  turnNo: number;
+  markdown: string;
 }

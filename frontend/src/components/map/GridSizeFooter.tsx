@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { TurnLogModal } from '../modals/TurnLogModal';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useTurn } from '../../hooks/useTurn';
 import { useAuth } from '../../hooks/useAuth';
@@ -20,10 +22,15 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
   const { session } = useAuth();
   const { status } = useRealtime();
   const offline = !!session && status !== REALTIME_STATUS.connected;
+  const [logOpen, setLogOpen] = useState(false);
 
   return (
     <footer className="stm-footer">
-      {turnNo !== null && <span className="badge stm-turn-badge">{t('turn.label', { no: turnNo })}</span>}
+      {turnNo !== null && (
+        <button type="button" className="badge stm-turn-badge" title={t('turnLog.open')} onClick={() => setLogOpen(true)}>
+          {t('turn.label', { no: turnNo })}
+        </button>
+      )}
       {offline && (
         <span className="badge stm-realtime-badge" title={t('realtime.offlineHint')}>
           {t(status === REALTIME_STATUS.reconnecting ? 'realtime.reconnecting' : 'realtime.offline')}
@@ -38,6 +45,7 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
         {isDirty && <span className="badge text-bg-warning">{t('map.unsaved')}</span>}
         {!canEdit && <span className="badge text-bg-secondary">{t('menu.readOnly')}</span>}
       </div>
+      <TurnLogModal open={logOpen} onOpenChange={setLogOpen} />
     </footer>
   );
 };

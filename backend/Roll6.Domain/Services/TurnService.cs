@@ -3,6 +3,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
 using Roll6.Domain.Realtime;
+using Roll6.Domain.Turns;
 using Roll6.DTO.Realtime;
 using Roll6.DTO.Turn;
 using Roll6.Infra.Interfaces.AppServices;
@@ -26,6 +27,7 @@ public class TurnService : ITurnService
     private readonly IMapNpcRepository<MapNpc> _mapNpcRepository;
     private readonly INpcRepository<Npc> _npcRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IUserRepository<User> _userRepository;
     private readonly IRealtimeNotifier _notifier;
 
     public TurnService(
@@ -38,9 +40,11 @@ public class TurnService : ITurnService
         IMapNpcRepository<MapNpc> mapNpcRepository,
         INpcRepository<Npc> npcRepository,
         IUnitOfWork unitOfWork,
+        IUserRepository<User> userRepository,
         IRealtimeNotifier notifier)
     {
         _notifier = notifier;
+        _userRepository = userRepository;
         _repository = repository;
         _campaignRepository = campaignRepository;
         _mapRepository = mapRepository;
@@ -68,12 +72,102 @@ public class TurnService : ITurnService
         return await MapToDtoAsync(await _repository.ListByCampaignTurnAsync(campaignId, turnNo));
     }
 
+    /// <summary>
+    /// Everything that happened in a turn as markdown (024): the entries in order and where every character/NPC piece
+    /// of the turn's map is — now for the turn in progress, after its last move for a finished turn.
+    /// </summary>
+    public async Task<TurnSummaryInfo> GetSummaryAsync(long userId, long campaignId, int? turnNo)
+    {
+        var campaign = await GetReadableCampaignAsync(userId, campaignId);
+        var number = turnNo ?? campaign.CurrentTurn;
+        if (number < 1 || number > campaign.CurrentTurn)
+            throw new DomainValidationException("turnNo", $"O turno deve estar entre 1 e {campaign.CurrentTurn}.");
+        var current = number == campaign.CurrentTurn;
+
+        var entries = await _repository.ListByCampaignTurnAsync(campaignId, number);
+        var mapId = current
+            ? campaign.CurrentMapId ?? entries.LastOrDefault(e => e.MapId.HasValue)?.MapId
+            : entries.LastOrDefault(e => e.MapId.HasValue)?.MapId ?? campaign.CurrentMapId;
+        var pieces = mapId is long id
+            ? (await _mapTokenRepository.ListByMapAsync(id)).Where(p => p.CampaignCharacterId.HasValue || p.MapNpcId.HasValue).ToList()
+            : new List<MapToken>();
+
+        // Names in batch: characters (and owners), NPC occurrences, NPCs and authors.
+        var participations = (await _campaignCharacterRepository.ListByIdsAsync(
+                pieces.Where(p => p.CampaignCharacterId.HasValue).Select(p => p.CampaignCharacterId!.Value)))
+            .ToDictionary(p => p.CampaignCharacterId, p => p.CharacterId);
+        var characters = (await _characterRepository.ListByIdsAsync(entries.Where(e => e.CharacterId.HasValue)
+                .Select(e => e.CharacterId!.Value).Concat(participations.Values).Distinct()))
+            .ToDictionary(c => c.CharacterId);
+        var mapNpcs = (await _mapNpcRepository.ListByIdsAsync(entries.Where(e => e.MapNpcId.HasValue).Select(e => e.MapNpcId!.Value)
+                .Concat(pieces.Where(p => p.MapNpcId.HasValue).Select(p => p.MapNpcId!.Value)).Distinct()))
+            .ToDictionary(m => m.MapNpcId, m => m.Name);
+        var npcs = (await _npcRepository.ListByIdsAsync(entries.Where(e => e.NpcId.HasValue).Select(e => e.NpcId!.Value).Distinct()))
+            .ToDictionary(n => n.NpcId, n => n.Name);
+        var users = (await _userRepository.ListByIdsAsync(entries.Select(e => e.UserId)
+                .Concat(characters.Values.Select(c => c.UserId)).Append(campaign.UserId).Distinct()))
+            .ToDictionary(u => u.UserId, u => u.Name);
+
+        string CharacterLabel(long characterId) => characters.TryGetValue(characterId, out var c)
+            ? $"{c.Name} ({users.GetValueOrDefault(c.UserId, string.Empty)})" : "?";
+        string NpcLabel(long? mapNpcId, long? npcId) =>
+            $"{(mapNpcId is long m && mapNpcs.TryGetValue(m, out var name) ? name : npcId is long n ? npcs.GetValueOrDefault(n, "NPC") : "NPC")} (GM)";
+        long? OwnerOf(Turn e) => e.CharacterId is long c && characters.TryGetValue(c, out var character) ? character.UserId : null;
+        string? AuthorLabel(Turn e)
+        {
+            // The owner acting on their own character is the character itself; otherwise the master shows as GM.
+            if (e.CharacterId.HasValue && OwnerOf(e) == e.UserId)
+                return null;
+            var name = users.GetValueOrDefault(e.UserId, string.Empty);
+            return e.UserId == campaign.UserId ? $"GM ({name})" : name;
+        }
+
+        var spent = new Dictionary<(long?, long?), int>();
+        var lines = new List<SummaryLine>();
+        foreach (var e in entries)
+        {
+            var key = (e.CharacterId, e.MapNpcId ?? e.NpcId);
+            if (e.Moved is int moved)
+                spent[key] = spent.GetValueOrDefault(key) + moved;
+            lines.Add(new SummaryLine
+            {
+                Type = e.TurnType,
+                Actor = e.CharacterId is long characterId ? CharacterLabel(characterId) : NpcLabel(e.MapNpcId, e.NpcId),
+                Author = e.TurnType is TurnType.Movement or TurnType.Action && e.CharacterId.HasValue ? null : AuthorLabel(e),
+                IsNpc = !e.CharacterId.HasValue,
+                Before = e is { BeforeX: int bx, BeforeY: int by, BeforeLook: int bl } ? (bx, by, bl) : null,
+                After = e is { X: int x, Y: int y, Look: int l } ? (x, y, l) : null,
+                Moved = e.Moved,
+                MovedTotal = spent.GetValueOrDefault(key),
+                Description = e.Description,
+                Changes = e.Changes
+            });
+        }
+
+        // Finished turn: each piece where its last move up to that turn left it (when on this map).
+        var lastMoves = current || mapId == null
+            ? new Dictionary<(long?, long?), Turn>()
+            : (await _repository.ListLastMovementsAsync(campaignId, number)).Where(t => t.MapId == mapId)
+                .ToDictionary(t => (t.CharacterId, t.MapNpcId));
+        var positions = pieces.Select(p =>
+        {
+            long? characterId = p.CampaignCharacterId is long cc && participations.TryGetValue(cc, out var ch) ? ch : null;
+            var key = (characterId, characterId.HasValue ? null : p.MapNpcId);
+            var (x, y, look) = lastMoves.TryGetValue(key, out var move) && move is { X: int mx, Y: int my, Look: int ml }
+                ? (mx, my, ml) : (p.X, p.Y, p.Look);
+            var label = characterId is long cid ? CharacterLabel(cid) : NpcLabel(p.MapNpcId, null);
+            return new SummaryPosition(label, x, y, look);
+        }).ToList();
+
+        return new TurnSummaryInfo { CampaignId = campaignId, TurnNo = number, Markdown = TurnSummary.Build(lines, positions) };
+    }
+
     public async Task<TurnInfo> ActAsync(long userId, TurnActInfo info)
     {
         var (piece, map, campaign) = await GetPieceAsync(info.MapTokenId);
         var actor = await ResolveActorAsync(userId, piece, campaign);
         var turn = Turn.Action(campaign.CampaignId, map.MapId, actor.CharacterId, actor.NpcId, actor.MapNpcId,
-            campaign.CurrentTurn, info.Description);
+            campaign.CurrentTurn, userId, info.Description);
         var result = (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
         return result;
@@ -84,7 +178,10 @@ public class TurnService : ITurnService
     {
         var (piece, map, campaign) = await GetPieceAsync(info.MapTokenId);
         var actor = await ResolveActorAsync(userId, piece, campaign);
-        var entries = await _repository.ListByActorTurnAsync(campaign.CampaignId, campaign.CurrentTurn, actor.CharacterId, actor.MapNpcId);
+        // Character/NPC changes are history (024): the reset only undoes the move and the action.
+        var entries = (await _repository.ListByActorTurnAsync(campaign.CampaignId, campaign.CurrentTurn, actor.CharacterId, actor.MapNpcId))
+            .Where(e => e.TurnType is TurnType.Movement or TurnType.Action)
+            .ToList();
         var movement = entries.FirstOrDefault(e => e.TurnType == TurnType.Movement);
 
         var reverted = false;
@@ -147,11 +244,11 @@ public class TurnService : ITurnService
         var turnNo = info.TurnNo ?? campaign.CurrentTurn;
         var turn = (TurnType)info.TurnType switch
         {
-            TurnType.Movement => Turn.Movement(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo,
+            TurnType.Movement => Turn.Movement(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, userId,
                 (Required(info.BeforeX, "beforeX"), Required(info.BeforeY, "beforeY"), Required(info.BeforeLook, "beforeLook")),
                 (Required(info.X, "x"), Required(info.Y, "y"), Required(info.Look, "look"))),
-            TurnType.Action => Turn.Action(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, info.Description),
-            TurnType.ActionResult => Turn.ActionResult(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, info.Description),
+            TurnType.Action => Turn.Action(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, userId, info.Description),
+            TurnType.ActionResult => Turn.ActionResult(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, userId, info.Description),
             _ => throw new DomainValidationException("turnType", "O tipo deve ser 1 (Movement), 2 (Action) ou 3 (ActionResult).")
         };
         var result = (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
@@ -247,6 +344,8 @@ public class TurnService : ITurnService
             : (await _mapNpcRepository.ListByIdsAsync(mapNpcIds)).ToDictionary(m => m.MapNpcId, m => m.Name);
         var npcs = npcIds.Count == 0 ? new Dictionary<long, string>()
             : (await _npcRepository.ListByIdsAsync(npcIds)).ToDictionary(n => n.NpcId, n => n.Name);
+        var users = (await _userRepository.ListByIdsAsync(turns.Select(t => t.UserId).Distinct()))
+            .ToDictionary(u => u.UserId, u => u.Name);
 
         return turns.Select(t => new TurnInfo
         {
@@ -268,6 +367,10 @@ public class TurnService : ITurnService
             Y = t.Y,
             Look = t.Look,
             Description = t.Description,
+            UserId = t.UserId,
+            UserName = users.GetValueOrDefault(t.UserId, string.Empty),
+            Moved = t.Moved,
+            Changes = t.Changes?.Select(c => new TurnChangeInfo { Field = c.Field, Before = c.Before, After = c.After }).ToList(),
             CreatedAt = t.CreatedAt
         }).ToList();
     }

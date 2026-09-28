@@ -17,7 +17,7 @@ public class TurnInfo
     [JsonPropertyName("turnNo")]
     public int TurnNo { get; set; }
 
-    /// <summary>1 Movement, 2 Action, 3 ActionResult.</summary>
+    /// <summary>1 Movement, 2 Action, 3 ActionResult, 4 CharacterUpdate.</summary>
     [JsonPropertyName("turnType")]
     public int TurnType { get; set; }
 
@@ -54,6 +54,21 @@ public class TurnInfo
 
     [JsonPropertyName("description")]
     public string? Description { get; set; }
+
+    /// <summary>Who made the entry (the master or the character owner).</summary>
+    [JsonPropertyName("userId")]
+    public long UserId { get; set; }
+
+    [JsonPropertyName("userName")]
+    public string UserName { get; set; } = string.Empty;
+
+    /// <summary>Movement points spent (moves only).</summary>
+    [JsonPropertyName("moved")]
+    public int? Moved { get; set; }
+
+    /// <summary>Fields changed (CharacterUpdate only).</summary>
+    [JsonPropertyName("changes")]
+    public List<TurnChangeInfo>? Changes { get; set; }
 
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }

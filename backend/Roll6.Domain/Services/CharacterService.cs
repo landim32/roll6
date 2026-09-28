@@ -1,3 +1,4 @@
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
@@ -102,15 +103,27 @@ public class CharacterService : ICharacterService
     {
         var character = await GetOwnedAsync(userId, characterId);
         var token = await GetTokenAsync(info.TokenId);
+        var before = (character.Name, character.Life, character.Energy, character.Move);
         character.Update(info.Name, info.Sheet, info.Life, info.Energy, info.Move, info.Image, info.TokenId, info.SheetFile);
+        var campaignIds = await _campaignCharacterRepository.ListCampaignIdsByCharacterAsync(characterId);
+        var turns = await CharacterUpdateTurnsAsync(userId, character, campaignIds, TurnChange.Diff(
+            ("name", before.Name, character.Name),
+            ("life", before.Life, character.Life),
+            ("energy", before.Energy, character.Energy),
+            ("move", before.Move, character.Move)));
+
         Character saved = character;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             saved = await _repository.UpdateAsync(character);
             // Lower totals also lower the current values in every campaign (FR-011).
             await _campaignCharacterRepository.ClampVitalsAsync(character.CharacterId, character.Life, character.Energy);
+            foreach (var turn in turns)
+                await _turnRepository.InsertAsync(turn);
         });
-        await PublishToCampaignsAsync(await _campaignCharacterRepository.ListCampaignIdsByCharacterAsync(characterId), userId);
+        await PublishToCampaignsAsync(campaignIds, userId);
+        foreach (var turn in turns)
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, turn.CampaignId, userId));
         return MapToDto(saved, token);
     }
 
@@ -149,6 +162,28 @@ public class CharacterService : ICharacterService
         await PublishToCampaignsAsync(campaignIds, userId);
         foreach (var campaignId in campaignIds)
             await RemoveFormerOwnerIfNoAccessAsync(userId, campaignId);
+    }
+
+    /// <summary>
+    /// A CharacterUpdate entry in the current turn of every campaign where the character is approved (024); none
+    /// when name, totals and move did not change (picture, token and sheets are not table changes).
+    /// </summary>
+    private async Task<List<Turn>> CharacterUpdateTurnsAsync(long userId, Character character, IEnumerable<long> campaignIds, List<TurnChange> changes)
+    {
+        var turns = new List<Turn>();
+        if (changes.Count == 0)
+            return turns;
+        foreach (var campaignId in campaignIds)
+        {
+            var participation = await _campaignCharacterRepository.GetAsync(campaignId, character.CharacterId);
+            if (participation?.Status != CampaignCharacterStatus.Approved)
+                continue;
+            var campaign = await _campaignRepository.GetByIdAsync(campaignId);
+            if (campaign != null)
+                turns.Add(Turn.CharacterUpdate(campaign.CampaignId, campaign.CurrentMapId, character.CharacterId, null, null,
+                    campaign.CurrentTurn, userId, changes));
+        }
+        return turns;
     }
 
     /// <summary>The former owner stops receiving the events of campaigns they can no longer read (017).</summary>

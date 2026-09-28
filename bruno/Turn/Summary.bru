@@ -1,0 +1,20 @@
+meta {
+  name: Summary
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/turn/summary
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Readable markdown of a turn (024): "## Ações" and "## Posições". Add `?turnNo=N` for a finished turn; without it,
+  the turn in progress.
+}

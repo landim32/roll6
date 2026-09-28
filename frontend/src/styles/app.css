@@ -782,6 +782,26 @@ body,
   font-weight: 600;
 }
 
+button.stm-turn-badge {
+  cursor: pointer;
+}
+
+button.stm-turn-badge:hover {
+  background: rgba(255, 193, 7, 0.3);
+}
+
+/* Turn summary (024): the markdown as plain text, ready to copy. */
+.stm-turn-log {
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  padding: 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-tertiary-bg);
+  font-size: 0.875rem;
+}
+
 .stm-map .stm-turn-trails {
   pointer-events: none;
 }
