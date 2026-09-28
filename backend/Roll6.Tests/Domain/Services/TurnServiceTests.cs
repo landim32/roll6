@@ -38,6 +38,7 @@ public class TurnServiceTests
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
+    private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
     private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3 };
     private readonly MapToken _ariaPiece;
     private readonly TurnService _service;
@@ -79,7 +80,7 @@ public class TurnServiceTests
             .ReturnsAsync((IEnumerable<long> ids) => ids.Select(id => new User { UserId = id, Name = $"User {id}" }).ToList());
 
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
-            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _notifier.Object);
+            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _notifier.Object);
     }
 
     // --- State (US1) ---
@@ -414,5 +415,180 @@ public class TurnServiceTests
     public async Task Summary_OutsiderIsDenied()
     {
         await _service.Invoking(s => s.GetSummaryAsync(STRANGER, CAMPAIGN, null)).Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    // ---- 027: turn data and processing ----
+
+    private const long BRAM_PARTICIPATION = 71;
+    private const long BRAM_PIECE = 45;
+
+    /// <summary>Aria (player's, approved, piece at 4,4) and Bram (master's, approved, piece at 1,1), a goblin occurrence at 6,6.</summary>
+    private (MapToken Bram, MapToken Goblin, CampaignCharacter AriaPlay, CampaignCharacter BramPlay, MapNpc Goblin1) Table()
+    {
+        _campaign.CurrentMapId = MAP;
+        _mapRepository.Setup(r => r.GetByIdAsync(MAP)).ReturnsAsync(new Map { MapId = MAP, CampaignId = CAMPAIGN, MapModelId = 50, UserId = MASTER, Status = MapStatus.Active });
+        _mapModelRepository.Setup(r => r.GetByIdAsync(50)).ReturnsAsync(new MapModel { MapModelId = 50, GridWidth = 10, GridHeight = 10 });
+        var ariaPlay = new CampaignCharacter
+        {
+            CampaignCharacterId = PARTICIPATION, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved,
+            CurrentLife = 10, CurrentEnergy = 8, CharacterStatus = "Agachada", Sheet = "anotação"
+        };
+        var bramPlay = new CampaignCharacter
+        {
+            CampaignCharacterId = BRAM_PARTICIPATION, CampaignId = CAMPAIGN, CharacterId = BRAM, Status = CampaignCharacterStatus.Approved,
+            CurrentLife = 12, CurrentEnergy = 5
+        };
+        _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(new List<CampaignCharacter> { ariaPlay, bramPlay });
+        _campaignCharacterRepository.Setup(r => r.UpdateAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character>
+        {
+            new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria", Life = 10, Energy = 8 },
+            new() { CharacterId = BRAM, UserId = MASTER, Name = "Bram", Life = 12, Energy = 6 }
+        });
+        var goblin1 = new MapNpc { MapNpcId = MAP_NPC, MapId = MAP, NpcId = NPC, Name = "Goblin 1", CurrentLife = 7, CurrentEnergy = 2 };
+        _mapNpcRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapNpc> { goblin1 });
+        _mapNpcRepository.Setup(r => r.UpdateAsync(It.IsAny<MapNpc>())).ReturnsAsync((MapNpc m) => m);
+        _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Npc> { new() { NpcId = NPC, Name = "Goblin", Life = 7, Energy = 2 } });
+        var bram = MapToken.PlaceCharacter(MAP, 5, BRAM_PARTICIPATION, "Bram", 1, 1);
+        bram.MapTokenId = BRAM_PIECE;
+        var goblin = MapToken.PlaceNpc(MAP, 5, MAP_NPC, "Goblin 1", 6, 6, 0);
+        goblin.MapTokenId = GOBLIN_PIECE;
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken> { _ariaPiece, bram, goblin });
+        return (bram, goblin, ariaPlay, bramPlay, goblin1);
+    }
+
+    [Fact]
+    public async Task Data_ListsCharactersNpcsAndActions()
+    {
+        Table();
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(CAMPAIGN, PLAYER)).ReturnsAsync(true);
+        _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3)).ReturnsAsync(new List<Turn> { Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Ataca") });
+
+        var data = await _service.GetDataAsync(PLAYER, CAMPAIGN, null);
+
+        (data.TurnNo, data.CurrentTurn, data.MapId).Should().Be((3, 3, (long?)MAP));
+        data.Characters.Select(c => (c.Name, c.PlayerName, c.CurrentLife, c.TotalLife, c.CurrentEnergy, c.TotalEnergy, c.Status, c.X, c.Y))
+            .Should().Equal(("Aria", "User 2", 10, 10, 8, 8, "Agachada", (int?)4, (int?)4), ("Bram", "User 1", 12, 12, 5, 6, (string?)null, (int?)1, (int?)1));
+        data.Characters[0].LookName.Should().NotBeNullOrEmpty();
+        data.Npcs.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            MapNpcId = MAP_NPC, NpcId = NPC, MapTokenId = (long?)GOBLIN_PIECE, Name = "Goblin 1", CurrentLife = 7, TotalLife = 7,
+            CurrentEnergy = 2, TotalEnergy = 2, X = (int?)6, Y = (int?)6, Look = (int?)0, LookName = "Norte"
+        });
+        data.Actions.Should().Be("## Ações\nAria (User 2): \"Ataca\"\n");
+    }
+
+    [Fact]
+    public async Task Data_OutsiderAndOutOfRange_AreRefused()
+    {
+        await _service.Invoking(s => s.GetDataAsync(STRANGER, CAMPAIGN, null)).Should().ThrowAsync<UnauthorizedAccessException>();
+        (await _service.Invoking(s => s.GetDataAsync(MASTER, CAMPAIGN, 9)).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("turnNo");
+    }
+
+    [Fact]
+    public async Task Process_SavesEverythingLogsItAndFinishesTheTurn()
+    {
+        var (bram, goblin, ariaPlay, _, goblin1) = Table();
+        var inserted = new List<Turn>();
+        _repository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => inserted.Add(t)).ReturnsAsync((Turn t) => t);
+
+        var result = await _service.ProcessAsync(MASTER, CAMPAIGN, new TurnProcessInfo
+        {
+            Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, CurrentLife = 2, Status = "Caída" } },
+            Npcs = new() { new TurnProcessNpcInfo { MapNpcId = MAP_NPC, CurrentLife = -1, ClearStatus = true, X = 6, Y = 5, Look = 0 } },
+            Narration = "O goblin acertou Aria e recuou."
+        });
+
+        (ariaPlay.CurrentLife, ariaPlay.CharacterStatus, ariaPlay.Sheet).Should().Be((2, "Caída", "anotação"));
+        (goblin1.CurrentLife, goblin.X, goblin.Y).Should().Be((-1, 6, 5));
+        inserted.Select(t => (t.TurnType, t.UserId, t.TurnNo)).Should().Equal(
+            (TurnType.CharacterUpdate, MASTER, 3), (TurnType.CharacterUpdate, MASTER, 3), (TurnType.Movement, MASTER, 3), (TurnType.Narration, MASTER, 3));
+        inserted[2].Moved.Should().Be(1);
+        _campaignRepository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.CurrentTurn == 4)), Times.Once);
+        (result.FinishedTurn, result.TurnNo, result.Data.TurnNo).Should().Be((3, 4, 3));
+        foreach (var type in new[] { TableEventType.PARTY_CHANGED, TableEventType.MAP_TOKENS_CHANGED, TableEventType.TURN_FINISHED })
+            _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == type && e.CampaignId == CAMPAIGN)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Process_OnlyTheStatus_ChangesOnlyTheStatus()
+    {
+        var (_, _, ariaPlay, _, _) = Table();
+        var inserted = new List<Turn>();
+        _repository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => inserted.Add(t)).ReturnsAsync((Turn t) => t);
+
+        await _service.ProcessAsync(MASTER, CAMPAIGN, new TurnProcessInfo
+        {
+            Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, Status = "Em pé" } }
+        });
+
+        (ariaPlay.CurrentLife, ariaPlay.CurrentEnergy, ariaPlay.CharacterStatus).Should().Be((10, 8, "Em pé"));
+        inserted.Single().Changes!.Single().Field.Should().Be("characterStatus");
+    }
+
+    [Fact]
+    public async Task Process_PiecesMaySwapHexes()
+    {
+        var (bram, _, _, _, _) = Table();
+
+        await _service.ProcessAsync(MASTER, CAMPAIGN, new TurnProcessInfo
+        {
+            Characters = new()
+            {
+                new TurnProcessCharacterInfo { CharacterId = ARIA, X = 1, Y = 1 },
+                new TurnProcessCharacterInfo { CharacterId = BRAM, X = 4, Y = 4 }
+            }
+        });
+
+        ((_ariaPiece.X, _ariaPiece.Y), (bram.X, bram.Y)).Should().Be(((1, 1), (4, 4)));
+    }
+
+    public static IEnumerable<object[]> InvalidBatches() => new[]
+    {
+        new object[] { new TurnProcessInfo(), "batch" },
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA }, new TurnProcessCharacterInfo { CharacterId = ARIA } } }, "batch" },
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = 999, CurrentLife = 1 } } }, "characters[0].characterId" },
+        new object[] { new TurnProcessInfo { Npcs = new() { new TurnProcessNpcInfo { MapNpcId = 999, CurrentLife = 1 } } }, "npcs[0].mapNpcId" },
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, CurrentLife = 11 } } }, "characters[0].currentLife" },
+        new object[] { new TurnProcessInfo { Npcs = new() { new TurnProcessNpcInfo { MapNpcId = MAP_NPC, CurrentEnergy = 3 } } }, "npcs[0].currentEnergy" },
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 1, Y = 1 } } }, "characters[0].x" },
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 20, Y = 1 } } }, "characters[0].x" },
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 3 } } }, "characters[0].x" },
+        new object[] { new TurnProcessInfo { Narration = new string('a', Turn.MAX_NARRATION + 1) }, "narration" }
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidBatches))]
+    public async Task Process_InvalidBatch_ChangesNothing(TurnProcessInfo info, string key)
+    {
+        Table();
+
+        (await _service.Invoking(s => s.ProcessAsync(MASTER, CAMPAIGN, info)).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey(key);
+        _repository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+        _campaignRepository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        _campaign.CurrentTurn.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Process_NotMaster_IsForbidden()
+    {
+        Table();
+
+        await _service.Invoking(s => s.ProcessAsync(PLAYER, CAMPAIGN, new TurnProcessInfo { Narration = "x" }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+        _campaignRepository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Process_ResultDataMatchesTheTurnData()
+    {
+        Table();
+
+        var result = await _service.ProcessAsync(MASTER, CAMPAIGN, new TurnProcessInfo { Narration = "Nada aconteceu." });
+        var data = await _service.GetDataAsync(MASTER, CAMPAIGN, result.FinishedTurn);
+
+        result.Data.Should().BeEquivalentTo(data, o => o.Excluding(d => d.Actions));
     }
 }

@@ -9,5 +9,7 @@ public enum TurnType
     Movement = 1,
     Action = 2,
     ActionResult = 3,
-    CharacterUpdate = 4
+    CharacterUpdate = 4,
+    /// <summary>What happened in the turn, written when the turn is processed (027); no character/NPC.</summary>
+    Narration = 5
 }

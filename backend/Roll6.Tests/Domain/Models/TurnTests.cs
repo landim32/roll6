@@ -102,4 +102,22 @@ public class TurnTests
 
         changes.Select(c => (c.Field, c.Before, c.After)).Should().Equal(("currentLife", "10", "6"), ("notes", "a", "b"));
     }
+
+    // ---- 027: narration ----
+
+    [Fact]
+    public void Narration_HasNoActor_AndAcceptsLongTexts()
+    {
+        var turn = Turn.Narration(10, 30, 3, 1, new string('a', 5000));
+
+        (turn.TurnType, turn.CharacterId, turn.NpcId, turn.MapNpcId, turn.UserId).Should().Be((TurnType.Narration, (long?)null, (long?)null, (long?)null, 1L));
+    }
+
+    [Fact]
+    public void Narration_RequiresTheTextWithinTheLimit()
+    {
+        ((Action)(() => Turn.Narration(10, 30, 3, 1, " "))).Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("narration");
+        ((Action)(() => Turn.Narration(10, 30, 3, 1, new string('a', Turn.MAX_NARRATION + 1)))).Should().Throw<DomainValidationException>();
+        ((Action)(() => Turn.Action(10, 30, 80, null, null, 3, 1, new string('a', Turn.MAX_DESCRIPTION + 1)))).Should().Throw<DomainValidationException>();
+    }
 }

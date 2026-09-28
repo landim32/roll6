@@ -22,7 +22,7 @@ interface PartyCardProps {
   draggable?: boolean;
 }
 
-/** One character of the party: round picture, name, life and energy bars (current/total). */
+/** One character of the party: round picture, name, life and energy bars (current/total) and its status in the campaign. */
 export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: PartyCardProps) => {
   const { t } = useTranslation();
   const { turnNo, entries } = useTurn();
@@ -55,6 +55,9 @@ export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: 
         </div>
         <VitalBar label={t('party.life')} current={member.currentLife} total={member.totalLife} variant="life" />
         <VitalBar label={t('party.energy')} current={member.currentEnergy} total={member.totalEnergy} variant="energy" />
+        {member.characterStatus && (
+          <small className="d-block text-body-secondary text-truncate" title={member.characterStatus}>{member.characterStatus}</small>
+        )}
       </div>
     </li>
   );

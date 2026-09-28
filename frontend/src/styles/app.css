@@ -209,6 +209,25 @@ body,
   max-width: 800px;
 }
 
+/* Most of the screen: campaign settings (lists in columns, tall plan editor). */
+.stm-modal-content.stm-modal-wide {
+  max-width: 1400px;
+  width: calc(100% - 4rem);
+  height: calc(100% - 4rem);
+}
+
+/* A list-group laid out as a grid of cards (one column on narrow screens). */
+.stm-grid-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 0.5rem;
+}
+
+.stm-grid-list > .list-group-item {
+  border-width: var(--bs-list-group-border-width);
+  border-radius: var(--bs-list-group-border-radius);
+}
+
 .stm-modal-content .modal-body {
   overflow-y: auto;
 }
@@ -947,13 +966,13 @@ button.stm-turn-badge:hover {
 
 .stm-plan-layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
 
 .stm-plan-list .list-group {
-  max-height: 480px;
+  max-height: max(420px, calc(90vh - 300px));
   overflow-y: auto;
 }
 

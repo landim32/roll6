@@ -1,0 +1,32 @@
+meta {
+  name: Process
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/turn/process
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "characters": [
+      { "characterId": {{playerCharacterId}}, "currentLife": 5, "status": "Ferida" }
+    ],
+    "npcs": [
+      { "mapNpcId": {{mapNpcId}}, "currentLife": -1, "status": "Caído" }
+    ],
+    "narration": "O goblin acertou Lyra de raspão e caiu com o contra-ataque."
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Master only (027): saves every change at once (nothing is saved when any item is invalid), logs it in the turn,
+  writes the narration and FINISHES the turn. Answer: { finishedTurn, turnNo, data }.
+}

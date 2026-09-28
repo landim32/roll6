@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import { ArchiveIcon, OpenIcon, TrashIcon, UnarchiveIcon } from '../ui/icons';
 import { mapService } from '../../Services/mapService';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useTableEvents } from '../../hooks/useRealtime';
@@ -77,10 +78,11 @@ export const CampaignMapsTab = ({ onOpenMap }: CampaignMapsTabProps) => {
 
   return (
     <>
-      <ul className="list-group stm-list">
+      <ul className="list-group stm-list stm-grid-list">
         {data.items.map((map) => {
           const archived = map.status === MAP_STATUS_ARCHIVED;
           const busy = busyId === map.mapId;
+          const statusLabel = archived ? 'campaignSettings.restoreMap' : 'campaignSettings.archiveMap';
           return (
             <li key={map.mapId} className="list-group-item stm-character-row">
               {map.mapModelImageUrl ? <img className="stm-thumb" src={map.mapModelImageUrl} alt="" /> : <div className="stm-thumb" />}
@@ -96,15 +98,18 @@ export const CampaignMapsTab = ({ onOpenMap }: CampaignMapsTabProps) => {
                 </small>
               </div>
               <div className="stm-character-actions">
-                <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => onOpenMap(map)}>
-                  {t('campaignSettings.openMap')}
+                <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => onOpenMap(map)}
+                  title={t('campaignSettings.openMap')} aria-label={t('campaignSettings.openMap')}>
+                  <OpenIcon size={14} />
                 </button>
                 <button type="button" className="btn btn-sm btn-outline-secondary" disabled={busy}
+                  title={t(statusLabel)} aria-label={t(statusLabel)}
                   onClick={() => { void setStatus(map, archived ? MAP_STATUS_ACTIVE : MAP_STATUS_ARCHIVED); }}>
-                  {t(archived ? 'campaignSettings.restoreMap' : 'campaignSettings.archiveMap')}
+                  {archived ? <UnarchiveIcon size={14} /> : <ArchiveIcon size={14} />}
                 </button>
-                <button type="button" className="btn btn-sm btn-outline-danger" disabled={busy} onClick={() => setToDelete(map)}>
-                  {t('campaignSettings.deleteMap')}
+                <button type="button" className="btn btn-sm btn-outline-danger" disabled={busy} onClick={() => setToDelete(map)}
+                  title={t('campaignSettings.deleteMap')} aria-label={t('campaignSettings.deleteMap')}>
+                  <TrashIcon size={14} />
                 </button>
               </div>
             </li>

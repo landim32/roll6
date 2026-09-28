@@ -167,6 +167,36 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>The whole table for an AI assistant (027); without turnNo, the turn in progress.</summary>
+    [HttpGet("{id:long}/turn/data")]
+    [ProducesResponseType(typeof(TurnDataInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTurnData(long id, [FromQuery] int? turnNo)
+    {
+        try
+        {
+            return Ok(await _turnService.GetDataAsync(CurrentUserId, id, turnNo));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Saves the result of the turn (characters, NPCs, narration) at once and finishes it (027, master only).</summary>
+    [HttpPost("{id:long}/turn/process")]
+    [ProducesResponseType(typeof(TurnProcessResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ProcessTurn(long id, [FromBody] TurnProcessInfo info)
+    {
+        try
+        {
+            return Ok(await _turnService.ProcessAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Entries of a turn, oldest first (turn summary).</summary>
     [HttpGet("{id:long}/turn/{turnNo:int}")]
     [ProducesResponseType(typeof(List<TurnInfo>), StatusCodes.Status200OK)]

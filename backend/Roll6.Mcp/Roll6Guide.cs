@@ -81,6 +81,8 @@ public static class Roll6Guide
         - Every entry records who made it (`userId`/`userName`); moves record the movement points spent (`moved`); any
           change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the
           fields before/after. `get_turn_summary` returns the whole turn as readable markdown (actions + positions).
+        - Running a turn as an assistant: `get_turn_data` (characters, NPC occurrences and actions in one call) → decide →
+          `process_turn` (all changes + narration in one atomic call; it also finishes the turn).
         - `finish_turn` (master) moves to the next turn; without `force` it only lists the approved characters that
           have not acted yet. NPCs never block.
         - `create_turn_entry` / `delete_turn_entry` (master) write entries directly — the only way to record an

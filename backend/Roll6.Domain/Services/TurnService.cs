@@ -16,7 +16,7 @@ namespace Roll6.Domain.Services;
 /// characters; the master acts for any character or NPC occurrence, writes entries directly (action results
 /// only this way) and finishes the turn.
 /// </summary>
-public class TurnService : ITurnService
+public partial class TurnService : ITurnService
 {
     private readonly ITurnRepository<Turn> _repository;
     private readonly ICampaignRepository<Campaign> _campaignRepository;
@@ -28,6 +28,7 @@ public class TurnService : ITurnService
     private readonly INpcRepository<Npc> _npcRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserRepository<User> _userRepository;
+    private readonly IMapModelRepository<MapModel> _mapModelRepository;
     private readonly IRealtimeNotifier _notifier;
 
     public TurnService(
@@ -41,8 +42,10 @@ public class TurnService : ITurnService
         INpcRepository<Npc> npcRepository,
         IUnitOfWork unitOfWork,
         IUserRepository<User> userRepository,
+        IMapModelRepository<MapModel> mapModelRepository,
         IRealtimeNotifier notifier)
     {
+        _mapModelRepository = mapModelRepository;
         _notifier = notifier;
         _userRepository = userRepository;
         _repository = repository;
@@ -79,9 +82,7 @@ public class TurnService : ITurnService
     public async Task<TurnSummaryInfo> GetSummaryAsync(long userId, long campaignId, int? turnNo)
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
-        var number = turnNo ?? campaign.CurrentTurn;
-        if (number < 1 || number > campaign.CurrentTurn)
-            throw new DomainValidationException("turnNo", $"O turno deve estar entre 1 e {campaign.CurrentTurn}.");
+        var number = CheckTurnNo(campaign, turnNo);
         var current = number == campaign.CurrentTurn;
 
         var entries = await _repository.ListByCampaignTurnAsync(campaignId, number);
@@ -92,57 +93,13 @@ public class TurnService : ITurnService
             ? (await _mapTokenRepository.ListByMapAsync(id)).Where(p => p.CampaignCharacterId.HasValue || p.MapNpcId.HasValue).ToList()
             : new List<MapToken>();
 
-        // Names in batch: characters (and owners), NPC occurrences, NPCs and authors.
+        // Names in batch: characters (and owners), NPC occurrences, NPCs and authors — shared with the turn data (027).
         var participations = (await _campaignCharacterRepository.ListByIdsAsync(
                 pieces.Where(p => p.CampaignCharacterId.HasValue).Select(p => p.CampaignCharacterId!.Value)))
             .ToDictionary(p => p.CampaignCharacterId, p => p.CharacterId);
-        var characters = (await _characterRepository.ListByIdsAsync(entries.Where(e => e.CharacterId.HasValue)
-                .Select(e => e.CharacterId!.Value).Concat(participations.Values).Distinct()))
-            .ToDictionary(c => c.CharacterId);
-        var mapNpcs = (await _mapNpcRepository.ListByIdsAsync(entries.Where(e => e.MapNpcId.HasValue).Select(e => e.MapNpcId!.Value)
-                .Concat(pieces.Where(p => p.MapNpcId.HasValue).Select(p => p.MapNpcId!.Value)).Distinct()))
-            .ToDictionary(m => m.MapNpcId, m => m.Name);
-        var npcs = (await _npcRepository.ListByIdsAsync(entries.Where(e => e.NpcId.HasValue).Select(e => e.NpcId!.Value).Distinct()))
-            .ToDictionary(n => n.NpcId, n => n.Name);
-        var users = (await _userRepository.ListByIdsAsync(entries.Select(e => e.UserId)
-                .Concat(characters.Values.Select(c => c.UserId)).Append(campaign.UserId).Distinct()))
-            .ToDictionary(u => u.UserId, u => u.Name);
-
-        string CharacterLabel(long characterId) => characters.TryGetValue(characterId, out var c)
-            ? $"{c.Name} ({users.GetValueOrDefault(c.UserId, string.Empty)})" : "?";
-        string NpcLabel(long? mapNpcId, long? npcId) =>
-            $"{(mapNpcId is long m && mapNpcs.TryGetValue(m, out var name) ? name : npcId is long n ? npcs.GetValueOrDefault(n, "NPC") : "NPC")} (GM)";
-        long? OwnerOf(Turn e) => e.CharacterId is long c && characters.TryGetValue(c, out var character) ? character.UserId : null;
-        string? AuthorLabel(Turn e)
-        {
-            // The owner acting on their own character is the character itself; otherwise the master shows as GM.
-            if (e.CharacterId.HasValue && OwnerOf(e) == e.UserId)
-                return null;
-            var name = users.GetValueOrDefault(e.UserId, string.Empty);
-            return e.UserId == campaign.UserId ? $"GM ({name})" : name;
-        }
-
-        var spent = new Dictionary<(long?, long?), int>();
-        var lines = new List<SummaryLine>();
-        foreach (var e in entries)
-        {
-            var key = (e.CharacterId, e.MapNpcId ?? e.NpcId);
-            if (e.Moved is int moved)
-                spent[key] = spent.GetValueOrDefault(key) + moved;
-            lines.Add(new SummaryLine
-            {
-                Type = e.TurnType,
-                Actor = e.CharacterId is long characterId ? CharacterLabel(characterId) : NpcLabel(e.MapNpcId, e.NpcId),
-                Author = e.TurnType is TurnType.Movement or TurnType.Action && e.CharacterId.HasValue ? null : AuthorLabel(e),
-                IsNpc = !e.CharacterId.HasValue,
-                Before = e is { BeforeX: int bx, BeforeY: int by, BeforeLook: int bl } ? (bx, by, bl) : null,
-                After = e is { X: int x, Y: int y, Look: int l } ? (x, y, l) : null,
-                Moved = e.Moved,
-                MovedTotal = spent.GetValueOrDefault(key),
-                Description = e.Description,
-                Changes = e.Changes
-            });
-        }
+        var names = await LoadNamesAsync(campaign, entries, participations.Values,
+            pieces.Where(p => p.MapNpcId.HasValue).Select(p => p.MapNpcId!.Value));
+        var lines = BuildLines(entries, names);
 
         // Finished turn: each piece where its last move up to that turn left it (when on this map).
         var lastMoves = current || mapId == null
@@ -155,7 +112,7 @@ public class TurnService : ITurnService
             var key = (characterId, characterId.HasValue ? null : p.MapNpcId);
             var (x, y, look) = lastMoves.TryGetValue(key, out var move) && move is { X: int mx, Y: int my, Look: int ml }
                 ? (mx, my, ml) : (p.X, p.Y, p.Look);
-            var label = characterId is long cid ? CharacterLabel(cid) : NpcLabel(p.MapNpcId, null);
+            var label = characterId is long cid ? names.CharacterLabel(cid) : names.NpcLabel(p.MapNpcId, null);
             return new SummaryPosition(label, x, y, look);
         }).ToList();
 

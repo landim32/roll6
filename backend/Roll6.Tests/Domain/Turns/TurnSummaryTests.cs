@@ -117,4 +117,26 @@ public class TurnSummaryTests
     {
         TurnSummary.Direction(look).Should().Be(name);
     }
+
+    // ---- 027: narration and the actions section alone ----
+
+    [Fact]
+    public void Build_Narration_NamesTheMaster()
+    {
+        var line = new SummaryLine { Type = TurnType.Narration, Author = "GM (Rodrigo)", Description = "O goblin *fugiu*." };
+
+        TurnSummary.Build(new[] { line }, Array.Empty<SummaryPosition>()).Should().Contain("GM (Rodrigo): Narração: O goblin \\*fugiu\\*.\n");
+    }
+
+    [Fact]
+    public void BuildActions_IsTheFirstSectionOfBuild()
+    {
+        var lines = new[] { new SummaryLine { Type = TurnType.Action, Actor = "Cedric (José)", Description = "Ataca" } };
+        var positions = new[] { new SummaryPosition("Cedric (José)", 1, 1, 0) };
+
+        var actions = TurnSummary.BuildActions(lines);
+
+        actions.Should().Be("## Ações\nCedric (José): \"Ataca\"\n");
+        TurnSummary.Build(lines, positions).Should().StartWith(actions);
+    }
 }

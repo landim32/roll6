@@ -17,6 +17,7 @@ const typeLabel: Record<number, string> = {
   [TURN_TYPE.action]: 'turn.action',
   [TURN_TYPE.actionResult]: 'turn.result',
   [TURN_TYPE.characterUpdate]: 'turn.update',
+  [TURN_TYPE.narration]: 'turn.narration',
 };
 
 /** Everything done in a turn, in order: moves, actions and action results. */

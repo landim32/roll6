@@ -7,6 +7,8 @@ interface ModalProps {
   title: string;
   /** Wider dialog for lists. */
   large?: boolean;
+  /** Takes most of the screen (settings with side-by-side lists and editors). */
+  wide?: boolean;
   children: ReactNode;
   footer?: ReactNode;
   /**
@@ -20,13 +22,13 @@ interface ModalProps {
  * Base modal: Radix Dialog (focus trap, Esc, a11y) styled with Bootstrap's modal classes in the
  * dark theme. Every window besides the map opens through it.
  */
-export const Modal = ({ open, onOpenChange, title, large = false, children, footer, hidden = false }: ModalProps) => (
+export const Modal = ({ open, onOpenChange, title, large = false, wide = false, children, footer, hidden = false }: ModalProps) => (
   <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="stm-modal-overlay" hidden={hidden} />
       <DialogPrimitive.Content
         hidden={hidden}
-        className={`modal-content stm-modal-content${large ? ' stm-modal-lg' : ''}`}
+        className={`modal-content stm-modal-content${wide ? ' stm-modal-wide' : large ? ' stm-modal-lg' : ''}`}
         aria-describedby={undefined}
       >
         <div className="modal-header">

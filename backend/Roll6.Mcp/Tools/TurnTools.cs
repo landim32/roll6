@@ -51,6 +51,55 @@ public static class TurnTools
         [Description("Turn number (1 up to the current turn). Omit it for the turn in progress.")] int? turnNo = null) =>
         api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/turn/summary", null, ("turnNo", turnNo));
 
+    [McpServerTool(Name = "get_turn_data", Title = "Get turn data", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/campaign/{id}/turn/data")]
+    [Description("""
+        What it does: returns the whole table in ONE call, to decide what happened in a turn: every approved character
+        (characterId, name, playerName, currentLife/totalLife, currentEnergy/totalEnergy — energy is the fatigue —, status and,
+        when it has a piece on the current map, x/y/look/lookName), every NPC occurrence on the current map (mapNpcId, name,
+        current/total life and energy, status, x/y/look/lookName) and "actions": the "## Ações" markdown of the turn (moves,
+        actions, results, changes, narration, with who made them).
+        Who can use it: the campaign master or a player with an approved character in the campaign.
+        Returns: { campaignId, turnNo, currentTurn, mapId, characters[], npcs[], actions }. Without turnNo it is the turn in
+        progress (values are always the current ones).
+        Common errors: 400 turnNo below 1 or above the current turn, 403 no access to the campaign, 404 campaign not found.
+        Related tools: process_turn, get_participation (sheet and campaign notes), get_turn_summary.
+        """)]
+    public static Task<CallToolResult> GetTurnData(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("Turn number (1 up to the current turn). Omit it for the turn in progress.")] int? turnNo = null) =>
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/turn/data", null, ("turnNo", turnNo));
+
+    [McpServerTool(Name = "process_turn", Title = "Process turn", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
+    [ApiOperation("POST", "/api/campaign/{id}/turn/process")]
+    [Description($$"""
+        What it does: saves the result of the turn in ONE call and FINISHES it (the campaign moves to the next turn). For each
+        character (characterId) and NPC occurrence (mapNpcId) send only what changed: currentLife, currentEnergy (fatigue),
+        status (or clearStatus: true), x/y (together) and look. Also send "narration": what happened in the turn (up to 10000
+        characters). Everything is validated first — current values never above the totals, positions inside the grid and on
+        free hexes (checked after all moves, so two pieces may swap) — and saved together: if any item is invalid nothing
+        changes and the turn does not advance. Every change is logged in the turn by the master (moves without the one-move
+        limit). Campaign notes and sheets are not changed here (use update_participation). {{McpDocs.DESTRUCTIVE}}
+        Who can use it: only the campaign master.
+        Returns: { finishedTurn, turnNo (new turn in progress), data } where data is the turn data of the processed turn.
+        Common errors: 400 with keys per item such as characters[0].currentLife, npcs[1].x, narration or batch (empty,
+        repeated items), 403 not the master, 404 campaign not found.
+        Related tools: get_turn_data, get_turn_summary, update_participation.
+        """)]
+    public static Task<CallToolResult> ProcessTurn(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, status?, clearStatus?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessCharacterInfo>? characters = null,
+        [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, status?, clearStatus?, x?, y?, look? }].")] List<TurnProcessNpcInfo>? npcs = null,
+        [Description("What happened in the turn, in plain text or markdown (up to 10000 characters); stays in the turn log.")] string? narration = null) =>
+        api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/process", new TurnProcessInfo
+        {
+            Characters = characters ?? new List<TurnProcessCharacterInfo>(),
+            Npcs = npcs ?? new List<TurnProcessNpcInfo>(),
+            Narration = narration
+        });
+
     [McpServerTool(Name = "reset_turn", Title = "Reset piece turn", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("POST", "/api/turn/reset")]
     [Description($$"""
