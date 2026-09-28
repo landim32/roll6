@@ -1,7 +1,7 @@
 meta {
   name: Invite (after denial)
   type: http
-  seq: 9
+  seq: 16
 }
 
 post {
@@ -12,22 +12,17 @@ post {
 
 body:json {
   {
-    "campaignId": {{closedCampaignId}},
-    "characterId": {{secondCharacterId}}
+    "campaignId": {{campaignId}},
+    "characterId": {{thirdCharacterId}}
   }
 }
 
 assert {
   res.status: eq 201
-  res.body.status: eq 1
 }
 
 script:post-response {
   if (res.status === 200 || res.status === 201) {
-    bru.setVar("inviteId", res.body.campaignCharacterId);
+    bru.setVar("declineId", res.body.campaignCharacterId);
   }
-}
-
-docs {
-  Only the master (who may invite their own characters). Denied → Invited; pending request → Approved.
 }

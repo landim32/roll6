@@ -7,22 +7,29 @@ auth:bearer {
 }
 
 vars:pre-request {
-  baseUrl: http://localhost:5000
+  baseUrl: https://roll6.site
   email: rodrigo@emagine.com.br
-  password: eaa69cpxy2
-  newPassword: Eaa69cpxy2++
+  password: {{password}}
 }
 
 docs {
   # Roll6 API
   
-  Requests inherit Bearer auth from the collection; `User/Login` stores `token`.
-  Create requests store ids (`mapModelId`, `campaignId`, `mapId`, `tokenId`, `mapTokenId`,
-  `characterId`, `imageFileName`) as runtime variables used by the following requests.
+  Requests inherit Bearer auth from the collection; `User/Login` stores `token` and `User/Login player` stores
+  `playerToken` (requests made as the player use it explicitly). Create requests store ids as runtime variables used
+  by the following requests.
   
-  Running the whole collection in order (Runner) works end to end: each folder creates an
-  extra record just to exercise its DELETE, so the records used by later folders survive.
-  `User/Register` creates a new user with a random e-mail on every run.
+  Running the whole collection in order (Runner) works end to end and can be repeated:
+  - `User/Register` creates the main user from the environment (`email`, `password`); later runs get 409, which is fine.
+  - `User/Change password back` restores the password; `User/Register player` creates a new player each run.
+  - Each folder creates an extra record just to exercise its DELETE, so the records used by later folders survive.
   
-  `Image/Upload` needs S3 (DigitalOcean Spaces) credentials configured on the API.
+  Folders: User, ApiKey (019), Image/Document uploads, Token, MapModel, Campaign, Map, Character, CampaignCharacter,
+  MapToken, Npc/CampaignNpc/MapNpc (013), Turn (016), CampaignPlan (018), Transfer (021).
+  
+  Uploads (`Image/*`) need S3 (DigitalOcean Spaces) credentials on the API; everything that uses `imageFileName`,
+  `sheetFileName` depends on them.
+  
+  Credentials live in the environments; in Production they are secret variables (set them in Bruno, they are not
+  saved in the file).
 }

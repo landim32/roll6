@@ -1,0 +1,30 @@
+meta {
+  name: Update
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/api/maptoken/{{mapTokenId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Barril de vinho",
+    "tokenType": 4,
+    "sheet": null,
+    "life": 0,
+    "energy": 0,
+    "status": "Aberto",
+    "move": 0,
+    "x": 3,
+    "y": 4,
+    "look": 2
+  }
+}
+
+assert {
+  res.status: eq 200
+}

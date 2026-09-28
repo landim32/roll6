@@ -1,0 +1,15 @@
+meta {
+  name: List campaign maps
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/map
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}

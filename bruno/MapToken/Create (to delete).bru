@@ -1,7 +1,7 @@
 meta {
   name: Create (to delete)
   type: http
-  seq: 3
+  seq: 9
 }
 
 post {
@@ -13,17 +13,17 @@ post {
 body:json {
   {
     "mapId": {{mapId}},
-    "tokenId": {{tokenId}},
-    "name": "Baú",
+    "tokenId": {{objectTokenId}},
+    "name": "Caixa",
     "tokenType": 4,
     "sheet": null,
     "life": 0,
     "energy": 0,
     "status": null,
     "move": 0,
-    "x": 1,
-    "y": 0,
-    "look": 0
+    "x": 10,
+    "y": 10,
+    "look": 3
   }
 }
 
@@ -33,6 +33,6 @@ assert {
 
 script:post-response {
   if (res.status === 200 || res.status === 201) {
-    bru.setVar("mapTokenIdToDelete", res.body.mapTokenId);
+    bru.setVar("tempMapTokenId", res.body.mapTokenId);
   }
 }

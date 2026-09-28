@@ -1,18 +1,16 @@
 meta {
   name: Search
   type: http
-  seq: 4
+  seq: 6
 }
 
 get {
-  url: {{baseUrl}}/api/token?page=1&pageSize=20&search=gob
+  url: {{baseUrl}}/api/token?search=gob
   body: none
   auth: inherit
 }
 
 params:query {
-  page: 1
-  pageSize: 20
   search: gob
 }
 

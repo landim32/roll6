@@ -1,0 +1,29 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/campaignplan
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "campaignId": {{campaignId}},
+    "title": "Ato 1 — A taverna",
+    "description": "# Ato 1\nOs heróis chegam à taverna.\n\n![Taverna](roll6-image:{{imageFileName}})"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("campaignPlanId", res.body.campaignPlanId);
+  }
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/mapnpc/{{tempMapNpcId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Deletes the occurrence and its piece.
+}

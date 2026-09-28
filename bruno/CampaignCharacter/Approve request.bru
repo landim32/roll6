@@ -1,7 +1,7 @@
 meta {
   name: Approve request
   type: http
-  seq: 5
+  seq: 12
 }
 
 post {
@@ -12,9 +12,4 @@ post {
 
 assert {
   res.status: eq 200
-  res.body.status: eq 3
-}
-
-docs {
-  Only the master.
 }

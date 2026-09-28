@@ -1,0 +1,27 @@
+meta {
+  name: Move (master)
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/maptoken/{{mapTokenId}}/position
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "x": 3,
+    "y": 4,
+    "look": 2
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  The master moves anything without limit; players move only their own approved character (cost ≤ move).
+}

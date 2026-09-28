@@ -1,0 +1,19 @@
+meta {
+  name: Get detail
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/campaigncharacter/{{campaignCharacterId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Owner, master or approved participant; includes the campaign sheet and the sheet file.
+}

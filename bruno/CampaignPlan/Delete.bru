@@ -1,0 +1,15 @@
+meta {
+  name: Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/campaignplan/{{campaignPlanId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 204
+}

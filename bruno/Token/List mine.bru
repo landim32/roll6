@@ -1,0 +1,19 @@
+meta {
+  name: List mine
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/token?mine=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  mine: true
+}
+
+assert {
+  res.status: eq 200
+}

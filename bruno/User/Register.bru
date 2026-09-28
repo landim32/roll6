@@ -18,6 +18,12 @@ body:json {
   }
 }
 
-assert {
-  res.status: eq 201
+tests {
+  test("created, or already registered on a previous run", () => {
+    expect([201, 409]).to.include(res.status);
+  });
+}
+
+docs {
+  Creates the main user. On later runs the e-mail already exists (409), which is fine.
 }

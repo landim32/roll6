@@ -1,7 +1,7 @@
 meta {
   name: Update
   type: http
-  seq: 4
+  seq: 5
 }
 
 put {
@@ -14,14 +14,19 @@ body:json {
   {
     "name": "Thorin",
     "sheet": "## Thorin\n- Anão guerreiro\n- Nível 3",
-    "life": 21,
+    "life": 30,
     "energy": 10,
-    "status": "Envenenado",
     "move": 5,
-    "image": "{{imageFileName}}"
+    "image": "{{imageFileName}}",
+    "tokenId": {{tokenId}},
+    "sheetFile": "{{sheetFileName}}"
   }
 }
 
 assert {
   res.status: eq 200
+}
+
+docs {
+  Replaces every field: omitting `image`, `tokenId` or `sheetFile` removes them.
 }

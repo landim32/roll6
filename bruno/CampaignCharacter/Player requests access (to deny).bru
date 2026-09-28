@@ -1,0 +1,32 @@
+meta {
+  name: Player requests access (to deny)
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/campaigncharacter/request
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{playerToken}}
+}
+
+body:json {
+  {
+    "campaignId": {{campaignId}},
+    "characterId": {{thirdCharacterId}}
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("deniedId", res.body.campaignCharacterId);
+  }
+}

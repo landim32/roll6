@@ -1,0 +1,27 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/npc/{{npcId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "tokenId": {{tokenId}},
+    "name": "Goblin batedor",
+    "life": 8,
+    "energy": 2,
+    "move": 6,
+    "sheet": "## Goblin\n- Lança",
+    "image": "{{imageFileName}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Remove from campaign
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/campaignnpc/{{tempCampaignNpcId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Also deletes its occurrences and pieces on the campaign maps.
+}

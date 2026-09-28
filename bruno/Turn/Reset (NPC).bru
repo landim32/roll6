@@ -1,0 +1,25 @@
+meta {
+  name: Reset (NPC)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/turn/reset
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "mapTokenId": {{npcMapTokenId}}
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Deletes the actor's entries in the turn and moves the piece back when its former hex is free.
+}

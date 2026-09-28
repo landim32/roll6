@@ -30,11 +30,3 @@ script:post-response {
     bru.setVar("tokenId", res.body.tokenId);
   }
 }
-
-docs {
-  `upSpace` null → 1.
-  `downSpace`:
-  - informed → stored as sent (>= 0);
-  - null with `downImage` → 2;
-  - null without `downImage` → null (token without down state).
-}

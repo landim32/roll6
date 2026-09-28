@@ -1,11 +1,11 @@
 meta {
   name: List
   type: http
-  seq: 3
+  seq: 4
 }
 
 get {
-  url: {{baseUrl}}/api/token?page=1&pageSize=20&search=
+  url: {{baseUrl}}/api/token?page=1&pageSize=20
   body: none
   auth: inherit
 }
@@ -13,7 +13,6 @@ get {
 params:query {
   page: 1
   pageSize: 20
-  search: 
 }
 
 assert {

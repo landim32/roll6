@@ -1,7 +1,7 @@
 meta {
   name: List
   type: http
-  seq: 2
+  seq: 3
 }
 
 get {
@@ -17,8 +17,4 @@ params:query {
 
 assert {
   res.status: eq 200
-}
-
-docs {
-  Only the campaigns of the authenticated user.
 }

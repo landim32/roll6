@@ -1,0 +1,28 @@
+meta {
+  name: Invite
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/campaigncharacter/invite
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "campaignId": {{campaignId}},
+    "characterId": {{playerCharacterId}}
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("inviteId", res.body.campaignCharacterId);
+  }
+}

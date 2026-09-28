@@ -1,0 +1,31 @@
+meta {
+  name: Place player character
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/maptoken/character
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "mapId": {{mapId}},
+    "campaignCharacterId": {{inviteId}},
+    "tokenId": null,
+    "x": 8,
+    "y": 5
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("playerMapTokenId", res.body.mapTokenId);
+  }
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Act (player)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/turn/action
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{playerToken}}
+}
+
+body:json {
+  {
+    "mapTokenId": {{playerMapTokenId}},
+    "description": "Ataco o goblin com a espada."
+  }
+}
+
+assert {
+  res.status: eq 201
+}

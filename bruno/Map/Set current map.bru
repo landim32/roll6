@@ -1,0 +1,25 @@
+meta {
+  name: Set current map
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/current-map
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "mapId": {{mapId}}
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  The map the players follow (017). `null` clears it.
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Update campaign values
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/campaigncharacter/{{campaignCharacterId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "currentLife": 20,
+    "currentEnergy": 8,
+    "characterStatus": "Ferido no braço",
+    "sheet": "## Na campanha\n- Espada +1"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

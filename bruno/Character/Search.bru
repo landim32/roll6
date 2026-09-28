@@ -1,19 +1,17 @@
 meta {
   name: Search
   type: http
-  seq: 9
+  seq: 4
 }
 
 get {
-  url: {{baseUrl}}/api/character/search?page=1&pageSize=20&search=a
+  url: {{baseUrl}}/api/character/search?search=tho
   body: none
   auth: inherit
 }
 
 params:query {
-  page: 1
-  pageSize: 20
-  search: a
+  search: tho
 }
 
 assert {
@@ -21,5 +19,5 @@ assert {
 }
 
 docs {
-  Characters of every user (public fields only: name, image, owner) for the master's invite search.
+  Characters of every user, public fields only (for invites).
 }
