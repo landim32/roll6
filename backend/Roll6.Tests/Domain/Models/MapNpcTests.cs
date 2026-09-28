@@ -7,11 +7,11 @@ namespace Roll6.Tests.Domain.Models;
 public class MapNpcTests
 {
     [Fact]
-    public void FromNpc_CopiesNameLifeEnergyAndStatus()
+    public void FromNpc_StartsAtTheNpcTotals()
     {
         var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7, Energy = 2, Status = "ferido" });
 
-        (mapNpc.MapId, mapNpc.NpcId, mapNpc.Name, mapNpc.Life, mapNpc.Energy, mapNpc.Status)
+        (mapNpc.MapId, mapNpc.NpcId, mapNpc.Name, mapNpc.CurrentLife, mapNpc.CurrentEnergy, mapNpc.Status)
             .Should().Be((30L, 8L, "Goblin", 7, 2, "ferido"));
     }
 
@@ -20,19 +20,31 @@ public class MapNpcTests
     {
         var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7 });
 
-        mapNpc.Update("Goblin 2", -3, 0, " caído ");
+        mapNpc.Update("Goblin 2", -3, 0, " caído ", 7, 0);
 
-        (mapNpc.Name, mapNpc.Life, mapNpc.Energy, mapNpc.Status).Should().Be(("Goblin 2", -3, 0, "caído"));
+        (mapNpc.Name, mapNpc.CurrentLife, mapNpc.CurrentEnergy, mapNpc.Status).Should().Be(("Goblin 2", -3, 0, "caído"));
+    }
+
+    [Fact]
+    public void Update_AboveTheTotals_Throws()
+    {
+        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 11, Energy = 11 });
+
+        ((Action)(() => mapNpc.Update("Goblin", 12, 1, null, 11, 11))).Should().Throw<DomainValidationException>()
+            .Which.Errors.Should().ContainKey("currentLife");
+        ((Action)(() => mapNpc.Update("Goblin", 1, 12, null, 11, 11))).Should().Throw<DomainValidationException>()
+            .Which.Errors.Should().ContainKey("currentEnergy");
+        mapNpc.CurrentLife.Should().Be(11);
     }
 
     [Fact]
     public void Update_InvalidTexts_Throw()
     {
-        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin" });
+        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 5, Energy = 5 });
 
-        ((Action)(() => mapNpc.Update(" ", 1, 1, null))).Should().Throw<DomainValidationException>()
+        ((Action)(() => mapNpc.Update(" ", 1, 1, null, 5, 5))).Should().Throw<DomainValidationException>()
             .Which.Errors.Should().ContainKey("name");
-        ((Action)(() => mapNpc.Update("Goblin", 1, 1, new string('x', 261)))).Should().Throw<DomainValidationException>()
+        ((Action)(() => mapNpc.Update("Goblin", 1, 1, new string('x', 261), 5, 5))).Should().Throw<DomainValidationException>()
             .Which.Errors.Should().ContainKey("status");
     }
 }

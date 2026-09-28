@@ -39,7 +39,8 @@ public static class Roll6Guide
           values, pieces and turn entries stay exactly as they were. Besides the markdown `sheet`, a character may have a
           **sheet file** (image or PDF, stored as sent): `upload_document` → `sheetFile` on create/update_character.
         - **NPCs**: belong to a master's library (require a token). The master adds his own NPCs to a campaign
-          (campaign NPC) and places **occurrences** on maps (each occurrence has its own name/life/energy/status).
+          (campaign NPC) and places **occurrences** on maps (each occurrence has its own name, status and current
+          life/energy, at most the NPC's totals; its piece shows them with the NPC's sheet).
         - **Map models**: the image + grid layout (a reusable map). A **campaign map** is a map model added to a
           campaign; its pieces live on the campaign map.
 

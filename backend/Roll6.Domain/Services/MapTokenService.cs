@@ -351,6 +351,8 @@ public class MapTokenService : IMapTokenService
                 Sheet = mapToken.Sheet,
                 Life = mapToken.Life,
                 Energy = mapToken.Energy,
+                TotalLife = mapToken.Life,
+                TotalEnergy = mapToken.Energy,
                 Status = mapToken.Status,
                 Move = mapToken.Move,
                 X = mapToken.X,
@@ -367,6 +369,8 @@ public class MapTokenService : IMapTokenService
                 info.Move = character?.Move ?? 0;
                 info.Life = participation.CurrentLife;
                 info.Energy = participation.CurrentEnergy;
+                info.TotalLife = character?.Life ?? participation.CurrentLife;
+                info.TotalEnergy = character?.Energy ?? participation.CurrentEnergy;
                 info.Status = participation.CharacterStatus;
                 info.Sheet = participation.Sheet;
             }
@@ -374,11 +378,16 @@ public class MapTokenService : IMapTokenService
             {
                 info.MapNpcId = mapNpc.MapNpcId;
                 info.NpcId = mapNpc.NpcId;
+                // The occurrence owns name, current vitals and status; the NPC gives totals, move and the sheet (026).
+                var npc = npcs.GetValueOrDefault(mapNpc.NpcId);
                 info.Name = mapNpc.Name;
-                info.Life = mapNpc.Life;
-                info.Energy = mapNpc.Energy;
+                info.Life = mapNpc.CurrentLife;
+                info.Energy = mapNpc.CurrentEnergy;
+                info.TotalLife = npc?.Life ?? mapNpc.CurrentLife;
+                info.TotalEnergy = npc?.Energy ?? mapNpc.CurrentEnergy;
                 info.Status = mapNpc.Status;
-                info.Move = npcs.GetValueOrDefault(mapNpc.NpcId)?.Move ?? 0;
+                info.Move = npc?.Move ?? 0;
+                info.Sheet = mapToken.Sheet ?? npc?.Sheet;
             }
             return info;
         }).ToList();

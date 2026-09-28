@@ -352,7 +352,7 @@ public class MapTokenServiceTests
         });
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character>
         {
-            new() { CharacterId = ARIA, Name = "Aria", Move = 5 }
+            new() { CharacterId = ARIA, Name = "Aria", Move = 5, Life = 12, Energy = 6 }
         });
         _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
         {
@@ -365,6 +365,8 @@ public class MapTokenServiceTests
         var aria = result.Single(t => t.CampaignCharacterId == APPROVED);
         (aria.Name, aria.Life, aria.Energy, aria.Status, aria.Sheet, aria.Move, aria.CharacterId)
             .Should().Be(("Aria", 8, 3, "ferida", "Força 3", 5, (long?)ARIA));
+        // 026: character pieces keep reading the participation, with the character's totals.
+        (aria.TotalLife, aria.TotalEnergy).Should().Be((12, 6));
         var goblin = result.Single(t => t.MapTokenId == 41);
         (goblin.Name, goblin.Life, goblin.CharacterId).Should().Be(("Goblin", 4, (long?)null));
     }
@@ -374,11 +376,11 @@ public class MapTokenServiceTests
     {
         _mapNpcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<MapNpc>
         {
-            new() { MapNpcId = 90, MapId = 30, NpcId = 8, Name = "Goblin 2", Life = -1, Energy = 2, Status = "caído" }
+            new() { MapNpcId = 90, MapId = 30, NpcId = 8, Name = "Goblin 2", CurrentLife = -1, CurrentEnergy = 2, Status = "caído" }
         });
         _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Npc>
         {
-            new() { NpcId = 8, Name = "Goblin", Move = 6 }
+            new() { NpcId = 8, Name = "Goblin", Move = 6, Life = 11, Energy = 9, Sheet = "## Goblin" }
         });
         _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
         {
@@ -389,6 +391,7 @@ public class MapTokenServiceTests
 
         (piece.MapNpcId, piece.NpcId, piece.Name, piece.Life, piece.Energy, piece.Status, piece.Move)
             .Should().Be(((long?)90, (long?)8, "Goblin 2", -1, 2, "caído", 6));
+        (piece.TotalLife, piece.TotalEnergy, piece.Sheet).Should().Be((11, 9, "## Goblin"));
         piece.TokenType.Should().Be((int)MapTokenType.Npc);
     }
 
@@ -525,5 +528,69 @@ public class MapTokenServiceTests
         await _service.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 7, Look = 3 });
 
         (recorded!.UserId, recorded.Moved).Should().Be((1L, (int?)8));
+    }
+
+    // ---- 026: NPC pieces read the occurrence (never the piece's own zeros) ----
+
+    private void NpcPiece(MapNpc occurrence, Npc npc, string? pieceSheet = null)
+    {
+        _mapNpcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<MapNpc> { occurrence });
+        _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Npc> { npc });
+        var piece = MapToken.PlaceNpc(30, 5, occurrence.MapNpcId, occurrence.Name, 3, 3, 0);
+        piece.Sheet = pieceSheet;
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { piece });
+    }
+
+    [Fact]
+    public async Task ListByMap_JustPlacedNpc_ShowsTheOccurrenceAtTheNpcTotals()
+    {
+        var npc = new Npc { NpcId = 8, Name = "Batedor", Life = 11, Energy = 11, Move = 5, Sheet = "Ficha do batedor" };
+        NpcPiece(WithId(MapNpc.FromNpc(30, npc), 91), npc);
+
+        var piece = (await _service.ListByMapAsync(1, 30)).Single();
+
+        (piece.Life, piece.Energy, piece.TotalLife, piece.TotalEnergy).Should().Be((11, 11, 11, 11));
+        piece.Sheet.Should().Be("Ficha do batedor");
+    }
+
+    [Fact]
+    public async Task ListByMap_UpdatedOccurrence_ShowsTheNewValuesAndStatus()
+    {
+        var npc = new Npc { NpcId = 8, Name = "Batedor", Life = 11, Energy = 11 };
+        var occurrence = WithId(MapNpc.FromNpc(30, npc), 92);
+        occurrence.Update("Batedor", 1, 11, "Montado, cavalo exausto", 11, 11);
+        NpcPiece(occurrence, npc);
+
+        var piece = (await _service.ListByMapAsync(1, 30)).Single();
+
+        (piece.Life, piece.TotalLife, piece.Status).Should().Be((1, 11, "Montado, cavalo exausto"));
+    }
+
+    [Fact]
+    public async Task ListByMap_NpcPieceWithItsOwnSheet_KeepsIt()
+    {
+        var npc = new Npc { NpcId = 8, Name = "Batedor", Life = 11, Energy = 11, Sheet = "Ficha do NPC" };
+        NpcPiece(WithId(MapNpc.FromNpc(30, npc), 93), npc, pieceSheet: "Anotação da peça");
+
+        (await _service.ListByMapAsync(1, 30)).Single().Sheet.Should().Be("Anotação da peça");
+    }
+
+    [Fact]
+    public async Task ListByMap_ObjectPiece_TotalsAreItsOwnValues()
+    {
+        var chest = MapToken.PlaceNpc(30, 5, 99, "Baú", 4, 4, 0);
+        chest.MapNpcId = null;
+        chest.Update("Baú", (int)MapTokenType.Object, null, 3, 1, null, 0, 4, 4, 0);
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { chest });
+
+        var piece = (await _service.ListByMapAsync(1, 30)).Single();
+
+        (piece.Life, piece.TotalLife, piece.Energy, piece.TotalEnergy).Should().Be((3, 3, 1, 1));
+    }
+
+    private static MapNpc WithId(MapNpc occurrence, long id)
+    {
+        occurrence.MapNpcId = id;
+        return occurrence;
     }
 }

@@ -28,8 +28,12 @@ export interface MapTokenInfo {
   name: string;
   tokenType: MapTokenType;
   sheet: string | null;
+  /** Current values (participation / NPC occurrence for character and NPC pieces). */
   life: number;
   energy: number;
+  /** Maximum values: the character's or the NPC's totals (the piece's own values for objects, 026). */
+  totalLife: number;
+  totalEnergy: number;
   status: string | null;
   move: number;
   /** Column/row (odd-q offset). */

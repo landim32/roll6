@@ -7,11 +7,13 @@ public class MapNpcUpdateInfo
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
-    [JsonPropertyName("life")]
-    public int Life { get; set; }
+    /// <summary>Current life (at most the NPC's life; 0 or below = fallen).</summary>
+    [JsonPropertyName("currentLife")]
+    public int CurrentLife { get; set; }
 
-    [JsonPropertyName("energy")]
-    public int Energy { get; set; }
+    /// <summary>Current energy (at most the NPC's energy).</summary>
+    [JsonPropertyName("currentEnergy")]
+    public int CurrentEnergy { get; set; }
 
     [JsonPropertyName("status")]
     public string? Status { get; set; }

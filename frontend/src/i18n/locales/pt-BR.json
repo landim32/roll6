@@ -184,6 +184,7 @@
     }
   },
   "npcs": {
+    "occurrences": "Ocorrências de {{name}} no mapa",
     "title": "NPCs ({{count}})",
     "empty": "Nenhum NPC na campanha.",
     "add": "Incluir NPC",

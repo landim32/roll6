@@ -20,11 +20,21 @@ public class MapNpcInfo
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
-    [JsonPropertyName("life")]
-    public int Life { get; set; }
+    /// <summary>Current life of this occurrence (0 or below = fallen).</summary>
+    [JsonPropertyName("currentLife")]
+    public int CurrentLife { get; set; }
 
-    [JsonPropertyName("energy")]
-    public int Energy { get; set; }
+    /// <summary>Current energy of this occurrence.</summary>
+    [JsonPropertyName("currentEnergy")]
+    public int CurrentEnergy { get; set; }
+
+    /// <summary>The NPC's life (maximum of the current life).</summary>
+    [JsonPropertyName("totalLife")]
+    public int TotalLife { get; set; }
+
+    /// <summary>The NPC's energy (maximum of the current energy).</summary>
+    [JsonPropertyName("totalEnergy")]
+    public int TotalEnergy { get; set; }
 
     [JsonPropertyName("status")]
     public string? Status { get; set; }
