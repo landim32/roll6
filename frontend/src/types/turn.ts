@@ -78,3 +78,20 @@ export interface TurnSummaryInfo {
   turnNo: number;
   markdown: string;
 }
+
+/** One finished turn of the turn console (028). */
+export interface TurnHistoryItemInfo {
+  turnNo: number;
+  /** "## Ações" text of the turn summary. */
+  actions: string;
+  /** UTC time of the turn's last entry, without zone. */
+  finishedAt: string | null;
+}
+
+/** A page of finished turns, newest first; `nextBefore` loads older ones (null = turn 1 reached). */
+export interface TurnHistoryPageInfo {
+  campaignId: number;
+  currentTurn: number;
+  items: TurnHistoryItemInfo[];
+  nextBefore: number | null;
+}

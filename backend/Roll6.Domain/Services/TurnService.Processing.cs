@@ -403,4 +403,43 @@ public partial class TurnService
             Data = await BuildDataAsync(campaign, finished)
         };
     }
+
+    // ------------------------------------------------------------------ history (028)
+
+    public const int DEFAULT_HISTORY_LIMIT = 5;
+    public const int MAX_HISTORY_LIMIT = 20;
+
+    /// <summary>
+    /// A page of finished turns (below the turn in progress), newest first, each with the "## Ações" text of its
+    /// summary; the cursor is the turn number, so turns finished meanwhile never shift the pages.
+    /// </summary>
+    public async Task<TurnHistoryPageInfo> GetHistoryAsync(long userId, long campaignId, int? before, int? limit)
+    {
+        var campaign = await GetReadableCampaignAsync(userId, campaignId);
+        if (before < 1)
+            throw new DomainValidationException("before", "O turno deve ser maior que zero.");
+        var size = Math.Clamp(limit ?? DEFAULT_HISTORY_LIMIT, 1, MAX_HISTORY_LIMIT);
+        var newest = Math.Min(before ?? campaign.CurrentTurn, campaign.CurrentTurn) - 1;
+        var page = new TurnHistoryPageInfo { CampaignId = campaignId, CurrentTurn = campaign.CurrentTurn };
+        if (newest < 1)
+            return page;
+
+        var oldest = Math.Max(1, newest - size + 1);
+        var entries = await _repository.ListByCampaignTurnRangeAsync(campaignId, oldest, newest);
+        var names = await LoadNamesAsync(campaign, entries, Array.Empty<long>(), Array.Empty<long>());
+        var byTurn = entries.GroupBy(e => e.TurnNo).ToDictionary(g => g.Key, g => g.ToList());
+
+        for (var turnNo = newest; turnNo >= oldest; turnNo--)
+        {
+            var turnEntries = byTurn.GetValueOrDefault(turnNo) ?? new List<Turn>();
+            page.Items.Add(new TurnHistoryItemInfo
+            {
+                TurnNo = turnNo,
+                Actions = TurnSummary.BuildActions(BuildLines(turnEntries, names)),
+                FinishedAt = turnEntries.Count == 0 ? null : turnEntries.Max(e => e.CreatedAt)
+            });
+        }
+        page.NextBefore = oldest > 1 ? oldest : null;
+        return page;
+    }
 }

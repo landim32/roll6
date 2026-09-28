@@ -197,6 +197,21 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Finished turns, newest first, paged by turn number (028: turn console).</summary>
+    [HttpGet("{id:long}/turn/history")]
+    [ProducesResponseType(typeof(TurnHistoryPageInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTurnHistory(long id, [FromQuery] int? before, [FromQuery] int? limit)
+    {
+        try
+        {
+            return Ok(await _turnService.GetHistoryAsync(CurrentUserId, id, before, limit));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Entries of a turn, oldest first (turn summary).</summary>
     [HttpGet("{id:long}/turn/{turnNo:int}")]
     [ProducesResponseType(typeof(List<TurnInfo>), StatusCodes.Status200OK)]

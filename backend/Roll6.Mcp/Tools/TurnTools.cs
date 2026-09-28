@@ -100,6 +100,25 @@ public static class TurnTools
             Narration = narration
         });
 
+    [McpServerTool(Name = "get_turn_history", Title = "Get turn history", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/campaign/{id}/turn/history")]
+    [Description("""
+        What it does: pages through the FINISHED turns of a campaign, newest first. Each item is one turn: turnNo, finishedAt
+        and "actions" — the "## Ações" markdown of that turn (moves, actions, results, changes and narration, with who made
+        them). Use it to read what happened before the turn in progress, a few turns at a time.
+        Who can use it: the campaign master or a player with an approved character in the campaign.
+        Returns: { campaignId, currentTurn, items[], nextBefore }. Pass nextBefore as "before" to get older turns; null means
+        turn 1 was reached. Without "before" it starts right below the turn in progress.
+        Common errors: 400 before below 1, 403 no access to the campaign, 404 campaign not found.
+        Related tools: get_turn_data, get_turn_summary.
+        """)]
+    public static Task<CallToolResult> GetTurnHistory(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("Only turns below this number (the previous page's nextBefore). Omit it for the newest finished turns.")] int? before = null,
+        [Description("How many turns per page, 1 to 20 (default 5).")] int? limit = null) =>
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/turn/history", null, ("before", before), ("limit", limit));
+
     [McpServerTool(Name = "reset_turn", Title = "Reset piece turn", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("POST", "/api/turn/reset")]
     [Description($$"""

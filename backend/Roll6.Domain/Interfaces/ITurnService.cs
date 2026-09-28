@@ -15,6 +15,9 @@ public interface ITurnService
 
     /// <summary>Saves the result of the turn in one transaction and finishes it (027, master only).</summary>
     Task<TurnProcessResultInfo> ProcessAsync(long userId, long campaignId, TurnProcessInfo info);
+
+    /// <summary>Finished turns before `before` (default: the turn in progress), newest first (028).</summary>
+    Task<TurnHistoryPageInfo> GetHistoryAsync(long userId, long campaignId, int? before, int? limit);
     Task<TurnInfo> ActAsync(long userId, TurnActInfo info);
     Task<TurnResetResultInfo> ResetAsync(long userId, TurnPieceInfo info);
     Task<TurnFinishResultInfo> FinishAsync(long userId, long campaignId, TurnFinishInfo info);

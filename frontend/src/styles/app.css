@@ -169,6 +169,98 @@ body,
   text-decoration: none;
 }
 
+/* ---------- turn console (028) ---------- */
+.stm-console-toggle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0.1rem 0.75rem;
+  line-height: 1;
+  color: var(--bs-body-color);
+  border: 1px solid var(--stm-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.stm-console-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.stm-turn-console {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--stm-footer-height) + 0.25rem);
+  transform: translateX(-50%);
+  width: min(720px, calc(100% - 2rem));
+  max-height: 35vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.72rem;
+  background: rgba(20, 22, 27, 0.6);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--stm-border);
+  border-radius: var(--bs-border-radius);
+}
+
+.stm-turn-console-header {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  opacity: 0.8;
+  margin-bottom: 0.2rem;
+}
+
+.stm-turn-history {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.stm-turn-history-scroll {
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 70vh;
+  flex: 1;
+}
+
+.stm-turn-history.is-compact .stm-turn-history-scroll {
+  max-height: calc(35vh - 2rem);
+  opacity: 0.9;
+}
+
+.stm-turn-history-item + .stm-turn-history-item {
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--stm-border);
+}
+
+.stm-turn-history-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.stm-turn-history-sentinel {
+  height: 1px;
+}
+
+.stm-turn-history-news {
+  position: absolute;
+  top: 0.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+@media (max-width: 576px) {
+  .stm-turn-console {
+    width: calc(100% - 1rem);
+    max-height: 30vh;
+  }
+}
+
 /* ---------- modal (Radix Dialog styled as Bootstrap) ---------- */
 .stm-modal-overlay {
   position: fixed;
