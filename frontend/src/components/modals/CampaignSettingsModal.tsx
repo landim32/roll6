@@ -71,7 +71,7 @@ export const CampaignSettingsModal = ({ open, onOpenChange, onOpenMap }: Campaig
         open={open && currentCampaign !== null}
         onOpenChange={(value) => { if (value) onOpenChange(true); else guarded(() => onOpenChange(false)); }}
         title={t('campaignSettings.title', { name: currentCampaign?.name ?? '' })}
-        large
+        wide
       >
         <Tabs
           tabs={[

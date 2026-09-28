@@ -25,7 +25,7 @@ export const CampaignNpcsTab = () => {
       {campaignNpcs.length === 0 ? (
         <p className="text-body-secondary">{t('npcs.empty')}</p>
       ) : (
-        <ul className="list-group stm-list">
+        <ul className="list-group stm-list stm-grid-list">
           {campaignNpcs.map((npc) => (
             <li key={npc.campaignNpcId} className="list-group-item stm-character-row">
               <CharacterAvatar name={npc.name} imageUrl={npc.imageUrl ?? npc.tokenImageUrl} />

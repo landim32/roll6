@@ -7,6 +7,8 @@ export const TURN_TYPE = {
   actionResult: 3,
   /** A change to a character/NPC during the turn (024), created by the system. */
   characterUpdate: 4,
+  /** What happened in the turn, written when an assistant processes it (027); no character/NPC. */
+  narration: 5,
 } as const;
 
 export type TurnType = (typeof TURN_TYPE)[keyof typeof TURN_TYPE];

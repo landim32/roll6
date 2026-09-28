@@ -428,6 +428,7 @@
   "turn": {
     "label": "Turno {{no}}",
     "update": "Alteração",
+    "narration": "Narração",
     "fields": {
       "currentLife": "Vida",
       "currentEnergy": "Energia",

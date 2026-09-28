@@ -14,6 +14,9 @@ public class Turn
 {
     public const int MAX_DESCRIPTION = 2000;
 
+    /// <summary>A turn narration is longer than an action (027).</summary>
+    public const int MAX_NARRATION = 10000;
+
     public long TurnId { get; set; }
     public long CampaignId { get; set; }
     public long? MapId { get; set; }
@@ -82,6 +85,25 @@ public class Turn
         var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, userId, TurnType.CharacterUpdate);
         turn.Changes = changes.ToList();
         return turn;
+    }
+
+    /// <summary>What happened in the whole turn (027): written by the master when the turn is processed, no actor.</summary>
+    public static Turn Narration(long campaignId, long? mapId, int turnNo, long userId, string? text)
+    {
+        if (userId <= 0)
+            throw new DomainValidationException("userId", "Informe quem fez o registro.");
+        if (turnNo < 1)
+            throw new DomainValidationException("turnNo", "O turno deve ser maior que zero.");
+        return new Turn
+        {
+            CampaignId = campaignId,
+            MapId = mapId,
+            TurnNo = turnNo,
+            TurnType = TurnType.Narration,
+            UserId = userId,
+            Description = Guard.RequiredText(text, "narration", MAX_NARRATION),
+            CreatedAt = DateTime.UtcNow
+        };
     }
 
     private static Turn Create(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,

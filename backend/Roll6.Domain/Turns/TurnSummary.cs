@@ -45,8 +45,20 @@ public static class TurnSummary
 
     public static string Build(IEnumerable<SummaryLine> lines, IEnumerable<SummaryPosition> positions)
     {
-        var text = new StringBuilder();
-        text.Append("## Ações\n");
+        var text = new StringBuilder(BuildActions(lines));
+        text.Append("## Posições\n");
+        var pieces = positions.OrderBy(p => p.Actor, StringComparer.CurrentCultureIgnoreCase).ToList();
+        foreach (var piece in pieces)
+            text.Append($"- {Escape(piece.Actor)} - ({piece.X}, {piece.Y}) - {Direction(piece.Look)}\n");
+        if (pieces.Count == 0)
+            text.Append("Nenhuma peça no mapa.\n");
+        return text.ToString();
+    }
+
+    /// <summary>Only the "## Ações" section (027: the turn data for AI assistants).</summary>
+    public static string BuildActions(IEnumerable<SummaryLine> lines)
+    {
+        var text = new StringBuilder("## Ações\n");
         var any = false;
         foreach (var line in lines)
         {
@@ -55,13 +67,6 @@ public static class TurnSummary
         }
         if (!any)
             text.Append("Nenhuma ação registrada.\n");
-
-        text.Append("## Posições\n");
-        var pieces = positions.OrderBy(p => p.Actor, StringComparer.CurrentCultureIgnoreCase).ToList();
-        foreach (var piece in pieces)
-            text.Append($"- {Escape(piece.Actor)} - ({piece.X}, {piece.Y}) - {Direction(piece.Look)}\n");
-        if (pieces.Count == 0)
-            text.Append("Nenhuma peça no mapa.\n");
         return text.ToString();
     }
 
@@ -74,6 +79,7 @@ public static class TurnSummary
             TurnType.Movement => $"{actor}: {Movement(line)}",
             TurnType.Action => $"{actor}: \"{Escape(line.Description)}\"",
             TurnType.ActionResult => $"{author ?? actor}: Resultado para {actor}: {Escape(line.Description)}",
+            TurnType.Narration => $"{author ?? "GM"}: Narração: {Escape(line.Description)}",
             TurnType.CharacterUpdate => author == null
                 ? $"{actor}: Alterou: {Changes(line)}"
                 : $"{author}: Alterou {actor}: {Changes(line)}",

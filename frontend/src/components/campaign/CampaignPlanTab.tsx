@@ -206,11 +206,14 @@ export const CampaignPlanTab = ({ onDirtyChange }: CampaignPlanTabProps) => {
             </div>
             <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
               <MarkdownEditor
+                // Remounted per plan so every plan opens as preview again (a new one opens with the editor).
+                key={selectedId ?? 'new'}
                 id="plan-description"
                 value={draft.description}
                 onChange={(description) => setDraft((prev) => ({ ...prev, description }))}
                 maxLength={PLAN_MAX_DESCRIPTION}
-                height={380}
+                height="max(380px, calc(90vh - 340px))"
+                initialMode={selection.kind === 'plan' ? 'preview' : 'live'}
                 imageUrls={imageUrls}
                 onCursorChange={(position) => { cursorRef.current = position; }}
               />

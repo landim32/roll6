@@ -318,7 +318,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.X).HasColumnName("x");
             entity.Property(e => e.Y).HasColumnName("y");
             entity.Property(e => e.Look).HasColumnName("look");
-            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(Turn.MAX_DESCRIPTION);
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(Turn.MAX_NARRATION);
             entity.Property(e => e.UserId).HasColumnName("user_id");
             entity.Property(e => e.Moved).HasColumnName("moved");
             // Changed fields (024) as a JSON array: [{ "field", "before", "after" }].

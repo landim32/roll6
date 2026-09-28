@@ -1,0 +1,20 @@
+meta {
+  name: Data
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/campaign/{{campaignId}}/turn/data
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Whole table for an AI assistant (027): approved characters, NPC occurrences of the current map and the "## Ações"
+  text of the turn in progress (add `?turnNo=N` for another turn).
+}

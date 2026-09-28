@@ -8,7 +8,8 @@ interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
   maxLength?: number;
-  height?: number;
+  /** px or any CSS height (e.g. `calc(...)`). */
+  height?: number | string;
   /**
    * Plan images (018): with it, the preview resolves `roll6-image:` references to these URLs (the text keeps the
    * references) and raw HTML is skipped.
