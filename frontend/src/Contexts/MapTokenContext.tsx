@@ -17,6 +17,8 @@ interface MapTokenContextType {
   mapTokens: MapTokenInfo[];
   /** Only the master of the current campaign places, moves and changes pieces (011 FR-012). */
   canPlace: boolean;
+  /** A map of the current campaign is open: players may place their own approved characters on it. */
+  canPlaceOwn: boolean;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -45,7 +47,8 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   const mapIdRef = useRef<number | null>(null);
 
   const mapId = draft.mapId;
-  const canPlace = isMaster && mapId !== null && draft.campaignId === currentCampaign?.campaignId;
+  const canPlaceOwn = mapId !== null && draft.campaignId === currentCampaign?.campaignId;
+  const canPlace = isMaster && canPlaceOwn;
 
   const refresh = useCallback(async () => {
     mapIdRef.current = mapId;
@@ -138,7 +141,7 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   const clearError = useCallback(() => setError(null), []);
 
   const value: MapTokenContextType = {
-    mapTokens, canPlace, loading, error, refresh, addToken, placeCharacter, moveToken, changeToken, deleteToken, clearError,
+    mapTokens, canPlace, canPlaceOwn, loading, error, refresh, addToken, placeCharacter, moveToken, changeToken, deleteToken, clearError,
   };
   return <MapTokenContext.Provider value={value}>{children}</MapTokenContext.Provider>;
 };

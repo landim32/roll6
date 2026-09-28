@@ -25,6 +25,7 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
   const { t } = useTranslation();
   const { getNpc, updateNpc, removeFromCampaign } = useNpc();
   const [saved, setSaved] = useState<NpcInfo | null>(null);
+  const [pickingToken, setPickingToken] = useState(false);
   const [form, setForm] = useState<NpcForm>(emptyNpcForm);
   const [crop, setCrop] = useState<ImageCrop | null>(null);
   const [keepImage, setKeepImage] = useState(true);
@@ -95,6 +96,7 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
         open={npc !== null && !confirmRemove}
         onOpenChange={(next) => { if (!next && !busy) onClose(); }}
         title={t('npcs.editTitle')}
+        hidden={pickingToken}
         large
         footer={(
           <>
@@ -115,6 +117,7 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
               onRemoveImage={() => setKeepImage(false)}
               token={token}
               onToken={setToken}
+          onPickingTokenChange={setPickingToken}
             />
           </form>
         )}

@@ -27,15 +27,21 @@ interface NpcFormFieldsProps {
   onRemoveImage?: () => void;
   token: NpcTokenChoice | null;
   onToken: (token: NpcTokenChoice | null) => void;
+  /** The tokens modal opened/closed: the form's modal hides meanwhile (one modal at a time). */
+  onPickingTokenChange?: (picking: boolean) => void;
 }
 
 /**
  * Fields of an NPC, shared by "Novo NPC" and "Editar NPC": name, round picture, required token (picked in
  * the tokens modal), life, energy, move and the markdown sheet.
  */
-export const NpcFormFields = ({ idPrefix, form, onField, onImageCrop, currentImage, onRemoveImage, token, onToken }: NpcFormFieldsProps) => {
+export const NpcFormFields = ({ idPrefix, form, onField, onImageCrop, currentImage, onRemoveImage, token, onToken, onPickingTokenChange }: NpcFormFieldsProps) => {
   const { t } = useTranslation();
-  const [pickingToken, setPickingToken] = useState(false);
+  const [pickingToken, setPickingTokenState] = useState(false);
+  const setPickingToken = (picking: boolean) => {
+    setPickingTokenState(picking);
+    onPickingTokenChange?.(picking);
+  };
   const id = (name: string) => `${idPrefix}-${name}`;
 
   const numberField = (field: 'life' | 'energy' | 'move') => (

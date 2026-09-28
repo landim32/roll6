@@ -5,6 +5,7 @@ import { Tabs } from '../ui/Tabs';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { StatusBadge } from '../ui/StatusBadge';
+import { TrashIcon } from '../ui/icons';
 import { useCharacter } from '../../hooks/useCharacter';
 import { inviteAction } from '../../lib/characterSelection';
 import type { CharacterSearchInfo } from '../../types/character';
@@ -164,7 +165,10 @@ export const ManageCharactersPanel = ({ active }: ManageCharactersPanelProps) =>
                               <button type="button" className="btn btn-sm btn-outline-warning" disabled={busy} onClick={() => onDeny(m)}>{t('manage.deny')}</button>
                             </>
                           )}
-                          <button type="button" className="btn btn-sm btn-outline-danger" disabled={busy} onClick={() => setToRemove(m)}>{t('manage.remove')}</button>
+                          <button type="button" className="btn btn-sm btn-outline-danger" disabled={busy} onClick={() => setToRemove(m)}
+                            aria-label={t('manage.remove')} title={t('manage.remove')}>
+                            <TrashIcon size={14} />
+                          </button>
                         </div>
                       </li>
                     );

@@ -29,6 +29,7 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
   const { t } = useTranslation();
   const { campaignNpcs, searchMyNpcs, createNpc, addToCampaign } = useNpc();
   const [tab, setTab] = useState('mine');
+  const [pickingToken, setPickingToken] = useState(false);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -107,6 +108,7 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
       open={open}
       onOpenChange={(next) => { if (!busy) onOpenChange(next); }}
       title={t('npcs.pickerTitle')}
+      hidden={pickingToken}
       large
       footer={(
         <>
@@ -155,6 +157,7 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
           onImageCrop={setCrop}
           token={token}
           onToken={setToken}
+          onPickingTokenChange={setPickingToken}
         />
       </form>
     </Modal>

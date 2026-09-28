@@ -51,9 +51,10 @@ public static class MapTokenTools
         What it does: places an approved character of the campaign on a free hex of a campaign map (blue piece). The piece
         uses the character's token; if the character has none, pass tokenId and it is also saved on the character.
         A character appears at most once per map.
-        Who can use it: only the master.
+        Who can use it: the master (any approved character) or the character's owner (own characters only); once on
+        the map, players move it with move_map_token (turn and move limits apply).
         {{RETURNS}}
-        Common errors: 403 not the master, 404 not found, 409 not approved / already on this map / hex occupied, 400 no
+        Common errors: 403 neither the master nor the character's owner, 404 not found, 409 not approved / already on this map / hex occupied, 400 no
         token or outside the grid.
         Related tools: list_campaign_characters (campaignCharacterId, characterTokenId), move_map_token.
         """)]

@@ -215,13 +215,25 @@ public class MapTokenServiceTests
     }
 
     [Fact]
-    public async Task PlaceCharacter_NotMaster_Throws()
+    public async Task PlaceCharacter_ByTheCharactersOwner_Places()
     {
         SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
 
-        var act = () => _service.PlaceCharacterAsync(2, Place());
+        var result = await _service.PlaceCharacterAsync(2, Place());
+
+        result.CampaignCharacterId.Should().Be(APPROVED);
+        (result.X, result.Y).Should().Be((3, 2));
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_NeitherMasterNorOwner_Throws()
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
+
+        var act = () => _service.PlaceCharacterAsync(3, Place());
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Never);
     }
 
     [Theory]
