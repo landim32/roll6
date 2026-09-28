@@ -1,10 +1,12 @@
+using Roll6.Domain.Exceptions;
 using Roll6.Domain.Validation;
 
 namespace Roll6.Domain.Models;
 
 /// <summary>
-/// One occurrence of an NPC on a campaign map, with its own name, life, energy and status (three goblins on
-/// the same map are three occurrences). It is shown by a map piece linked through <see cref="MapToken.MapNpcId"/>.
+/// One occurrence of an NPC on a campaign map, with its own name, current life, current energy and status (three
+/// goblins on the same map are three occurrences); the totals are the NPC's (026, like a participation and its
+/// character). It is shown by a map piece linked through <see cref="MapToken.MapNpcId"/>, which reads these values.
 /// </summary>
 public class MapNpc
 {
@@ -12,13 +14,16 @@ public class MapNpc
     public long MapId { get; set; }
     public long NpcId { get; set; }
     public string Name { get; set; } = string.Empty;
-    public int Life { get; set; }
-    public int Energy { get; set; }
+    /// <summary>Current life (at most the NPC's life; 0 or below = fallen).</summary>
+    public int CurrentLife { get; set; }
+
+    /// <summary>Current energy (at most the NPC's energy).</summary>
+    public int CurrentEnergy { get; set; }
     public string? Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    /// <summary>Starts with the NPC's name, life, energy and status.</summary>
+    /// <summary>Starts with the NPC's name and status and the current values at the NPC's totals.</summary>
     public static MapNpc FromNpc(long mapId, Npc npc)
     {
         var now = DateTime.UtcNow;
@@ -27,20 +32,27 @@ public class MapNpc
             MapId = mapId,
             NpcId = npc.NpcId,
             Name = npc.Name,
-            Life = npc.Life,
-            Energy = npc.Energy,
+            CurrentLife = npc.Life,
+            CurrentEnergy = npc.Energy,
             Status = npc.Status,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
 
-    /// <summary>Changes only this occurrence; life and energy may go to zero or below (fallen).</summary>
-    public void Update(string? name, int life, int energy, string? status)
+    /// <summary>
+    /// Changes only this occurrence; current life and energy may go to zero or below (fallen) but never above the
+    /// NPC's totals.
+    /// </summary>
+    public void Update(string? name, int currentLife, int currentEnergy, string? status, int totalLife, int totalEnergy)
     {
+        if (currentLife > totalLife)
+            throw new DomainValidationException("currentLife", $"A vida atual não pode passar da vida total ({totalLife}).");
+        if (currentEnergy > totalEnergy)
+            throw new DomainValidationException("currentEnergy", $"A energia atual não pode passar da energia total ({totalEnergy}).");
         Name = Guard.RequiredText(name, "name", 260);
-        Life = life;
-        Energy = energy;
+        CurrentLife = currentLife;
+        CurrentEnergy = currentEnergy;
         Status = Guard.OptionalText(status, "status", 260);
         UpdatedAt = DateTime.UtcNow;
     }

@@ -289,8 +289,8 @@ public class Roll6Context : DbContext
             entity.Property(e => e.MapId).HasColumnName("map_id");
             entity.Property(e => e.NpcId).HasColumnName("npc_id");
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(260).IsRequired();
-            entity.Property(e => e.Life).HasColumnName("life");
-            entity.Property(e => e.Energy).HasColumnName("energy");
+            entity.Property(e => e.CurrentLife).HasColumnName("current_life");
+            entity.Property(e => e.CurrentEnergy).HasColumnName("current_energy");
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");

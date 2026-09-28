@@ -51,6 +51,14 @@ public class MapTokenInfo
     [JsonPropertyName("energy")]
     public int Energy { get; set; }
 
+    /// <summary>Maximum life: the character's or the NPC's total (the piece's own life for objects, 026).</summary>
+    [JsonPropertyName("totalLife")]
+    public int TotalLife { get; set; }
+
+    /// <summary>Maximum energy: the character's or the NPC's total (the piece's own energy for objects).</summary>
+    [JsonPropertyName("totalEnergy")]
+    public int TotalEnergy { get; set; }
+
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 

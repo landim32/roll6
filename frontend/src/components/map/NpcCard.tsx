@@ -18,16 +18,16 @@ interface NpcCardProps {
 }
 
 /**
- * One campaign NPC: round picture (or its token), name and the NPC's base life/energy bars. The turn circle
+ * One campaign NPC: round picture (or its token) and name. Each occurrence on the open map is listed with its own
+ * current/total life and energy and its status (026); without occurrences, the NPC's totals. The turn circle
  * aggregates the NPC's pieces on the open map (each occurrence has its own turn).
  */
 export const NpcCard = ({ npc, onEdit, draggable }: NpcCardProps) => {
   const { t } = useTranslation();
   const { turnNo, entries } = useTurn();
   const { mapTokens } = useMapToken();
-  const occurrenceIds = mapTokens
-    .filter((token) => token.npcId === npc.npcId && token.mapNpcId !== null)
-    .map((token) => token.mapNpcId!);
+  const occurrences = mapTokens.filter((token) => token.npcId === npc.npcId && token.mapNpcId !== null);
+  const occurrenceIds = occurrences.map((token) => token.mapNpcId!);
   return (
     <li
       className={`stm-party-card${draggable ? ' stm-party-draggable' : ''}`}
@@ -49,8 +49,23 @@ export const NpcCard = ({ npc, onEdit, draggable }: NpcCardProps) => {
             </button>
           )}
         </div>
-        <VitalBar label={t('party.life')} current={npc.life} total={npc.life} variant="life" />
-        <VitalBar label={t('party.energy')} current={npc.energy} total={npc.energy} variant="energy" />
+        {occurrences.length === 0 ? (
+          <>
+            <VitalBar label={t('party.life')} current={npc.life} total={npc.life} variant="life" />
+            <VitalBar label={t('party.energy')} current={npc.energy} total={npc.energy} variant="energy" />
+          </>
+        ) : (
+          <ul className="list-unstyled mb-0" aria-label={t('npcs.occurrences', { name: npc.name })}>
+            {occurrences.map((piece) => (
+              <li key={piece.mapTokenId} className="mt-1">
+                {occurrences.length > 1 && <small className="d-block text-truncate" title={piece.name}>{piece.name}</small>}
+                <VitalBar label={t('party.life')} current={piece.life} total={piece.totalLife} variant="life" />
+                <VitalBar label={t('party.energy')} current={piece.energy} total={piece.totalEnergy} variant="energy" />
+                {piece.status && <small className="d-block text-body-secondary text-truncate" title={piece.status}>{piece.status}</small>}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </li>
   );

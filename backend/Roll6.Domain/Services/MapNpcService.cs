@@ -97,14 +97,16 @@ public class MapNpcService : IMapNpcService
     public async Task<MapNpcInfo> UpdateAsync(long userId, long mapNpcId, MapNpcUpdateInfo info)
     {
         var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
-        var before = (mapNpc.Name, mapNpc.Life, mapNpc.Energy, mapNpc.Status);
-        mapNpc.Update(info.Name, info.Life, info.Energy, info.Status);
+        var before = (mapNpc.Name, mapNpc.CurrentLife, mapNpc.CurrentEnergy, mapNpc.Status);
+        var npc = await _npcRepository.GetByIdAsync(mapNpc.NpcId)
+            ?? throw new KeyNotFoundException("NPC não encontrado.");
+        mapNpc.Update(info.Name, info.CurrentLife, info.CurrentEnergy, info.Status, npc.Life, npc.Energy);
 
         // Every change during the turn is recorded with who made it (024).
         var changes = TurnChange.Diff(
             ("name", before.Name, mapNpc.Name),
-            ("life", before.Life, mapNpc.Life),
-            ("energy", before.Energy, mapNpc.Energy),
+            ("currentLife", before.CurrentLife, mapNpc.CurrentLife),
+            ("currentEnergy", before.CurrentEnergy, mapNpc.CurrentEnergy),
             ("status", before.Status, mapNpc.Status));
         Turn? turn = null;
         if (changes.Count > 0)
@@ -179,11 +181,14 @@ public class MapNpcService : IMapNpcService
             .Where(p => p.MapNpcId.HasValue)
             .ToDictionary(p => p.MapNpcId!.Value);
         var tokens = (await _tokenRepository.ListByIdsAsync(pieces.Values.Select(p => p.TokenId).Distinct())).ToDictionary(t => t.TokenId);
+        // Totals are the NPC's (026).
+        var npcs = (await _npcRepository.ListByIdsAsync(mapNpcs.Select(m => m.NpcId).Distinct())).ToDictionary(n => n.NpcId);
 
         return mapNpcs.Select(m =>
         {
             var piece = pieces.GetValueOrDefault(m.MapNpcId);
             var token = piece != null ? tokens.GetValueOrDefault(piece.TokenId) : null;
+            var npc = npcs.GetValueOrDefault(m.NpcId);
             return new MapNpcInfo
             {
                 MapNpcId = m.MapNpcId,
@@ -191,8 +196,10 @@ public class MapNpcService : IMapNpcService
                 NpcId = m.NpcId,
                 MapTokenId = piece?.MapTokenId,
                 Name = m.Name,
-                Life = m.Life,
-                Energy = m.Energy,
+                CurrentLife = m.CurrentLife,
+                CurrentEnergy = m.CurrentEnergy,
+                TotalLife = npc?.Life ?? m.CurrentLife,
+                TotalEnergy = npc?.Energy ?? m.CurrentEnergy,
                 Status = m.Status,
                 TokenId = piece?.TokenId,
                 TokenImageUrl = _imageStorage.GetUrl(token?.UpImage),

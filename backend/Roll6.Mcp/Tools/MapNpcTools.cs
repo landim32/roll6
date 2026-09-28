@@ -18,8 +18,9 @@ public static class MapNpcTools
     [ApiOperation("POST", "/api/mapnpc")]
     [Description($$"""
         What it does: places a new occurrence of a campaign NPC on a free hex of a campaign map, creating its piece (red
-        disc). Each call creates another occurrence (e.g. three goblins) with its own name/life/energy copied from the NPC
-        and its own turn.
+        disc). Each call creates another occurrence (e.g. three goblins) with its own name, status and current life/energy —
+        starting at the NPC's totals — and its own turn. The piece reads these values (list_map_tokens: life/energy =
+        current, totalLife/totalEnergy = the NPC's, sheet = the NPC's sheet).
         Who can use it: only the master; the NPC must be in the campaign (add_npc_to_campaign).
         {{RETURNS}}
         Common errors: 403 not the master, 404 map/NPC not found, 409 NPC not in the campaign or hex occupied, 400 outside
@@ -38,21 +39,25 @@ public static class MapNpcTools
     [McpServerTool(Name = "update_map_npc", Title = "Update NPC occurrence", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/mapnpc/{id}")]
     [Description($$"""
-        What it does: changes one NPC occurrence on a map (name, current life/energy — may go to 0 or below — and a
-        free-text status like "stunned"); the library NPC is unchanged. The piece shows it at once for everyone.
+        What it does: changes one NPC occurrence on a map (name, current life/energy — may go to 0 or below, never above
+        the NPC's totals — and a free-text status like "stunned"); the library NPC is unchanged. The piece and the NPC card
+        show it at once for everyone; there is no need to touch the piece (update_map_token).
         Who can use it: only the master.
         {{RETURNS}}
-        Common errors: 403 not the master, 404 not found, 400 invalid name/status.
+        Common errors: 403 not the master, 404 not found, 400 invalid name/status or current value above the total.
         Related tools: list_map_npcs (mapNpcId).
         """)]
     public static Task<CallToolResult> UpdateMapNpc(
         Roll6ApiClient api,
         [Description("Id of the occurrence (mapNpcId from list_map_npcs or the piece's mapNpcId in list_map_tokens).")] long mapNpcId,
         [Description("Occurrence name (required, up to 260 characters). Example: \"Goblin 2\".")] string name,
-        [Description("Current life of this occurrence; 0 or negative = fallen.")] int life,
-        [Description("Current energy of this occurrence.")] int energy,
+        [Description("Current life of this occurrence, at most the NPC's life (totalLife); 0 or negative = fallen.")] int currentLife,
+        [Description("Current energy of this occurrence, at most the NPC's energy (totalEnergy).")] int currentEnergy,
         [Description("Free-text status (up to 260 characters), e.g. \"stunned\". Null clears it.")] string? status = null) =>
-        api.SendAsync(HttpMethod.Put, $"/api/mapnpc/{mapNpcId}", new MapNpcUpdateInfo { Name = name, Life = life, Energy = energy, Status = status });
+        api.SendAsync(HttpMethod.Put, $"/api/mapnpc/{mapNpcId}", new MapNpcUpdateInfo
+        {
+            Name = name, CurrentLife = currentLife, CurrentEnergy = currentEnergy, Status = status
+        });
 
     [McpServerTool(Name = "delete_map_npc", Title = "Delete NPC occurrence", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/mapnpc/{id}")]

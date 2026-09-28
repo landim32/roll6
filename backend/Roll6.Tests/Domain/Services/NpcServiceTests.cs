@@ -22,6 +22,7 @@ public class NpcServiceTests
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly NpcService _service;
 
     public NpcServiceTests()
@@ -32,7 +33,7 @@ public class NpcServiceTests
         _repository.Setup(r => r.InsertAsync(It.IsAny<Npc>())).ReturnsAsync((Npc n) => n);
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Npc>())).ReturnsAsync((Npc n) => n);
         _campaignNpcRepository.Setup(r => r.ListCampaignIdsByNpcAsync(It.IsAny<long>())).ReturnsAsync(new List<long>());
-        _service = new NpcService(_repository.Object, _tokenRepository.Object, _campaignNpcRepository.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object, _notifier.Object);
+        _service = new NpcService(_repository.Object, _tokenRepository.Object, _campaignNpcRepository.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object, _mapNpcRepository.Object, _notifier.Object);
     }
 
     private static NpcInsertInfo Info(long tokenId = 5) => new() { TokenId = tokenId, Name = "Goblin", Life = 7, Move = 6 };
@@ -102,5 +103,20 @@ public class NpcServiceTests
 
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
             e.Type == TableEventType.CAMPAIGN_NPCS_CHANGED && e.CampaignId == 10 && e.ActorUserId == OWNER)), Times.Once);
+    }
+
+    // ---- 026: lowering the totals lowers the occurrences ----
+
+    [Fact]
+    public async Task Update_ClampsTheOccurrencesAndReloadsThePieces()
+    {
+        _campaignNpcRepository.Setup(r => r.ListCampaignIdsByNpcAsync(NPC)).ReturnsAsync(new List<long> { 20, 21 });
+
+        await _service.UpdateAsync(OWNER, NPC, new NpcInsertInfo { TokenId = 5, Name = "Goblin", Life = 5, Energy = 3, Move = 6 });
+
+        _mapNpcRepository.Verify(r => r.ClampVitalsAsync(NPC, 5, 3), Times.Once);
+        foreach (var campaignId in new long[] { 20, 21 })
+            _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+                e.Type == TableEventType.MAP_TOKENS_CHANGED && e.CampaignId == campaignId && e.MapId == null)), Times.Once);
     }
 }

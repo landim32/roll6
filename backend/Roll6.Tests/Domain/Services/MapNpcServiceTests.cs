@@ -41,6 +41,8 @@ public class MapNpcServiceTests
         _mapRepository.Setup(r => r.GetByIdAsync(MAP)).ReturnsAsync(new Map { MapId = MAP, CampaignId = CAMPAIGN, MapModelId = 50, UserId = MASTER, Status = MapStatus.Active });
         _mapModelRepository.Setup(r => r.GetByIdAsync(50)).ReturnsAsync(new MapModel { MapModelId = 50, GridWidth = 10, GridHeight = 8 });
         _npcRepository.Setup(r => r.GetByIdAsync(NPC)).ReturnsAsync(new Npc { NpcId = NPC, UserId = MASTER, TokenId = 5, Name = "Goblin", Life = 7, Energy = 2 });
+        _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync(new List<Npc> { new() { NpcId = NPC, UserId = MASTER, TokenId = 5, Name = "Goblin", Life = 7, Energy = 2 } });
         _campaignNpcRepository.Setup(r => r.GetAsync(CAMPAIGN, NPC)).ReturnsAsync(new CampaignNpc { CampaignNpcId = 3, CampaignId = CAMPAIGN, NpcId = NPC });
         _repository.Setup(r => r.InsertAsync(It.IsAny<MapNpc>())).ReturnsAsync((MapNpc m) => { m.MapNpcId = _nextId++; return m; });
         _repository.Setup(r => r.UpdateAsync(It.IsAny<MapNpc>())).ReturnsAsync((MapNpc m) => m);
@@ -61,8 +63,8 @@ public class MapNpcServiceTests
     {
         var result = await _service.CreateAsync(MASTER, At(2, 3));
 
-        (result.Name, result.Life, result.Energy, result.Status, result.X, result.Y, result.TokenId)
-            .Should().Be(("Goblin", 7, 2, (string?)null, (int?)2, (int?)3, (long?)5));
+        (result.Name, result.CurrentLife, result.CurrentEnergy, result.TotalLife, result.TotalEnergy, result.Status, result.X, result.Y, result.TokenId)
+            .Should().Be(("Goblin", 7, 2, 7, 2, (string?)null, (int?)2, (int?)3, (long?)5));
         var piece = _insertedPieces.Single();
         (piece.TokenType, piece.MapNpcId, piece.TokenId).Should().Be((MapTokenType.Npc, (long?)result.MapNpcId, 5L));
     }
@@ -105,11 +107,11 @@ public class MapNpcServiceTests
     [Fact]
     public async Task Update_ChangesOnlyTheOccurrence()
     {
-        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", Life = 7 });
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7 });
 
-        var result = await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin 2", Life = -1, Energy = 0, Status = "caído" });
+        var result = await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin 2", CurrentLife = -1, CurrentEnergy = 0, Status = "caído" });
 
-        (result.Name, result.Life, result.Status).Should().Be(("Goblin 2", -1, "caído"));
+        (result.Name, result.CurrentLife, result.TotalLife, result.Status).Should().Be(("Goblin 2", -1, 7, "caído"));
         _npcRepository.Verify(r => r.UpdateAsync(It.IsAny<Npc>()), Times.Never);
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
             e.Type == TableEventType.MAP_TOKENS_CHANGED && e.CampaignId == CAMPAIGN && e.MapId == MAP)), Times.Once);
@@ -151,24 +153,36 @@ public class MapNpcServiceTests
     [Fact]
     public async Task Update_RecordsACharacterUpdateForTheOccurrence()
     {
-        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", Life = 7, Energy = 2 });
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2 });
         Turn? recorded = null;
         _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
 
-        await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", Life = 3, Energy = 2, Status = "Assustado" });
+        await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 3, CurrentEnergy = 2, Status = "Assustado" });
 
         (recorded!.TurnType, recorded.UserId, recorded.NpcId, recorded.MapNpcId, recorded.TurnNo, recorded.MapId)
             .Should().Be((TurnType.CharacterUpdate, MASTER, (long?)NPC, (long?)90, 4, (long?)MAP));
-        recorded.Changes!.Select(c => c.Field).Should().Equal("life", "status");
+        recorded.Changes!.Select(c => c.Field).Should().Equal("currentLife", "status");
     }
 
     [Fact]
     public async Task Update_WithoutChanges_RecordsNothing()
     {
-        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", Life = 7, Energy = 2 });
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2 });
 
-        await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", Life = 7, Energy = 2 });
+        await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2 });
 
         _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+    }
+
+    // ---- 026: current vitals with the NPC's totals ----
+
+    [Fact]
+    public async Task Update_AboveTheNpcTotal_Throws()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2 });
+
+        (await _service.Invoking(s => s.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 8, CurrentEnergy = 2 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("currentLife");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapNpc>()), Times.Never);
     }
 }

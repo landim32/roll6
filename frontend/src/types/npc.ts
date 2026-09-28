@@ -62,8 +62,12 @@ export interface MapNpcInfo {
   npcId: number;
   mapTokenId: number | null;
   name: string;
-  life: number;
-  energy: number;
+  /** Current values of this occurrence (026); 0 or below = fallen. */
+  currentLife: number;
+  currentEnergy: number;
+  /** The NPC's totals. */
+  totalLife: number;
+  totalEnergy: number;
   status: string | null;
   tokenId: number | null;
   tokenImageUrl: string | null;

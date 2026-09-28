@@ -114,8 +114,10 @@ public static class MapTokenTools
     [ApiOperation("PUT", "/api/maptoken/{id}")]
     [Description($$"""
         What it does: replaces the stored data of a piece (name, type, sheet, life, energy, status, move, position,
-        facing) without recording a turn move. Read it with list_map_tokens and send unchanged values back. Character and
-        NPC pieces display the participation/occurrence data, so prefer update_participation / update_map_npc for them.
+        facing) without recording a turn move. Read it with list_map_tokens and send unchanged values back. Only object
+        pieces display these stored values: character and NPC pieces always show the participation / NPC occurrence
+        (name, current life/energy, status; totals, move and sheet from the character / NPC), so to change them use
+        update_participation / update_map_npc — writing them here has no visible effect.
         Who can use it: only the master.
         {{RETURNS}}
         Common errors: 403 not the master, 404 not found, 409 hex occupied, 400 invalid values.

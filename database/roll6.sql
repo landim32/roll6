@@ -993,5 +993,27 @@ BEGIN
     VALUES ('20260928130000_AddNpcStatus', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928173235_RenameMapNpcCurrentVitals') THEN
+    ALTER TABLE map_npcs RENAME COLUMN life TO current_life;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928173235_RenameMapNpcCurrentVitals') THEN
+    ALTER TABLE map_npcs RENAME COLUMN energy TO current_energy;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928173235_RenameMapNpcCurrentVitals') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260928173235_RenameMapNpcCurrentVitals', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

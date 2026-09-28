@@ -73,4 +73,13 @@ public class MapNpcRepository : IMapNpcRepository<MapNpc>
         var idList = mapIds.ToList();
         await _context.MapNpcs.Where(e => idList.Contains(e.MapId)).ExecuteDeleteAsync();
     }
+
+    public async Task ClampVitalsAsync(long npcId, int totalLife, int totalEnergy)
+    {
+        await _context.MapNpcs
+            .Where(e => e.NpcId == npcId && (e.CurrentLife > totalLife || e.CurrentEnergy > totalEnergy))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(e => e.CurrentLife, e => e.CurrentLife > totalLife ? totalLife : e.CurrentLife)
+                .SetProperty(e => e.CurrentEnergy, e => e.CurrentEnergy > totalEnergy ? totalEnergy : e.CurrentEnergy));
+    }
 }

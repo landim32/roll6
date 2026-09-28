@@ -19,6 +19,7 @@ public class NpcService : INpcService
     private readonly IImageStorageAppService _imageStorage;
     private readonly ITurnRepository<Turn> _turnRepository;
 
+    private readonly IMapNpcRepository<MapNpc> _mapNpcRepository;
     private readonly IRealtimeNotifier _notifier;
 
     public NpcService(
@@ -27,8 +28,10 @@ public class NpcService : INpcService
         ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         IImageStorageAppService imageStorage,
         ITurnRepository<Turn> turnRepository,
+        IMapNpcRepository<MapNpc> mapNpcRepository,
         IRealtimeNotifier notifier)
     {
+        _mapNpcRepository = mapNpcRepository;
         _notifier = notifier;
         _turnRepository = turnRepository;
         _repository = repository;
@@ -73,9 +76,14 @@ public class NpcService : INpcService
         npc.Update(info.TokenId, info.Name, info.Life, info.Energy, info.Move, info.Sheet, info.Image, info.Status);
         var token = await GetTokenAsync(npc.TokenId);
         var result = MapToDto(await _repository.UpdateAsync(npc), token);
-        // The campaign NPC cards show the library NPC (017).
+        // Lower totals also lower the current values of the occurrences above them (026, like characters).
+        await _mapNpcRepository.ClampVitalsAsync(npc.NpcId, npc.Life, npc.Energy);
+        // The campaign NPC cards show the library NPC (017) and the pieces show its totals, sheet and move (026).
         foreach (var campaignId in await _campaignNpcRepository.ListCampaignIdsByNpcAsync(npcId))
+        {
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_NPCS_CHANGED, campaignId, userId));
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
+        }
         return result;
     }
 
