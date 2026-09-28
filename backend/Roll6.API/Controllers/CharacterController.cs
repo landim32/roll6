@@ -101,4 +101,20 @@ public class CharacterController : ApiControllerBase
             return HandleException(ex);
         }
     }
+
+    /// <summary>Transfers the character to the user with the given e-mail, keeping campaigns, pieces and turns (021).</summary>
+    [HttpPost("{id:long}/transfer")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Transfer(long id, [FromBody] CharacterTransferInfo info)
+    {
+        try
+        {
+            await _characterService.TransferAsync(CurrentUserId, id, info);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
 }

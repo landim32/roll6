@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Moq;
+using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Character;
@@ -26,6 +27,7 @@ public class CharacterServiceTests
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
+    private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
     private readonly CharacterService _service;
 
     public CharacterServiceTests()
@@ -37,7 +39,7 @@ public class CharacterServiceTests
         _campaignCharacterRepository.Setup(r => r.ListCampaignIdsByCharacterAsync(It.IsAny<long>())).ReturnsAsync(new List<long>());
         _repository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(() => new Character { CharacterId = CHARACTER, UserId = OWNER, Name = "Aria", Life = 12, Energy = 6 });
         _service = new CharacterService(_repository.Object, _campaignCharacterRepository.Object,
-            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object, _turnRepository.Object, _notifier.Object);
+            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object, _turnRepository.Object, _campaignRepository.Object, _notifier.Object);
     }
 
     [Fact]
@@ -162,5 +164,113 @@ public class CharacterServiceTests
             _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.PARTY_CHANGED && e.CampaignId == campaignId)), Times.Once);
             _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.CampaignId == campaignId)), Times.Once);
         }
+    }
+
+    // ---- 021: transfer ----
+
+    private const long RECEIVER = 4;
+
+    private void GivenReceiver(string email = "b@x.com") =>
+        _userRepository.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync(new User { UserId = RECEIVER, Email = email });
+
+    [Fact]
+    public async Task Transfer_Owner_MovesTheCharacterToTheNormalizedEmailUser()
+    {
+        GivenReceiver();
+        _repository.Setup(r => r.TransferAsync(CHARACTER, OWNER, RECEIVER)).ReturnsAsync(true);
+
+        await _service.TransferAsync(OWNER, CHARACTER, new CharacterTransferInfo { Email = "  B@X.COM " });
+
+        _repository.Verify(r => r.TransferAsync(CHARACTER, OWNER, RECEIVER), Times.Once);
+    }
+
+    [Fact]
+    public async Task Transfer_UnknownCharacter_NotFound()
+    {
+        var act = () => _service.TransferAsync(OWNER, 99, new CharacterTransferInfo { Email = "b@x.com" });
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+        _repository.Verify(r => r.TransferAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Transfer_NotOwner_Forbidden()
+    {
+        GivenReceiver();
+
+        var act = () => _service.TransferAsync(OUTSIDER, CHARACTER, new CharacterTransferInfo { Email = "b@x.com" });
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        _repository.Verify(r => r.TransferAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("not-an-email")]
+    public async Task Transfer_InvalidEmail_ValidationError(string email)
+    {
+        var act = () => _service.TransferAsync(OWNER, CHARACTER, new CharacterTransferInfo { Email = email });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("email");
+        _repository.Verify(r => r.TransferAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Transfer_UnknownEmail_UserNotFound()
+    {
+        var act = () => _service.TransferAsync(OWNER, CHARACTER, new CharacterTransferInfo { Email = "nobody@x.com" });
+
+        await act.Should().ThrowAsync<KeyNotFoundException>().WithMessage("Usuário não encontrado.");
+        _repository.Verify(r => r.TransferAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Transfer_ToTheOwner_ValidationError()
+    {
+        _userRepository.Setup(r => r.GetByEmailAsync("a@x.com")).ReturnsAsync(new User { UserId = OWNER, Email = "a@x.com" });
+
+        var act = () => _service.TransferAsync(OWNER, CHARACTER, new CharacterTransferInfo { Email = "a@x.com" });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("email");
+        _repository.Verify(r => r.TransferAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Transfer_OwnerChangedMeanwhile_ConflictAndNoEvents()
+    {
+        GivenReceiver();
+        _campaignCharacterRepository.Setup(r => r.ListCampaignIdsByCharacterAsync(CHARACTER)).ReturnsAsync(new List<long> { 20 });
+        _repository.Setup(r => r.TransferAsync(CHARACTER, OWNER, RECEIVER)).ReturnsAsync(false);
+
+        var act = () => _service.TransferAsync(OWNER, CHARACTER, new CharacterTransferInfo { Email = "b@x.com" });
+
+        await act.Should().ThrowAsync<ConflictException>();
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+        _notifier.Verify(n => n.RemoveUserFromCampaignAsync(It.IsAny<long>(), It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Transfer_PublishesToEveryCampaignAndDropsTheFormerOwnerWhereHeLostAccess()
+    {
+        GivenReceiver();
+        _repository.Setup(r => r.TransferAsync(CHARACTER, OWNER, RECEIVER)).ReturnsAsync(true);
+        _campaignCharacterRepository.Setup(r => r.ListCampaignIdsByCharacterAsync(CHARACTER)).ReturnsAsync(new List<long> { 20, 21, 22 });
+        _campaignRepository.Setup(r => r.GetByIdAsync(20)).ReturnsAsync(new Campaign { CampaignId = 20, UserId = MASTER });
+        _campaignRepository.Setup(r => r.GetByIdAsync(21)).ReturnsAsync(new Campaign { CampaignId = 21, UserId = MASTER });
+        _campaignRepository.Setup(r => r.GetByIdAsync(22)).ReturnsAsync(new Campaign { CampaignId = 22, UserId = OWNER });
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(20, OWNER)).ReturnsAsync(false);
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(21, OWNER)).ReturnsAsync(true);
+
+        await _service.TransferAsync(OWNER, CHARACTER, new CharacterTransferInfo { Email = "b@x.com" });
+
+        foreach (var campaignId in new long[] { 20, 21, 22 })
+        {
+            _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.PARTY_CHANGED && e.CampaignId == campaignId)), Times.Once);
+            _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.CampaignId == campaignId)), Times.Once);
+        }
+        // 20: player without another approved character; 21: still has one; 22: he is the master.
+        _notifier.Verify(n => n.RemoveUserFromCampaignAsync(OWNER, 20), Times.Once);
+        _notifier.Verify(n => n.RemoveUserFromCampaignAsync(OWNER, It.IsIn(21L, 22L)), Times.Never);
     }
 }

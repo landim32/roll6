@@ -124,4 +124,23 @@ public static class CharacterTools
         Roll6ApiClient api,
         [Description("Id of the character to delete (characterId).")] long characterId) =>
         api.SendAsync(HttpMethod.Delete, $"/api/character/{characterId}");
+
+    [McpServerTool(Name = "transfer_character", Title = "Transfer character", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
+    [ApiOperation("POST", "/api/character/{id}/transfer")]
+    [Description($$"""
+        What it does: hands one of your characters to another user, identified by the exact e-mail of the account. Only
+        the owner changes: the character keeps its campaigns (and its status in each), current life/energy, campaign
+        status and sheet, pieces on maps (same hex and facing) and turn entries. You lose every owner permission right
+        away (edit, delete, move the piece, act); only the new owner can give it back. {{McpDocs.DESTRUCTIVE}}
+        Who can use it: only the current owner.
+        Returns: { ok: true }.
+        Common errors: 400 invalid e-mail or the e-mail is your own, 403 not the owner, 404 character not found or
+        "Usuário não encontrado." (no account with that e-mail), 409 the character changed owner meanwhile.
+        Related tools: list_my_characters, get_character.
+        """)]
+    public static Task<CallToolResult> TransferCharacter(
+        Roll6ApiClient api,
+        [Description("Id of the character to transfer (characterId, from list_my_characters).")] long characterId,
+        [Description("Exact e-mail of the user who will own the character (case and surrounding spaces are ignored).")] string email) =>
+        api.SendAsync(HttpMethod.Post, $"/api/character/{characterId}/transfer", new CharacterTransferInfo { Email = email });
 }

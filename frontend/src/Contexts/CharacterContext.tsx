@@ -66,6 +66,8 @@ interface CharacterContextType {
   // Character owner (the character itself)
   getCharacter: (characterId: number) => Promise<CharacterInfo>;
   updateCharacter: (characterId: number, data: CharacterInsertInfo) => Promise<CharacterInfo>;
+  /** Hands the character to the user with this e-mail (021); reloads the lists afterwards. */
+  transferCharacter: (characterId: number, email: string) => Promise<void>;
   // Party panel: anyone who sees the party reads; the owner or the master changes
   getParticipation: (campaignCharacterId: number) => Promise<CampaignCharacterDetailInfo>;
   updateParticipation: (campaignCharacterId: number, data: CampaignCharacterUpdateInfo) => Promise<CampaignCharacterDetailInfo>;
@@ -317,6 +319,10 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
   const updateCharacter = useCallback((characterId: number, data: CharacterInsertInfo) =>
     run(() => characterService.update(characterId, data)), [run]);
 
+  // The list reload drops the character; an invalid selection falls back like any other (lib/characterSelection).
+  const transferCharacter = useCallback((characterId: number, email: string) =>
+    run(() => characterService.transfer(characterId, { email })), [run]);
+
   const getParticipation = useCallback(async (campaignCharacterId: number) => {
     try {
       setError(null);
@@ -348,7 +354,7 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
     refresh, refreshParty, select, clearError,
     createCharacter, requestAccess, refreshInvites, acceptInvite, declineInvite,
     listCampaignCharacters, approve, deny, remove, invite, searchCharacters,
-    getCharacter, updateCharacter, getParticipation, updateParticipation,
+    getCharacter, updateCharacter, transferCharacter, getParticipation, updateParticipation,
   };
 
   return <CharacterContext.Provider value={value}>{children}</CharacterContext.Provider>;

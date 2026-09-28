@@ -1,4 +1,4 @@
-import type { CharacterInfo, CharacterInsertInfo, CharacterSearchInfo } from '../types/character';
+import type { CharacterInfo, CharacterInsertInfo, CharacterSearchInfo, CharacterTransferInfo } from '../types/character';
 import type { ListQuery, PagedList } from '../types/common';
 import { API_URL, getHeaders, handleApiResponse, toQuery } from './apiHelpers';
 
@@ -46,6 +46,14 @@ class CharacterService {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify(data),
     });
     return this.handleResponse<CharacterInfo>(response);
+  }
+
+  /** Transfers the character to another user (owner only); campaigns, pieces and turns stay as they are. */
+  async transfer(id: number, data: CharacterTransferInfo): Promise<void> {
+    const response = await fetch(`${API_BASE}/${id}/transfer`, {
+      method: 'POST', headers: getHeaders(true), body: JSON.stringify(data),
+    });
+    return this.handleResponse<void>(response);
   }
 
   /** Searches characters of every user by name (public fields only), paged. */

@@ -75,4 +75,15 @@ public class CharacterRepository : ICharacterRepository<Character>
     {
         return await _context.Characters.AnyAsync(e => e.TokenId == tokenId);
     }
+
+    public async Task<bool> TransferAsync(long characterId, long fromUserId, long toUserId)
+    {
+        var now = DateTime.UtcNow;
+        var affected = await _context.Characters
+            .Where(e => e.CharacterId == characterId && e.UserId == fromUserId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(e => e.UserId, toUserId)
+                .SetProperty(e => e.UpdatedAt, now));
+        return affected > 0;
+    }
 }

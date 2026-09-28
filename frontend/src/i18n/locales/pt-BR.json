@@ -67,6 +67,18 @@
     "current": "Atual",
     "empty": "Você ainda não tem personagens."
   },
+  "transfer": {
+    "action": "Transferir personagem",
+    "title": "Transferir personagem",
+    "description": "Transferir <strong>{{name}}</strong> para outro usuário. Ele continua em todas as campanhas, com os mesmos dados e peças nos mapas.",
+    "email": "E-mail do novo dono",
+    "warning": "Você deixará de ser o dono: não poderá mais editar, mover ou agir com este personagem. Só o novo dono pode devolvê-lo.",
+    "submit": "Transferir",
+    "errors": {
+      "required": "Informe o e-mail do novo dono.",
+      "invalid": "E-mail inválido."
+    }
+  },
   "manage": {
     "title": "Gerenciar Personagens",
     "campaignTab": "Personagens na Campanha",
@@ -340,6 +352,7 @@
     "inviteAccepted": "Convite aceito: {{name}} está em {{campaign}}.",
     "inviteDeclined": "Convite recusado.",
     "characterSelected": "Jogando com {{name}}.",
+    "characterTransferred": "{{name}} foi transferido para {{email}}.",
     "requestApproved": "{{name}} foi aprovado.",
     "requestDenied": "O pedido de {{name}} foi recusado.",
     "characterRemoved": "{{name}} foi removido da campanha.",

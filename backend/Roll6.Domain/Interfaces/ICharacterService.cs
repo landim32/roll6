@@ -11,4 +11,5 @@ public interface ICharacterService
     Task<CharacterInfo> CreateAsync(long userId, CharacterInsertInfo info);
     Task<CharacterInfo> UpdateAsync(long userId, long characterId, CharacterInsertInfo info);
     Task DeleteAsync(long userId, long characterId);
+    Task TransferAsync(long userId, long characterId, CharacterTransferInfo info);
 }

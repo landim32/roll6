@@ -1,6 +1,8 @@
+using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
 using Roll6.Domain.Realtime;
+using Roll6.Domain.Validation;
 using Roll6.DTO.Character;
 using Roll6.DTO.Common;
 using Roll6.DTO.Realtime;
@@ -19,6 +21,7 @@ public class CharacterService : ICharacterService
     private readonly ITokenRepository<Token> _tokenRepository;
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly ICampaignRepository<Campaign> _campaignRepository;
 
     private readonly IRealtimeNotifier _notifier;
 
@@ -31,8 +34,10 @@ public class CharacterService : ICharacterService
         IMapTokenRepository<MapToken> mapTokenRepository,
         IImageStorageAppService imageStorage,
         ITurnRepository<Turn> turnRepository,
+        ICampaignRepository<Campaign> campaignRepository,
         IRealtimeNotifier notifier)
     {
+        _campaignRepository = campaignRepository;
         _notifier = notifier;
         _turnRepository = turnRepository;
         _tokenRepository = tokenRepository;
@@ -121,6 +126,39 @@ public class CharacterService : ICharacterService
             await _repository.DeleteAsync(characterId);
         });
         await PublishToCampaignsAsync(campaignIds, userId);
+    }
+
+    /// <summary>
+    /// Hands the character to the user with the given e-mail (021). Participations, pieces and turn entries point to
+    /// the character, and player permissions are checked against its current owner, so only the owner changes.
+    /// </summary>
+    public async Task TransferAsync(long userId, long characterId, CharacterTransferInfo info)
+    {
+        await GetOwnedAsync(userId, characterId);
+        var email = Guard.Email(info.Email, "email");
+        var receiver = await _userRepository.GetByEmailAsync(email)
+            ?? throw new KeyNotFoundException("Usuário não encontrado.");
+        if (receiver.UserId == userId)
+            throw new DomainValidationException("email", "O personagem já é seu.");
+
+        // Conditional update: a concurrent transfer that got there first makes this one fail.
+        if (!await _repository.TransferAsync(characterId, userId, receiver.UserId))
+            throw new ConflictException("O personagem já não pertence a você.");
+
+        var campaignIds = await _campaignCharacterRepository.ListCampaignIdsByCharacterAsync(characterId);
+        await PublishToCampaignsAsync(campaignIds, userId);
+        foreach (var campaignId in campaignIds)
+            await RemoveFormerOwnerIfNoAccessAsync(userId, campaignId);
+    }
+
+    /// <summary>The former owner stops receiving the events of campaigns they can no longer read (017).</summary>
+    private async Task RemoveFormerOwnerIfNoAccessAsync(long userId, long campaignId)
+    {
+        var campaign = await _campaignRepository.GetByIdAsync(campaignId);
+        if (campaign == null || campaign.UserId == userId)
+            return;
+        if (!await _campaignCharacterRepository.HasApprovedCharacterAsync(campaignId, userId))
+            await _notifier.RemoveUserFromCampaignAsync(userId, campaignId);
     }
 
     /// <summary>The character's name, picture, token and totals show in parties and pieces (017).</summary>

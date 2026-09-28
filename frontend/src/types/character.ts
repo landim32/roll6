@@ -41,3 +41,8 @@ export interface CharacterSearchInfo {
   ownerId: number;
   ownerName: string;
 }
+
+/** Transfers a character to the user with this e-mail (021). */
+export interface CharacterTransferInfo {
+  email: string;
+}
