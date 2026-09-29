@@ -11,6 +11,11 @@ public interface ITurnRepository<TModel> where TModel : class
     Task<bool> ExistsMovementAsync(long campaignId, int turnNo, long? characterId, long? mapNpcId);
     /// <summary>The last Movement of each character / NPC occurrence up to a turn (positions of a finished turn, 024).</summary>
     Task<List<TModel>> ListLastMovementsAsync(long campaignId, int turnNo);
+    /// <summary>
+    /// Narration entries of <paramref name="turnNo"/>, or — when it is null — of the greatest turn below
+    /// <paramref name="beforeTurn"/> that has one. Oldest first (029).
+    /// </summary>
+    Task<List<TModel>> ListNarrationsAsync(long campaignId, int? turnNo, int beforeTurn);
     /// <summary>Entries of a range of turns, ordered by turn and time (turn history, 028).</summary>
     Task<List<TModel>> ListByCampaignTurnRangeAsync(long campaignId, int fromTurn, int toTurn);
     Task<TModel> InsertAsync(TModel entity);

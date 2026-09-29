@@ -23,6 +23,7 @@ import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { useMapEditor } from '../hooks/useMapEditor';
 import { useMapToken } from '../hooks/useMapToken';
 import { useTurn } from '../hooks/useTurn';
+import { useTableRoute } from '../hooks/useTableRoute';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import type { CharacterEditTarget } from '../components/modals/CharacterFormModal';
 import type { CampaignNpcInfo } from '../types/npc';
@@ -32,6 +33,7 @@ import type { TokenInfo } from '../types/token';
 export const MainPage = () => {
   const { isDirty, draft } = useMapEditor();
   const { guard, requestSave, saveModalProps, unsavedModalProps } = useUnsavedGuard();
+  useTableRoute(guard);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);

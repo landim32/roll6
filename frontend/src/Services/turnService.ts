@@ -1,4 +1,4 @@
-import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo, TurnStateInfo, TurnSummaryInfo, TurnHistoryPageInfo } from '../types/turn';
+import type { TurnFinishResultInfo, TurnInfo, TurnNarrationInfo, TurnResetResultInfo, TurnStateInfo, TurnSummaryInfo, TurnHistoryPageInfo } from '../types/turn';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface TurnServiceConfig {
@@ -34,6 +34,13 @@ class TurnService {
     const query = turnNo === undefined ? '' : `?turnNo=${turnNo}`;
     const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/summary${query}`, { headers: getHeaders(true) });
     return this.handleResponse<TurnSummaryInfo>(response);
+  }
+
+  /** Narration of a turn, or the latest finished turn that has one (029). 204 → null. */
+  async narration(campaignId: number, turnNo?: number): Promise<TurnNarrationInfo | null> {
+    const query = turnNo === undefined ? '' : `?turnNo=${turnNo}`;
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/narration${query}`, { headers: getHeaders(true) });
+    return this.handleResponse<TurnNarrationInfo | null>(response);
   }
 
   /** Finished turns, newest first (028); `before` = previous page's `nextBefore`. */

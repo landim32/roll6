@@ -12,6 +12,8 @@ export interface MapDraft {
   mapModelId: number | null;
   /** Campaign map, when opened from "Mapas da campanha". */
   mapId: number | null;
+  /** Slug of the campaign map. Not a saved field, so it does not make the draft dirty. */
+  mapSlug: string | null;
   /** Campaign of the campaign map (to know who is the master). */
   campaignId: number | null;
   /** Owner of the map model; different from the user → saving creates a copy. */
@@ -35,6 +37,7 @@ export interface MapDraft {
 export const createEmptyDraft = (): MapDraft => ({
   mapModelId: null,
   mapId: null,
+  mapSlug: null,
   campaignId: null,
   ownerUserId: null,
   name: '',
@@ -54,6 +57,7 @@ export const createEmptyDraft = (): MapDraft => ({
 export const draftFromMapModel = (model: MapModelInfo, map?: MapInfo | null): MapDraft => ({
   mapModelId: model.mapModelId,
   mapId: map?.mapId ?? null,
+  mapSlug: map?.slug ?? null,
   campaignId: map?.campaignId ?? null,
   ownerUserId: model.userId,
   name: map?.name ?? model.name,

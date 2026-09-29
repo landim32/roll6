@@ -68,6 +68,28 @@ public class CampaignService : ICampaignService
         return await MapToDtoAsync(await GetCampaignAsync(campaignId));
     }
 
+    public async Task<CampaignInfo> GetBySlugAsync(string slug)
+    {
+        var campaign = await _repository.GetBySlugAsync(slug)
+            ?? throw new KeyNotFoundException("Campanha não encontrada.");
+        return await MapToDtoAsync(campaign);
+    }
+
+    public async Task<List<CampaignTableInfo>> ListTableAsync(long userId)
+    {
+        var rows = await _repository.ListTableAsync(userId);
+        return rows.Select(row => new CampaignTableInfo
+        {
+            CampaignId = row.CampaignId,
+            Name = row.Name,
+            Slug = row.Slug,
+            IsMaster = row.UserId == userId,
+            CurrentMapId = row.CurrentMapId,
+            CurrentMapName = row.CurrentMapName,
+            CurrentMapSlug = row.CurrentMapSlug
+        }).ToList();
+    }
+
     public async Task<CampaignInfo> CreateAsync(long userId, CampaignInsertInfo info)
     {
         var campaign = new Campaign { UserId = userId };
@@ -175,6 +197,7 @@ public class CampaignService : ICampaignService
         UserId = campaign.UserId,
         OwnerName = ownerNames.GetValueOrDefault(campaign.UserId, string.Empty),
         Name = campaign.Name,
+        Slug = campaign.Slug,
         Open = campaign.Open,
         CurrentTurn = campaign.CurrentTurn,
         CurrentMapId = campaign.CurrentMapId,

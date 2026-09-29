@@ -76,6 +76,25 @@ public partial class TurnService : ITurnService
     }
 
     /// <summary>
+    /// Narration of the requested turn, or of the latest finished turn that has one. Entries of the same turn are
+    /// joined with a blank line; <c>finishedAt</c> is the last entry's time (null while that turn is in progress).
+    /// </summary>
+    public async Task<TurnNarrationInfo?> GetNarrationAsync(long userId, long campaignId, int? turnNo)
+    {
+        var campaign = await GetReadableCampaignAsync(userId, campaignId);
+        if (turnNo is int requested) CheckTurnNo(campaign, requested);
+        var entries = await _repository.ListNarrationsAsync(campaignId, turnNo, campaign.CurrentTurn);
+        if (entries.Count == 0) return null;
+        var number = entries[0].TurnNo;
+        return new TurnNarrationInfo
+        {
+            TurnNo = number,
+            Narration = string.Join("\n\n", entries.Select(e => e.Description ?? string.Empty)),
+            FinishedAt = number == campaign.CurrentTurn ? null : entries[^1].CreatedAt
+        };
+    }
+
+    /// <summary>
     /// Everything that happened in a turn as markdown (024): the entries in order and where every character/NPC piece
     /// of the turn's map is — now for the turn in progress, after its last move for a finished turn.
     /// </summary>

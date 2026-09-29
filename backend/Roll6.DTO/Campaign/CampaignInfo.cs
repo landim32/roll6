@@ -26,6 +26,10 @@ public class CampaignInfo
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Unique URL slug. Set on creation and never changed.</summary>
+    [JsonPropertyName("slug")]
+    public string Slug { get; set; } = string.Empty;
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

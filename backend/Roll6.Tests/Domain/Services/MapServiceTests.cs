@@ -35,7 +35,8 @@ public class MapServiceTests
     private void SetupMap(MapStatus status = MapStatus.Active) =>
         _repository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(new Map
         {
-            MapId = 30, CampaignId = 10, MapModelId = 20, UserId = OWNER_ID, Sequence = 1, Name = "Masmorra 1", Status = status
+            MapId = 30, CampaignId = 10, MapModelId = 20, UserId = OWNER_ID, Sequence = 1,
+            Name = "Masmorra 1", Slug = "masmorra-1", Status = status
         });
 
     [Fact]
@@ -46,14 +47,28 @@ public class MapServiceTests
             {
                 map.Sequence = 2;
                 map.Name = $"{modelName} {map.Sequence}";
+                map.AssignSlug("masmorra-2");
                 return map;
             });
 
         var result = await _service.CreateAsync(OWNER_ID, new MapInsertInfo { CampaignId = 10, MapModelId = 20 });
 
         result.Name.Should().Be("Masmorra 2");
+        result.Slug.Should().Be("masmorra-2");
         result.Status.Should().Be((int)MapStatus.Active);
         result.UserId.Should().Be(OWNER_ID);
+    }
+
+    [Fact]
+    public async Task Update_DoesNotChangeSlug()
+    {
+        SetupMap();
+
+        var result = await _service.UpdateAsync(OWNER_ID, 30, new MapUpdateInfo { Name = "Outro nome", Status = (int)MapStatus.Active });
+
+        result.Name.Should().Be("Outro nome");
+        result.Slug.Should().Be("masmorra-1");
+        _repository.Verify(r => r.UpdateAsync(It.Is<Map>(m => m.Slug == "masmorra-1" && m.Name == "Outro nome")));
     }
 
     [Fact]
@@ -82,6 +97,63 @@ public class MapServiceTests
         var result = await _service.UpdateAsync(OWNER_ID, 30, new MapUpdateInfo { Name = "Masmorra 1", Status = (int)MapStatus.Archived });
 
         result.Status.Should().Be((int)MapStatus.Archived);
+    }
+
+    [Fact]
+    public async Task GetBySlug_Existing_ReturnsMap()
+    {
+        _repository.Setup(r => r.GetBySlugAsync("masmorra-1")).ReturnsAsync(new Map
+        {
+            MapId = 30, CampaignId = 10, MapModelId = 20, UserId = OWNER_ID, Sequence = 1,
+            Name = "Masmorra 1", Slug = "masmorra-1", Status = MapStatus.Active
+        });
+
+        var result = await _service.GetBySlugAsync(OWNER_ID, "masmorra-1");
+
+        result.MapId.Should().Be(30);
+        result.Slug.Should().Be("masmorra-1");
+    }
+
+    [Fact]
+    public async Task GetBySlug_MissingOrDeleted_ThrowsNotFound()
+    {
+        await _service.Invoking(s => s.GetBySlugAsync(OWNER_ID, "nao-existe")).Should().ThrowAsync<KeyNotFoundException>();
+
+        _repository.Setup(r => r.GetBySlugAsync("apagado")).ReturnsAsync(new Map
+        {
+            MapId = 30, CampaignId = 10, MapModelId = 20, UserId = OWNER_ID,
+            Name = "Masmorra 1", Slug = "apagado", Status = MapStatus.Deleted
+        });
+
+        await _service.Invoking(s => s.GetBySlugAsync(OWNER_ID, "apagado")).Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task GetBySlug_WithoutAccess_Throws()
+    {
+        _repository.Setup(r => r.GetBySlugAsync("masmorra-1")).ReturnsAsync(new Map
+        {
+            MapId = 30, CampaignId = 10, MapModelId = 20, UserId = OWNER_ID,
+            Name = "Masmorra 1", Slug = "masmorra-1", Status = MapStatus.Active
+        });
+
+        await _service.Invoking(s => s.GetBySlugAsync(OTHER_USER_ID, "masmorra-1"))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    [Fact]
+    public async Task GetBySlug_ApprovedParticipant_ReturnsMap()
+    {
+        _repository.Setup(r => r.GetBySlugAsync("masmorra-1")).ReturnsAsync(new Map
+        {
+            MapId = 30, CampaignId = 10, MapModelId = 20, UserId = OWNER_ID,
+            Name = "Masmorra 1", Slug = "masmorra-1", Status = MapStatus.Active
+        });
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(10, OTHER_USER_ID)).ReturnsAsync(true);
+
+        var result = await _service.GetBySlugAsync(OTHER_USER_ID, "masmorra-1");
+
+        result.Slug.Should().Be("masmorra-1");
     }
 
     [Fact]

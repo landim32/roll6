@@ -23,6 +23,8 @@ export interface MapInfo {
   userId: number;
   sequence: number;
   name: string;
+  /** Unique URL slug. Set on creation and never changed. */
+  slug: string;
   /** One of the MAP_STATUS_* values. */
   status: number;
   createdAt: string;

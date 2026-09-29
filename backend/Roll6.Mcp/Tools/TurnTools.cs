@@ -119,6 +119,25 @@ public static class TurnTools
         [Description("How many turns per page, 1 to 20 (default 5).")] int? limit = null) =>
         api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/turn/history", null, ("before", before), ("limit", limit));
 
+    [McpServerTool(Name = "get_turn_narration", Title = "Get turn narration", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/campaign/{id}/turn/narration")]
+    [Description("""
+        What it does: returns the narration of a campaign turn — the text stored when the turn was processed — as one
+        markdown string. Several narration entries in the same turn are joined with a blank line, oldest first. Without
+        turnNo it is the latest FINISHED turn (below the turn in progress) that has a narration; turns with none are skipped.
+        Who can use it: the campaign master or a player with an approved character in the campaign.
+        Returns: { turnNo, narration, finishedAt }. finishedAt is the time of the last narration entry, or null when that
+        narration belongs to the turn in progress. When there is no narration the API answers 204 and this tool returns
+        { ok: true }.
+        Common errors: 400 turnNo below 1 or above the current turn, 403 no access to the campaign, 404 campaign not found.
+        Related tools: get_turn_summary, get_turn_history, process_turn.
+        """)]
+    public static Task<CallToolResult> GetTurnNarration(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("Turn number (1 up to the current turn). Omit it for the latest finished turn that has a narration.")] int? turnNo = null) =>
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/turn/narration", null, ("turnNo", turnNo));
+
     [McpServerTool(Name = "reset_turn", Title = "Reset piece turn", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("POST", "/api/turn/reset")]
     [Description($$"""

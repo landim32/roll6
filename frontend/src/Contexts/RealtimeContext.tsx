@@ -37,7 +37,7 @@ const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined
 export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
   const { t } = useTranslation();
-  const { currentCampaign, selectCampaign } = useCampaign();
+  const { currentCampaign, selectCampaign, refreshTableCampaigns } = useCampaign();
   const [status, setStatus] = useState<RealtimeStatus>(REALTIME_STATUS.disconnected);
   const [joinedId, setJoinedId] = useState<number | null>(null);
   const connectionRef = useRef<HubConnection | null>(null);
@@ -52,6 +52,8 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
   campaignRef.current = currentCampaign;
   const selectRef = useRef(selectCampaign);
   selectRef.current = selectCampaign;
+  const refreshRef = useRef(refreshTableCampaigns);
+  refreshRef.current = refreshTableCampaigns;
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -62,6 +64,8 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
   const applyCampaignEvent = useCallback((event: TableEvent) => {
     const campaign = campaignRef.current;
     if (!campaign || campaign.campaignId !== event.campaignId) return;
+    if (event.type === TABLE_EVENT.campaignChanged || event.type === TABLE_EVENT.mapCurrent || event.type === TABLE_EVENT.campaignDeleted)
+      void refreshRef.current();
     if (event.type === TABLE_EVENT.campaignChanged && event.data)
       selectRef.current({ ...(event.data as CampaignInfo) });
     else if (event.type === TABLE_EVENT.campaignDeleted) {

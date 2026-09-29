@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
@@ -19,7 +20,8 @@ const PAGE_SIZE = 10;
 /** Current campaign picker: "Minhas campanhas", "Buscar campanhas" (with owner) and "Nova campanha". */
 export const CampaignModal = ({ open, onOpenChange }: CampaignModalProps) => {
   const { t } = useTranslation();
-  const { currentCampaign, listCampaigns, createCampaign, selectCampaign, loading: saving } = useCampaign();
+  const navigate = useNavigate();
+  const { currentCampaign, listCampaigns, createCampaign, loading: saving } = useCampaign();
   const [tab, setTab] = useState('mine');
   const [data, setData] = useState<PagedList<CampaignInfo> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,7 +46,7 @@ export const CampaignModal = ({ open, onOpenChange }: CampaignModalProps) => {
   }, [open, tab]);
 
   const choose = (campaign: CampaignInfo) => {
-    selectCampaign(campaign);
+    navigate(`/campaign/${encodeURIComponent(campaign.slug)}`);
     toast.success(t('toast.campaignSelected', { name: campaign.name }));
     onOpenChange(false);
   };
@@ -57,6 +59,7 @@ export const CampaignModal = ({ open, onOpenChange }: CampaignModalProps) => {
     }
     try {
       const created = await createCampaign({ name: name.trim(), open: isOpen });
+      navigate(`/campaign/${encodeURIComponent(created.slug)}`);
       toast.success(t('toast.campaignCreated', { name: created.name }));
       setName('');
       setIsOpen(false);

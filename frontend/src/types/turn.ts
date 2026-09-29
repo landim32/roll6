@@ -88,6 +88,13 @@ export interface TurnHistoryItemInfo {
   finishedAt: string | null;
 }
 
+/** Narration of one turn (029). `finishedAt` is null when that turn is still in progress. */
+export interface TurnNarrationInfo {
+  turnNo: number;
+  narration: string;
+  finishedAt: string | null;
+}
+
 /** A page of finished turns, newest first; `nextBefore` loads older ones (null = turn 1 reached). */
 export interface TurnHistoryPageInfo {
   campaignId: number;

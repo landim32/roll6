@@ -119,6 +119,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("open");
 
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("slug");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -133,6 +139,10 @@ namespace Roll6.Infra.Migrations
                         .HasName("campaigns_pkey");
 
                     b.HasIndex("CurrentMapId");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_campaigns_slug");
 
                     b.HasIndex("UserId");
 
@@ -387,6 +397,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("sequence");
 
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("slug");
+
                     b.Property<int>("Status")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -407,6 +423,10 @@ namespace Roll6.Infra.Migrations
                         .HasName("maps_pkey");
 
                     b.HasIndex("MapModelId");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_maps_slug");
 
                     b.HasIndex("UserId");
 

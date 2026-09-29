@@ -58,6 +58,16 @@ public class MapService : IMapService
         return MapToDto(map, await _mapModelRepository.GetByIdAsync(map.MapModelId));
     }
 
+    public async Task<MapInfo> GetBySlugAsync(long userId, string slug)
+    {
+        var map = await _repository.GetBySlugAsync(slug)
+            ?? throw new KeyNotFoundException("Mapa não encontrado.");
+        if (map.IsDeleted)
+            throw new KeyNotFoundException("Mapa não encontrado.");
+        await EnsureCanReadCampaignAsync(userId, map.CampaignId);
+        return MapToDto(map, await _mapModelRepository.GetByIdAsync(map.MapModelId));
+    }
+
     public async Task<MapInfo> CreateAsync(long userId, MapInsertInfo info)
     {
         await GetOwnedCampaignAsync(userId, info.CampaignId);
@@ -159,6 +169,7 @@ public class MapService : IMapService
         UserId = map.UserId,
         Sequence = map.Sequence,
         Name = map.Name,
+        Slug = map.Slug,
         Status = (int)map.Status,
         CreatedAt = map.CreatedAt,
         UpdatedAt = map.UpdatedAt

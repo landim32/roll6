@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useTableEvents } from '../hooks/useRealtime';
 import { TABLE_EVENT } from '../types/realtime';
 import { MAP_STORAGE_KEY } from '../Services/apiHelpers';
+import { parseTablePath } from '../lib/tableRoute';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { gridPixelSize, HEX_SIZE } from '../lib/hexGrid';
@@ -79,6 +80,8 @@ interface MapEditorContextType {
   zoomIn: (screenX: number, screenY: number) => void;
   zoomOut: (screenX: number, screenY: number) => void;
   panBy: (dx: number, dy: number) => void;
+  /** Puts the map point (map units) in the middle of the screen with this zoom. */
+  centerOn: (mapX: number, mapY: number, zoom: number) => void;
   // Draft editing (saved only by saveMap)
   setImage: (fileName: string, url: string | null) => Promise<void>;
   setImageLayout: (layout: ImageLayout) => void;
@@ -88,6 +91,8 @@ interface MapEditorContextType {
   newMap: () => void;
   /** `keepView` keeps zoom/pan (the same map reloaded because someone saved it, 017). */
   loadMapModel: (mapModelId: number, map?: MapInfo | null, options?: { keepView?: boolean }) => Promise<MapDraft>;
+  /** Opens a campaign map by its URL slug and returns it. */
+  openCampaignMapBySlug: (slug: string) => Promise<MapInfo>;
   discardChanges: () => void;
   saveMap: (info?: SaveMapInfo) => Promise<SaveMapResult>;
   clearError: () => void;
@@ -134,7 +139,7 @@ const writeStoredMap = (map: StoredMap | null) => {
 
 export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
-  const { currentCampaign, isMaster } = useCampaign();
+  const { currentCampaign, isMaster, refreshTableCampaigns } = useCampaign();
   const [draft, setDraft] = useState<MapDraft>(createEmptyDraft);
   const [saved, setSaved] = useState<MapDraft>(createEmptyDraft);
   const [view, setView] = useState<MapView>(INITIAL_VIEW);
@@ -173,6 +178,10 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const zoomOut = useCallback((x: number, y: number) => zoomAt(1 / ZOOM_STEP, x, y), [zoomAt]);
   const panBy = useCallback((dx: number, dy: number) => {
     setView((prev) => ({ ...prev, panX: prev.panX + dx, panY: prev.panY + dy }));
+  }, []);
+  const centerOn = useCallback((mapX: number, mapY: number, zoom: number) => {
+    const scale = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    setView({ zoom: scale, panX: window.innerWidth / 2 - mapX * scale, panY: window.innerHeight / 2 - mapY * scale });
   }, []);
 
   // ---------- draft editing ----------
@@ -256,7 +265,13 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
       if (!needsName && draft.mapModelId !== null) {
         const updated = await mapModelService.update(
           draft.mapModelId, toMapModelInsert(draft, draft.modelName, draft.description));
-        const next = { ...draftFromMapModel(updated), mapId: draft.mapId, campaignId: draft.campaignId, name: draft.name };
+        const next = {
+          ...draftFromMapModel(updated),
+          mapId: draft.mapId,
+          mapSlug: draft.mapSlug,
+          campaignId: draft.campaignId,
+          name: draft.name,
+        };
         setDraft(next);
         setSaved(next);
         return { name: next.name, copied: false, campaignName: null };
@@ -270,13 +285,14 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
       const next = draftFromMapModel(created, campaignMap);
       setDraft(next);
       setSaved(next);
+      if (campaignMap) await refreshTableCampaigns();
       return { name: created.name, copied: isCopy, campaignName: campaignMap ? currentCampaign?.name ?? null : null };
     } catch (err) {
       return handleError(err);
     } finally {
       setLoading(false);
     }
-  }, [draft, needsName, isCopy, currentCampaign, isMaster]);
+  }, [draft, needsName, isCopy, currentCampaign, isMaster, refreshTableCampaigns]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -295,6 +311,11 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     markRestored(false);
     if (!session) return;
+    // A /campaign or /map address is resolved by useTableRoute; restoring here would race it.
+    if (parseTablePath(window.location.pathname).kind !== 'root') {
+      markRestored(true);
+      return;
+    }
     const stored = readStoredMap();
     if (!stored) {
       markRestored(true);
@@ -347,6 +368,13 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     return loadMapModel(map.mapModelId, map, options);
   }, [loadMapModel]);
 
+  const openCampaignMapBySlug = useCallback(async (slug: string): Promise<MapInfo> => {
+    const map = await mapService.getBySlug(slug);
+    if (map.status === MAP_STATUS_DELETED) throw new Error('map deleted');
+    await loadMapModel(map.mapModelId, map);
+    return map;
+  }, [loadMapModel]);
+
   /**
    * Players follow the master's map: on entering the campaign (after the restore, so it wins over the
    * remembered map) and whenever the master switches. Opening another map on their own is fine until the
@@ -357,8 +385,14 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     if (!restored) return;
     const key = `${campaignId}:${currentMapId}`;
     if (followedRef.current === key) return;
+    const previous = followedRef.current;
     followedRef.current = key;
     if (isMaster || campaignId === null || currentMapId === null || draft.mapId === currentMapId) return;
+    // A /map/<slug> deep link stays until the master switches, the same as opening another map yourself.
+    const route = parseTablePath(window.location.pathname);
+    const explicitMap = route.kind === 'map' && draft.mapSlug === route.slug && draft.campaignId === campaignId;
+    const enteredCampaign = previous === null || !previous.startsWith(`${campaignId}:`);
+    if (explicitMap && enteredCampaign) return;
     if (isDirty) {
       toast.warning(t('realtime.mapChangedDirty'));
       return;
@@ -369,7 +403,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
         if (opened && hadMap) toast.info(t('realtime.followedMap', { name: opened.name }));
       })
       .catch(() => { /* not accessible (yet): stay on the current map */ });
-  }, [restored, campaignId, currentMapId, isMaster, isDirty, draft.mapId, openCampaignMap, t]);
+  }, [restored, campaignId, currentMapId, isMaster, isDirty, draft.mapId, draft.mapSlug, draft.campaignId, openCampaignMap, t]);
 
   useTableEvents((event) => {
     if (event.type === TABLE_EVENT.mapSaved) {
@@ -391,9 +425,9 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   const value: MapEditorContextType = {
     draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, loading, error,
-    zoomAt, zoomIn, zoomOut, panBy,
+    zoomAt, zoomIn, zoomOut, panBy, centerOn,
     setImage, setImageLayout, setGridSize, toggleResizeMode,
-    newMap, loadMapModel, discardChanges, saveMap, clearError,
+    newMap, loadMapModel, openCampaignMapBySlug, discardChanges, saveMap, clearError,
   };
 
   return <MapEditorContext.Provider value={value}>{children}</MapEditorContext.Provider>;

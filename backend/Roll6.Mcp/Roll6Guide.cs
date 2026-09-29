@@ -56,6 +56,10 @@ public static class Roll6Guide
           character joins and record only what changed in this campaign (e.g. the character had a sword and lost it).
           The character's own sheet stays the reference and is never changed by campaign play.
         - The campaign's **current map** (`set_current_map`, master) is the map all players follow in the app.
+        - Every campaign and every campaign map has an immutable **slug** (built from the name, unique on the whole
+          site; renaming does not change it). `get_campaign_by_slug` and `get_map_by_slug` open them.
+          `list_my_table_campaigns` lists the campaigns where you are the master or have an approved character, each
+          with the map the table is following.
 
         ## Hex grid (maps)
         - Flat-top hexagons in a rectangle of `gridWidth` columns × `gridHeight` rows; odd columns are shifted half a
@@ -83,7 +87,8 @@ public static class Roll6Guide
           fields before/after. `get_turn_summary` returns the whole turn as readable markdown (actions + positions).
         - Running a turn as an assistant: `get_turn_data` (characters, NPC occurrences and actions in one call) → decide →
           `process_turn` (all changes + narration in one atomic call; it also finishes the turn). Older turns:
-          `get_turn_history` (finished turns, newest first, a few at a time).
+          `get_turn_history` (finished turns, newest first, a few at a time). `get_turn_narration` returns only the
+          narration of one turn, or of the latest finished turn that has one (204 / `{ ok: true }` when there is none).
         - `finish_turn` (master) moves to the next turn; without `force` it only lists the approved characters that
           have not acted yet. NPCs never block.
         - `create_turn_entry` / `delete_turn_entry` (master) write entries directly — the only way to record an

@@ -8,6 +8,11 @@ public class Campaign
     public long UserId { get; set; }
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Unique URL slug. Assigned only on insert (<see cref="AssignSlug"/>); <see cref="Rename"/> never changes it.
+    /// </summary>
+    public string Slug { get; set; } = string.Empty;
+
     /// <summary>Open campaigns approve access requests immediately; closed ones need the master.</summary>
     public bool Open { get; set; }
 
@@ -23,6 +28,12 @@ public class Campaign
     {
         Name = Guard.RequiredText(name, "name", 260);
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Sets the slug. Called only when the campaign is inserted.</summary>
+    public void AssignSlug(string slug)
+    {
+        Slug = slug;
     }
 
     /// <summary>Finishes the current turn: the next one starts.</summary>

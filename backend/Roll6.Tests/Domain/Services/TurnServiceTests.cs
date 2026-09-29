@@ -98,6 +98,47 @@ public class TurnServiceTests
         await _service.Invoking(s => s.GetStateAsync(STRANGER, CAMPAIGN)).Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
+    // --- Narration (029) ---
+
+    [Fact]
+    public async Task GetNarration_WithoutTurnNo_JoinsTheLatestFinishedTurn()
+    {
+        var first = Turn.Narration(CAMPAIGN, MAP, 1, MASTER, "Os heróis entram.");
+        first.CreatedAt = new DateTime(2026, 9, 1, 10, 0, 0, DateTimeKind.Utc);
+        var second = Turn.Narration(CAMPAIGN, MAP, 1, MASTER, "A porta se fecha.");
+        second.CreatedAt = new DateTime(2026, 9, 1, 11, 0, 0, DateTimeKind.Utc);
+        _repository.Setup(r => r.ListNarrationsAsync(CAMPAIGN, null, 3)).ReturnsAsync(new List<Turn> { first, second });
+
+        var result = await _service.GetNarrationAsync(MASTER, CAMPAIGN, null);
+
+        result.Should().NotBeNull();
+        result!.TurnNo.Should().Be(1);
+        result.Narration.Should().Be("Os heróis entram.\n\nA porta se fecha.");
+        result.FinishedAt.Should().Be(second.CreatedAt);
+        _repository.Verify(r => r.ListNarrationsAsync(CAMPAIGN, null, _campaign.CurrentTurn), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetNarration_CurrentTurn_HasNoFinishedAt()
+    {
+        var live = Turn.Narration(CAMPAIGN, MAP, 3, MASTER, "Ainda em curso.");
+        _repository.Setup(r => r.ListNarrationsAsync(CAMPAIGN, 3, 3)).ReturnsAsync(new List<Turn> { live });
+
+        var result = await _service.GetNarrationAsync(MASTER, CAMPAIGN, 3);
+
+        result!.Narration.Should().Be("Ainda em curso.");
+        result.FinishedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetNarration_None_ReturnsNull_AndStrangerIsForbidden()
+    {
+        _repository.Setup(r => r.ListNarrationsAsync(CAMPAIGN, null, 3)).ReturnsAsync(new List<Turn>());
+
+        (await _service.GetNarrationAsync(MASTER, CAMPAIGN, null)).Should().BeNull();
+        await _service.Invoking(s => s.GetNarrationAsync(STRANGER, CAMPAIGN, null)).Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
     // --- Act (US2) ---
 
     [Fact]

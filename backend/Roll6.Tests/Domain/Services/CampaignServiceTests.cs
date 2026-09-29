@@ -96,6 +96,76 @@ public class CampaignServiceTests
     }
 
     [Fact]
+    public async Task GetBySlug_Existing_ReturnsCampaign()
+    {
+        _repository.Setup(r => r.GetBySlugAsync("campanha")).ReturnsAsync(new Campaign
+        {
+            CampaignId = 10, UserId = 1, Name = "Campanha", Slug = "campanha"
+        });
+
+        var result = await _service.GetBySlugAsync("campanha");
+
+        result.CampaignId.Should().Be(10);
+        result.Slug.Should().Be("campanha");
+        result.OwnerName.Should().Be("Mestre Ana");
+    }
+
+    [Fact]
+    public async Task ListTable_SetsMasterAndKeepsMissingMapNull()
+    {
+        _repository.Setup(r => r.ListTableAsync(1)).ReturnsAsync(new List<CampaignTableRow>
+        {
+            new() { CampaignId = 10, UserId = 1, Name = "Tormento Vil", Slug = "tormento-vil", CurrentMapId = 12, CurrentMapName = "Estrada 1", CurrentMapSlug = "estrada-1" },
+            new() { CampaignId = 9, UserId = 2, Name = "Teste 2", Slug = "teste-2" }
+        });
+
+        var result = await _service.ListTableAsync(1);
+
+        result.Should().HaveCount(2);
+        result[0].IsMaster.Should().BeTrue();
+        result[0].CurrentMapSlug.Should().Be("estrada-1");
+        result[1].IsMaster.Should().BeFalse();
+        result[1].CurrentMapId.Should().BeNull();
+        result[1].CurrentMapName.Should().BeNull();
+        result[1].CurrentMapSlug.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetBySlug_Missing_ThrowsNotFound()
+    {
+        await _service.Invoking(s => s.GetBySlugAsync("nao-existe")).Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Create_ReturnsSlugStoredByRepository()
+    {
+        _repository.Setup(r => r.InsertAsync(It.IsAny<Campaign>())).ReturnsAsync((Campaign c) =>
+        {
+            c.AssignSlug("nova");
+            return c;
+        });
+
+        var result = await _service.CreateAsync(1, new CampaignInsertInfo { Name = "Nova" });
+
+        result.Slug.Should().Be("nova");
+    }
+
+    [Fact]
+    public async Task Rename_DoesNotChangeSlug()
+    {
+        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign
+        {
+            CampaignId = 10, UserId = 1, Name = "Campanha", Slug = "campanha"
+        });
+
+        var result = await _service.RenameAsync(1, 10, new CampaignInsertInfo { Name = "Nova" });
+
+        result.Name.Should().Be("Nova");
+        result.Slug.Should().Be("campanha");
+        _repository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.Slug == "campanha" && c.Name == "Nova")));
+    }
+
+    [Fact]
     public async Task Create_WithoutOpen_IsClosed()
     {
         var result = await _service.CreateAsync(1, new CampaignInsertInfo { Name = "Nova" });

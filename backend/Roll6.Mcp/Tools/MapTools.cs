@@ -11,8 +11,8 @@ public static class MapTools
 {
     private const string RETURNS = """
         Returns: the map { mapId, campaignId, mapModelId, mapModelName, mapModelImageUrl, gridWidth, gridHeight, imageWidth,
-        imageHeight, imageTop, imageLeft, hexSize, userId (master), sequence, name, status (1 active, 2 archived),
-        createdAt, updatedAt }.
+        imageHeight, imageTop, imageLeft, hexSize, userId (master), sequence, name, slug (immutable URL slug),
+        status (1 active, 2 archived), createdAt, updatedAt }.
         """;
 
     [McpServerTool(Name = "get_map", Title = "Get map", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -28,6 +28,20 @@ public static class MapTools
         Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId) =>
         api.SendAsync(HttpMethod.Get, $"/api/map/{mapId}");
+
+    [McpServerTool(Name = "get_map_by_slug", Title = "Get map by slug", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/map/slug/{slug}")]
+    [Description($$"""
+        What it does: returns one campaign map by its URL slug, including archived maps, with the grid size needed for x/y.
+        Who can use it: the master and approved participants of the map's campaign.
+        {{RETURNS}}
+        Common errors: 403 not allowed, 404 slug not found or the map is deleted.
+        Related tools: get_map, get_campaign_by_slug, list_map_tokens.
+        """)]
+    public static Task<CallToolResult> GetMapBySlug(
+        Roll6ApiClient api,
+        [Description(McpDocs.SLUG)] string slug) =>
+        api.SendAsync(HttpMethod.Get, $"/api/map/slug/{slug}");
 
     [McpServerTool(Name = "add_map_to_campaign", Title = "Add map to campaign", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/map")]

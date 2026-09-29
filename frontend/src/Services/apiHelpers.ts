@@ -44,6 +44,17 @@ export const getHeaders = (authenticated: boolean, json = true): HeadersInit => 
   return headers;
 };
 
+/** API failure that keeps the HTTP status (404 vs 403) along with the ProblemDetails message. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 /** Converts an error response (ProblemDetails or text) into a readable message. */
 export const readError = async (response: Response): Promise<string> => {
   const text = await response.text();
@@ -80,9 +91,9 @@ export const setUnauthorizedHandler = (handler: (() => void) | undefined): void 
 export const handleApiResponse = async <T>(response: Response, onUnauthorized?: () => void): Promise<T> => {
   if (response.status === 401) {
     (onUnauthorized ?? unauthorizedHandler)?.();
-    throw new Error(await readError(response));
+    throw new ApiError(response.status, await readError(response));
   }
-  if (!response.ok) throw new Error(await readError(response));
+  if (!response.ok) throw new ApiError(response.status, await readError(response));
   if (response.status === 204) return undefined as T;
   const text = await response.text();
   return (text ? JSON.parse(text) : undefined) as T;

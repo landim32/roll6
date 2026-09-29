@@ -23,6 +23,8 @@ export const App = () => {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
+        <Route path="/campaign/:slug" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
+        <Route path="/map/:slug" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster theme="dark" position="bottom-left" richColors closeButton />
