@@ -42,7 +42,9 @@ Estado → URL sempre com `replace`; escolhas do usuário com push (voltar/avan�
 - Ordem: `+`, `−`, **Compartilhar** (`ShareIcon`, `title`/`aria-label` = `map.share`), imagem, redimensionar.
 - Visível com mapa de campanha aberto; desabilitado com spinner enquanto gera.
 - Com Web Share de arquivos: janela nativa com `roll6-<map-slug>.jpg` + texto.
-- Sem: baixa o arquivo, copia o texto, toast `share.fallback` ("Imagem baixada e texto copiado — cole no WhatsApp").
+- Se o aparelho não aceita imagem + texto juntos (ou o envio com texto falha): compartilha só a imagem.
+- Sem compartilhamento de arquivos: baixa só a imagem, toast `share.fallback` ("Imagem do mapa baixada — envie no WhatsApp.").
+- Gesto expirado (`NotAllowedError`): toast `share.ready` com ação `share.send` que tenta de novo.
 - Falha: toast `share.error`; cancelamento: nada.
 
 Texto (exemplo):

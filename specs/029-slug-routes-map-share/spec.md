@@ -88,7 +88,7 @@ Junto com os botões de zoom há um botão "Compartilhar". Ele gera uma imagem d
 **Acceptance Scenarios**:
 
 1. **Given** um mapa de campanha aberto e um aparelho que permite compartilhar arquivos, **When** o usuário toca em "Compartilhar", **Then** a janela de compartilhamento do aparelho abre com a imagem do mapa e o texto da última narração formatado para o WhatsApp.
-2. **Given** um aparelho/navegador sem compartilhamento de arquivos (ex.: desktop), **When** o usuário clica em "Compartilhar", **Then** a imagem é baixada e o texto formatado é copiado para a área de transferência, com um aviso explicando o que foi feito.
+2. **Given** um aparelho/navegador sem compartilhamento de arquivos (ex.: desktop), **When** o usuário clica em "Compartilhar", **Then** só a imagem é baixada, com um aviso explicando o que foi feito. *(Revisado: o texto não é mais copiado.)*
 3. **Given** a campanha ainda não tem nenhuma narração, **When** o usuário compartilha, **Then** só a imagem (com o nome da campanha e do mapa como texto) é compartilhada.
 4. **Given** a imagem, **Then** ela mostra o mapa inteiro (independente do zoom e da posição atuais), com as peças, sem elementos de interface (menus, destaque do mouse, rastro do modo Mover).
 5. **Given** um mapa aberto fora de uma campanha (só o modelo), **Then** o botão não aparece.
@@ -151,9 +151,10 @@ Junto com os botões de zoom há um botão "Compartilhar". Ele gera uma imagem d
 - **FR-022**: A área dos botões de zoom MUST ter um botão "Compartilhar" (ícone com dica e rótulo acessível), visível para quem está com um mapa de campanha aberto.
 - **FR-023**: O compartilhamento MUST gerar uma imagem (PNG ou JPEG) do mapa inteiro — fundo, grade e peças com as suas imagens e orientação — sem elementos de interface, com resolução suficiente para leitura num celular.
 - **FR-024**: O texto compartilhado MUST ser a narração do turno finalizado mais recente que tenha narração, precedida por uma linha com campanha, mapa e número do turno, convertida para a formatação do WhatsApp: negrito `*texto*`, itálico `_texto_`, tachado `~texto~`, código em bloco com três crases, títulos viram linha em negrito, itens de lista com "- " ou numerados, links mostrados como "texto (url)", imagens e HTML removidos.
-- **FR-025**: Quando o aparelho suporta compartilhar arquivos, o sistema MUST abrir a janela nativa de compartilhamento com imagem e texto; senão MUST baixar a imagem e copiar o texto, avisando o usuário.
-- **FR-026**: Falhas ao gerar a imagem ou cancelamento pelo usuário MUST ser tratados sem travar a tela (erro avisado; cancelamento silencioso).
-- **FR-027**: Todos os textos novos MUST estar no arquivo de traduções pt-BR.
+- **FR-025**: Quando o aparelho suporta compartilhar arquivos, o sistema MUST abrir a janela nativa de compartilhamento com imagem e texto; se imagem e texto não puderem ir juntos, MUST compartilhar só a imagem; sem compartilhamento de arquivos, MUST baixar só a imagem, avisando o usuário. *(Revisado após o teste na mesa.)*
+- **FR-026**: As imagens do fundo e das peças MUST ser lidas pela própria API (`GET /api/image/file/{fileName}`), para que a imagem compartilhada saia com fundo, grade e peças sem depender de CORS no bucket; a grade e as bordas das peças MUST manter espessura legível qualquer que seja a redução da imagem.
+- **FR-027**: Falhas ao gerar a imagem ou cancelamento pelo usuário MUST ser tratados sem travar a tela (erro avisado; cancelamento silencioso).
+- **FR-028**: Todos os textos novos MUST estar no arquivo de traduções pt-BR.
 
 ### Key Entities *(include if feature involves data)*
 

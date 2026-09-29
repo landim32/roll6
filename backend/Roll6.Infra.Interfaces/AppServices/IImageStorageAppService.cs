@@ -1,3 +1,5 @@
+using Roll6.DTO.Image;
+
 namespace Roll6.Infra.Interfaces.AppServices;
 
 public interface IImageStorageAppService
@@ -7,4 +9,7 @@ public interface IImageStorageAppService
 
     /// <summary>Returns a temporary URL for the file, or null when there is no file.</summary>
     string? GetUrl(string? fileName);
+
+    /// <summary>Opens the stored file for reading, or null when it does not exist.</summary>
+    Task<StoredImageInfo?> OpenAsync(string fileName);
 }

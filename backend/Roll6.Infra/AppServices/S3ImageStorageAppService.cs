@@ -3,6 +3,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
+using Roll6.DTO.Image;
 using Roll6.DTO.Settings;
 using Roll6.Infra.Interfaces.AppServices;
 
@@ -69,6 +70,25 @@ public class S3ImageStorageAppService : IImageStorageAppService
             Verb = HttpVerb.GET,
             Expires = DateTime.UtcNow.AddMinutes(_settings.UrlExpirationMinutes)
         });
+    }
+
+    public async Task<StoredImageInfo?> OpenAsync(string fileName)
+    {
+        try
+        {
+            var response = await _client.GetObjectAsync(_settings.BucketName, GetKey(fileName));
+            return new StoredImageInfo
+            {
+                Content = response.ResponseStream,
+                ContentType = string.IsNullOrWhiteSpace(response.Headers.ContentType)
+                    ? "application/octet-stream"
+                    : response.Headers.ContentType
+            };
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
     }
 
     /// <summary>Only the file name is stored in the database; the configured folder is applied here.</summary>

@@ -33,6 +33,17 @@ class ImageService {
     return this.handleResponse<ImageUploadInfo>(response);
   }
 
+  /**
+   * Bytes of a stored image read through the API (029), for drawing on a canvas: the bucket's presigned
+   * URLs send no CORS headers. Null when the API cannot serve it.
+   */
+  async fetchStored(fileName: string): Promise<Blob | null> {
+    const response = await fetch(`${API_BASE}/file/${encodeURIComponent(fileName)}`, {
+      headers: { ...getHeaders(true, false), Accept: 'image/*' },
+    });
+    return response.ok ? response.blob() : null;
+  }
+
   /** Uploads a character sheet file (image or PDF) exactly as chosen — no crop, no conversion (022). */
   async uploadDocument(file: File): Promise<DocumentUploadInfo> {
     // Same bytes; only fills the MIME type some systems leave empty.

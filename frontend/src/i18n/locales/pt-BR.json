@@ -305,7 +305,9 @@
     "share": "Compartilhar"
   },
   "share": {
-    "fallback": "Imagem baixada e texto copiado — cole no WhatsApp.",
+    "fallback": "Imagem do mapa baixada — envie no WhatsApp.",
+    "ready": "Imagem do mapa pronta.",
+    "send": "Compartilhar",
     "error": "Não foi possível gerar a imagem do mapa.",
     "turn": "Turno {{no}}"
   },
