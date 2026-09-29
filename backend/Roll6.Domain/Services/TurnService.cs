@@ -29,6 +29,7 @@ public partial class TurnService : ITurnService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserRepository<User> _userRepository;
     private readonly IMapModelRepository<MapModel> _mapModelRepository;
+    private readonly ICampaignNpcRepository<CampaignNpc> _campaignNpcRepository;
     private readonly IRealtimeNotifier _notifier;
 
     public TurnService(
@@ -43,8 +44,10 @@ public partial class TurnService : ITurnService
         IUnitOfWork unitOfWork,
         IUserRepository<User> userRepository,
         IMapModelRepository<MapModel> mapModelRepository,
+        ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         IRealtimeNotifier notifier)
     {
+        _campaignNpcRepository = campaignNpcRepository;
         _mapModelRepository = mapModelRepository;
         _notifier = notifier;
         _userRepository = userRepository;
@@ -213,25 +216,41 @@ public partial class TurnService : ITurnService
         return new TurnFinishResultInfo { Finished = true, FinishedTurn = finished, TurnNo = campaign.CurrentTurn };
     }
 
-    /// <summary>Direct entry by the master; the only way to record an action result.</summary>
+    /// <summary>
+    /// Direct entry by the master in any turn from 1 up to the current one (030) — the only way to record an action
+    /// result. Writes only the log: pieces and values don't change and the one-move-per-turn rule doesn't apply.
+    /// </summary>
     public async Task<TurnInfo> CreateAsync(long userId, TurnInsertInfo info)
     {
         var campaign = await GetMasteredCampaignAsync(userId, info.CampaignId);
         var turnNo = info.TurnNo ?? campaign.CurrentTurn;
-        var turn = (TurnType)info.TurnType switch
+        Turn.EnsureTurnInRange(turnNo, campaign.CurrentTurn);
+        if (info.MapId is long mapId)
+            await EnsureMapInCampaignAsync(mapId, campaign.CampaignId);
+        var type = (TurnType)info.TurnType;
+        if (type == TurnType.Narration)
+            EnsureNoActor(info);
+        else if (Enum.IsDefined(type))
+            await EnsureActorInCampaignAsync(campaign.CampaignId, info.CharacterId, info.NpcId, info.MapNpcId);
+        var turn = type switch
         {
             TurnType.Movement => Turn.Movement(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, userId,
                 (Required(info.BeforeX, "beforeX"), Required(info.BeforeY, "beforeY"), Required(info.BeforeLook, "beforeLook")),
-                (Required(info.X, "x"), Required(info.Y, "y"), Required(info.Look, "look"))),
+                (Required(info.X, "x"), Required(info.Y, "y"), Required(info.Look, "look")), info.Moved),
             TurnType.Action => Turn.Action(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, userId, info.Description),
             TurnType.ActionResult => Turn.ActionResult(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, userId, info.Description),
-            _ => throw new DomainValidationException("turnType", "O tipo deve ser 1 (Movement), 2 (Action) ou 3 (ActionResult).")
+            TurnType.CharacterUpdate => Turn.CharacterUpdate(campaign.CampaignId, info.MapId, info.CharacterId, info.NpcId, info.MapNpcId, turnNo, userId,
+                ToChanges(info.Changes)),
+            TurnType.Narration => Turn.Narration(campaign.CampaignId, info.MapId, turnNo, userId, info.Description),
+            _ => throw new DomainValidationException("turnType",
+                "O tipo deve ser 1 (Movement), 2 (Action), 3 (ActionResult), 4 (CharacterUpdate) ou 5 (Narration).")
         };
         var result = (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
         return result;
     }
 
+    /// <summary>Deletes any entry of any turn (master only); pieces and values are not rolled back.</summary>
     public async Task DeleteAsync(long userId, long turnId)
     {
         var turn = await _repository.GetByIdAsync(turnId)

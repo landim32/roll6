@@ -17,7 +17,7 @@ public class TurnInfo
     [JsonPropertyName("turnNo")]
     public int TurnNo { get; set; }
 
-    /// <summary>1 Movement, 2 Action, 3 ActionResult, 4 CharacterUpdate.</summary>
+    /// <summary>1 Movement, 2 Action, 3 ActionResult, 4 CharacterUpdate, 5 Narration.</summary>
     [JsonPropertyName("turnType")]
     public int TurnType { get; set; }
 

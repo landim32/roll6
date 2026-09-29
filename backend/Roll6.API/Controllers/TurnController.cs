@@ -63,6 +63,22 @@ public class TurnController : ApiControllerBase
         }
     }
 
+    /// <summary>Changes an entry of any turn (master only, null = keep); pieces and values don't change (030).</summary>
+    [HttpPut("{id:long}")]
+    [ProducesResponseType(typeof(TurnInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Update(long id, [FromBody] TurnUpdateInfo info)
+    {
+        try
+        {
+            return Ok(await _service.UpdateAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Deletes any entry of any turn (master only); pieces and values are not rolled back.</summary>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(long id)

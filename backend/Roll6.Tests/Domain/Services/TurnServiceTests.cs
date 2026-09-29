@@ -39,6 +39,7 @@ public class TurnServiceTests
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
+    private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
     private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3 };
     private readonly MapToken _ariaPiece;
     private readonly TurnService _service;
@@ -79,8 +80,14 @@ public class TurnServiceTests
         _userRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
             .ReturnsAsync((IEnumerable<long> ids) => ids.Select(id => new User { UserId = id, Name = $"User {id}" }).ToList());
 
+        _campaignCharacterRepository.Setup(r => r.GetAsync(CAMPAIGN, ARIA)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = PARTICIPATION, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved
+        });
+        _campaignNpcRepository.Setup(r => r.GetAsync(CAMPAIGN, NPC)).ReturnsAsync(new CampaignNpc { CampaignNpcId = 5, CampaignId = CAMPAIGN, NpcId = NPC });
+
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
-            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _notifier.Object);
+            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object, _notifier.Object);
     }
 
     // --- State (US1) ---
@@ -337,10 +344,10 @@ public class TurnServiceTests
     }
 
     [Fact]
-    public async Task Create_CharacterUpdate_IsRefused()
+    public async Task Create_CharacterUpdateWithoutChanges_IsRefused()
     {
         (await _service.Invoking(s => s.CreateAsync(MASTER, new TurnInsertInfo { CampaignId = CAMPAIGN, TurnType = (int)TurnType.CharacterUpdate, CharacterId = ARIA }))
-            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("turnType");
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("changes");
     }
 
     [Fact]
@@ -695,5 +702,253 @@ public class TurnServiceTests
         (await _service.Invoking(s => s.GetHistoryAsync(MASTER, CAMPAIGN, 0, null)).Should().ThrowAsync<DomainValidationException>())
             .Which.Errors.Should().ContainKey("before");
         await _service.Invoking(s => s.GetHistoryAsync(STRANGER, CAMPAIGN, null, null)).Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    // ---- 030: turn log administration ----
+
+    private void VerifyNothingElseChanged()
+    {
+        _mapTokenRepository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+        _campaignCharacterRepository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+        _mapNpcRepository.Verify(r => r.UpdateAsync(It.IsAny<MapNpc>()), Times.Never);
+    }
+
+    private void VerifyPublished(string type, Times times) =>
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == type && e.CampaignId == CAMPAIGN)), times);
+
+    [Fact]
+    public async Task Create_NarrationInAnOldTurn_HasNoActor()
+    {
+        var result = await _service.CreateAsync(MASTER, new TurnInsertInfo
+        {
+            CampaignId = CAMPAIGN, TurnNo = 2, TurnType = (int)TurnType.Narration, MapId = MAP, Description = "O grupo atravessa a ponte."
+        });
+
+        (result.TurnType, result.TurnNo, result.CharacterId, result.NpcId, result.MapNpcId, result.UserId)
+            .Should().Be(((int)TurnType.Narration, 2, (long?)null, (long?)null, (long?)null, MASTER));
+        VerifyPublished(TableEventType.TURN_CHANGED, Times.Once());
+        VerifyNothingElseChanged();
+    }
+
+    [Fact]
+    public async Task Create_NarrationWithAnActor_IsRefused()
+    {
+        (await _service.Invoking(s => s.CreateAsync(MASTER, new TurnInsertInfo
+        {
+            CampaignId = CAMPAIGN, TurnType = (int)TurnType.Narration, CharacterId = ARIA, Description = "x"
+        })).Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("characterId");
+    }
+
+    [Fact]
+    public async Task Create_CharacterUpdate_StoresTheChangesOnly()
+    {
+        var result = await _service.CreateAsync(MASTER, new TurnInsertInfo
+        {
+            CampaignId = CAMPAIGN, TurnNo = 1, TurnType = (int)TurnType.CharacterUpdate, CharacterId = ARIA,
+            Changes = new List<TurnChangeInfo> { new() { Field = "currentLife", Before = "10", After = "6" } }
+        });
+
+        result.Changes!.Single().Should().BeEquivalentTo(new TurnChangeInfo { Field = "currentLife", Before = "10", After = "6" });
+        VerifyNothingElseChanged();
+    }
+
+    [Fact]
+    public async Task Create_MovementIgnoresTheOneMoveRule_AndKeepsThePoints()
+    {
+        _repository.Setup(r => r.ExistsMovementAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<long?>(), It.IsAny<long?>())).ReturnsAsync(true);
+
+        var result = await _service.CreateAsync(MASTER, new TurnInsertInfo
+        {
+            CampaignId = CAMPAIGN, TurnType = (int)TurnType.Movement, CharacterId = ARIA, BeforeX = 1, BeforeY = 1, BeforeLook = 0,
+            X = 2, Y = 2, Look = 3, Moved = 4
+        });
+
+        (result.X, result.Moved).Should().Be(((int?)2, (int?)4));
+        _repository.Verify(r => r.ExistsMovementAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<long?>(), It.IsAny<long?>()), Times.Never);
+        VerifyNothingElseChanged();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public async Task Create_OutsideOneToCurrent_IsRefused(int turnNo)
+    {
+        (await _service.Invoking(s => s.CreateAsync(MASTER, new TurnInsertInfo
+        {
+            CampaignId = CAMPAIGN, TurnNo = turnNo, TurnType = (int)TurnType.Action, CharacterId = ARIA, Description = "x"
+        })).Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("turnNo");
+    }
+
+    [Fact]
+    public async Task Create_ActorOrMapOutsideTheCampaign_IsRefused()
+    {
+        _mapRepository.Setup(r => r.GetByIdAsync(99)).ReturnsAsync(new Map { MapId = 99, CampaignId = 77 });
+        _mapNpcRepository.Setup(r => r.GetByIdAsync(91)).ReturnsAsync(new MapNpc { MapNpcId = 91, MapId = 99, NpcId = NPC });
+
+        async Task<IDictionary<string, string[]>> Errors(TurnInsertInfo info) =>
+            (await _service.Invoking(s => s.CreateAsync(MASTER, info)).Should().ThrowAsync<DomainValidationException>()).Which.Errors;
+
+        (await Errors(new TurnInsertInfo { CampaignId = CAMPAIGN, TurnType = 2, CharacterId = BRAM, Description = "x" })).Should().ContainKey("characterId");
+        (await Errors(new TurnInsertInfo { CampaignId = CAMPAIGN, TurnType = 2, NpcId = 55, Description = "x" })).Should().ContainKey("npcId");
+        (await Errors(new TurnInsertInfo { CampaignId = CAMPAIGN, TurnType = 2, NpcId = NPC, MapNpcId = 91, Description = "x" })).Should().ContainKey("mapNpcId");
+        (await Errors(new TurnInsertInfo { CampaignId = CAMPAIGN, TurnType = 2, CharacterId = ARIA, MapId = 99, Description = "x" })).Should().ContainKey("mapId");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_NpcOccurrenceOfTheCampaign_IsAccepted()
+    {
+        var result = await _service.CreateAsync(MASTER, new TurnInsertInfo
+        {
+            CampaignId = CAMPAIGN, TurnType = (int)TurnType.ActionResult, NpcId = NPC, MapNpcId = MAP_NPC, Description = "Foge"
+        });
+
+        (result.NpcId, result.MapNpcId).Should().Be(((long?)NPC, (long?)MAP_NPC));
+    }
+
+    private Turn SetupEntry(Turn turn, long id = 700)
+    {
+        turn.TurnId = id;
+        _repository.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(turn);
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Turn>())).ReturnsAsync((Turn t) => t);
+        return turn;
+    }
+
+    [Fact]
+    public async Task Update_Text_KeepsIdAuthorAndDate()
+    {
+        var entry = SetupEntry(Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 2, PLAYER, "Ataca"));
+        var created = entry.CreatedAt;
+
+        var result = await _service.UpdateAsync(MASTER, 700, new TurnUpdateInfo { Description = "Ataca o orc com a espada" });
+
+        (result.TurnId, result.Description, result.UserId, result.CreatedAt, result.TurnNo)
+            .Should().Be((700L, "Ataca o orc com a espada", PLAYER, created, 2));
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 700)), Times.Once);
+        VerifyPublished(TableEventType.TURN_CHANGED, Times.Once());
+        VerifyNothingElseChanged();
+    }
+
+    [Fact]
+    public async Task Update_MovementAndTurn_DoesNotMoveThePiece()
+    {
+        SetupEntry(Turn.Movement(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, (1, 1, 0), (2, 2, 3)));
+
+        var result = await _service.UpdateAsync(MASTER, 700, new TurnUpdateInfo { X = 5, Look = 1, TurnNo = 1 });
+
+        (result.X, result.Y, result.Look, result.TurnNo).Should().Be(((int?)5, (int?)2, (int?)1, 1));
+        VerifyNothingElseChanged();
+    }
+
+    [Fact]
+    public async Task Update_InvalidValues_AreRefused_AndNothingIsSaved()
+    {
+        SetupEntry(Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 2, PLAYER, "Ataca"));
+        _mapRepository.Setup(r => r.GetByIdAsync(99)).ReturnsAsync(new Map { MapId = 99, CampaignId = 77 });
+
+        async Task<IDictionary<string, string[]>> Errors(TurnUpdateInfo info) =>
+            (await _service.Invoking(s => s.UpdateAsync(MASTER, 700, info)).Should().ThrowAsync<DomainValidationException>()).Which.Errors;
+
+        (await Errors(new TurnUpdateInfo { TurnNo = 4 })).Should().ContainKey("turnNo");
+        (await Errors(new TurnUpdateInfo { MapId = 99 })).Should().ContainKey("mapId");
+        (await Errors(new TurnUpdateInfo { X = 1 })).Should().ContainKey("x");
+        (await Errors(new TurnUpdateInfo { Changes = new List<TurnChangeInfo>() })).Should().ContainKey("changes");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Turn>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_EmptyBody_KeepsEverything()
+    {
+        SetupEntry(Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 2, PLAYER, "Ataca"));
+
+        var result = await _service.UpdateAsync(MASTER, 700, new TurnUpdateInfo());
+
+        (result.Description, result.TurnNo, result.MapId).Should().Be(("Ataca", 2, (long?)MAP));
+    }
+
+    [Fact]
+    public async Task Update_NotMasterOrMissing_Throw()
+    {
+        SetupEntry(Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 2, PLAYER, "Ataca"));
+
+        await _service.Invoking(s => s.UpdateAsync(PLAYER, 700, new TurnUpdateInfo { Description = "x" })).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.UpdateAsync(STRANGER, 700, new TurnUpdateInfo { Description = "x" })).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.UpdateAsync(MASTER, 999, new TurnUpdateInfo())).Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Delete_AnyTypeOfAnOldTurn_OnlyDeletesTheEntry()
+    {
+        _repository.Setup(r => r.GetByIdAsync(501)).ReturnsAsync(new Turn { TurnId = 501, CampaignId = CAMPAIGN, TurnNo = 1, TurnType = TurnType.Narration });
+        _repository.Setup(r => r.GetByIdAsync(502)).ReturnsAsync(new Turn { TurnId = 502, CampaignId = CAMPAIGN, TurnNo = 2, TurnType = TurnType.CharacterUpdate, CharacterId = ARIA });
+
+        await _service.DeleteAsync(MASTER, 501);
+        await _service.DeleteAsync(MASTER, 502);
+
+        _repository.Verify(r => r.DeleteAsync(It.IsIn(501L, 502L)), Times.Exactly(2));
+        VerifyNothingElseChanged();
+        await _service.Invoking(s => s.DeleteAsync(MASTER, 999)).Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task SetCurrent_Forward_WorksLikeFinishing()
+    {
+        var result = await _service.SetCurrentAsync(MASTER, CAMPAIGN, new TurnSetCurrentInfo { TurnNo = 8 });
+
+        (result.PreviousTurn, result.TurnNo, result.DiscardedEntries).Should().Be((3, 8, 0));
+        _campaignRepository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.CurrentTurn == 8)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_FINISHED
+            && e.Data!.ToString()!.Contains("finishedTurn = 7"))), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetCurrent_SameTurn_DoesNothing()
+    {
+        var result = await _service.SetCurrentAsync(MASTER, CAMPAIGN, new TurnSetCurrentInfo { TurnNo = 3 });
+
+        (result.PreviousTurn, result.TurnNo).Should().Be((3, 3));
+        _campaignRepository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetCurrent_BackWithoutLaterEntries_Saves()
+    {
+        _repository.Setup(r => r.ListTurnNosAfterAsync(CAMPAIGN, 1)).ReturnsAsync(new List<int>());
+
+        await _service.SetCurrentAsync(MASTER, CAMPAIGN, new TurnSetCurrentInfo { TurnNo = 1 });
+
+        _campaignRepository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.CurrentTurn == 1)), Times.Once);
+        _repository.Verify(r => r.DeleteAfterTurnAsync(It.IsAny<long>(), It.IsAny<int>()), Times.Never);
+        VerifyPublished(TableEventType.TURN_CHANGED, Times.Once());
+    }
+
+    [Fact]
+    public async Task SetCurrent_BackWithLaterEntries_ConflictsUnlessDiscarding()
+    {
+        _repository.Setup(r => r.ListTurnNosAfterAsync(CAMPAIGN, 1)).ReturnsAsync(new List<int> { 2, 3 });
+        _repository.Setup(r => r.DeleteAfterTurnAsync(CAMPAIGN, 1)).ReturnsAsync(7);
+
+        (await _service.Invoking(s => s.SetCurrentAsync(MASTER, CAMPAIGN, new TurnSetCurrentInfo { TurnNo = 1 }))
+            .Should().ThrowAsync<ConflictException>()).Which.Message.Should().Contain("2, 3");
+        _campaignRepository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        _campaign.CurrentTurn.Should().Be(3);
+
+        var result = await _service.SetCurrentAsync(MASTER, CAMPAIGN, new TurnSetCurrentInfo { TurnNo = 1, DiscardLaterEntries = true });
+
+        (result.PreviousTurn, result.TurnNo, result.DiscardedEntries).Should().Be((3, 1, 7));
+        _unitOfWork.Verify(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>()), Times.Once);
+        _repository.Verify(r => r.DeleteAfterTurnAsync(CAMPAIGN, 1), Times.Once);
+        _campaignRepository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.CurrentTurn == 1)), Times.Once);
+        VerifyPublished(TableEventType.TURN_CHANGED, Times.Once());
+    }
+
+    [Fact]
+    public async Task SetCurrent_InvalidTurnNotMasterOrMissingCampaign_Throw()
+    {
+        (await _service.Invoking(s => s.SetCurrentAsync(MASTER, CAMPAIGN, new TurnSetCurrentInfo { TurnNo = 0 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("turnNo");
+        await _service.Invoking(s => s.SetCurrentAsync(PLAYER, CAMPAIGN, new TurnSetCurrentInfo { TurnNo = 5 })).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.SetCurrentAsync(MASTER, 999, new TurnSetCurrentInfo { TurnNo = 5 })).Should().ThrowAsync<KeyNotFoundException>();
     }
 }

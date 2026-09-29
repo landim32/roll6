@@ -261,4 +261,27 @@ public static class CampaignTools
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("true = finish even if some characters haven't acted; false (default) = only report who is missing.")] bool force = false) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/finish", new TurnFinishInfo { Force = force });
+
+    [McpServerTool(Name = "set_current_turn", Title = "Set current turn", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/campaign/{id}/turn/current")]
+    [Description($$"""
+        What it does: sets the turn in progress directly, to fix the campaign's turn counter (e.g. turns played outside the
+        table, or a turn finished by mistake). Going forward works like finish_turn without the pending check: every
+        skipped turn counts as finished and everyone gets a "turn finished" notification. Going back reopens that turn;
+        when later turns have entries it is refused (409, listing the turns) unless discardLaterEntries is true, which
+        deletes those entries in the same atomic call. The same number changes nothing. Pieces, characters and NPCs never
+        change.
+        {{McpDocs.DESTRUCTIVE}}
+        Who can use it: only the master.
+        Returns: { previousTurn, turnNo, discardedEntries }.
+        Common errors: 400 turnNo below 1, 403 not the master, 404 campaign not found, 409 later turns have entries.
+        Related tools: get_turn_state, finish_turn, get_turn_history, update_turn_entry, create_turn_entry.
+        """)]
+    public static Task<CallToolResult> SetCurrentTurn(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("The new turn in progress (1 or more).")] int turnNo,
+        [Description("Only when going back: true = delete the entries of the later turns; false (default) = refuse with 409 if there are any.")] bool discardLaterEntries = false) =>
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/turn/current",
+            new TurnSetCurrentInfo { TurnNo = turnNo, DiscardLaterEntries = discardLaterEntries });
 }
