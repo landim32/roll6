@@ -86,6 +86,26 @@ public class TurnRepository : ITurnRepository<Turn>
         return entity;
     }
 
+    public async Task<Turn> UpdateAsync(Turn entity)
+    {
+        _context.Turns.Update(entity);
+        await _context.SaveChangesAsync();
+        return entity;
+    }
+
+    public async Task<List<int>> ListTurnNosAfterAsync(long campaignId, int turnNo)
+    {
+        return await _context.Turns
+            .Where(e => e.CampaignId == campaignId && e.TurnNo > turnNo)
+            .Select(e => e.TurnNo).Distinct().OrderBy(n => n)
+            .ToListAsync();
+    }
+
+    public async Task<int> DeleteAfterTurnAsync(long campaignId, int turnNo)
+    {
+        return await _context.Turns.Where(e => e.CampaignId == campaignId && e.TurnNo > turnNo).ExecuteDeleteAsync();
+    }
+
     public async Task DeleteAsync(long id)
     {
         await _context.Turns.Where(e => e.TurnId == id).ExecuteDeleteAsync();

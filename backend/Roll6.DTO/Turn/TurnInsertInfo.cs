@@ -2,7 +2,10 @@ using System.Text.Json.Serialization;
 
 namespace Roll6.DTO.Turn;
 
-/// <summary>Direct entry created by the master (the only way to create action results).</summary>
+/// <summary>
+/// Direct entry created by the master in any turn up to the current one (the only way to create action results;
+/// 030: also character updates and narrations).
+/// </summary>
 public class TurnInsertInfo
 {
     [JsonPropertyName("campaignId")]
@@ -15,6 +18,7 @@ public class TurnInsertInfo
     [JsonPropertyName("turnNo")]
     public int? TurnNo { get; set; }
 
+    /// <summary>1 Movement, 2 Action, 3 ActionResult, 4 CharacterUpdate, 5 Narration (no actor).</summary>
     [JsonPropertyName("turnType")]
     public int TurnType { get; set; }
 
@@ -47,4 +51,12 @@ public class TurnInsertInfo
 
     [JsonPropertyName("description")]
     public string? Description { get; set; }
+
+    /// <summary>Movement only: movement points spent (optional, ≥ 0).</summary>
+    [JsonPropertyName("moved")]
+    public int? Moved { get; set; }
+
+    /// <summary>CharacterUpdate only: the fields that changed (required, at least one).</summary>
+    [JsonPropertyName("changes")]
+    public List<TurnChangeInfo>? Changes { get; set; }
 }

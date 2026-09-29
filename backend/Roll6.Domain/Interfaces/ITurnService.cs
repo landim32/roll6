@@ -26,4 +26,10 @@ public interface ITurnService
     Task<TurnFinishResultInfo> FinishAsync(long userId, long campaignId, TurnFinishInfo info);
     Task<TurnInfo> CreateAsync(long userId, TurnInsertInfo info);
     Task DeleteAsync(long userId, long turnId);
+
+    /// <summary>Changes an entry of any turn (030, master only); pieces and values don't change.</summary>
+    Task<TurnInfo> UpdateAsync(long userId, long turnId, TurnUpdateInfo info);
+
+    /// <summary>Sets the turn in progress (030, master only); going back may discard later entries.</summary>
+    Task<TurnSetCurrentResultInfo> SetCurrentAsync(long userId, long campaignId, TurnSetCurrentInfo info);
 }

@@ -1,3 +1,4 @@
+using Roll6.Domain.Exceptions;
 using Roll6.Domain.Validation;
 
 namespace Roll6.Domain.Models;
@@ -40,6 +41,15 @@ public class Campaign
     public void AdvanceTurn()
     {
         CurrentTurn++;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Sets the turn in progress directly (030, master fixing the turn log).</summary>
+    public void SetCurrentTurn(int turnNo)
+    {
+        if (turnNo < 1)
+            throw new DomainValidationException("turnNo", "O turno deve ser maior que zero.");
+        CurrentTurn = turnNo;
         UpdatedAt = DateTime.UtcNow;
     }
 

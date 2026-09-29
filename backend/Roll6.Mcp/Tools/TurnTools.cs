@@ -10,8 +10,9 @@ namespace Roll6.Mcp.Tools;
 public static class TurnTools
 {
     private const string ENTRY = """
-        Returns: the entry { turnId, campaignId, mapId, turnNo, turnType (1 Movement, 2 Action, 3 ActionResult),
-        characterId, npcId, mapNpcId, actorName, beforeX, beforeY, beforeLook, x, y, look, description, createdAt }.
+        Returns: the entry { turnId, campaignId, mapId, turnNo, turnType (1 Movement, 2 Action, 3 ActionResult,
+        4 CharacterUpdate, 5 Narration), characterId, npcId, mapNpcId, actorName, userId, userName, beforeX, beforeY,
+        beforeLook, x, y, look, moved, description, changes, createdAt }.
         """;
 
     [McpServerTool(Name = "act_in_turn", Title = "Act in turn", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -157,46 +158,88 @@ public static class TurnTools
     [McpServerTool(Name = "create_turn_entry", Title = "Create turn entry", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/turn")]
     [Description($$"""
-        What it does: writes a turn entry directly — the only way to record an ActionResult (turn type 3, e.g. "the goblin
-        takes 4 damage"). Also accepts Movement (1, with before/after positions) and Action (2). Exactly one of
-        characterId / npcId must be given (mapNpcId only together with npcId).
+        What it does: writes a turn entry directly, in the turn in progress or in any earlier turn — the only way to
+        record an ActionResult (turn type 3, e.g. "the goblin takes 4 damage") and the way to log turns played outside the
+        table. Types: 1 Movement (before/after positions, optional moved), 2 Action and 3 ActionResult (description),
+        4 CharacterUpdate (changes: [{ field, before, after }]) and 5 Narration (description up to 10000 characters, no
+        actor). Types 1-4 need exactly one of characterId / npcId (mapNpcId only together with npcId), and the actor and
+        the map must belong to the campaign. It only writes the log: pieces, characters and NPCs don't change and the
+        one-move-per-turn rule doesn't apply.
         Who can use it: only the master.
         {{ENTRY}}
-        Common errors: 403 not the master, 400 invalid type, missing actor or positions, text too long.
-        Related tools: get_turn_state, delete_turn_entry.
+        Common errors: 403 not the master, 400 invalid type, turnNo outside 1..current turn, actor or map not in the
+        campaign, narration with an actor, missing positions/changes, text too long.
+        Related tools: get_turn_state, list_turn_entries, update_turn_entry, delete_turn_entry, set_current_turn.
         """)]
     public static Task<CallToolResult> CreateTurnEntry(
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
-        [Description("1 Movement, 2 Action, 3 ActionResult.")] int turnType,
-        [Description("Character the entry belongs to (characterId). Give this or npcId.")] long? characterId = null,
-        [Description("Library NPC the entry belongs to (npcId). Give this or characterId.")] long? npcId = null,
+        [Description("1 Movement, 2 Action, 3 ActionResult, 4 CharacterUpdate, 5 Narration.")] int turnType,
+        [Description("Character the entry belongs to (characterId). Give this or npcId; none for a narration.")] long? characterId = null,
+        [Description("Library NPC the entry belongs to (npcId). Give this or characterId; none for a narration.")] long? npcId = null,
         [Description("NPC occurrence on a map (mapNpcId), only together with npcId. Optional.")] long? mapNpcId = null,
-        [Description("Text of an Action or ActionResult (required for those, up to 2000 characters).")] string? description = null,
-        [Description("Turn number; omit for the turn in progress.")] int? turnNo = null,
-        [Description("Map where it happened (mapId). Optional.")] long? mapId = null,
+        [Description("Text of an Action or ActionResult (up to 2000 characters) or of a Narration (up to 10000).")] string? description = null,
+        [Description("Turn number, from 1 up to the current turn; omit for the turn in progress.")] int? turnNo = null,
+        [Description("Map where it happened (mapId, a map of the campaign). Optional.")] long? mapId = null,
         [Description("Movement only: column before the move.")] int? beforeX = null,
         [Description("Movement only: row before the move.")] int? beforeY = null,
         [Description("Movement only: facing before the move (0-5).")] int? beforeLook = null,
         [Description("Movement only: column after the move.")] int? x = null,
         [Description("Movement only: row after the move.")] int? y = null,
-        [Description("Movement only: facing after the move (0-5).")] int? look = null) =>
+        [Description("Movement only: facing after the move (0-5).")] int? look = null,
+        [Description("Movement only: movement points spent (0 or more). Optional.")] int? moved = null,
+        [Description("CharacterUpdate only (required there): the changed fields, e.g. [{ \"field\": \"currentLife\", \"before\": \"10\", \"after\": \"6\" }].")] List<TurnChangeInfo>? changes = null) =>
         api.SendAsync(HttpMethod.Post, "/api/turn", new TurnInsertInfo
         {
             CampaignId = campaignId, TurnType = turnType, CharacterId = characterId, NpcId = npcId, MapNpcId = mapNpcId,
             Description = description, TurnNo = turnNo, MapId = mapId, BeforeX = beforeX, BeforeY = beforeY,
-            BeforeLook = beforeLook, X = x, Y = y, Look = look
+            BeforeLook = beforeLook, X = x, Y = y, Look = look, Moved = moved, Changes = changes
+        });
+
+    [McpServerTool(Name = "update_turn_entry", Title = "Update turn entry", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/turn/{id}")]
+    [Description($$"""
+        What it does: fixes an entry of any turn — only the fields you send change (omitted = kept). Text for Action,
+        ActionResult and Narration; positions, facings and moved for Movement; the whole changes list for CharacterUpdate;
+        turnNo (1 up to the current turn) and mapId for any entry. Type, actor, author and creation date never change
+        (delete and create again for that). It only rewrites the log: pieces, characters and NPCs don't change.
+        {{McpDocs.DESTRUCTIVE}}
+        Who can use it: only the master.
+        {{ENTRY}}
+        Common errors: 403 not the master, 404 entry not found, 400 field that doesn't apply to the entry's type, turnNo
+        outside 1..current turn, map not in the campaign, empty text or changes, text too long.
+        Related tools: list_turn_entries, get_turn_summary, create_turn_entry, delete_turn_entry.
+        """)]
+    public static Task<CallToolResult> UpdateTurnEntry(
+        Roll6ApiClient api,
+        [Description("Id of the entry (turnId from get_turn_state or list_turn_entries).")] long turnId,
+        [Description("Moves the entry to this turn (1 up to the current turn). Optional.")] int? turnNo = null,
+        [Description("Map where it happened (mapId, a map of the campaign). Optional.")] long? mapId = null,
+        [Description("Action / ActionResult (up to 2000 characters) or Narration (up to 10000) text. Optional.")] string? description = null,
+        [Description("Movement only: column before the move.")] int? beforeX = null,
+        [Description("Movement only: row before the move.")] int? beforeY = null,
+        [Description("Movement only: facing before the move (0-5).")] int? beforeLook = null,
+        [Description("Movement only: column after the move.")] int? x = null,
+        [Description("Movement only: row after the move.")] int? y = null,
+        [Description("Movement only: facing after the move (0-5).")] int? look = null,
+        [Description("Movement only: movement points spent (0 or more).")] int? moved = null,
+        [Description("CharacterUpdate only: replaces the whole list, e.g. [{ \"field\": \"currentLife\", \"before\": \"10\", \"after\": \"6\" }].")] List<TurnChangeInfo>? changes = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/turn/{turnId}", new TurnUpdateInfo
+        {
+            TurnNo = turnNo, MapId = mapId, Description = description, BeforeX = beforeX, BeforeY = beforeY, BeforeLook = beforeLook,
+            X = x, Y = y, Look = look, Moved = moved, Changes = changes
         });
 
     [McpServerTool(Name = "delete_turn_entry", Title = "Delete turn entry", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/turn/{id}")]
     [Description($$"""
-        What it does: deletes one turn entry (it does not move pieces back — use reset_turn for that).
+        What it does: deletes one entry of any type from any turn. Nothing is rolled back: pieces don't move back (use
+        reset_turn for the turn in progress) and character/NPC values stay.
         {{McpDocs.DESTRUCTIVE}}
         Who can use it: only the master.
         Returns: { ok: true }.
         Common errors: 403 not the master, 404 not found.
-        Related tools: get_turn_state, list_turn_entries (turnId).
+        Related tools: get_turn_state, list_turn_entries (turnId), update_turn_entry.
         """)]
     public static Task<CallToolResult> DeleteTurnEntry(
         Roll6ApiClient api,

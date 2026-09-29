@@ -93,6 +93,12 @@ public static class Roll6Guide
           have not acted yet. NPCs never block.
         - `create_turn_entry` / `delete_turn_entry` (master) write entries directly — the only way to record an
           ActionResult (turn type 3). `list_turn_entries` returns the entries of any turn (a summary).
+        - Fixing the turn log (master): `update_turn_entry` corrects any entry of any turn (only the fields sent change;
+          type, actor, author and date stay); `create_turn_entry` with `turnNo` logs past turns (1 up to the current
+          one; all five types, including CharacterUpdate `changes` and Narration without an actor); `delete_turn_entry`
+          removes one; `set_current_turn` sets the turn in progress (forward = like `finish_turn`; back refuses with
+          409 while later turns have entries, unless `discardLaterEntries`). None of these move pieces or change
+          characters/NPCs — use `process_turn`, `update_participation`, `update_map_npc` or the piece tools for that.
 
         ## Campaign plan
         - Secret notes of the master: several entries with title and markdown description (`list_campaign_plans`,

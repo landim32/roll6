@@ -19,6 +19,12 @@ public interface ITurnRepository<TModel> where TModel : class
     /// <summary>Entries of a range of turns, ordered by turn and time (turn history, 028).</summary>
     Task<List<TModel>> ListByCampaignTurnRangeAsync(long campaignId, int fromTurn, int toTurn);
     Task<TModel> InsertAsync(TModel entity);
+    /// <summary>Saves every column of an entry changed by the master (030).</summary>
+    Task<TModel> UpdateAsync(TModel entity);
+    /// <summary>Distinct turn numbers above <paramref name="turnNo"/> that have entries, ascending (030).</summary>
+    Task<List<int>> ListTurnNosAfterAsync(long campaignId, int turnNo);
+    /// <summary>Deletes the entries of the turns above <paramref name="turnNo"/>; returns how many (030).</summary>
+    Task<int> DeleteAfterTurnAsync(long campaignId, int turnNo);
     Task DeleteAsync(long id);
     Task DeleteRangeAsync(IEnumerable<long> ids);
     Task DeleteByCampaignAsync(long campaignId);

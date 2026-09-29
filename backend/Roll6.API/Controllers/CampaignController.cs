@@ -317,6 +317,24 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>
+    /// Sets the turn in progress (master, 030): forward works like finishing; back refuses (409) while later turns
+    /// have entries unless discardLaterEntries.
+    /// </summary>
+    [HttpPut("{id:long}/turn/current")]
+    [ProducesResponseType(typeof(TurnSetCurrentResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetCurrentTurn(long id, [FromBody] TurnSetCurrentInfo info)
+    {
+        try
+        {
+            return Ok(await _turnService.SetCurrentAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpGet("{id:long}/character")]
     [ProducesResponseType(typeof(List<CampaignCharacterInfo>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListCharacters(long id)
