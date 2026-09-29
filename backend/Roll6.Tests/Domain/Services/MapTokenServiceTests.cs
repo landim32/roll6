@@ -263,7 +263,7 @@ public class MapTokenServiceTests
     public async Task PlaceCharacter_OnOccupiedHex_Throws()
     {
         SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
-        _repository.Setup(r => r.ExistsAtAsync(30, 3, 2, null)).ReturnsAsync(true);
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 99, MapId = 30, TokenId = 5, X = 3, Y = 2 } });
 
         var act = () => _service.PlaceCharacterAsync(1, Place());
 
@@ -284,7 +284,7 @@ public class MapTokenServiceTests
     public async Task Move_ToOccupiedHex_Throws_AndToFreeHex_Moves()
     {
         _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Goblin", TokenType = MapTokenType.Object });
-        _repository.Setup(r => r.ExistsAtAsync(30, 1, 1, 40)).ReturnsAsync(true);
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 99, MapId = 30, TokenId = 5, X = 1, Y = 1 } });
 
         var blocked = () => _service.MoveAsync(1, 40, new MapTokenPositionInfo { X = 1, Y = 1 });
         await blocked.Should().ThrowAsync<ConflictException>();
@@ -319,7 +319,7 @@ public class MapTokenServiceTests
     [Fact]
     public async Task Create_OnOccupiedHex_Throws()
     {
-        _repository.Setup(r => r.ExistsAtAsync(30, 0, 0, null)).ReturnsAsync(true);
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 99, MapId = 30, TokenId = 5, X = 0, Y = 0 } });
 
         var act = () => _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 4 });
 
@@ -592,5 +592,209 @@ public class MapTokenServiceTests
     {
         occurrence.MapNpcId = id;
         return occurrence;
+    }
+
+    // ---- 031: posture from the piece menu ----
+
+    private const long POSTURE_PARTICIPATION = 75;
+
+    private void SetupCharacterPiece(long ownerId, CampaignCharacterStatus status = CampaignCharacterStatus.Approved)
+    {
+        _repository.Setup(r => r.GetByIdAsync(60)).ReturnsAsync(new MapToken
+        {
+            MapTokenId = 60, MapId = 30, TokenId = 6, CampaignCharacterId = POSTURE_PARTICIPATION, TokenType = MapTokenType.Character, Name = "Aria"
+        });
+        var participation = new CampaignCharacter { CampaignCharacterId = POSTURE_PARTICIPATION, CampaignId = 10, CharacterId = 90, Status = status };
+        _campaignCharacterRepository.Setup(r => r.GetByIdAsync(POSTURE_PARTICIPATION)).ReturnsAsync(participation);
+        _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter> { participation });
+        _characterRepository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new Character { CharacterId = 90, UserId = ownerId, Name = "Aria" });
+    }
+
+    [Theory]
+    [InlineData(2L)]
+    [InlineData(1L)]
+    public async Task SetPosture_OwnerOrMaster_SavesOnTheParticipationAndRecordsIt(long userId)
+    {
+        SetupCharacterPiece(ownerId: 2);
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        var result = await _service.SetPostureAsync(userId, 60, new MapTokenPostureInfo { Posture = 3 });
+
+        result.Posture.Should().Be(3);
+        _campaignCharacterRepository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(p => p.Posture == Posture.OutOfCombat)), Times.Once);
+        (recorded!.TurnType, recorded.CharacterId, recorded.UserId, recorded.TurnNo).Should().Be((TurnType.CharacterUpdate, (long?)90, userId, 3));
+        recorded.Changes!.Should().ContainSingle(c => c.Field == "posture" && c.Before == "1" && c.After == "3");
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.PARTY_CHANGED)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.MapId == null)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Once);
+        _repository.Verify(r => r.ListByMapAsync(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetPosture_OtherPlayer_Throws()
+    {
+        SetupCharacterPiece(ownerId: 2);
+
+        await _service.Invoking(s => s.SetPostureAsync(3, 60, new MapTokenPostureInfo { Posture = 2 })).Should().ThrowAsync<UnauthorizedAccessException>();
+        _campaignCharacterRepository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetPosture_NotApproved_Throws()
+    {
+        SetupCharacterPiece(ownerId: 2, CampaignCharacterStatus.Denied);
+
+        await _service.Invoking(s => s.SetPostureAsync(2, 60, new MapTokenPostureInfo { Posture = 2 })).Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task SetPosture_SamePosture_RecordsNothing()
+    {
+        SetupCharacterPiece(ownerId: 2);
+
+        var result = await _service.SetPostureAsync(2, 60, new MapTokenPostureInfo { Posture = 1 });
+
+        result.Posture.Should().Be(1);
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetPosture_Npc_OnlyTheMaster()
+    {
+        _repository.Setup(r => r.GetByIdAsync(61)).ReturnsAsync(new MapToken { MapTokenId = 61, MapId = 30, TokenId = 5, MapNpcId = 91, TokenType = MapTokenType.Npc, Name = "Goblin" });
+        var occurrence = new MapNpc { MapNpcId = 91, MapId = 30, NpcId = 8, Name = "Goblin" };
+        _mapNpcRepository.Setup(r => r.GetByIdAsync(91)).ReturnsAsync(occurrence);
+        _mapNpcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<MapNpc> { occurrence });
+        _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Npc>());
+
+        await _service.Invoking(s => s.SetPostureAsync(2, 61, new MapTokenPostureInfo { Posture = 2 })).Should().ThrowAsync<UnauthorizedAccessException>();
+
+        var result = await _service.SetPostureAsync(1, 61, new MapTokenPostureInfo { Posture = 2 });
+
+        result.Posture.Should().Be(2);
+        _mapNpcRepository.Verify(r => r.UpdateAsync(It.Is<MapNpc>(m => m.Posture == Posture.Down)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_UPSERTED && e.MapId == 30)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetPosture_Object_Throws()
+    {
+        _repository.Setup(r => r.GetByIdAsync(62)).ReturnsAsync(new MapToken { MapTokenId = 62, MapId = 30, TokenId = 5, TokenType = MapTokenType.Object, Name = "Baú" });
+
+        (await _service.Invoking(s => s.SetPostureAsync(1, 62, new MapTokenPostureInfo { Posture = 2 })).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("posture");
+    }
+
+    // ---- 031: pieces of several hexes ----
+
+    [Fact]
+    public async Task Create_BigToken_NeedsTheWholeShapeFree()
+    {
+        _tokenRepository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(new Token { TokenId = 7, UserId = 9, Name = "Cavalo", UpSpace = 2 });
+        // Facing up at (3, 2), a 2-hex piece also takes the hex behind it: (3, 3).
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 99, MapId = 30, TokenId = 5, X = 3, Y = 3 } });
+
+        var act = () => _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 7, TokenType = 4, X = 3, Y = 2, Look = 0 });
+
+        await act.Should().ThrowAsync<ConflictException>();
+        var turned = await _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 7, TokenType = 4, X = 3, Y = 2, Look = 3 });
+        (turned.X, turned.Y, turned.Look).Should().Be((3, 2, 3));
+    }
+
+    [Fact]
+    public async Task Create_BigTokenLeavingTheGrid_Throws()
+    {
+        _tokenRepository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(new Token { TokenId = 7, UserId = 9, Name = "Dragão", UpSpace = 7 });
+
+        var act = () => _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 7, TokenType = 4, X = 0, Y = 3 });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("x");
+    }
+
+    [Fact]
+    public async Task Move_OntoAnyHexOfABigPiece_Throws()
+    {
+        _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Goblin", TokenType = MapTokenType.Object });
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
+        {
+            new() { MapTokenId = 40, MapId = 30, TokenId = 5 },
+            new() { MapTokenId = 41, MapId = 30, TokenId = 7, X = 5, Y = 4 }
+        });
+        _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token>
+        {
+            new() { TokenId = 5, Name = "Goblin" }, new() { TokenId = 7, Name = "Dragão", UpSpace = 7 }
+        });
+
+        var act = () => _service.MoveAsync(1, 40, new MapTokenPositionInfo { X = 6, Y = 4 });
+
+        await act.Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task ListByMap_ReturnsTheSizeOfEachPiece()
+    {
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(10, 2)).ReturnsAsync(true);
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 41, MapId = 30, TokenId = 7, Name = "Dragão" } });
+        _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token> { new() { TokenId = 7, Name = "Dragão", UpSpace = 10 } });
+
+        var result = await _service.ListByMapAsync(2, 30);
+
+        result.Single().Space.Should().Be(10);
+        result.Single().Posture.Should().BeNull();
+    }
+
+    // ---- 031 US3: the posture changes the size ----
+
+    private void SetupKnight(Posture posture)
+    {
+        var knight = new MapToken
+        {
+            MapTokenId = 60, MapId = 30, TokenId = 8, CampaignCharacterId = POSTURE_PARTICIPATION, TokenType = MapTokenType.Character, Name = "Aria", X = 4, Y = 4
+        };
+        _repository.Setup(r => r.GetByIdAsync(60)).ReturnsAsync(knight);
+        var participation = new CampaignCharacter
+        {
+            CampaignCharacterId = POSTURE_PARTICIPATION, CampaignId = 10, CharacterId = 90, Status = CampaignCharacterStatus.Approved, Posture = posture
+        };
+        _campaignCharacterRepository.Setup(r => r.GetByIdAsync(POSTURE_PARTICIPATION)).ReturnsAsync(participation);
+        _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter> { participation });
+        _characterRepository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new Character { CharacterId = 90, UserId = 2, Name = "Aria" });
+        _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token>
+        {
+            new() { TokenId = 8, Name = "Cavaleiro", UpSpace = 1, DownSpace = 2 }, new() { TokenId = 5, Name = "Goblin" }
+        });
+        // Another piece right behind the knight (facing up, behind = (4, 5)).
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
+        {
+            knight, new() { MapTokenId = 70, MapId = 30, TokenId = 5, X = 4, Y = 5 }
+        });
+    }
+
+    [Fact]
+    public async Task SetPosture_LyingDown_TakesTheDownSize_EvenOverAnotherPiece()
+    {
+        SetupKnight(Posture.Standing);
+
+        var result = await _service.SetPostureAsync(2, 60, new MapTokenPostureInfo { Posture = (int)Posture.Down });
+
+        (result.Posture, result.Space).Should().Be(((int?)Posture.Down, 2));
+    }
+
+    [Fact]
+    public async Task LyingPiece_BlocksTheHexBehindIt()
+    {
+        SetupKnight(Posture.Down);
+        _repository.Setup(r => r.GetByIdAsync(70)).ReturnsAsync(new MapToken { MapTokenId = 70, MapId = 30, TokenId = 5, Name = "Goblin", TokenType = MapTokenType.Object, X = 4, Y = 5 });
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
+        {
+            new() { MapTokenId = 60, MapId = 30, TokenId = 8, CampaignCharacterId = POSTURE_PARTICIPATION, X = 4, Y = 4 },
+            new() { MapTokenId = 70, MapId = 30, TokenId = 5, X = 2, Y = 2 }
+        });
+
+        // Facing up, the knight lying at (4, 4) also takes (4, 5).
+        await _service.Invoking(s => s.MoveAsync(1, 70, new MapTokenPositionInfo { X = 4, Y = 5 })).Should().ThrowAsync<ConflictException>();
     }
 }

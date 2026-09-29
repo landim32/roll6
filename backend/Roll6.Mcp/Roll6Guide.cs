@@ -64,11 +64,13 @@ public static class Roll6Guide
         ## Hex grid (maps)
         - Flat-top hexagons in a rectangle of `gridWidth` columns × `gridHeight` rows; odd columns are shifted half a
           hex down ("odd-q" layout).
-        - Positions are **`x` = column** and **`y` = row**, both 0-based, inside the grid. One piece per hex.
+        - Positions are **`x` = column** and **`y` = row**, both 0-based, inside the grid. A hex holds one piece; big
+          pieces take several hexes (see "Posture and piece size").
         - **`look`** = the side a piece faces, **0–5 clockwise starting at the top**: 0 up, 1 up-right, 2 down-right,
           3 down, 4 down-left, 5 up-left.
         - Movement cost (enforced for players): 1 for each step into the hex ahead, 1 for each 60° turn; the shortest
           path goes around other pieces; the total must fit the character's `move`. The master moves anything freely.
+          A big piece needs its whole shape free and inside the grid at every step and turn.
 
         ## Pieces (map tokens)
         - Types: `1 Character` (a campaign participation, blue), `2 Npc` (an NPC occurrence, red), `4 Object`
@@ -77,6 +79,20 @@ public static class Roll6Guide
           `place_npc_on_map` (creates the occurrence and its piece), `change_map_token_image`, `update_map_token`,
           `delete_map_token`. Everyone at the table: `list_map_tokens`, `list_map_npcs`.
         - `move_map_token` moves and turns a piece (master: any piece; player: his own approved character).
+
+        ## Posture and piece size
+        - Characters and NPC occurrences have a **`posture`**: `1` standing, `2` down ("Caído", drawn lying) or `3` out of
+          combat ("Fora de combate", lying and in black and white). The character's owner or the master changes a
+          character's (for all its pieces in the campaign); only the master changes an NPC's. Tools:
+          `set_piece_posture`, or `posture` in `update_participation`, `update_map_npc` and `process_turn`. It is logged
+          in the turn and is separate from the free-text status. Objects have none.
+        - Tokens have a standing size (`upSpace`) and an optional down size (`downSpace`), each **1, 2, 3, 7 or 10**
+          hexes; a piece takes the down size while down or out of combat. Pieces return `space` = hexes taken now.
+        - Shapes, around the piece's position (`x`/`y`) and the side it faces (`look`): 1 = the position; 2 = the
+          position + the hex behind it; 3 = a line along the facing with the position in the middle; 7 = the position
+          + its 6 neighbors; 10 = a line of 4 along the facing (the position is the 2nd from the front) + a line of 3 on
+          each side. Placing, moving or turning needs the whole shape inside the grid and free; lying down never fails:
+          the piece may overlap another one until it moves.
 
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move

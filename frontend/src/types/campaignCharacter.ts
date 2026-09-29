@@ -1,4 +1,5 @@
 import type { SheetFileType } from './image';
+import type { Posture } from './mapToken';
 
 /** Campaign participation types — mirror the backend CampaignCharacter DTOs. */
 
@@ -34,6 +35,8 @@ export interface CampaignCharacterInfo {
   characterMove: number;
   /** Free-text condition of the character in this campaign (not the participation `status`). */
   characterStatus: string | null;
+  /** Standing, down or out of combat in this campaign (031). */
+  posture: Posture;
   /** The character's token; without one, placing it on the map asks for a token. */
   characterTokenId: number | null;
   createdAt: string;
@@ -67,4 +70,6 @@ export interface CampaignCharacterUpdateInfo {
   sheet: string | null;
   /** New token of the character (saved on the character); null keeps the current one. */
   tokenId: number | null;
+  /** New posture (031); null/omitted keeps the current one. */
+  posture?: Posture | null;
 }

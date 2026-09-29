@@ -39,6 +39,7 @@ public class TurnServiceTests
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
+    private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
     private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3 };
     private readonly MapToken _ariaPiece;
@@ -87,7 +88,8 @@ public class TurnServiceTests
         _campaignNpcRepository.Setup(r => r.GetAsync(CAMPAIGN, NPC)).ReturnsAsync(new CampaignNpc { CampaignNpcId = 5, CampaignId = CAMPAIGN, NpcId = NPC });
 
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
-            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object, _notifier.Object);
+            _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object,
+            _tokenRepository.Object, _notifier.Object);
     }
 
     // --- State (US1) ---
@@ -270,7 +272,10 @@ public class TurnServiceTests
         _ariaPiece.MoveTo(4, 2);
         _repository.Setup(r => r.ListByActorTurnAsync(CAMPAIGN, 3, ARIA, null))
             .ReturnsAsync(new List<Turn> { Turn.Movement(CAMPAIGN, MAP, ARIA, null, null, 3, 1, (4, 4, 3), (4, 2, 0)) });
-        _mapTokenRepository.Setup(r => r.ExistsAtAsync(MAP, 4, 4, ARIA_PIECE)).ReturnsAsync(true);
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken>
+        {
+            _ariaPiece, new() { MapTokenId = 99, MapId = MAP, TokenId = 5, X = 4, Y = 4 }
+        });
 
         var result = await _service.ResetAsync(PLAYER, new TurnPieceInfo { MapTokenId = ARIA_PIECE });
 
@@ -576,6 +581,24 @@ public class TurnServiceTests
     }
 
     [Fact]
+    public async Task Process_Posture_ChangesAndLogsIt()
+    {
+        var (_, _, ariaPlay, _, goblin1) = Table();
+        var inserted = new List<Turn>();
+        _repository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => inserted.Add(t)).ReturnsAsync((Turn t) => t);
+
+        var result = await _service.ProcessAsync(MASTER, CAMPAIGN, new TurnProcessInfo
+        {
+            Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, Posture = (int)Posture.OutOfCombat } },
+            Npcs = new() { new TurnProcessNpcInfo { MapNpcId = MAP_NPC, Posture = (int)Posture.Down } }
+        });
+
+        (ariaPlay.Posture, goblin1.Posture).Should().Be((Posture.OutOfCombat, Posture.Down));
+        inserted.Select(t => t.Changes!.Single().Field).Should().Equal("posture", "posture");
+        result.Data.Characters.Single(c => c.CharacterId == ARIA).Posture.Should().Be((int)Posture.OutOfCombat);
+    }
+
+    [Fact]
     public async Task Process_PiecesMaySwapHexes()
     {
         var (bram, _, _, _, _) = Table();
@@ -603,7 +626,8 @@ public class TurnServiceTests
         new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 1, Y = 1 } } }, "characters[0].x" },
         new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 20, Y = 1 } } }, "characters[0].x" },
         new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 3 } } }, "characters[0].x" },
-        new object[] { new TurnProcessInfo { Narration = new string('a', Turn.MAX_NARRATION + 1) }, "narration" }
+        new object[] { new TurnProcessInfo { Narration = new string('a', Turn.MAX_NARRATION + 1) }, "narration" },
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, Posture = 5 } } }, "characters[0].posture" }
     };
 
     [Theory]

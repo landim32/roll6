@@ -1,4 +1,5 @@
 import type { CampaignCharacterUpdateInfo } from '../types/campaignCharacter';
+import type { Posture } from '../types/mapToken';
 
 /**
  * How a party card opens the character form: the owner changes everything, the master only what
@@ -31,17 +32,22 @@ export const validateCampaignArea = ({ characterStatus, sheet }: { characterStat
   return null;
 };
 
-/** API payload from valid values: numbers, trimmed status and blank texts as null; no token keeps the current one. */
-export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, sheet, tokenId = null }: {
+/**
+ * API payload from valid values: numbers, trimmed status and blank texts as null; no token keeps the current one,
+ * and so does no posture (031).
+ */
+export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, sheet, tokenId = null, posture = null }: {
   currentLife: string;
   currentEnergy: string;
   characterStatus: string;
   sheet: string;
   tokenId?: number | null;
+  posture?: Posture | null;
 }): CampaignCharacterUpdateInfo => ({
   currentLife: Number(currentLife),
   currentEnergy: Number(currentEnergy),
   characterStatus: characterStatus.trim() || null,
   sheet: sheet.trim() ? sheet : null,
   tokenId,
+  posture,
 });

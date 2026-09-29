@@ -12,6 +12,20 @@ export const MAP_TOKEN_TYPE = {
 
 export type MapTokenType = (typeof MAP_TOKEN_TYPE)[keyof typeof MAP_TOKEN_TYPE];
 
+/**
+ * How a character or NPC is on the map (backend Posture, 031). Down and out-of-combat pieces lie down and take the
+ * token's down size; out-of-combat pieces are drawn in black and white. Objects have none.
+ */
+export const POSTURE = {
+  standing: 1,
+  down: 2,
+  outOfCombat: 3,
+} as const;
+
+export type Posture = (typeof POSTURE)[keyof typeof POSTURE];
+
+export const POSTURES: readonly Posture[] = [POSTURE.standing, POSTURE.down, POSTURE.outOfCombat];
+
 /** A piece on a map. Character pieces show the participation's name, vitals, status and sheet. */
 export interface MapTokenInfo {
   mapTokenId: number;
@@ -41,6 +55,10 @@ export interface MapTokenInfo {
   y: number;
   /** Hex side the piece faces, 0–5 clockwise from the top. */
   look: number;
+  /** Posture of the character/NPC occurrence; null for objects. */
+  posture: Posture | null;
+  /** Hexes the piece takes now: the token's standing or down size, depending on the posture (1, 2, 3, 7 or 10). */
+  space: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,6 +93,10 @@ export interface MapTokenPositionInfo {
   y: number;
   /** New facing (0–5); omitted keeps the current one. */
   look?: number;
+}
+
+export interface MapTokenPostureInfo {
+  posture: Posture;
 }
 
 export interface MapTokenTokenInfo {

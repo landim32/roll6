@@ -9,7 +9,7 @@ const piece = (mapTokenId: number, x: number, y: number, mapId = 30): MapTokenIn
   mapTokenId, mapId, tokenId: 5, tokenName: 'T', upImageUrl: null, downImageUrl: null,
   campaignCharacterId: null, characterId: null, mapNpcId: null, npcId: null, name: `P${mapTokenId}`,
   tokenType: MAP_TOKEN_TYPE.object, sheet: null, life: 0, energy: 0, totalLife: 0, totalEnergy: 0, status: null, move: 0,
-  x, y, look: 0, createdAt: '', updatedAt: '',
+  x, y, look: 0, posture: null, space: 1, createdAt: '', updatedAt: '',
 });
 
 const event = (type: TableEventType, mapId: number | null, data: unknown = null): TableEvent =>
@@ -21,6 +21,12 @@ describe('applyTokenEvent', () => {
   it('replaces a moved piece in place', () => {
     const next = applyTokenEvent(tokens, event(TABLE_EVENT.mapTokenUpserted, 30, piece(2, 4, 5)), 30);
     expect(next.map((t) => [t.mapTokenId, t.x, t.y])).toEqual([[1, 0, 0], [2, 4, 5]]);
+  });
+
+  it('takes the new posture and size of a piece that lay down (031)', () => {
+    const lying = { ...piece(2, 1, 1), posture: 2 as const, space: 2 };
+    const next = applyTokenEvent(tokens, event(TABLE_EVENT.mapTokenUpserted, 30, lying), 30);
+    expect(next.find((t) => t.mapTokenId === 2)).toMatchObject({ posture: 2, space: 2 });
   });
 
   it('adds a new piece and applying it twice keeps one copy', () => {

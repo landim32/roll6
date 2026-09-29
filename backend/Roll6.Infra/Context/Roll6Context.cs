@@ -203,6 +203,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CurrentEnergy).HasColumnName("current_energy").IsRequired();
             entity.Property(e => e.CharacterStatus).HasColumnName("character_status").HasMaxLength(260);
             entity.Property(e => e.Sheet).HasColumnName("sheet").HasMaxLength(20000);
+            entity.Property(e => e.Posture).HasColumnName("posture").HasConversion<int>().HasDefaultValue(Posture.Standing).HasSentinel((Posture)0);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasIndex(e => new { e.CampaignId, e.CharacterId })
@@ -297,6 +298,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CurrentLife).HasColumnName("current_life");
             entity.Property(e => e.CurrentEnergy).HasColumnName("current_energy");
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(260);
+            entity.Property(e => e.Posture).HasColumnName("posture").HasConversion<int>().HasDefaultValue(Posture.Standing).HasSentinel((Posture)0);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.MapId)

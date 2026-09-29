@@ -24,6 +24,8 @@ public static class McpDocs
     public const string MAP_TOKEN_ID = "Id of the piece on the map (mapTokenId from list_map_tokens).";
     public const string PARTICIPATION_ID = "Id of the participation (campaignCharacterId from list_campaign_characters, list_my_participations or list_my_invites).";
 
+    public const string POSTURE = "Posture: 1 standing, 2 down (lying, may take more hexes), 3 out of combat (lying and drawn in black and white).";
+    public const string POSTURE_OPTIONAL = POSTURE + " Omit to keep the current posture.";
     public const string DESTRUCTIVE = "This cannot be undone: confirm with the user before calling it.";
 
     /// <summary>Same paging as the API's PageQuery.</summary>

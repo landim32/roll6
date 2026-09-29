@@ -172,4 +172,13 @@ public class TurnSummaryTests
         actions.Should().Be("## Ações\nCedric (José): \"Ataca\"\n");
         TurnSummary.Build(lines, positions).Should().StartWith(actions);
     }
+
+    [Fact]
+    public void Build_PostureChange_UsesTheLabels()
+    {
+        var line = Line(TurnType.CharacterUpdate, "Cedric (José)") with { Changes = new[] { new TurnChange("posture", "1", "2") } };
+
+        TurnSummary.Build(new[] { line }, Array.Empty<SummaryPosition>())
+            .Should().Contain("Cedric (José): Alterou: Postura de \"Em pé\" para \"Caído\"");
+    }
 }

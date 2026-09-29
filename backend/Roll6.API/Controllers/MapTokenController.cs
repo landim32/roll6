@@ -60,6 +60,24 @@ public class MapTokenController : ApiControllerBase
         }
     }
 
+    /// <summary>
+    /// Standing, down or out of combat (031): saved on the participation (character) or on the NPC occurrence. The
+    /// character's owner or the master; NPC pieces only the master.
+    /// </summary>
+    [HttpPut("{id:long}/posture")]
+    [ProducesResponseType(typeof(MapTokenInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetPosture(long id, [FromBody] MapTokenPostureInfo info)
+    {
+        try
+        {
+            return Ok(await _mapTokenService.SetPostureAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Another library token for the piece; position, facing and link are kept.</summary>
     [HttpPut("{id:long}/token")]
     [ProducesResponseType(typeof(MapTokenInfo), StatusCodes.Status200OK)]

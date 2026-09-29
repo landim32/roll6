@@ -10,9 +10,12 @@ namespace Roll6.Mcp.Tools;
 public static class TokenTools
 {
     private const string FIELDS = """
-        Fields: name (required, up to 260), description, upSpace (hexes the standing token occupies, default 1), upImage (image
-        of the token standing — required to draw it), downImage (optional image when lying down/fallen) and downSpace
-        (hexes when down; only with a downImage, default 2).
+        Fields: name (required, up to 260), description, upSpace (hexes the standing token occupies: 1, 2, 3, 7 or 10,
+        default 1), upImage (image of the token standing — required to draw it), downImage (optional image when lying
+        down/fallen) and downSpace (hexes when down or out of combat: 1, 2, 3, 7 or 10; default 2 with a downImage, else
+        none = the standing size). Shapes: 2 = the position + the hex behind; 3 = a line along the facing, position in
+        the middle; 7 = the position + its 6 neighbors; 10 = a line of 4 along the facing (position 2nd from the front)
+        + a line of 3 on each side. Any other size is refused (400).
         """;
 
     [McpServerTool(Name = "list_tokens", Title = "List tokens", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -61,8 +64,8 @@ public static class TokenTools
         Roll6ApiClient api,
         [Description("Token name (required, up to 260 characters). Example: \"Goblin archer\".")] string name,
         [Description("Optional free text describing the token.")] string? description = null,
-        [Description("Hexes the standing token occupies (0 or more). Default 1.")] int? upSpace = null,
-        [Description("Hexes the token occupies when down (0 or more). Only used with downImage; default 2.")] int? downSpace = null,
+        [Description("Hexes the standing token occupies: 1, 2, 3, 7 or 10. Default 1.")] int? upSpace = null,
+        [Description("Hexes the token occupies when down or out of combat: 1, 2, 3, 7 or 10. Default 2 with downImage.")] int? downSpace = null,
         [Description("Image of the token standing. " + McpDocs.IMAGE_FILE)] string? upImage = null,
         [Description("Optional image of the token lying down (fallen). " + McpDocs.IMAGE_FILE)] string? downImage = null) =>
         api.SendAsync(HttpMethod.Post, "/api/token", new TokenInsertInfo
@@ -86,8 +89,8 @@ public static class TokenTools
         [Description("Id of the token to change (tokenId).")] long tokenId,
         [Description("Token name (required, up to 260 characters).")] string name,
         [Description("Optional free text describing the token.")] string? description = null,
-        [Description("Hexes the standing token occupies (0 or more). Default 1.")] int? upSpace = null,
-        [Description("Hexes the token occupies when down. Only used with downImage; default 2.")] int? downSpace = null,
+        [Description("Hexes the standing token occupies: 1, 2, 3, 7 or 10. Default 1.")] int? upSpace = null,
+        [Description("Hexes the token occupies when down or out of combat: 1, 2, 3, 7 or 10. Default 2 with downImage.")] int? downSpace = null,
         [Description("Image of the token standing. " + McpDocs.IMAGE_FILE)] string? upImage = null,
         [Description("Optional image of the token lying down. " + McpDocs.IMAGE_FILE)] string? downImage = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/token/{tokenId}", new TokenInsertInfo

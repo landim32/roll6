@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useMapEditor } from './useMapEditor';
 import { useMapToken } from './useMapToken';
 import { movementField } from '../lib/hexGrid';
+import { buildOccupancy, isBlocked } from '../lib/occupancy';
 import type { Offset } from '../lib/hexGrid';
 import { hoverPath, IDLE, MOVEMENT_KIND, pickDestination, pointFacing, startMovement } from '../lib/movement';
 import type { MovementState } from '../lib/movement';
@@ -35,9 +36,10 @@ export const useTokenMovement = () => {
   }, [active]);
 
   const start = useCallback((token: MapTokenInfo) => {
-    const blocked = new Set(mapTokens.filter((t) => t.mapTokenId !== token.mapTokenId).map((t) => `${t.x},${t.y}`));
+    // Every hex of the other pieces blocks, and the whole shape of this one must fit at each step and turn (031).
+    const occupancy = buildOccupancy(mapTokens);
     const field = movementField({ x: token.x, y: token.y, look: token.look }, draft.gridWidth, draft.gridHeight,
-      (x, y) => blocked.has(`${x},${y}`));
+      (x, y) => isBlocked(occupancy, x, y, token.mapTokenId), token.space);
     const free = token.tokenType === MAP_TOKEN_TYPE.object;
     setState(startMovement({
       mapTokenId: token.mapTokenId,
@@ -47,6 +49,7 @@ export const useTokenMovement = () => {
       look: token.look,
       kind: free ? MOVEMENT_KIND.free : MOVEMENT_KIND.limited,
       total: free ? null : token.move,
+      space: token.space,
     }, field));
   }, [mapTokens, draft.gridWidth, draft.gridHeight]);
 

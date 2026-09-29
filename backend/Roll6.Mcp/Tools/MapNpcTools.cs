@@ -23,8 +23,8 @@ public static class MapNpcTools
         current, totalLife/totalEnergy = the NPC's, sheet = the NPC's sheet).
         Who can use it: only the master; the NPC must be in the campaign (add_npc_to_campaign).
         {{RETURNS}}
-        Common errors: 403 not the master, 404 map/NPC not found, 409 NPC not in the campaign or hex occupied, 400 outside
-        the grid.
+        Common errors: 403 not the master, 404 map/NPC not found, 409 NPC not in the campaign or a hex of the token's shape
+        occupied, 400 shape outside the grid.
         Related tools: list_campaign_npcs, list_map_tokens, move_map_token, update_map_npc.
         """)]
     public static Task<CallToolResult> PlaceNpcOnMap(
@@ -40,7 +40,8 @@ public static class MapNpcTools
     [ApiOperation("PUT", "/api/mapnpc/{id}")]
     [Description($$"""
         What it does: changes one NPC occurrence on a map (name, current life/energy — may go to 0 or below, never above
-        the NPC's totals — and a free-text status like "stunned"); the library NPC is unchanged. The piece and the NPC card
+        the NPC's totals — a free-text status like "stunned" and optionally the posture: standing, down or out of
+        combat); the library NPC is unchanged. The piece and the NPC card
         show it at once for everyone; there is no need to touch the piece (update_map_token).
         Who can use it: only the master.
         {{RETURNS}}
@@ -53,10 +54,11 @@ public static class MapNpcTools
         [Description("Occurrence name (required, up to 260 characters). Example: \"Goblin 2\".")] string name,
         [Description("Current life of this occurrence, at most the NPC's life (totalLife); 0 or negative = fallen.")] int currentLife,
         [Description("Current energy of this occurrence, at most the NPC's energy (totalEnergy).")] int currentEnergy,
-        [Description("Free-text status (up to 260 characters), e.g. \"stunned\". Null clears it.")] string? status = null) =>
+        [Description("Free-text status (up to 260 characters), e.g. \"stunned\". Null clears it.")] string? status = null,
+        [Description(McpDocs.POSTURE_OPTIONAL)] int? posture = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/mapnpc/{mapNpcId}", new MapNpcUpdateInfo
         {
-            Name = name, CurrentLife = currentLife, CurrentEnergy = currentEnergy, Status = status
+            Name = name, CurrentLife = currentLife, CurrentEnergy = currentEnergy, Status = status, Posture = posture
         });
 
     [McpServerTool(Name = "delete_map_npc", Title = "Delete NPC occurrence", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

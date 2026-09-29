@@ -12,6 +12,9 @@ describe('validateTokenForm', () => {
     [{ upSpace: '' }, 'invalidSpace'],
     [{ upSpace: '1.5' }, 'invalidSpace'],
     [{ downSpace: '-1' }, 'invalidSpace'],
+    [{ upSpace: '0' }, 'invalidSpace'],
+    [{ upSpace: '4' }, 'invalidSpace'],
+    [{ downSpace: '5' }, 'invalidSpace'],
   ])('rejects %j with %s', (changes, error) => {
     expect(validateTokenForm(form(changes))).toBe(error);
   });

@@ -1,3 +1,4 @@
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Validation;
 
@@ -20,6 +21,9 @@ public class MapNpc
     /// <summary>Current energy (at most the NPC's energy).</summary>
     public int CurrentEnergy { get; set; }
     public string? Status { get; set; }
+
+    /// <summary>Standing, down or out of combat (031); starts standing.</summary>
+    public Posture Posture { get; set; } = Posture.Standing;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -35,6 +39,7 @@ public class MapNpc
             CurrentLife = npc.Life,
             CurrentEnergy = npc.Energy,
             Status = npc.Status,
+            Posture = Posture.Standing,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -55,5 +60,16 @@ public class MapNpc
         CurrentEnergy = currentEnergy;
         Status = Guard.OptionalText(status, "status", 260);
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Changes the posture; false when it already was that one.</summary>
+    public bool ChangePosture(int posture)
+    {
+        var value = Guard.ValidPosture(posture, "posture");
+        if (value == Posture)
+            return false;
+        Posture = value;
+        UpdatedAt = DateTime.UtcNow;
+        return true;
     }
 }

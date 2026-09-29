@@ -26,6 +26,8 @@ import { validateVitals } from '../../lib/vitals';
 import type { CharacterInfo } from '../../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../../types/campaignCharacter';
 import type { CampaignCharacterDetailInfo, CampaignCharacterInfo } from '../../types/campaignCharacter';
+import { POSTURE, POSTURES } from '../../types/mapToken';
+import type { Posture } from '../../types/mapToken';
 
 // The markdown editor/viewer are heavy: loaded only when this form is opened.
 const MarkdownEditor = lazy(() => import('../ui/MarkdownEditor'));
@@ -74,6 +76,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
   const [currentLife, setCurrentLife] = useState('');
   const [currentEnergy, setCurrentEnergy] = useState('');
   const [characterStatus, setCharacterStatus] = useState('');
+  const [posture, setPosture] = useState<Posture>(POSTURE.standing);
   const [campaignSheet, setCampaignSheet] = useState('');
   /** The character's own token (011 US5): chosen in the tokens modal, saved with the character. */
   const [token, setToken] = useState<{ tokenId: number; name: string; imageUrl: string | null } | null>(null);
@@ -112,6 +115,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
         setCurrentLife(String(participation.currentLife));
         setCurrentEnergy(String(participation.currentEnergy));
         setCharacterStatus(participation.characterStatus ?? '');
+        setPosture(participation.posture);
         setCampaignSheet(participation.sheet ?? '');
         // The token belongs to the character, but the owner and the master both choose it here.
         setToken(participation.characterTokenId !== null
@@ -177,7 +181,7 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
         name = (await updateCharacter(before.characterId, { ...draft, image })).name;
       }
       await updateParticipation(before.campaignCharacterId, toCampaignUpdate({
-        currentLife: vitals.life, currentEnergy: vitals.energy, characterStatus, sheet: campaignSheet,
+        currentLife: vitals.life, currentEnergy: vitals.energy, characterStatus, sheet: campaignSheet, posture,
         // The owner's token goes with the character (it may be removed); the master changes it here.
         tokenId: draft ? null : token?.tokenId ?? null,
       }));
@@ -316,10 +320,17 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
                         <input id="character-current-energy" type="number" step={1} className="form-control"
                           value={currentEnergy} onChange={(e) => setCurrentEnergy(e.target.value)} />
                       </div>
-                      <div className="col-12">
+                      <div className="col-sm-8">
                         <label className="form-label" htmlFor="character-status">{t('characterForm.characterStatus')}</label>
                         <input id="character-status" className="form-control" maxLength={MAX_CHARACTER_STATUS}
                           value={characterStatus} onChange={(e) => setCharacterStatus(e.target.value)} />
+                      </div>
+                      <div className="col-sm-4">
+                        <label className="form-label" htmlFor="character-posture">{t('posture.label')}</label>
+                        <select id="character-posture" className="form-select" value={posture}
+                          onChange={(e) => setPosture(Number(e.target.value) as Posture)}>
+                          {POSTURES.map((value) => <option key={value} value={value}>{t(`posture.${value}`)}</option>)}
+                        </select>
                       </div>
                     </>
                   )}

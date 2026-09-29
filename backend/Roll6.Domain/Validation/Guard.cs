@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 
 namespace Roll6.Domain.Validation;
@@ -38,6 +39,22 @@ public static class Guard
         if (value < 0)
             throw new DomainValidationException(field, $"O campo {field} não pode ser negativo.");
         return value;
+    }
+
+    /// <summary>Token sizes (031): 1, 2, 3, 7 or 10 hexes.</summary>
+    public static int TokenSpace(int value, string field)
+    {
+        if (!Grid.HexGrid.IsAllowedSpace(value))
+            throw new DomainValidationException(field, "O tamanho deve ser 1, 2, 3, 7 ou 10 hexes.");
+        return value;
+    }
+
+    /// <summary>One of the postures of a character/NPC on the map (031).</summary>
+    public static Posture ValidPosture(int value, string field)
+    {
+        if (!Enum.IsDefined(typeof(Posture), value))
+            throw new DomainValidationException(field, "A postura deve ser 1 (Em pé), 2 (Caído) ou 3 (Fora de combate).");
+        return (Posture)value;
     }
 
     /// <summary>Accepts only file names returned by the image upload.</summary>

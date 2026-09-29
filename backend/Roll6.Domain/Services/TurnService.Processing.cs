@@ -142,6 +142,7 @@ public partial class TurnService
                         CurrentEnergy = p.CurrentEnergy,
                         TotalEnergy = character.Energy,
                         Status = p.CharacterStatus,
+                        Posture = (int)p.Posture,
                         MapTokenId = piece?.MapTokenId,
                         X = piece?.X,
                         Y = piece?.Y,
@@ -167,6 +168,7 @@ public partial class TurnService
                         CurrentEnergy = o.CurrentEnergy,
                         TotalEnergy = npc?.Energy ?? o.CurrentEnergy,
                         Status = o.Status,
+                        Posture = (int)o.Posture,
                         X = piece?.X,
                         Y = piece?.Y,
                         Look = piece?.Look,
@@ -253,11 +255,8 @@ public partial class TurnService
             var look = item.Look ?? piece.Look;
             if (look < 0 || look > MapToken.MAX_LOOK)
                 Error($"{prefix}.look", $"O sentido deve estar entre 0 e {MapToken.MAX_LOOK}.");
-            var x = item.X ?? piece.X;
-            var y = item.Y ?? piece.Y;
-            if (model != null && !HexGrid.IsInsideGrid(x, y, model.GridWidth, model.GridHeight))
-                Error($"{prefix}.x", "A posição está fora da grid do mapa.");
-            return (x, y, look);
+            // The grid and the other pieces are checked on the final state, with the final sizes (031).
+            return (item.X ?? piece.X, item.Y ?? piece.Y, look);
         }
 
         string? NewStatus(string prefix, TurnProcessPieceInfo item, string? current)
@@ -268,6 +267,18 @@ public partial class TurnService
             if (status?.Length > MAX_STATUS)
                 Error($"{prefix}.status", $"O status deve ter no máximo {MAX_STATUS} caracteres.");
             return string.IsNullOrEmpty(status) ? null : status;
+        }
+
+        Posture NewPosture(string prefix, TurnProcessPieceInfo item, Posture current)
+        {
+            if (item.Posture is not int posture)
+                return current;
+            if (!Enum.IsDefined(typeof(Posture), posture))
+            {
+                Error($"{prefix}.posture", "A postura deve ser 1 (Em pé), 2 (Caído) ou 3 (Fora de combate).");
+                return current;
+            }
+            return (Posture)posture;
         }
 
         void CheckVitals(string prefix, int life, int energy, int totalLife, int totalEnergy)
@@ -290,6 +301,7 @@ public partial class TurnService
             var life = item.CurrentLife ?? participation.CurrentLife;
             var energy = item.CurrentEnergy ?? participation.CurrentEnergy;
             var status = NewStatus(prefix, item, participation.CharacterStatus);
+            var posture = NewPosture(prefix, item, participation.Posture);
             CheckVitals(prefix, life, energy, character.Life, character.Energy);
             var piece = pieces.FirstOrDefault(p => p.CampaignCharacterId == participation.CampaignCharacterId);
             var target = Target(prefix, item, piece);
@@ -299,10 +311,12 @@ public partial class TurnService
             var changes = TurnChange.Diff(
                 ("currentLife", participation.CurrentLife, life),
                 ("currentEnergy", participation.CurrentEnergy, energy),
-                ("characterStatus", participation.CharacterStatus, status));
+                ("characterStatus", participation.CharacterStatus, status),
+                ("posture", (int)participation.Posture, (int)posture));
             if (changes.Count > 0)
             {
                 participation.UpdatePlay(life, energy, status, participation.Sheet, character.Life, character.Energy);
+                participation.ChangePosture((int)posture);
                 updatedParticipations.Add(participation);
                 turns.Add(Turn.CharacterUpdate(campaignId, mapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes));
             }
@@ -325,6 +339,7 @@ public partial class TurnService
             var life = item.CurrentLife ?? occurrence.CurrentLife;
             var energy = item.CurrentEnergy ?? occurrence.CurrentEnergy;
             var status = NewStatus(prefix, item, occurrence.Status);
+            var posture = NewPosture(prefix, item, occurrence.Posture);
             CheckVitals(prefix, life, energy, totalLife, totalEnergy);
             var piece = pieces.FirstOrDefault(p => p.MapNpcId == occurrence.MapNpcId);
             var target = Target(prefix, item, piece);
@@ -334,10 +349,12 @@ public partial class TurnService
             var changes = TurnChange.Diff(
                 ("currentLife", occurrence.CurrentLife, life),
                 ("currentEnergy", occurrence.CurrentEnergy, energy),
-                ("status", occurrence.Status, status));
+                ("status", occurrence.Status, status),
+                ("posture", (int)occurrence.Posture, (int)posture));
             if (changes.Count > 0)
             {
                 occurrence.Update(occurrence.Name, life, energy, status, totalLife, totalEnergy);
+                occurrence.ChangePosture((int)posture);
                 updatedOccurrences.Add(occurrence);
                 turns.Add(Turn.CharacterUpdate(campaignId, mapId, null, occurrence.NpcId, occurrence.MapNpcId, campaign.CurrentTurn, userId, changes));
             }
@@ -345,14 +362,27 @@ public partial class TurnService
                 moved.Add(new PieceChange { Key = $"{prefix}.x", Piece = piece, Target = target });
         }
 
-        // Positions are checked on the final state: pieces may swap hexes, but two can't end on the same one.
+        // Positions are checked on the final state, each piece with its whole shape at its final size (031): pieces may
+        // swap hexes, but two can't end on the same one and no shape may leave the grid.
+        Posture? PostureOf(MapToken piece) => piece.CampaignCharacterId is long cc
+            ? participations.Values.FirstOrDefault(p => p.CampaignCharacterId == cc)?.Posture
+            : piece.MapNpcId is long mn ? occurrences.GetValueOrDefault(mn)?.Posture : null;
+        var spaces = await _occupancy.SpacesAsync(pieces, PostureOf);
         var movingIds = moved.Select(m => m.Piece!.MapTokenId).ToHashSet();
-        var taken = pieces.Where(p => !movingIds.Contains(p.MapTokenId)).Select(p => (p.X, p.Y)).ToHashSet();
+        var taken = Occupancy.Build(pieces.Where(p => !movingIds.Contains(p.MapTokenId))
+            .Select(p => new PieceShape(p.MapTokenId, p.X, p.Y, p.Look, spaces[p.MapTokenId])));
+        var claimed = new HashSet<(int X, int Y)>();
         foreach (var change in moved)
         {
-            var hex = (change.Target!.Value.X, change.Target.Value.Y);
-            if (!taken.Add(hex))
-                Error(change.Key, $"O hex ({hex.X}, {hex.Y}) já está ocupado.");
+            var (x, y, look) = change.Target!.Value;
+            if (look < 0 || look > MapToken.MAX_LOOK)
+                continue;
+            var hexes = HexGrid.Footprint(x, y, look, spaces[change.Piece!.MapTokenId]);
+            if (model != null && hexes.Any(h => !HexGrid.IsInsideGrid(h.X, h.Y, model.GridWidth, model.GridHeight)))
+                Error(change.Key, "A peça não cabe na grid do mapa nessa posição.");
+            else if (hexes.Any(h => taken.IsBlocked(h.X, h.Y, change.Piece.MapTokenId) || claimed.Contains(h)))
+                Error(change.Key, $"O hex ({x}, {y}) já está ocupado.");
+            claimed.UnionWith(hexes);
         }
 
         if (errors.Count > 0)
@@ -363,7 +393,7 @@ public partial class TurnService
             var piece = change.Piece!;
             var (x, y, look) = change.Target!.Value;
             var cost = HexGrid.MovementCost(piece.X, piece.Y, piece.Look, x, y, look,
-                model?.GridWidth ?? int.MaxValue, model?.GridHeight ?? int.MaxValue, (_, _) => false);
+                model?.GridWidth ?? int.MaxValue, model?.GridHeight ?? int.MaxValue, (_, _) => false, spaces[piece.MapTokenId]);
             long? characterId = piece.CampaignCharacterId is long cc
                 ? participations.Values.FirstOrDefault(p => p.CampaignCharacterId == cc)?.CharacterId : null;
             long? npcId = piece.MapNpcId is long mn ? occurrences.GetValueOrDefault(mn)?.NpcId : null;

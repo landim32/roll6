@@ -1,9 +1,12 @@
+import { ALLOWED_SPACES } from './hexGrid';
 import type { TokenInfo, TokenInsertInfo } from '../types/token';
 
 /** Same limits as the backend Token.Update. */
 export const MAX_TOKEN_NAME = 260;
 export const MAX_TOKEN_DESCRIPTION = 2000;
 export const DEFAULT_UP_SPACE = 1;
+/** Sizes a token may take, in hexes (031); same list as the backend. */
+export { ALLOWED_SPACES as TOKEN_SPACES } from './hexGrid';
 
 /** Form values as typed (spaces stay strings until validated). */
 export interface TokenForm {
@@ -28,8 +31,7 @@ export const toTokenForm = (token: TokenInfo): TokenForm => ({
 
 const isSpace = (value: string, optional: boolean): boolean => {
   if (value.trim() === '') return optional;
-  const n = Number(value);
-  return Number.isInteger(n) && n >= 0;
+  return ALLOWED_SPACES.includes(Number(value));
 };
 
 export const validateTokenForm = (form: TokenForm): TokenFormError | null => {

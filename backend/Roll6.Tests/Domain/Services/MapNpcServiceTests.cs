@@ -91,7 +91,7 @@ public class MapNpcServiceTests
     [Fact]
     public async Task Create_OnOccupiedHexOrOutsideTheGrid_Throws()
     {
-        _mapTokenRepository.Setup(r => r.ExistsAtAsync(MAP, 1, 1, null)).ReturnsAsync(true);
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 99, MapId = MAP, TokenId = 1, X = 1, Y = 1 } });
 
         await _service.Invoking(s => s.CreateAsync(MASTER, At(1, 1))).Should().ThrowAsync<ConflictException>();
         await _service.Invoking(s => s.CreateAsync(MASTER, At(10, 0))).Should().ThrowAsync<DomainValidationException>();
@@ -184,5 +184,41 @@ public class MapNpcServiceTests
         (await _service.Invoking(s => s.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 8, CurrentEnergy = 2 }))
             .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("currentLife");
         _repository.Verify(r => r.UpdateAsync(It.IsAny<MapNpc>()), Times.Never);
+    }
+
+    // ---- 031: posture ----
+
+    [Fact]
+    public async Task Update_WithPosture_ChangesItAndRecordsIt()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2 });
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        var result = await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2, Posture = 3 });
+
+        result.Posture.Should().Be(3);
+        recorded!.Changes!.Should().ContainSingle(c => c.Field == "posture" && c.Before == "1" && c.After == "3");
+    }
+
+    [Fact]
+    public async Task Update_WithoutPosture_KeepsIt()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2, Posture = Posture.Down });
+
+        var result = await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2 });
+
+        result.Posture.Should().Be(2);
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_BigNpcToken_NeedsTheWholeShapeInsideTheGrid()
+    {
+        _tokenRepository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, Name = "Dragão", UpSpace = 7 });
+
+        (await _service.Invoking(s => s.CreateAsync(MASTER, At(0, 2))).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("x");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapNpc>()), Times.Never);
     }
 }

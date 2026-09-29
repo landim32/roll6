@@ -132,6 +132,56 @@ export const neighbor = (x: number, y: number, look: number): Offset => {
   return { x: offset.x + 0, y: offset.y + 0 };
 };
 
+/** Sizes a token may take, in hexes (031). Mirror of HexGrid.ALLOWED_SPACES. */
+export const ALLOWED_SPACES: readonly number[] = [1, 2, 3, 7, 10];
+
+/** The axial steps of a shape from its position: (steps along the facing d, steps along e = the next side). */
+const SHAPES: Record<number, readonly (readonly [number, number])[]> = {
+  1: [[0, 0]],
+  2: [[0, 0], [-1, 0]],
+  3: [[0, 0], [1, 0], [-1, 0]],
+  10: [[0, 0], [1, 0], [-1, 0], [-2, 0], [0, 1], [-1, 1], [-2, 1], [1, -1], [0, -1], [-1, -1]],
+};
+
+/** Axial offsets of a shape from its position, for a piece facing `look`. */
+const shapeOffsets = (look: number, space: number): Axial[] => {
+  if (!ALLOWED_SPACES.includes(space)) throw new RangeError(`The size must be 1, 2, 3, 7 or 10 hexes (${space}).`);
+  if (space === 7) return [{ q: 0, r: 0 }, ...LOOK_DIRECTIONS];
+  const d = LOOK_DIRECTIONS[((look % 6) + 6) % 6];
+  const e = LOOK_DIRECTIONS[(((look + 1) % 6) + 6) % 6];
+  return SHAPES[space].map(([forward, side]) => ({ q: forward * d.q + side * e.q, r: forward * d.r + side * e.r }));
+};
+
+/**
+ * Hexes taken by a piece of `space` hexes at (x, y) facing `look` (031), the position first: 1 = the position;
+ * 2 = + the hex behind; 3 = a line along the facing with the position in the middle; 7 = + the six neighbors;
+ * 10 = a line of 4 along the facing (position second from the front) + a line of 3 on each side.
+ * Mirror of HexGrid.Footprint — the tests of both pin the same cases.
+ */
+export const footprint = (x: number, y: number, look: number, space: number): Offset[] => {
+  const center = offsetToAxial(x, y);
+  return shapeOffsets(look, space).map((o) => {
+    const offset = axialToOffset(center.q + o.q, center.r + o.r);
+    return { x: offset.x + 0, y: offset.y + 0 };
+  });
+};
+
+/** Token images look down (look 3): the shape drawn around the piece is the look-3 one, turned with the piece. */
+const DRAWN_LOOK = 3;
+
+/**
+ * Centers (px) of the hexes of a shape relative to the piece's position, as drawn inside the piece's group — which
+ * is turned by (look − 3) × 60° — so they are the look-3 shape (axial → pixel for flat-top hexes).
+ */
+export const footprintLocal = (space: number, size: number): Point[] =>
+  shapeOffsets(DRAWN_LOOK, space).map(({ q, r }) => ({
+    x: size * 1.5 * q + 0,
+    y: size * ((SQRT_3 / 2) * q + SQRT_3 * r) + 0,
+  }));
+
+/** Whether turning in place changes the hexes taken (the 1- and 7-hex shapes never change). */
+export const turnChangesFootprint = (space: number): boolean => space === 2 || space === 3 || space === 10;
+
 /** Fewest 60° turns between two facings. Mirror of HexGrid.TurnCost. */
 export const turnCost = (from: number, to: number): number => {
   const d = Math.abs(from - to) % 6;
@@ -161,16 +211,19 @@ export interface MovementField {
 
 /**
  * Breadth-first search ("Movement range" / pathfinding in the guide) over (hex, facing) states: turning one
- * side left or right costs 1, stepping into the hex ahead costs 1. Hexes outside the grid or blocked are
- * never entered. Transitions are tried in a fixed order (left, right, ahead) so ties are stable.
- * Mirror of HexGrid.MovementCost.
+ * side left or right costs 1, stepping into the hex ahead costs 1. A state is entered only when the whole shape of a
+ * piece of `space` hexes fits there — inside the grid and on no blocked hex (031); the start is always accepted.
+ * Transitions are tried in a fixed order (left, right, ahead) so ties are stable. Mirror of HexGrid.MovementCost.
  */
 export const movementField = (
   start: MoveState,
   columns: number,
   rows: number,
   isBlocked: (x: number, y: number) => boolean,
+  space = 1,
 ): MovementField => {
+  const fits = (s: MoveState): boolean =>
+    footprint(s.x, s.y, s.look, space).every((h) => isInsideGrid(h, columns, rows) && !isBlocked(h.x, h.y));
   const dist = new Map<string, number>([[stateKey(start), 0]]);
   const parent = new Map<string, string>();
   const queue: MoveState[] = [start];
@@ -178,12 +231,12 @@ export const movementField = (
     const current = queue[head];
     const currentKey = stateKey(current);
     const cost = dist.get(currentKey)! + 1;
-    const ahead = neighbor(current.x, current.y, current.look);
+    const ahead: MoveState = { ...neighbor(current.x, current.y, current.look), look: current.look };
     const next: MoveState[] = [
       { ...current, look: (current.look + 5) % 6 },
       { ...current, look: (current.look + 1) % 6 },
-    ];
-    if (isInsideGrid(ahead, columns, rows) && !isBlocked(ahead.x, ahead.y)) next.push({ ...ahead, look: current.look });
+    ].filter((turned) => !turnChangesFootprint(space) || fits(turned));
+    if (fits(ahead)) next.push(ahead);
     for (const state of next) {
       const key = stateKey(state);
       if (dist.has(key)) continue;

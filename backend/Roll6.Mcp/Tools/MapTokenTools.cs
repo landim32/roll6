@@ -11,7 +11,8 @@ public static class MapTokenTools
 {
     private const string RETURNS = """
         Returns: the piece { mapTokenId, mapId, tokenId, tokenName, upImageUrl, campaignCharacterId, characterId, mapNpcId,
-        npcId, name, tokenType (1 Character, 2 Npc, 4 Object), sheet, life, energy, status, move, x, y, look, … }.
+        npcId, name, tokenType (1 Character, 2 Npc, 4 Object), sheet, life, energy, status, move, x, y, look, posture
+        (1 standing, 2 down, 3 out of combat; null for objects), space (hexes it takes now: 1, 2, 3, 7 or 10), … }.
         Character pieces show the participation's values; their sheet is the campaign notes, not the character sheet.
         """;
 
@@ -22,8 +23,8 @@ public static class MapTokenTools
         use place_character_on_map and NPCs place_npc_on_map instead.
         Who can use it: only the master.
         {{RETURNS}}
-        Common errors: 403 not the master, 404 map/token not found, 409 hex occupied, 400 outside the grid or tokenType
-        other than 4.
+        Common errors: 403 not the master, 404 map/token not found, 409 a hex of the piece's shape occupied, 400 shape
+        outside the grid or tokenType other than 4.
         Related tools: list_tokens, list_map_tokens, move_map_token.
         """)]
     public static Task<CallToolResult> AddObjectToMap(
@@ -54,8 +55,8 @@ public static class MapTokenTools
         Who can use it: the master (any approved character) or the character's owner (own characters only); once on
         the map, players move it with move_map_token (turn and move limits apply).
         {{RETURNS}}
-        Common errors: 403 neither the master nor the character's owner, 404 not found, 409 not approved / already on this map / hex occupied, 400 no
-        token or outside the grid.
+        Common errors: 403 neither the master nor the character's owner, 404 not found, 409 not approved / already on this map / a hex of the
+        shape occupied, 400 no token or shape outside the grid.
         Related tools: list_campaign_characters (campaignCharacterId, characterTokenId), move_map_token.
         """)]
     public static Task<CallToolResult> PlaceCharacterOnMap(
@@ -83,8 +84,8 @@ public static class MapTokenTools
         (0 up, 1 up-right, 2 down-right, 3 down, 4 down-left, 5 up-left).
         Cost (players): 1 per step into the hex ahead + 1 per 60° turn, shortest path around other pieces.
         Returns: the updated piece.
-        Common errors: 409 hex occupied or already moved this turn, 400 beyond the move or outside the grid, 403 not
-        your piece.
+        Common errors: 409 a hex of the piece's shape occupied or already moved this turn, 400 beyond the move or shape
+        outside the grid (big pieces need their whole shape free at every step and turn), 403 not your piece.
         Related tools: list_map_tokens (ids and positions), get_map (grid size), get_turn_state, reset_turn.
         """)]
     public static Task<CallToolResult> MoveMapToken(
@@ -109,6 +110,27 @@ public static class MapTokenTools
         [Description(McpDocs.MAP_TOKEN_ID)] long mapTokenId,
         [Description("New library token (tokenId from list_tokens).")] long tokenId) =>
         api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/token", new MapTokenTokenInfo { TokenId = tokenId });
+
+    [McpServerTool(Name = "set_piece_posture", Title = "Set piece posture", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/maptoken/{id}/posture")]
+    [Description($$"""
+        What it does: sets whether the character or NPC shown by a piece is standing (1), down (2, "Caído") or out of
+        combat (3, "Fora de combate"). Down and out-of-combat pieces are drawn lying down and take the token's down size
+        (e.g. a 1-hex token that is 2 hexes lying also takes the hex behind it); out-of-combat pieces are also drawn in
+        black and white. A character's posture belongs to its participation, so every piece of it in the campaign
+        changes; an NPC's belongs to that occurrence. Never refused for lack of space: a piece that lies down over
+        another one stays so until it moves. Recorded in the turn log like the other character/NPC changes; the same
+        posture again changes nothing. Free-text status (update_participation / update_map_npc) is separate.
+        Who can use it: the character's owner or the master; NPC pieces only the master.
+        {{RETURNS}}
+        Common errors: 400 object piece or posture not 1-3, 403 not allowed, 404 piece not found, 409 character not approved.
+        Related tools: list_map_tokens, update_participation, update_map_npc, process_turn.
+        """)]
+    public static Task<CallToolResult> SetPiecePosture(
+        Roll6ApiClient api,
+        [Description(McpDocs.MAP_TOKEN_ID)] long mapTokenId,
+        [Description(McpDocs.POSTURE)] int posture) =>
+        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/posture", new MapTokenPostureInfo { Posture = posture });
 
     [McpServerTool(Name = "update_map_token", Title = "Update piece", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/maptoken/{id}")]

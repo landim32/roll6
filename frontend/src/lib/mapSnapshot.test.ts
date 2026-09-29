@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { gridPixelSize, HEX_SIZE } from './hexGrid';
-import { snapshotBounds, snapshotScale, storedImageName } from './mapSnapshot';
+import { snapshotBounds, snapshotScale, storedImageName, toGrayscale } from './mapSnapshot';
 import type { SnapshotDraft } from './mapSnapshot';
 
 const draft = (image: Partial<SnapshotDraft> = {}): SnapshotDraft => ({
@@ -61,5 +61,13 @@ describe('storedImageName', () => {
     expect(storedImageName('https://example.test/token.png')).toBeNull();
     expect(storedImageName('https://example.test/0123456789abcdef0123456789abcdef.pdf')).toBeNull();
     expect(storedImageName('not a url')).toBeNull();
+  });
+});
+
+describe('toGrayscale', () => {
+  it('turns each pixel into its luma and keeps the alpha', () => {
+    const pixels = new Uint8ClampedArray([255, 0, 0, 200, 0, 0, 255, 255, 10, 10, 10, 0]);
+
+    expect(Array.from(toGrayscale(pixels))).toEqual([76, 76, 76, 200, 29, 29, 29, 255, 10, 10, 10, 0]);
   });
 });

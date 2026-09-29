@@ -153,7 +153,8 @@ public static class ParticipationTools
     [ApiOperation("PUT", "/api/campaigncharacter/{id}")]
     [Description("""
         What it does: changes the campaign values of an approved character: current life and energy (up to the totals;
-        0 or less = fallen), free-text status (e.g. "poisoned") and the campaign notes (`sheet`). The notes are NOT a copy
+        0 or less = fallen), free-text status (e.g. "poisoned"), optionally the posture (standing, down or out of combat)
+        and the campaign notes (`sheet`). The notes are NOT a copy
         of the character sheet: write only the differences caused by this campaign — items lost or gained, injuries,
         changed attributes (e.g. "- Lost the long sword in the goblin cave"). The character's own sheet never changes
         here. Optionally sets the character's token (saved on the character, used when it is placed on any map; the
@@ -170,10 +171,12 @@ public static class ParticipationTools
         [Description("Current energy, at most totalEnergy; may be 0 or negative. Example: 3.")] int currentEnergy,
         [Description("Free-text status shown on the character (up to 260 characters), e.g. \"poisoned\". Null clears it.")] string? characterStatus = null,
         [Description("Campaign notes in markdown (up to 20000 characters): only what changed in this campaign compared to the character's sheet, e.g. \"- Lost the long sword\". Send the current notes (from get_participation) to keep them; null clears them.")] string? sheet = null,
-        [Description("Optional new token for the character (tokenId from list_tokens); null keeps the current token.")] long? tokenId = null) =>
+        [Description("Optional new token for the character (tokenId from list_tokens); null keeps the current token.")] long? tokenId = null,
+        [Description(McpDocs.POSTURE_OPTIONAL)] int? posture = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaigncharacter/{campaignCharacterId}", new CampaignCharacterUpdateInfo
         {
-            CurrentLife = currentLife, CurrentEnergy = currentEnergy, CharacterStatus = characterStatus, Sheet = sheet, TokenId = tokenId
+            CurrentLife = currentLife, CurrentEnergy = currentEnergy, CharacterStatus = characterStatus, Sheet = sheet, TokenId = tokenId,
+            Posture = posture
         });
 
     [McpServerTool(Name = "remove_participation", Title = "Remove character from campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

@@ -128,6 +128,7 @@ public static class TurnSummary
             "move" => "Movimento",
             "name" => "Nome",
             "characterStatus" or "status" => "Status",
+            "posture" => "Postura",
             _ => change.Field
         };
         return $"{label} de {Value(change.Field, change.Before)} para {Value(change.Field, change.After)}";
@@ -137,8 +138,19 @@ public static class TurnSummary
     {
         if (string.IsNullOrEmpty(value))
             return "(vazio)";
+        if (field == "posture")
+            return $"\"{PostureName(value)}\"";
         return NUMBER_FIELDS.Contains(field) ? value : $"\"{Escape(value)}\"";
     }
+
+    /// <summary>Label of a posture stored as its number (031).</summary>
+    public static string PostureName(string value) => value switch
+    {
+        "1" => "Em pé",
+        "2" => "Caído",
+        "3" => "Fora de combate",
+        _ => value
+    };
 
     /// <summary>Names and free texts are written as text: markdown characters get a backslash.</summary>
     private static string Escape(string? value)

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 
@@ -46,5 +47,18 @@ public class MapNpcTests
             .Which.Errors.Should().ContainKey("name");
         ((Action)(() => mapNpc.Update("Goblin", 1, 1, new string('x', 261), 5, 5))).Should().Throw<DomainValidationException>()
             .Which.Errors.Should().ContainKey("status");
+    }
+
+    // ---- 031: posture ----
+
+    [Fact]
+    public void FromNpc_StartsStanding_AndChangePostureValidates()
+    {
+        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7 });
+
+        mapNpc.Posture.Should().Be(Posture.Standing);
+        mapNpc.ChangePosture((int)Posture.OutOfCombat).Should().BeTrue();
+        mapNpc.ChangePosture((int)Posture.OutOfCombat).Should().BeFalse();
+        mapNpc.Invoking(m => m.ChangePosture(9)).Should().Throw<DomainValidationException>();
     }
 }

@@ -9,7 +9,7 @@ import { affectsMap, applyTokenEvent } from '../lib/realtimeEvents';
 import { TABLE_EVENT } from '../types/realtime';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
-import type { MapTokenInfo } from '../types/mapToken';
+import type { MapTokenInfo, Posture } from '../types/mapToken';
 import type { TokenInfo } from '../types/token';
 
 interface MapTokenContextType {
@@ -29,6 +29,8 @@ interface MapTokenContextType {
   /** Moves (and optionally turns) a piece; players only their own characters, within the move (015). */
   moveToken: (mapTokenId: number, x: number, y: number, look?: number) => Promise<MapTokenInfo>;
   changeToken: (mapTokenId: number, tokenId: number) => Promise<MapTokenInfo>;
+  /** Standing, down or out of combat (031); a character's posture shows on all its pieces and on its party card. */
+  setPosture: (mapTokenId: number, posture: Posture) => Promise<MapTokenInfo>;
   /** Removes the piece from the map (the library token is kept). */
   deleteToken: (mapTokenId: number) => Promise<void>;
   clearError: () => void;
@@ -135,13 +137,20 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   const changeToken = useCallback((mapTokenId: number, tokenId: number) =>
     run(() => mapTokenService.changeToken(mapTokenId, { tokenId })), [run]);
 
+  const setPosture = useCallback(async (mapTokenId: number, posture: Posture) => {
+    const result = await run(() => mapTokenService.setPosture(mapTokenId, { posture }));
+    if (result.tokenType === MAP_TOKEN_TYPE.character) void refreshParty();
+    return result;
+  }, [run, refreshParty]);
+
   const deleteToken = useCallback((mapTokenId: number) =>
     run(() => mapTokenService.remove(mapTokenId)), [run]);
 
   const clearError = useCallback(() => setError(null), []);
 
   const value: MapTokenContextType = {
-    mapTokens, canPlace, canPlaceOwn, loading, error, refresh, addToken, placeCharacter, moveToken, changeToken, deleteToken, clearError,
+    mapTokens, canPlace, canPlaceOwn, loading, error, refresh, addToken, placeCharacter, moveToken, changeToken, setPosture, deleteToken,
+    clearError,
   };
   return <MapTokenContext.Provider value={value}>{children}</MapTokenContext.Provider>;
 };
