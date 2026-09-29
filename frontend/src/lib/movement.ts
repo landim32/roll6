@@ -1,4 +1,4 @@
-import { arrivalCost, movementCost, pathTo } from './hexGrid';
+import { arrivalCost, footprint, movementCost, pathTo } from './hexGrid';
 import type { MoveState, MovementField, Offset } from './hexGrid';
 
 /**
@@ -26,6 +26,8 @@ export interface MovingPiece {
   kind: MovementKind;
   /** The piece's move (characters/NPCs); null for objects. */
   total: number | null;
+  /** Hexes the piece takes (031): the whole shape moves and turns. */
+  space: number;
 }
 
 export type MovementState =
@@ -123,4 +125,13 @@ export const previewOf = (state: MovementState): MoveState | null => {
     look = step.look;
   }
   return { x: start.x, y: start.y, look };
+};
+
+/** Hexes the moving piece would take where it is drawn now (the target outline, 031). */
+export const previewHexes = (state: MovementState): Offset[] => {
+  if (state.phase === 'idle') return [];
+  if (state.phase === 'facing') return footprint(state.destination.x, state.destination.y, state.look, state.piece.space);
+  if (!state.target || state.cost === null) return state.target ? [state.target] : [];
+  const arrival = state.trail[state.trail.length - 1] ?? state.field.start;
+  return footprint(arrival.x, arrival.y, arrival.look, state.piece.space);
 };

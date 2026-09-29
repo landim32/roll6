@@ -55,6 +55,10 @@ public class CampaignCharacterInfo
     [JsonPropertyName("characterStatus")]
     public string? CharacterStatus { get; set; }
 
+    /// <summary>1 standing ("Em pé"), 2 down ("Caído"), 3 out of combat ("Fora de combate") (031).</summary>
+    [JsonPropertyName("posture")]
+    public int Posture { get; set; } = 1;
+
     /// <summary>The character's token; without one, placing it on a map asks for a token.</summary>
     [JsonPropertyName("characterTokenId")]
     public long? CharacterTokenId { get; set; }

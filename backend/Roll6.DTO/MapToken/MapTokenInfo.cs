@@ -74,6 +74,14 @@ public class MapTokenInfo
     [JsonPropertyName("look")]
     public int Look { get; set; }
 
+    /// <summary>Posture of the character/NPC occurrence: 1 standing, 2 down, 3 out of combat; null for objects (031).</summary>
+    [JsonPropertyName("posture")]
+    public int? Posture { get; set; }
+
+    /// <summary>Hexes the piece takes now (1, 2, 3, 7 or 10): the token's standing or down size, by the posture.</summary>
+    [JsonPropertyName("space")]
+    public int Space { get; set; } = 1;
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

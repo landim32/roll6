@@ -162,14 +162,17 @@ public class CampaignCharacterService : ICampaignCharacterService
         if (character.UserId != userId && campaign.UserId != userId)
             throw new UnauthorizedAccessException("Apenas o dono do personagem ou o mestre da campanha podem alterar os dados na campanha.");
 
-        var before = (participation.CurrentLife, participation.CurrentEnergy, participation.CharacterStatus, participation.Sheet);
+        var before = (participation.CurrentLife, participation.CurrentEnergy, participation.CharacterStatus, participation.Sheet, participation.Posture);
         participation.UpdatePlay(info.CurrentLife, info.CurrentEnergy, info.CharacterStatus, info.Sheet, character.Life, character.Energy);
+        if (info.Posture is int posture)
+            participation.ChangePosture(posture);
         // Every change during the turn is recorded with who made it (024).
         var changes = TurnChange.Diff(
             ("currentLife", before.CurrentLife, participation.CurrentLife),
             ("currentEnergy", before.CurrentEnergy, participation.CurrentEnergy),
             ("characterStatus", before.CharacterStatus, participation.CharacterStatus),
-            ("notes", before.Sheet, participation.Sheet));
+            ("notes", before.Sheet, participation.Sheet),
+            ("posture", (int)before.Posture, (int)participation.Posture));
         var turn = changes.Count == 0 ? null
             : Turn.CharacterUpdate(campaign.CampaignId, campaign.CurrentMapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes);
         if (info.TokenId.HasValue && await _tokenRepository.GetByIdAsync(info.TokenId.Value) == null)
@@ -264,6 +267,7 @@ public class CampaignCharacterService : ICampaignCharacterService
             TotalEnergy = info.TotalEnergy,
             CharacterMove = info.CharacterMove,
             CharacterStatus = info.CharacterStatus,
+            Posture = info.Posture,
             CharacterTokenId = info.CharacterTokenId,
             CreatedAt = info.CreatedAt,
             UpdatedAt = info.UpdatedAt,
@@ -341,6 +345,7 @@ public class CampaignCharacterService : ICampaignCharacterService
                 TotalEnergy = character?.Energy ?? 0,
                 CharacterMove = character?.Move ?? 0,
                 CharacterStatus = p.CharacterStatus,
+                Posture = (int)p.Posture,
                 CharacterTokenId = character?.TokenId,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt

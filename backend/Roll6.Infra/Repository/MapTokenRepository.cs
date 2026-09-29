@@ -68,12 +68,6 @@ public class MapTokenRepository : IMapTokenRepository<MapToken>
             .FirstOrDefaultAsync(e => e.MapId == mapId && e.CampaignCharacterId == campaignCharacterId);
     }
 
-    public async Task<bool> ExistsAtAsync(long mapId, int x, int y, long? exceptMapTokenId)
-    {
-        return await _context.MapTokens.AnyAsync(e => e.MapId == mapId && e.X == x && e.Y == y
-                                                      && (exceptMapTokenId == null || e.MapTokenId != exceptMapTokenId));
-    }
-
     public async Task DeleteByCampaignCharacterAsync(long campaignCharacterId)
     {
         await _context.MapTokens.Where(e => e.CampaignCharacterId == campaignCharacterId).ExecuteDeleteAsync();

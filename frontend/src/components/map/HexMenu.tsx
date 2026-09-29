@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
-import { MoveIcon, PlusIcon, SpeechIcon, SwapIcon, TrashIcon, UndoIcon } from '../ui/icons';
+import { CheckIcon, MoveIcon, PlusIcon, SpeechIcon, SwapIcon, TrashIcon, UndoIcon } from '../ui/icons';
+import { POSTURES } from '../../types/mapToken';
+import type { Posture } from '../../types/mapToken';
 
 interface HexMenuProps {
   /** Click position relative to the map container (px). */
@@ -19,6 +21,10 @@ interface HexMenuProps {
   onAct?: () => void;
   /** "Resetar turno" (016): only when the piece has entries in the turn in progress. */
   onResetTurn?: () => void;
+  /** Current posture of the piece's character/NPC (031); with `onPosture` the three postures are offered. */
+  posture?: Posture | null;
+  /** Changes the posture; absent for objects and for pieces the user can't change. */
+  onPosture?: (posture: Posture) => void;
   /** Master: add/change/delete tokens. Players only get "Mover" on their own characters. */
   canManage?: boolean;
   onClose: () => void;
@@ -36,7 +42,8 @@ const MARGIN = 8;
  * (Mover, Agir, Resetar turno) of their own characters.
  */
 export const HexMenu = ({
-  left, top, token = null, onAdd, onChange, onDelete, onMove, onAct, onResetTurn, canManage = true, onClose,
+  left, top, token = null, onAdd, onChange, onDelete, onMove, onAct, onResetTurn, posture = null, onPosture, canManage = true,
+  onClose,
 }: HexMenuProps) => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -110,6 +117,25 @@ export const HexMenu = ({
           <span>{t('hexMenu.resetTurn')}</span>
           <UndoIcon size={18} />
         </button>
+      )}
+      {token && onPosture && (
+        <div role="group" aria-label={t('hexMenu.posture')}>
+          <div className="stm-float-menu-section">{t('hexMenu.posture')}</div>
+          {POSTURES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              className="stm-float-menu-item"
+              role="menuitemradio"
+              aria-checked={value === posture}
+              disabled={value === posture}
+              onClick={choose(() => onPosture(value))}
+            >
+              <span>{t(`posture.${value}`)}</span>
+              {value === posture && <CheckIcon size={18} />}
+            </button>
+          ))}
+        </div>
       )}
       {!canManage ? null : token ? (
         <>

@@ -46,6 +46,10 @@ public abstract class TurnProcessPieceInfo
     /// <summary>New facing, 0–5 clockwise from the top.</summary>
     [JsonPropertyName("look")]
     public int? Look { get; set; }
+
+    /// <summary>1 standing, 2 down, 3 out of combat (031); null keeps the current posture.</summary>
+    [JsonPropertyName("posture")]
+    public int? Posture { get; set; }
 }
 
 public class TurnProcessCharacterInfo : TurnProcessPieceInfo

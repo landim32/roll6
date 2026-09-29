@@ -1,3 +1,4 @@
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Grid;
 using Roll6.Domain.Interfaces;
@@ -59,7 +60,10 @@ public class MapNpcService : IMapNpcService
         _tokenRepository = tokenRepository;
         _unitOfWork = unitOfWork;
         _imageStorage = imageStorage;
+        _occupancy = new MapOccupancyLoader(mapModelRepository, mapTokenRepository, tokenRepository, campaignCharacterRepository, repository);
     }
+
+    private readonly MapOccupancyLoader _occupancy;
 
     public async Task<List<MapNpcInfo>> ListByMapAsync(long userId, long mapId)
     {
@@ -69,7 +73,10 @@ public class MapNpcService : IMapNpcService
         return await MapToDtoAsync(await _repository.ListByMapAsync(mapId));
     }
 
-    /// <summary>New occurrence of a campaign NPC with its piece on a free hex inside the grid (one transaction).</summary>
+    /// <summary>
+    /// New occurrence of a campaign NPC with its piece (one transaction); the whole shape of the NPC's token (standing)
+    /// must be inside the grid and on free hexes (031).
+    /// </summary>
     public async Task<MapNpcInfo> CreateAsync(long userId, MapNpcInsertInfo info)
     {
         var map = await GetMasteredMapAsync(userId, info.MapId);
@@ -78,11 +85,8 @@ public class MapNpcService : IMapNpcService
         if (await _campaignNpcRepository.GetAsync(map.CampaignId, npc.NpcId) == null)
             throw new ConflictException("O NPC não está na campanha deste mapa.");
 
-        var model = await _mapModelRepository.GetByIdAsync(map.MapModelId);
-        if (model != null && !HexGrid.IsInsideGrid(info.X, info.Y, model.GridWidth, model.GridHeight))
-            throw new DomainValidationException("x", "A posição está fora da grid do mapa.");
-        if (await _mapTokenRepository.ExistsAtAsync(map.MapId, info.X, info.Y, null))
-            throw new ConflictException("O hex já está ocupado.");
+        (await _occupancy.LoadAsync(map)).EnsureFits(info.X, info.Y, info.Look ?? 0,
+            await _occupancy.SpaceOfTokenAsync(npc.TokenId, Posture.Standing), null);
 
         MapNpc saved = null!;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -97,17 +101,20 @@ public class MapNpcService : IMapNpcService
     public async Task<MapNpcInfo> UpdateAsync(long userId, long mapNpcId, MapNpcUpdateInfo info)
     {
         var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
-        var before = (mapNpc.Name, mapNpc.CurrentLife, mapNpc.CurrentEnergy, mapNpc.Status);
+        var before = (mapNpc.Name, mapNpc.CurrentLife, mapNpc.CurrentEnergy, mapNpc.Status, mapNpc.Posture);
         var npc = await _npcRepository.GetByIdAsync(mapNpc.NpcId)
             ?? throw new KeyNotFoundException("NPC não encontrado.");
         mapNpc.Update(info.Name, info.CurrentLife, info.CurrentEnergy, info.Status, npc.Life, npc.Energy);
+        if (info.Posture is int posture)
+            mapNpc.ChangePosture(posture);
 
         // Every change during the turn is recorded with who made it (024).
         var changes = TurnChange.Diff(
             ("name", before.Name, mapNpc.Name),
             ("currentLife", before.CurrentLife, mapNpc.CurrentLife),
             ("currentEnergy", before.CurrentEnergy, mapNpc.CurrentEnergy),
-            ("status", before.Status, mapNpc.Status));
+            ("status", before.Status, mapNpc.Status),
+            ("posture", (int)before.Posture, (int)mapNpc.Posture));
         Turn? turn = null;
         if (changes.Count > 0)
         {
@@ -201,6 +208,7 @@ public class MapNpcService : IMapNpcService
                 TotalLife = npc?.Life ?? m.CurrentLife,
                 TotalEnergy = npc?.Energy ?? m.CurrentEnergy,
                 Status = m.Status,
+                Posture = (int)m.Posture,
                 TokenId = piece?.TokenId,
                 TokenImageUrl = _imageStorage.GetUrl(token?.UpImage),
                 X = piece?.X,

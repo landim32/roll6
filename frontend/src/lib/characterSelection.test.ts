@@ -14,7 +14,7 @@ const character = (characterId: number, name: string): CharacterInfo => ({
 const participation = (characterId: number, status: CampaignCharacterStatus): CampaignCharacterInfo => ({
   campaignCharacterId: characterId * 10, campaignId: 5, campaignName: 'Mesa', campaignOwnerName: 'Ana',
   characterId, characterName: '', characterImageUrl: null, characterOwnerId: 1, characterOwnerName: '',
-  status, currentLife: 0, currentEnergy: 0, totalLife: 0, totalEnergy: 0, characterMove: 0, characterStatus: null, characterTokenId: null, createdAt: '', updatedAt: '',
+  status, currentLife: 0, currentEnergy: 0, totalLife: 0, totalEnergy: 0, characterMove: 0, characterStatus: null, posture: 1, characterTokenId: null, createdAt: '', updatedAt: '',
 });
 
 const myCharacters = [character(1, 'Aria'), character(2, 'Bram'), character(3, 'Cid')];

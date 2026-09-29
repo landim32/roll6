@@ -209,4 +209,45 @@ public class CampaignCharacterTests
 
         act.Should().Throw<ConflictException>();
     }
+
+    // ---- 031: posture ----
+
+    [Fact]
+    public void ChangePosture_ChangesOnlyWhenDifferent()
+    {
+        var participation = With(CampaignCharacterStatus.Approved);
+
+        participation.ChangePosture((int)Posture.Down).Should().BeTrue();
+        participation.Posture.Should().Be(Posture.Down);
+        participation.ChangePosture((int)Posture.Down).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public void ChangePosture_InvalidValue_Throws(int posture)
+    {
+        var act = () => With(CampaignCharacterStatus.Approved).ChangePosture(posture);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("posture");
+    }
+
+    [Fact]
+    public void ChangePosture_NotApproved_Throws()
+    {
+        var act = () => With(CampaignCharacterStatus.Invited).ChangePosture((int)Posture.Down);
+
+        act.Should().Throw<ConflictException>();
+    }
+
+    [Fact]
+    public void Approving_StandsTheCharacterUp()
+    {
+        var participation = With(CampaignCharacterStatus.RequestedAccess);
+        participation.Posture = Posture.OutOfCombat;
+
+        participation.ApproveRequest(Hero);
+
+        participation.Posture.Should().Be(Posture.Standing);
+    }
 }

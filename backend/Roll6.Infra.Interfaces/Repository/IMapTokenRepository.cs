@@ -11,8 +11,6 @@ public interface IMapTokenRepository<TModel> where TModel : class
     Task DeleteByMapIdsAsync(IEnumerable<long> mapIds);
     /// <summary>The piece of a campaign character on a map, if it is there.</summary>
     Task<TModel?> GetByMapAndCampaignCharacterAsync(long mapId, long campaignCharacterId);
-    /// <summary>True when another piece (not <paramref name="exceptMapTokenId"/>) occupies the cell.</summary>
-    Task<bool> ExistsAtAsync(long mapId, int x, int y, long? exceptMapTokenId);
     Task DeleteByCampaignCharacterAsync(long campaignCharacterId);
     /// <summary>Pieces of every participation of the character.</summary>
     Task DeleteByCharacterAsync(long characterId);

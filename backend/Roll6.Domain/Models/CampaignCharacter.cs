@@ -29,6 +29,9 @@ public class CampaignCharacter
     /// (e.g. the sword lost in combat). Starts empty; the character's sheet stays the reference.
     /// </summary>
     public string? Sheet { get; set; }
+
+    /// <summary>Standing, down or out of combat in this campaign (031); every piece of the character shows it.</summary>
+    public Posture Posture { get; set; } = Posture.Standing;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -108,6 +111,19 @@ public class CampaignCharacter
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>Changes the posture; false when it already was that one. Only while approved.</summary>
+    public bool ChangePosture(int posture)
+    {
+        if (Status != CampaignCharacterStatus.Approved)
+            throw new ConflictException("Só personagens aprovados na campanha podem ter os dados da campanha alterados.");
+        var value = Guard.ValidPosture(posture, "posture");
+        if (value == Posture)
+            return false;
+        Posture = value;
+        UpdatedAt = DateTime.UtcNow;
+        return true;
+    }
+
     private static CampaignCharacter Create(long campaignId, Character character, CampaignCharacterStatus status)
     {
         var now = DateTime.UtcNow;
@@ -132,7 +148,7 @@ public class CampaignCharacter
 
     /// <summary>
     /// Fresh start in the campaign (010 FR-003): current values at the character's totals, no campaign notes
-    /// and no status. Done when the participation is created or becomes approved.
+    /// no status and standing. Done when the participation is created or becomes approved.
     /// </summary>
     private void ResetFrom(Character character)
     {
@@ -140,6 +156,7 @@ public class CampaignCharacter
         CurrentEnergy = character.Energy;
         Sheet = null;
         CharacterStatus = null;
+        Posture = Posture.Standing;
     }
 
     private void EnsureStatus(CampaignCharacterStatus expected, string error)

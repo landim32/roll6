@@ -65,6 +65,10 @@ public class TurnDataCharacterInfo
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 
+    /// <summary>1 standing ("Em pé"), 2 down ("Caído"), 3 out of combat ("Fora de combate") (031).</summary>
+    [JsonPropertyName("posture")]
+    public int Posture { get; set; } = 1;
+
     /// <summary>Piece on the current map (null without one).</summary>
     [JsonPropertyName("mapTokenId")]
     public long? MapTokenId { get; set; }
@@ -113,6 +117,10 @@ public class TurnDataNpcInfo
 
     [JsonPropertyName("status")]
     public string? Status { get; set; }
+
+    /// <summary>1 standing ("Em pé"), 2 down ("Caído"), 3 out of combat ("Fora de combate") (031).</summary>
+    [JsonPropertyName("posture")]
+    public int Posture { get; set; } = 1;
 
     [JsonPropertyName("x")]
     public int? X { get; set; }

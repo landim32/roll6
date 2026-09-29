@@ -10,6 +10,8 @@ import { PARTICIPATION_DRAG_TYPE } from '../../lib/mapTokens';
 import type { ParticipationMode } from '../../lib/campaignCharacterForm';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 import { EyeIcon, PencilIcon } from '../ui/icons';
+import { PostureBadge } from '../ui/PostureBadge';
+import { POSTURE } from '../../types/mapToken';
 
 interface PartyCardProps {
   member: CampaignCharacterInfo;
@@ -22,7 +24,10 @@ interface PartyCardProps {
   draggable?: boolean;
 }
 
-/** One character of the party: round picture, name, life and energy bars (current/total) and its status in the campaign. */
+/**
+ * One character of the party: round picture, name, life and energy bars (current/total), its status in the campaign
+ * and its posture (031: badge when down or out of combat; out of combat also turns the picture black and white).
+ */
 export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: PartyCardProps) => {
   const { t } = useTranslation();
   const { turnNo, entries } = useTurn();
@@ -37,12 +42,16 @@ export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: 
         event.dataTransfer.effectAllowed = 'move';
       } : undefined}
     >
-      <CharacterAvatar name={member.characterName} imageUrl={member.characterImageUrl} size={32} />
+      <span className={`d-inline-flex flex-shrink-0${member.posture === POSTURE.outOfCombat ? ' stm-grayscale' : ''}`}>
+        <CharacterAvatar name={member.characterName} imageUrl={member.characterImageUrl} size={32} />
+      </span>
       <div className="stm-party-info">
         <div className="stm-party-name">
           {turnNo !== null && <TurnStatusDot status={characterStatus(entries, member.characterId)} />}
           <span title={member.characterName}>{member.characterName}</span>
-          {fallen && <span className="badge text-bg-danger">{t('party.fallen')}</span>}
+          {member.posture !== POSTURE.standing
+            ? <PostureBadge posture={member.posture} />
+            : fallen && <span className="badge text-bg-danger">{t('party.fallen')}</span>}
           <button
             type="button"
             className="btn btn-link btn-sm p-0 ms-auto"

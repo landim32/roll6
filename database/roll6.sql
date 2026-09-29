@@ -1158,5 +1158,41 @@ BEGIN
     VALUES ('20260929114755_AddSlugs', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929215843_AddPostureAndTokenSpaces') THEN
+    ALTER TABLE map_npcs ADD posture integer NOT NULL DEFAULT 1;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929215843_AddPostureAndTokenSpaces') THEN
+    ALTER TABLE campaign_characters ADD posture integer NOT NULL DEFAULT 1;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929215843_AddPostureAndTokenSpaces') THEN
+    UPDATE tokens SET up_space = 1 WHERE up_space NOT IN (1, 2, 3, 7, 10);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929215843_AddPostureAndTokenSpaces') THEN
+    UPDATE tokens SET down_space = 2 WHERE down_space IS NOT NULL AND down_space NOT IN (1, 2, 3, 7, 10);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929215843_AddPostureAndTokenSpaces') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260929215843_AddPostureAndTokenSpaces', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

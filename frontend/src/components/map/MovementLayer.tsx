@@ -4,7 +4,8 @@ import type { MovementStatus } from '../../lib/movement';
 
 interface MovementLayerProps {
   trail: MoveState[];
-  destination: Offset | null;
+  /** Hexes the piece would take at the destination (its whole shape, 031). */
+  destination: Offset[];
   status: MovementStatus;
   hexSize: number;
 }
@@ -18,7 +19,9 @@ export const MovementLayer = ({ trail, destination, status, hexSize }: MovementL
     .join(' ');
   return (
     <g className="stm-movement">
-      {destination && <path className={`stm-move-target is-${status}`} d={hexPath(destination.x, destination.y, hexSize)} />}
+      {destination.length > 0 && (
+        <path className={`stm-move-target is-${status}`} d={destination.map((hex) => hexPath(hex.x, hex.y, hexSize)).join('')} />
+      )}
       {trail.length > 1 && <polyline className={`stm-move-trail is-${status}`} points={points} />}
     </g>
   );

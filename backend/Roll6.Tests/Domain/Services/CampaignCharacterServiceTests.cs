@@ -531,4 +531,33 @@ public class CampaignCharacterServiceTests
         recorded!.UserId.Should().Be(PLAYER_ID);
         recorded.Changes.Should().ContainSingle().Which.Field.Should().Be("notes");
     }
+
+    // ---- 031: posture ----
+
+    [Fact]
+    public async Task Update_WithPosture_ChangesItAndRecordsIt()
+    {
+        SetupParticipation(81, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+        var info = Play();
+        info.Posture = (int)Posture.Down;
+
+        var result = await _service.UpdateAsync(PLAYER_ID, 81, info);
+
+        result.Posture.Should().Be((int)Posture.Down);
+        recorded!.Changes!.Should().Contain(c => c.Field == "posture" && c.Before == "1" && c.After == "2");
+    }
+
+    [Fact]
+    public async Task Update_InvalidPosture_Throws()
+    {
+        SetupParticipation(81, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        var info = Play();
+        info.Posture = 7;
+
+        (await _service.Invoking(s => s.UpdateAsync(PLAYER_ID, 81, info)).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("posture");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+    }
 }

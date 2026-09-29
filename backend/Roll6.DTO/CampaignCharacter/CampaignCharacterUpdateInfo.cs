@@ -21,4 +21,8 @@ public class CampaignCharacterUpdateInfo
     /// <summary>New token of the character (saved on the character, used on every map); null keeps the current one.</summary>
     [JsonPropertyName("tokenId")]
     public long? TokenId { get; set; }
+
+    /// <summary>1 standing, 2 down, 3 out of combat (031); null keeps the current posture.</summary>
+    [JsonPropertyName("posture")]
+    public int? Posture { get; set; }
 }

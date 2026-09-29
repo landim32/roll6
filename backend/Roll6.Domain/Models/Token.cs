@@ -1,3 +1,4 @@
+using Roll6.Domain.Enums;
 using Roll6.Domain.Validation;
 
 namespace Roll6.Domain.Models;
@@ -23,12 +24,19 @@ public class Token
     {
         Name = Guard.RequiredText(name, "name", 260);
         Description = Guard.OptionalText(description, "description", 2000);
-        UpSpace = Guard.NonNegative(upSpace ?? DEFAULT_UP_SPACE, "upSpace");
+        UpSpace = Guard.TokenSpace(upSpace ?? DEFAULT_UP_SPACE, "upSpace");
         UpImage = Guard.ImageFileName(upImage, "upImage");
         DownImage = Guard.ImageFileName(downImage, "downImage");
         DownSpace = ResolveDownSpace(downSpace, DownImage);
         UpdatedAt = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Hexes a piece of this token takes (031): the standing size while standing (and for objects, which have no
+    /// posture), the down size while down or out of combat — or the standing one when the token has no down state.
+    /// </summary>
+    public int SpaceFor(Posture? posture) =>
+        posture is null or Posture.Standing ? UpSpace : DownSpace ?? UpSpace;
 
     /// <summary>
     /// Informed value wins; otherwise the default only applies when the token has a down image,
@@ -37,7 +45,7 @@ public class Token
     private static int? ResolveDownSpace(int? downSpace, string? downImage)
     {
         if (downSpace.HasValue)
-            return Guard.NonNegative(downSpace.Value, "downSpace");
+            return Guard.TokenSpace(downSpace.Value, "downSpace");
         return downImage != null ? DEFAULT_DOWN_SPACE : null;
     }
 }

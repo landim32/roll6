@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   axialToOffset, gridPath, gridPixelSize, HEX_SIZE, hexCenter, hexCorners, hexPath, hexRound, isInsideGrid, offsetToAxial,
-  pixelToHex, neighbor, turnCost, movementField, movementCost, pathTo, arrivalCost, lookToward,
+  pixelToHex, neighbor, turnCost, movementField, movementCost, pathTo, arrivalCost, lookToward, footprint, footprintLocal,
 } from './hexGrid';
 
 // Reference values shared with backend/Roll6.Tests/Domain/Grid/HexGridTests.cs.
@@ -183,5 +183,90 @@ describe('movement (steps + turns)', () => {
     expect(lookToward(c, { x: 50, y: 130 }, 0)).toBe(4);
     expect(lookToward(c, { x: 50, y: 70 }, 0)).toBe(5);
     expect(lookToward(c, c, 2)).toBe(2);
+  });
+});
+
+// 031: piece shapes — the same cases as HexGridTests.Footprint_MatchesReferenceValues in the backend.
+const FOOTPRINTS: [number, number, number, number, string][] = [
+    [4, 4, 0, 1, '4,4'],
+    [4, 4, 3, 7, '4,4;4,3;5,3;5,4;4,5;3,4;3,3'],
+    [4, 4, 0, 2, '4,4;4,5'],
+    [4, 4, 1, 2, '4,4;3,4'],
+    [4, 4, 2, 2, '4,4;3,3'],
+    [4, 4, 3, 2, '4,4;4,3'],
+    [4, 4, 4, 2, '4,4;5,3'],
+    [4, 4, 5, 2, '4,4;5,4'],
+    [4, 4, 0, 3, '4,4;4,3;4,5'],
+    [4, 4, 1, 3, '4,4;5,3;3,4'],
+    [4, 4, 2, 3, '4,4;5,4;3,3'],
+    [4, 4, 3, 3, '4,4;4,5;4,3'],
+    [4, 4, 4, 3, '4,4;3,4;5,3'],
+    [4, 4, 5, 3, '4,4;3,3;5,4'],
+    [4, 4, 0, 10, '4,4;4,3;4,5;4,6;5,3;5,4;5,5;3,3;3,4;3,5'],
+    [4, 4, 1, 10, '4,4;5,3;3,4;2,5;5,4;4,5;3,5;4,3;3,3;2,4'],
+    [4, 4, 2, 10, '4,4;5,4;3,3;2,3;4,5;3,4;2,4;5,3;4,3;3,2'],
+    [4, 4, 3, 10, '4,4;4,5;4,3;4,2;3,4;3,3;3,2;5,4;5,3;5,2'],
+    [4, 4, 4, 10, '4,4;3,4;5,3;6,3;3,3;4,3;5,2;4,5;5,4;6,4'],
+    [4, 4, 5, 10, '4,4;3,3;5,4;6,5;4,3;5,3;6,4;3,4;4,5;5,5'],
+    [5, 4, 0, 1, '5,4'],
+    [5, 4, 3, 7, '5,4;5,3;6,4;6,5;5,5;4,5;4,4'],
+    [5, 4, 0, 2, '5,4;5,5'],
+    [5, 4, 1, 2, '5,4;4,5'],
+    [5, 4, 2, 2, '5,4;4,4'],
+    [5, 4, 3, 2, '5,4;5,3'],
+    [5, 4, 4, 2, '5,4;6,4'],
+    [5, 4, 5, 2, '5,4;6,5'],
+    [5, 4, 0, 3, '5,4;5,3;5,5'],
+    [5, 4, 1, 3, '5,4;6,4;4,5'],
+    [5, 4, 2, 3, '5,4;6,5;4,4'],
+    [5, 4, 3, 3, '5,4;5,5;5,3'],
+    [5, 4, 4, 3, '5,4;4,5;6,4'],
+    [5, 4, 5, 3, '5,4;4,4;6,5'],
+    [5, 4, 0, 10, '5,4;5,3;5,5;5,6;6,4;6,5;6,6;4,4;4,5;4,6'],
+    [5, 4, 1, 10, '5,4;6,4;4,5;3,5;6,5;5,5;4,6;5,3;4,4;3,4'],
+    [5, 4, 2, 10, '5,4;6,5;4,4;3,3;5,5;4,5;3,4;6,4;5,3;4,3'],
+    [5, 4, 3, 10, '5,4;5,5;5,3;5,2;4,5;4,4;4,3;6,5;6,4;6,3'],
+    [5, 4, 4, 10, '5,4;4,5;6,4;7,3;4,4;5,3;6,3;5,5;6,5;7,4'],
+    [5, 4, 5, 10, '5,4;4,4;6,5;7,5;5,3;6,4;7,4;4,5;5,5;6,6'],
+];
+
+const parse = (hexes: string) => hexes.split(';').map((h) => {
+  const [x, y] = h.split(',').map(Number);
+  return { x, y };
+});
+
+describe('footprint (piece shapes)', () => {
+  it.each(FOOTPRINTS)('(%i, %i) look %i size %i → %s', (x, y, look, space, expected) => {
+    expect(footprint(x, y, look, space)).toEqual(parse(expected));
+  });
+
+  it('refuses other sizes', () => {
+    expect(() => footprint(0, 0, 0, 4)).toThrow(RangeError);
+  });
+
+  it('draws the look-3 shape around the position (centers in px)', () => {
+    const size = 10;
+    const local = footprintLocal(2, size);
+    // Looking down, the second hex is the one above (behind).
+    expect(local[0]).toEqual({ x: 0, y: 0 });
+    expect(local[1].x).toBeCloseTo(0);
+    expect(local[1].y).toBeCloseTo(-Math.sqrt(3) * size);
+    expect(footprintLocal(10, size)).toHaveLength(10);
+  });
+});
+
+describe('movement of big pieces', () => {
+  it('needs the whole shape free to turn', () => {
+    const blocked = (x: number, y: number) => x === 3 && y === 4;
+    const field = movementField({ x: 4, y: 4, look: 0 }, 10, 10, blocked, 2);
+    expect(movementCost(field, { x: 4, y: 4, look: 1 })).not.toBe(1);
+    expect(movementCost(movementField({ x: 4, y: 4, look: 0 }, 10, 10, () => false, 2), { x: 4, y: 4, look: 1 })).toBe(1);
+  });
+
+  it('keeps the shape inside the grid and may leave an overlapping start', () => {
+    expect(movementCost(movementField({ x: 0, y: 0, look: 3 }, 10, 10, () => false, 2), { x: 0, y: 1, look: 3 })).toBe(1);
+    expect(movementCost(movementField({ x: 0, y: 1, look: 3 }, 10, 10, () => false, 3), { x: 0, y: 1, look: 0 })).toBeNull();
+    const overlapped = (x: number, y: number) => x === 4 && y === 5;
+    expect(movementCost(movementField({ x: 4, y: 4, look: 0 }, 10, 10, overlapped, 2), { x: 4, y: 3, look: 0 })).toBe(1);
   });
 });

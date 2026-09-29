@@ -69,13 +69,30 @@ public class TokenLibraryServiceTests
         result.DownImage.Should().BeNull();
     }
 
-    [Fact]
-    public async Task Create_WithZeroSpace_KeepsZero()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(7)]
+    [InlineData(10)]
+    public async Task Create_WithAllowedSpace_KeepsIt(int space)
     {
-        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Moeda", UpSpace = 0, DownSpace = 0 });
+        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Dragão", UpSpace = space, DownSpace = space });
 
-        result.UpSpace.Should().Be(0);
-        result.DownSpace.Should().Be(0);
+        result.UpSpace.Should().Be(space);
+        result.DownSpace.Should().Be(space);
+    }
+
+    [Theory]
+    [InlineData(0, null, "upSpace")]
+    [InlineData(4, null, "upSpace")]
+    [InlineData(1, 0, "downSpace")]
+    [InlineData(1, 5, "downSpace")]
+    public async Task Create_WithOtherSpace_Throws(int upSpace, int? downSpace, string field)
+    {
+        var act = () => _service.CreateAsync(1, new TokenInsertInfo { Name = "Moeda", UpSpace = upSpace, DownSpace = downSpace });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey(field);
     }
 
     [Fact]

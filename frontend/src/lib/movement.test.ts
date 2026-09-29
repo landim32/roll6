@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { movementField } from './hexGrid';
 import {
-  canConfirm, canPickDestination, currentStatus, hoverPath, IDLE, MOVEMENT_KIND, pickDestination, pointFacing, previewOf,
+  canConfirm, canPickDestination, currentStatus, hoverPath, IDLE, MOVEMENT_KIND, pickDestination, pointFacing, previewHexes, previewOf,
   startMovement,
 } from './movement';
 import type { MovingPiece } from './movement';
 
 const piece = (changes: Partial<MovingPiece> = {}): MovingPiece => ({
-  mapTokenId: 1, name: 'Aria', x: 2, y: 2, look: 0, kind: MOVEMENT_KIND.limited, total: 6, ...changes,
+  mapTokenId: 1, name: 'Aria', x: 2, y: 2, look: 0, kind: MOVEMENT_KIND.limited, total: 6, space: 1, ...changes,
 });
 
 const start = (changes: Partial<MovingPiece> = {}, blocked = (x: number, y: number) => x === -1 && y === -1) => {
   const p = piece(changes);
-  return startMovement(p, movementField({ x: p.x, y: p.y, look: p.look }, 5, 8, blocked));
+  return startMovement(p, movementField({ x: p.x, y: p.y, look: p.look }, 5, 8, blocked, p.space));
 };
 
 describe('path phase', () => {
@@ -75,5 +75,27 @@ describe('facing phase', () => {
     expect(hoverPath(IDLE, { x: 0, y: 0 })).toBe(IDLE);
     expect(pointFacing(IDLE, 2)).toBe(IDLE);
     expect(previewOf(IDLE)).toBeNull();
+  });
+});
+
+describe('big pieces (031)', () => {
+  it('outlines the whole shape at the target and refuses facings where it does not fit', () => {
+    // A 3-hex line in column 2 of a 5 × 8 grid, facing up.
+    let state = hoverPath(start({ space: 3, y: 3 }), { x: 2, y: 2 });
+    expect(previewHexes(state)).toEqual([{ x: 2, y: 2 }, { x: 2, y: 1 }, { x: 2, y: 3 }]);
+
+    state = pickDestination(state);
+    expect(state.phase).toBe('facing');
+    // In column 0 the line could not turn sideways; in column 2 it can, and facing down is the same line.
+    state = pointFacing(state, 3);
+    expect(currentStatus(state)).not.toBeNull();
+    expect(canConfirm(state, true)).toBe(true);
+    expect(previewHexes(state)).toEqual([{ x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 1 }]);
+  });
+
+  it('never reaches a facing whose shape leaves the grid', () => {
+    const state = pointFacing(pickDestination(hoverPath(start({ space: 3, x: 0, y: 3 }), { x: 0, y: 2 })), 1);
+    expect(state.phase === 'facing' && state.cost).toBeNull();
+    expect(canConfirm(state, true)).toBe(false);
   });
 });

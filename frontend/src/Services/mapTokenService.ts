@@ -1,5 +1,5 @@
 import type {
-  MapTokenCharacterInsertInfo, MapTokenInfo, MapTokenInsertInfo, MapTokenPositionInfo, MapTokenTokenInfo,
+  MapTokenCharacterInsertInfo, MapTokenInfo, MapTokenInsertInfo, MapTokenPositionInfo, MapTokenPostureInfo, MapTokenTokenInfo,
 } from '../types/mapToken';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
@@ -49,6 +49,11 @@ class MapTokenService {
 
   async changeToken(id: number, data: MapTokenTokenInfo): Promise<MapTokenInfo> {
     return this.send('PUT', `/${id}/token`, data);
+  }
+
+  /** Standing, down or out of combat (031): character owner or master; NPC pieces only the master. */
+  async setPosture(id: number, data: MapTokenPostureInfo): Promise<MapTokenInfo> {
+    return this.send('PUT', `/${id}/posture`, data);
   }
 
   /** Removes the piece from the map (the library token is kept). */

@@ -1,5 +1,6 @@
 using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
+using Roll6.Domain.Grid;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
 using Roll6.Domain.Realtime;
@@ -32,6 +33,9 @@ public partial class TurnService : ITurnService
     private readonly ICampaignNpcRepository<CampaignNpc> _campaignNpcRepository;
     private readonly IRealtimeNotifier _notifier;
 
+    /// <summary>Hexes taken on a map (031): resets and processed moves need the whole shape free.</summary>
+    private readonly MapOccupancyLoader _occupancy;
+
     public TurnService(
         ITurnRepository<Turn> repository,
         ICampaignRepository<Campaign> campaignRepository,
@@ -45,8 +49,10 @@ public partial class TurnService : ITurnService
         IUserRepository<User> userRepository,
         IMapModelRepository<MapModel> mapModelRepository,
         ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
+        ITokenRepository<Token> tokenRepository,
         IRealtimeNotifier notifier)
     {
+        _occupancy = new MapOccupancyLoader(mapModelRepository, mapTokenRepository, tokenRepository, campaignCharacterRepository, mapNpcRepository);
         _campaignNpcRepository = campaignNpcRepository;
         _mapModelRepository = mapModelRepository;
         _notifier = notifier;
@@ -152,7 +158,9 @@ public partial class TurnService : ITurnService
         return result;
     }
 
-    /// <summary>Removes the piece's entries of the current turn and undoes its move when the former hex is free.</summary>
+    /// <summary>
+    /// Removes the piece's entries of the current turn and undoes its move when its whole shape fits there again.
+    /// </summary>
     public async Task<TurnResetResultInfo> ResetAsync(long userId, TurnPieceInfo info)
     {
         var (piece, map, campaign) = await GetPieceAsync(info.MapTokenId);
@@ -165,7 +173,11 @@ public partial class TurnService : ITurnService
 
         var reverted = false;
         if (movement is { BeforeX: int x, BeforeY: int y, BeforeLook: int look } && movement.MapId == map.MapId)
-            reverted = !await _mapTokenRepository.ExistsAtAsync(map.MapId, x, y, piece.MapTokenId);
+        {
+            var layout = await _occupancy.LoadAsync(map);
+            reverted = layout.Occupancy.Fits(HexGrid.Footprint(x, y, look, layout.SpaceOf(piece)), layout.Columns, layout.Rows,
+                piece.MapTokenId) == FitResult.Ok;
+        }
 
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {

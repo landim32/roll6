@@ -807,6 +807,32 @@ body,
   stroke: rgba(110, 168, 254, 0.85);
 }
 
+/* Pieces of several hexes (031): the fill covers the shape, only its outer edges are outlined */
+.stm-map .stm-map-token-disc.stm-map-token-area {
+  stroke: none;
+}
+
+.stm-map .stm-map-token-edge {
+  fill: none;
+  stroke: rgba(173, 181, 189, 0.6);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.stm-map .stm-map-token.is-npc .stm-map-token-edge {
+  stroke: rgba(234, 134, 143, 0.85);
+}
+
+.stm-map .stm-map-token.is-character .stm-map-token-edge {
+  stroke: rgba(110, 168, 254, 0.85);
+}
+
+/* Out of combat (031): the whole piece — image and disc — in black and white */
+.stm-map .stm-map-token.is-out,
+.stm-grayscale {
+  filter: grayscale(1);
+}
+
 .stm-map .stm-map-token text {
   fill: var(--bs-body-color);
   font-weight: 600;
@@ -880,6 +906,20 @@ body,
 .stm-float-menu-item:focus-visible {
   background: rgba(255, 255, 255, 0.1);
   outline: none;
+}
+
+.stm-float-menu-section {
+  padding: 8px 16px 4px;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(235, 235, 245, 0.6);
+}
+
+.stm-float-menu-item:disabled {
+  opacity: 1;
+  color: rgba(235, 235, 245, 0.6);
+  background: transparent;
 }
 
 .stm-float-menu-item:active {

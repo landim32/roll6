@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ImageCropper } from '../ui/ImageCropper';
 import type { ImageCrop } from '../ui/ImageCropper';
-import { MAX_TOKEN_DESCRIPTION, MAX_TOKEN_NAME } from '../../lib/tokenForm';
+import { MAX_TOKEN_DESCRIPTION, MAX_TOKEN_NAME, TOKEN_SPACES } from '../../lib/tokenForm';
 import type { TokenForm } from '../../lib/tokenForm';
 
 interface TokenFormFieldsProps {
@@ -65,11 +65,16 @@ export const TokenFormFields = ({ idPrefix, form, onField, onUpCrop, onDownCrop,
       </div>
       <div className="col-6">
         <label className="form-label" htmlFor={id('up-space')}>{t('tokens.upSpace')}</label>
-        <input id={id('up-space')} type="number" min={0} step={1} className="form-control" value={form.upSpace} onChange={(e) => onField('upSpace', e.target.value)} />
+        <select id={id('up-space')} className="form-select" value={form.upSpace} onChange={(e) => onField('upSpace', e.target.value)}>
+          {TOKEN_SPACES.map((space) => <option key={space} value={String(space)}>{t('tokens.spaceOption', { count: space })}</option>)}
+        </select>
       </div>
       <div className="col-6">
         <label className="form-label" htmlFor={id('down-space')}>{t('tokens.downSpace')}</label>
-        <input id={id('down-space')} type="number" min={0} step={1} className="form-control" value={form.downSpace} onChange={(e) => onField('downSpace', e.target.value)} />
+        <select id={id('down-space')} className="form-select" value={form.downSpace} onChange={(e) => onField('downSpace', e.target.value)}>
+          <option value="">{t('tokens.downSpaceDefault')}</option>
+          {TOKEN_SPACES.map((space) => <option key={space} value={String(space)}>{t('tokens.spaceOption', { count: space })}</option>)}
+        </select>
       </div>
     </div>
   );

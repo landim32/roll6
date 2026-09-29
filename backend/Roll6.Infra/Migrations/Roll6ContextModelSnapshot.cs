@@ -185,6 +185,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("current_life");
 
+                    b.Property<int>("Posture")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("posture");
+
                     b.Property<string>("Sheet")
                         .HasMaxLength(20000)
                         .HasColumnType("character varying(20000)")
@@ -554,6 +560,12 @@ namespace Roll6.Infra.Migrations
                     b.Property<long>("NpcId")
                         .HasColumnType("bigint")
                         .HasColumnName("npc_id");
+
+                    b.Property<int>("Posture")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("posture");
 
                     b.Property<string>("Status")
                         .HasMaxLength(260)

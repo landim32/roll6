@@ -185,11 +185,14 @@
     "downImage": "Imagem deitado (opcional)",
     "upSpace": "Espaço em pé",
     "downSpace": "Espaço deitado (opcional)",
+    "spaceOption_one": "{{count}} hex",
+    "spaceOption_other": "{{count}} hexes",
+    "downSpaceDefault": "Padrão (2 hexes com imagem deitada)",
     "errors": {
       "nameRequired": "Informe o nome do token.",
       "nameTooLong": "O nome deve ter no máximo 260 caracteres.",
       "descriptionTooLong": "A descrição deve ter no máximo 2.000 caracteres.",
-      "invalidSpace": "Os espaços devem ser números inteiros não negativos."
+      "invalidSpace": "O tamanho deve ser 1, 2, 3, 7 ou 10 hexes."
     }
   },
   "npcs": {
@@ -240,7 +243,14 @@
     "changeToken": "Alterar token",
     "deleteToken": "Excluir",
     "act": "Agir",
-    "resetTurn": "Resetar turno"
+    "resetTurn": "Resetar turno",
+    "posture": "Postura"
+  },
+  "posture": {
+    "label": "Postura",
+    "1": "Em pé",
+    "2": "Caído",
+    "3": "Fora de combate"
   },
   "movement": {
     "counter": "Movimento",
@@ -250,6 +260,7 @@
   },
   "mapTokens": {
     "hexOccupied": "O hex precisa estar livre.",
+    "doesNotFit": "A peça não cabe aqui.",
     "useMove": "{{name}} já está no mapa: use \"Mover\" no menu da peça.",
     "chooseCharacterToken": "Escolher token de {{name}}",
     "deleteTitle": "Excluir token",

@@ -10,5 +10,6 @@ public interface IMapTokenService
     Task<MapTokenInfo> UpdateAsync(long userId, long mapTokenId, MapTokenUpdateInfo info);
     Task<MapTokenInfo> MoveAsync(long userId, long mapTokenId, MapTokenPositionInfo info);
     Task<MapTokenInfo> ChangeTokenAsync(long userId, long mapTokenId, MapTokenTokenInfo info);
+    Task<MapTokenInfo> SetPostureAsync(long userId, long mapTokenId, MapTokenPostureInfo info);
     Task DeleteAsync(long userId, long mapTokenId);
 }

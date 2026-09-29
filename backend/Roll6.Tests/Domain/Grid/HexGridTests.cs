@@ -141,4 +141,105 @@ public class HexGridTests
     {
         HexGrid.TurnCost(from, to).Should().Be(cost);
     }
+
+    // ---- 031: piece shapes (the frontend's hexGrid.test.ts pins the same cases) ----
+
+    [Theory]
+    [InlineData(4, 4, 0, 1, "4,4")]
+    [InlineData(4, 4, 3, 7, "4,4;4,3;5,3;5,4;4,5;3,4;3,3")]
+    [InlineData(4, 4, 0, 2, "4,4;4,5")]
+    [InlineData(4, 4, 1, 2, "4,4;3,4")]
+    [InlineData(4, 4, 2, 2, "4,4;3,3")]
+    [InlineData(4, 4, 3, 2, "4,4;4,3")]
+    [InlineData(4, 4, 4, 2, "4,4;5,3")]
+    [InlineData(4, 4, 5, 2, "4,4;5,4")]
+    [InlineData(4, 4, 0, 3, "4,4;4,3;4,5")]
+    [InlineData(4, 4, 1, 3, "4,4;5,3;3,4")]
+    [InlineData(4, 4, 2, 3, "4,4;5,4;3,3")]
+    [InlineData(4, 4, 3, 3, "4,4;4,5;4,3")]
+    [InlineData(4, 4, 4, 3, "4,4;3,4;5,3")]
+    [InlineData(4, 4, 5, 3, "4,4;3,3;5,4")]
+    [InlineData(4, 4, 0, 10, "4,4;4,3;4,5;4,6;5,3;5,4;5,5;3,3;3,4;3,5")]
+    [InlineData(4, 4, 1, 10, "4,4;5,3;3,4;2,5;5,4;4,5;3,5;4,3;3,3;2,4")]
+    [InlineData(4, 4, 2, 10, "4,4;5,4;3,3;2,3;4,5;3,4;2,4;5,3;4,3;3,2")]
+    [InlineData(4, 4, 3, 10, "4,4;4,5;4,3;4,2;3,4;3,3;3,2;5,4;5,3;5,2")]
+    [InlineData(4, 4, 4, 10, "4,4;3,4;5,3;6,3;3,3;4,3;5,2;4,5;5,4;6,4")]
+    [InlineData(4, 4, 5, 10, "4,4;3,3;5,4;6,5;4,3;5,3;6,4;3,4;4,5;5,5")]
+    [InlineData(5, 4, 0, 1, "5,4")]
+    [InlineData(5, 4, 3, 7, "5,4;5,3;6,4;6,5;5,5;4,5;4,4")]
+    [InlineData(5, 4, 0, 2, "5,4;5,5")]
+    [InlineData(5, 4, 1, 2, "5,4;4,5")]
+    [InlineData(5, 4, 2, 2, "5,4;4,4")]
+    [InlineData(5, 4, 3, 2, "5,4;5,3")]
+    [InlineData(5, 4, 4, 2, "5,4;6,4")]
+    [InlineData(5, 4, 5, 2, "5,4;6,5")]
+    [InlineData(5, 4, 0, 3, "5,4;5,3;5,5")]
+    [InlineData(5, 4, 1, 3, "5,4;6,4;4,5")]
+    [InlineData(5, 4, 2, 3, "5,4;6,5;4,4")]
+    [InlineData(5, 4, 3, 3, "5,4;5,5;5,3")]
+    [InlineData(5, 4, 4, 3, "5,4;4,5;6,4")]
+    [InlineData(5, 4, 5, 3, "5,4;4,4;6,5")]
+    [InlineData(5, 4, 0, 10, "5,4;5,3;5,5;5,6;6,4;6,5;6,6;4,4;4,5;4,6")]
+    [InlineData(5, 4, 1, 10, "5,4;6,4;4,5;3,5;6,5;5,5;4,6;5,3;4,4;3,4")]
+    [InlineData(5, 4, 2, 10, "5,4;6,5;4,4;3,3;5,5;4,5;3,4;6,4;5,3;4,3")]
+    [InlineData(5, 4, 3, 10, "5,4;5,5;5,3;5,2;4,5;4,4;4,3;6,5;6,4;6,3")]
+    [InlineData(5, 4, 4, 10, "5,4;4,5;6,4;7,3;4,4;5,3;6,3;5,5;6,5;7,4")]
+    [InlineData(5, 4, 5, 10, "5,4;4,4;6,5;7,5;5,3;6,4;7,4;4,5;5,5;6,6")]
+    public void Footprint_MatchesReferenceValues(int x, int y, int look, int space, string expected)
+    {
+        var hexes = expected.Split(';').Select(h => h.Split(',')).Select(p => (int.Parse(p[0]), int.Parse(p[1])));
+
+        HexGrid.Footprint(x, y, look, space).Should().Equal(hexes);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    [InlineData(5)]
+    public void Footprint_OtherSizes_Throw(int space)
+    {
+        var act = () => HexGrid.Footprint(0, 0, 0, space);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Footprint_TenHexes_IsSymmetricAndConnected()
+    {
+        var hexes = HexGrid.Footprint(4, 4, 0, 10);
+
+        hexes.Should().OnlyHaveUniqueItems().And.HaveCount(10);
+        // Each side hex touches two hexes of the middle line.
+        foreach (var side in hexes.Skip(4))
+            hexes.Take(4).Count(m => Enumerable.Range(0, 6).Any(look => HexGrid.Neighbor(side.X, side.Y, look) == m)).Should().Be(2);
+    }
+
+    [Fact]
+    public void MovementCost_BigPiece_NeedsTheWholeShapeFree()
+    {
+        // A 2-hex piece at (4, 4) looking up takes (4, 5) too; turning right would take (3, 4).
+        var blocked = new HashSet<(int, int)> { (3, 4) };
+
+        var cost = HexGrid.MovementCost(4, 4, 0, 4, 4, 1, 10, 10, (x, y) => blocked.Contains((x, y)), space: 2);
+
+        cost.Should().NotBe(1);
+        HexGrid.MovementCost(4, 4, 0, 4, 4, 1, 10, 10, (_, _) => false, space: 2).Should().Be(1);
+    }
+
+    [Fact]
+    public void MovementCost_BigPiece_StaysInsideTheGrid()
+    {
+        // Facing down at the top edge: the hex behind is outside, but stepping ahead brings it in.
+        HexGrid.MovementCost(0, 0, 3, 0, 1, 3, 10, 10, (_, _) => false, space: 2).Should().Be(1);
+        // A 3-hex line in column 0 can't turn: every other facing puts one end outside the grid (column −1).
+        HexGrid.MovementCost(0, 1, 3, 0, 1, 0, 10, 10, (_, _) => false, space: 3).Should().BeNull();
+    }
+
+    [Fact]
+    public void MovementCost_OverlappingStart_MayStillMove()
+    {
+        var blocked = new HashSet<(int, int)> { (4, 5) };
+
+        HexGrid.MovementCost(4, 4, 0, 4, 3, 0, 10, 10, (x, y) => blocked.Contains((x, y)), space: 2).Should().Be(1);
+    }
 }

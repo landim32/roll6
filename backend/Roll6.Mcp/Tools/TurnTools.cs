@@ -77,9 +77,9 @@ public static class TurnTools
     [Description($$"""
         What it does: saves the result of the turn in ONE call and FINISHES it (the campaign moves to the next turn). For each
         character (characterId) and NPC occurrence (mapNpcId) send only what changed: currentLife, currentEnergy (fatigue),
-        status (or clearStatus: true), x/y (together) and look. Also send "narration": what happened in the turn (up to 10000
-        characters). Everything is validated first — current values never above the totals, positions inside the grid and on
-        free hexes (checked after all moves, so two pieces may swap) — and saved together: if any item is invalid nothing
+        status (or clearStatus: true), posture (1 standing, 2 down, 3 out of combat), x/y (together) and look. Also send "narration": what happened in the turn (up to 10000
+        characters). Everything is validated first — current values never above the totals, the whole shape of each moved
+        piece inside the grid and on free hexes (checked after all moves, so two pieces may swap) — and saved together: if any item is invalid nothing
         changes and the turn does not advance. Every change is logged in the turn by the master (moves without the one-move
         limit). Campaign notes and sheets are not changed here (use update_participation). {{McpDocs.DESTRUCTIVE}}
         Who can use it: only the campaign master.
@@ -91,8 +91,8 @@ public static class TurnTools
     public static Task<CallToolResult> ProcessTurn(
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
-        [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, status?, clearStatus?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessCharacterInfo>? characters = null,
-        [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, status?, clearStatus?, x?, y?, look? }].")] List<TurnProcessNpcInfo>? npcs = null,
+        [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, status?, clearStatus?, posture?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessCharacterInfo>? characters = null,
+        [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, status?, clearStatus?, posture?, x?, y?, look? }].")] List<TurnProcessNpcInfo>? npcs = null,
         [Description("What happened in the turn, in plain text or markdown (up to 10000 characters); stays in the turn log.")] string? narration = null) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/process", new TurnProcessInfo
         {

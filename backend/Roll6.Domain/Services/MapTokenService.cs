@@ -13,10 +13,11 @@ namespace Roll6.Domain.Services;
 
 /// <summary>
 /// Pieces on a campaign map. Only the map owner (the campaign master) writes; the master and approved
-/// participants read. A hex holds at most one piece; a character appears at most once per map and its
-/// piece shows the participation's name, vitals, status and campaign notes (as its sheet).
+/// participants read. A hex holds at most one piece and a piece takes every hex of its shape (031: its token's size
+/// for the current posture); a character appears at most once per map and its piece shows the participation's name,
+/// vitals, status, posture and campaign notes (as its sheet).
 /// </summary>
-public class MapTokenService : IMapTokenService
+public partial class MapTokenService : IMapTokenService
 {
     private readonly IMapTokenRepository<MapToken> _repository;
     private readonly IMapRepository<Map> _mapRepository;
@@ -60,7 +61,10 @@ public class MapTokenService : IMapTokenService
         _npcRepository = npcRepository;
         _unitOfWork = unitOfWork;
         _imageStorage = imageStorage;
+        _occupancy = new MapOccupancyLoader(mapModelRepository, repository, tokenRepository, campaignCharacterRepository, mapNpcRepository);
     }
+
+    private readonly MapOccupancyLoader _occupancy;
 
     public async Task<List<MapTokenInfo>> ListByMapAsync(long userId, long mapId)
     {
@@ -76,7 +80,7 @@ public class MapTokenService : IMapTokenService
         if (info.TokenType == (int)MapTokenType.Npc)
             throw new DomainValidationException("tokenType", "NPCs entram no mapa pelo painel de NPCs.");
         var token = await GetTokenAsync(info.TokenId);
-        await EnsureFreeHexAsync(map, info.X, info.Y, null);
+        (await _occupancy.LoadAsync(map)).EnsureFits(info.X, info.Y, info.Look ?? 0, MapOccupancyLoader.PieceSpace(token, null), null);
 
         var mapToken = new MapToken { MapId = info.MapId, TokenId = info.TokenId };
         var name = string.IsNullOrWhiteSpace(info.Name) ? token.Name : info.Name;
@@ -106,11 +110,11 @@ public class MapTokenService : IMapTokenService
             throw new ConflictException("Só personagens aprovados nesta campanha podem ser colocados no mapa.");
         if (await _repository.GetByMapAndCampaignCharacterAsync(map.MapId, participation.CampaignCharacterId) != null)
             throw new ConflictException("O personagem já está neste mapa.");
-        await EnsureFreeHexAsync(map, info.X, info.Y, null);
 
         var tokenId = character.TokenId ?? info.TokenId
             ?? throw new DomainValidationException("tokenId", "Escolha um token para o personagem.");
-        await GetTokenAsync(tokenId);
+        var token = await GetTokenAsync(tokenId);
+        (await _occupancy.LoadAsync(map)).EnsureFits(info.X, info.Y, 0, MapOccupancyLoader.PieceSpace(token, participation.Posture), null);
 
         MapToken saved = null!;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -126,7 +130,8 @@ public class MapTokenService : IMapTokenService
     public async Task<MapTokenInfo> UpdateAsync(long userId, long mapTokenId, MapTokenUpdateInfo info)
     {
         var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
-        await EnsureFreeHexAsync(map, info.X, info.Y, mapToken.MapTokenId);
+        var layout = await _occupancy.LoadAsync(map);
+        layout.EnsureFits(info.X, info.Y, info.Look ?? 0, layout.SpaceOf(mapToken), mapToken.MapTokenId);
         mapToken.Update(info.Name, info.TokenType, info.Sheet, info.Life, info.Energy, info.Status, info.Move, info.X, info.Y, info.Look);
         return await PublishPieceAsync(map, userId, await MapToDtoAsync(await _repository.UpdateAsync(mapToken)));
     }
@@ -144,12 +149,13 @@ public class MapTokenService : IMapTokenService
             ?? throw new KeyNotFoundException("Mapa não encontrado.");
         map.EnsureNotDeleted();
         var look = info.Look ?? mapToken.Look;
+        var layout = await _occupancy.LoadAsync(map);
         if (map.UserId != userId)
-            await EnsurePlayerMoveAsync(userId, map, mapToken, info.X, info.Y, look);
-        await EnsureFreeHexAsync(map, info.X, info.Y, mapToken.MapTokenId);
+            await EnsurePlayerMoveAsync(userId, layout, mapToken, info.X, info.Y, look);
+        layout.EnsureFits(info.X, info.Y, look, layout.SpaceOf(mapToken), mapToken.MapTokenId);
 
         // Characters and NPC occurrences move once per turn, and the move is recorded (016); objects don't.
-        var turn = await PrepareMovementTurnAsync(userId, map, mapToken, info.X, info.Y, look);
+        var turn = await PrepareMovementTurnAsync(userId, map, layout, mapToken, info.X, info.Y, look);
         mapToken.MoveTo(info.X, info.Y);
         mapToken.Face(look);
         MapToken saved = mapToken;
@@ -169,7 +175,7 @@ public class MapTokenService : IMapTokenService
     /// The Movement entry of a character/NPC piece, or null for objects; refuses a second move in the turn. It keeps
     /// who moved and the movement points spent (024) — also for the master, who is not limited by them.
     /// </summary>
-    private async Task<Turn?> PrepareMovementTurnAsync(long userId, Map map, MapToken mapToken, int x, int y, int look)
+    private async Task<Turn?> PrepareMovementTurnAsync(long userId, Map map, MapLayout layout, MapToken mapToken, int x, int y, int look)
     {
         long? characterId = null;
         long? npcId = null;
@@ -185,30 +191,13 @@ public class MapTokenService : IMapTokenService
         var mapNpcId = characterId == null ? mapToken.MapNpcId : null;
         if (await _turnRepository.ExistsMovementAsync(campaign.CampaignId, campaign.CurrentTurn, characterId, mapNpcId))
             throw new ConflictException("Já se moveu neste turno.");
-        var moved = await MovementCostAsync(map, mapToken, x, y, look);
+        var moved = layout.MovementCost(mapToken, x, y, look) ?? layout.MovementCost(mapToken, x, y, look, ignorePieces: true);
         return Turn.Movement(campaign.CampaignId, map.MapId, characterId, npcId, mapNpcId, campaign.CurrentTurn, userId,
             (mapToken.X, mapToken.Y, mapToken.Look), (x, y, look), moved);
     }
 
-    /// <summary>
-    /// Cheapest cost around the other pieces; when the master jumped over them (no free path) the cost of the path
-    /// ignoring them.
-    /// </summary>
-    private async Task<int?> MovementCostAsync(Map map, MapToken mapToken, int x, int y, int look)
-    {
-        var model = await _mapModelRepository.GetByIdAsync(map.MapModelId);
-        var columns = model?.GridWidth ?? int.MaxValue;
-        var rows = model?.GridHeight ?? int.MaxValue;
-        var others = (await _repository.ListByMapAsync(map.MapId))
-            .Where(t => t.MapTokenId != mapToken.MapTokenId)
-            .Select(t => (t.X, t.Y))
-            .ToHashSet();
-        return HexGrid.MovementCost(mapToken.X, mapToken.Y, mapToken.Look, x, y, look, columns, rows, (hx, hy) => others.Contains((hx, hy)))
-            ?? HexGrid.MovementCost(mapToken.X, mapToken.Y, mapToken.Look, x, y, look, columns, rows, (_, _) => false);
-    }
-
-    /// <summary>A player moves only his own approved character, within its move.</summary>
-    private async Task EnsurePlayerMoveAsync(long userId, Map map, MapToken mapToken, int x, int y, int look)
+    /// <summary>A player moves only his own approved character, within its move (the whole shape around the other pieces).</summary>
+    private async Task EnsurePlayerMoveAsync(long userId, MapLayout layout, MapToken mapToken, int x, int y, int look)
     {
         var participation = mapToken.CampaignCharacterId is long participationId
             ? await _campaignCharacterRepository.GetByIdAsync(participationId)
@@ -217,13 +206,7 @@ public class MapTokenService : IMapTokenService
         if (participation == null || participation.Status != CampaignCharacterStatus.Approved || character?.UserId != userId)
             throw new UnauthorizedAccessException("Você só pode mover os seus personagens.");
 
-        var model = await _mapModelRepository.GetByIdAsync(map.MapModelId);
-        var others = (await _repository.ListByMapAsync(map.MapId))
-            .Where(t => t.MapTokenId != mapToken.MapTokenId)
-            .Select(t => (t.X, t.Y))
-            .ToHashSet();
-        var cost = HexGrid.MovementCost(mapToken.X, mapToken.Y, mapToken.Look, x, y, look,
-            model?.GridWidth ?? int.MaxValue, model?.GridHeight ?? int.MaxValue, (hx, hy) => others.Contains((hx, hy)));
+        var cost = layout.MovementCost(mapToken, x, y, look);
         if (cost == null || cost > character.Move)
             throw new DomainValidationException("move", "O movimento passou do máximo.");
     }
@@ -273,16 +256,6 @@ public class MapTokenService : IMapTokenService
     {
         return await _tokenRepository.GetByIdAsync(tokenId)
             ?? throw new KeyNotFoundException("Token não encontrado.");
-    }
-
-    /// <summary>The cell must be inside the map model's grid and hold no other piece.</summary>
-    private async Task EnsureFreeHexAsync(Map map, int x, int y, long? exceptMapTokenId)
-    {
-        var model = await _mapModelRepository.GetByIdAsync(map.MapModelId);
-        if (model != null && !HexGrid.IsInsideGrid(x, y, model.GridWidth, model.GridHeight))
-            throw new DomainValidationException("x", "A posição está fora da grid do mapa.");
-        if (await _repository.ExistsAtAsync(map.MapId, x, y, exceptMapTokenId))
-            throw new ConflictException("O hex já está ocupado.");
     }
 
     /// <summary>Reading is allowed to the map owner (master) and to owners of approved characters.</summary>
@@ -358,6 +331,7 @@ public class MapTokenService : IMapTokenService
                 X = mapToken.X,
                 Y = mapToken.Y,
                 Look = mapToken.Look,
+                Space = MapOccupancyLoader.PieceSpace(token, null),
                 CreatedAt = mapToken.CreatedAt,
                 UpdatedAt = mapToken.UpdatedAt
             };
@@ -373,6 +347,8 @@ public class MapTokenService : IMapTokenService
                 info.TotalEnergy = character?.Energy ?? participation.CurrentEnergy;
                 info.Status = participation.CharacterStatus;
                 info.Sheet = participation.Sheet;
+                info.Posture = (int)participation.Posture;
+                info.Space = MapOccupancyLoader.PieceSpace(token, participation.Posture);
             }
             if (mapToken.MapNpcId is long pieceNpcId && mapNpcs.TryGetValue(pieceNpcId, out var mapNpc))
             {
@@ -386,6 +362,8 @@ public class MapTokenService : IMapTokenService
                 info.TotalLife = npc?.Life ?? mapNpc.CurrentLife;
                 info.TotalEnergy = npc?.Energy ?? mapNpc.CurrentEnergy;
                 info.Status = mapNpc.Status;
+                info.Posture = (int)mapNpc.Posture;
+                info.Space = MapOccupancyLoader.PieceSpace(token, mapNpc.Posture);
                 info.Move = npc?.Move ?? 0;
                 info.Sheet = mapToken.Sheet ?? npc?.Sheet;
             }

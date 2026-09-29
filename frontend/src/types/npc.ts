@@ -1,4 +1,5 @@
 /** NPC types — mirror the backend Npc, CampaignNpc and MapNpc DTOs (feature 013). */
+import type { Posture } from './mapToken';
 
 /** NPC of the logged user's library. */
 export interface NpcInfo {
@@ -69,6 +70,8 @@ export interface MapNpcInfo {
   totalLife: number;
   totalEnergy: number;
   status: string | null;
+  /** Standing, down or out of combat (031). */
+  posture: Posture;
   tokenId: number | null;
   tokenImageUrl: string | null;
   x: number | null;

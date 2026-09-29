@@ -39,6 +39,10 @@ public class MapNpcInfo
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 
+    /// <summary>1 standing ("Em pé"), 2 down ("Caído"), 3 out of combat ("Fora de combate") (031).</summary>
+    [JsonPropertyName("posture")]
+    public int Posture { get; set; } = 1;
+
     [JsonPropertyName("tokenId")]
     public long? TokenId { get; set; }
 

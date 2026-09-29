@@ -8,6 +8,8 @@ import { VitalBar } from './VitalBar';
 import { NPC_DRAG_TYPE } from '../../lib/mapTokens';
 import type { CampaignNpcInfo } from '../../types/npc';
 import { PencilIcon } from '../ui/icons';
+import { PostureBadge } from '../ui/PostureBadge';
+import { POSTURE } from '../../types/mapToken';
 
 interface NpcCardProps {
   npc: CampaignNpcInfo;
@@ -28,6 +30,8 @@ export const NpcCard = ({ npc, onEdit, draggable }: NpcCardProps) => {
   const { mapTokens } = useMapToken();
   const occurrences = mapTokens.filter((token) => token.npcId === npc.npcId && token.mapNpcId !== null);
   const occurrenceIds = occurrences.map((token) => token.mapNpcId!);
+  // 031: the picture turns black and white when every occurrence on the map is out of combat.
+  const allOut = occurrences.length > 0 && occurrences.every((token) => token.posture === POSTURE.outOfCombat);
   return (
     <li
       className={`stm-party-card${draggable ? ' stm-party-draggable' : ''}`}
@@ -37,7 +41,9 @@ export const NpcCard = ({ npc, onEdit, draggable }: NpcCardProps) => {
         event.dataTransfer.effectAllowed = 'copy';
       } : undefined}
     >
-      <CharacterAvatar name={npc.name} imageUrl={npc.imageUrl ?? npc.tokenImageUrl} size={32} />
+      <span className={`d-inline-flex flex-shrink-0${allOut ? ' stm-grayscale' : ''}`}>
+        <CharacterAvatar name={npc.name} imageUrl={npc.imageUrl ?? npc.tokenImageUrl} size={32} />
+      </span>
       <div className="stm-party-info">
         <div className="stm-party-name">
           {turnNo !== null && <TurnStatusDot status={npcStatus(entries, npc.npcId, occurrenceIds)} />}
@@ -58,7 +64,12 @@ export const NpcCard = ({ npc, onEdit, draggable }: NpcCardProps) => {
           <ul className="list-unstyled mb-0" aria-label={t('npcs.occurrences', { name: npc.name })}>
             {occurrences.map((piece) => (
               <li key={piece.mapTokenId} className="mt-1">
-                {occurrences.length > 1 && <small className="d-block text-truncate" title={piece.name}>{piece.name}</small>}
+                {(occurrences.length > 1 || (piece.posture ?? POSTURE.standing) !== POSTURE.standing) && (
+                  <small className="d-flex align-items-center gap-1 text-truncate" title={piece.name}>
+                    {occurrences.length > 1 && <span className="text-truncate">{piece.name}</span>}
+                    <PostureBadge posture={piece.posture} />
+                  </small>
+                )}
                 <VitalBar label={t('party.life')} current={piece.life} total={piece.totalLife} variant="life" />
                 <VitalBar label={t('party.energy')} current={piece.energy} total={piece.totalEnergy} variant="energy" />
                 {piece.status && <small className="d-block text-body-secondary text-truncate" title={piece.status}>{piece.status}</small>}

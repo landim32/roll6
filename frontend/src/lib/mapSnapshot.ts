@@ -1,5 +1,7 @@
 import { gridPath, gridPixelSize, hexCenter } from './hexGrid';
+import { isOutOfCombat, pieceGeometry, pieceImage } from './pieceDrawing';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
+import type { Posture } from '../types/mapToken';
 import { imageService } from '../Services/imageService';
 
 /** Rectangle in map pixels (the image may start above or to the left of the grid). */
@@ -29,6 +31,11 @@ export interface SnapshotToken {
   name: string;
   tokenType: number;
   upImageUrl: string | null;
+  downImageUrl: string | null;
+  /** Down / out of combat pieces lie; out of combat ones are in black and white (031). */
+  posture: Posture | null;
+  /** Hexes the piece takes (1, 2, 3, 7 or 10). */
+  space: number;
 }
 
 const BACKGROUND = '#1a1d21';
@@ -49,6 +56,46 @@ const DISC: Record<number, { fill: string; stroke: string }> = {
 };
 
 const OBJECT_DISC = { fill: 'rgba(108, 117, 125, 0.35)', stroke: 'rgba(173, 181, 189, 0.6)' };
+
+/** Out of combat: the gray of the disc (the screen turns the whole piece gray with a CSS filter). */
+const OUT_DISC = { fill: 'rgba(128, 128, 128, 0.35)', stroke: 'rgba(190, 190, 190, 0.7)' };
+
+/**
+ * RGBA pixels to shades of gray in place (Rec. 601 luma), like CSS `grayscale(1)`. Done by hand because
+ * `ctx.filter` is missing in Safari.
+ */
+export const toGrayscale = (pixels: Uint8ClampedArray): Uint8ClampedArray => {
+  for (let i = 0; i < pixels.length; i += 4) {
+    const luma = Math.round(0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]);
+    pixels[i] = luma;
+    pixels[i + 1] = luma;
+    pixels[i + 2] = luma;
+  }
+  return pixels;
+};
+
+/** A black and white copy of a loaded picture, or the picture itself when the canvas can't be read. */
+const grayCopy = (image: HTMLImageElement): CanvasImageSource => {
+  const canvas = document.createElement('canvas');
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || canvas.width === 0 || canvas.height === 0) return image;
+  try {
+    ctx.drawImage(image, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    toGrayscale(data.data);
+    ctx.putImageData(data, 0, 0);
+    return canvas;
+  } catch {
+    return image;
+  }
+};
+
+const sourceSize = (source: CanvasImageSource): { width: number; height: number } =>
+  source instanceof HTMLImageElement
+    ? { width: source.naturalWidth, height: source.naturalHeight }
+    : { width: (source as HTMLCanvasElement).width, height: (source as HTMLCanvasElement).height };
 
 const union = (a: SnapshotBounds, b: SnapshotBounds): SnapshotBounds => {
   const x = Math.min(a.x, b.x);
@@ -136,13 +183,42 @@ const drawInitial = (ctx: CanvasRenderingContext2D, name: string, radius: number
   ctx.fillText(letter, 0, 0);
 };
 
-/** Draws the picture over the 2r square like `preserveAspectRatio="xMidYMid slice"` on screen. */
-const drawCover = (ctx: CanvasRenderingContext2D, image: HTMLImageElement, radius: number) => {
-  const side = Math.min(image.naturalWidth, image.naturalHeight);
-  if (side <= 0) return;
-  const sx = (image.naturalWidth - side) / 2;
-  const sy = (image.naturalHeight - side) / 2;
-  ctx.drawImage(image, sx, sy, side, side, -radius, -radius, radius * 2, radius * 2);
+/**
+ * Draws the picture over a rectangle like `preserveAspectRatio="xMidYMid slice"` on screen; turned sideways, the
+ * rectangle swaps its sides around its center (as the screen does).
+ */
+const drawCover = (
+  ctx: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  box: { x: number; y: number; width: number; height: number },
+  sideways: boolean,
+) => {
+  const { width: sourceWidth, height: sourceHeight } = sourceSize(image);
+  if (sourceWidth <= 0 || sourceHeight <= 0) return;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const [width, height] = sideways ? [box.height, box.width] : [box.width, box.height];
+  const scale = Math.max(width / sourceWidth, height / sourceHeight);
+  const sw = width / scale;
+  const sh = height / scale;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (sideways) ctx.rotate(Math.PI / 2);
+  ctx.drawImage(image, (sourceWidth - sw) / 2, (sourceHeight - sh) / 2, sw, sh, -width / 2, -height / 2, width, height);
+  ctx.restore();
+};
+
+const drawFrontMark = (ctx: CanvasRenderingContext2D, y: number, mark: number, scale: number) => {
+  ctx.beginPath();
+  ctx.moveTo(-mark, y - 1);
+  ctx.lineTo(0, y + mark);
+  ctx.lineTo(mark, y - 1);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.lineWidth = MARK_LINE / scale;
+  ctx.fill();
+  ctx.stroke();
 };
 
 const drawToken = (
@@ -155,10 +231,33 @@ const drawToken = (
   const center = hexCenter(token.x, token.y, hexSize);
   const radius = hexSize * 0.8;
   const mark = hexSize * 0.18;
-  const disc = DISC[token.tokenType] ?? OBJECT_DISC;
+  const out = isOutOfCombat(token);
+  const disc = out ? OUT_DISC : DISC[token.tokenType] ?? OBJECT_DISC;
+  const { sideways } = pieceImage(token);
   ctx.save();
   ctx.translate(center.x, center.y);
   ctx.rotate(((token.look - 3) * 60 * Math.PI) / 180);
+  if (token.space > 1) {
+    // A piece of several hexes (031): the same shape, clip and outer outline as TokenLayer.
+    const geometry = pieceGeometry(token.space, hexSize);
+    const area = new Path2D(geometry.fillPath);
+    ctx.fillStyle = disc.fill;
+    ctx.fill(area);
+    if (image) {
+      ctx.save();
+      ctx.clip(area);
+      drawCover(ctx, out ? grayCopy(image) : image, geometry.box, sideways);
+      ctx.restore();
+    } else {
+      drawInitial(ctx, token.name, radius);
+    }
+    ctx.lineWidth = DISC_LINE / scale;
+    ctx.strokeStyle = disc.stroke;
+    ctx.stroke(new Path2D(geometry.edgePath));
+    drawFrontMark(ctx, geometry.front.y, mark, scale);
+    ctx.restore();
+    return;
+  }
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = disc.fill;
@@ -171,21 +270,12 @@ const drawToken = (
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.clip();
-    drawCover(ctx, image, radius);
+    drawCover(ctx, out ? grayCopy(image) : image, { x: -radius, y: -radius, width: radius * 2, height: radius * 2 }, sideways);
     ctx.restore();
   } else {
     drawInitial(ctx, token.name, radius);
   }
-  ctx.beginPath();
-  ctx.moveTo(-mark, radius - 1);
-  ctx.lineTo(0, radius + mark);
-  ctx.lineTo(mark, radius - 1);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-  ctx.lineWidth = MARK_LINE / scale;
-  ctx.fill();
-  ctx.stroke();
+  drawFrontMark(ctx, radius, mark, scale);
   ctx.restore();
 };
 
@@ -220,7 +310,10 @@ export const renderMapSnapshot = async (input: {
   ctx.lineWidth = GRID_LINE / scale;
   ctx.stroke(new Path2D(gridPath(draft.gridWidth, draft.gridHeight, hexSize)));
 
-  const pictures = await Promise.all(tokens.map((token) => (token.upImageUrl ? loadImage(token.upImageUrl) : Promise.resolve(null))));
+  const pictures = await Promise.all(tokens.map((token) => {
+    const { url } = pieceImage(token);
+    return url ? loadImage(url) : Promise.resolve(null);
+  }));
   tokens.forEach((token, index) => drawToken(ctx, token, hexSize, pictures[index], scale));
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((value) => resolve(value), 'image/jpeg', 0.9));

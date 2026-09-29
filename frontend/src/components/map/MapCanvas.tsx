@@ -13,11 +13,12 @@ import { useNpc } from '../../hooks/useNpc';
 import { useTokenMovement } from '../../hooks/useTokenMovement';
 import { useTurn } from '../../hooks/useTurn';
 import { hexCenter, lookToward } from '../../lib/hexGrid';
-import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewOf } from '../../lib/movement';
+import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewHexes, previewOf } from '../../lib/movement';
 import { hasEntries, hasMoved, lastActions, movementTrails } from '../../lib/turnStatus';
 import { MAP_TOKEN_TYPE } from '../../types/mapToken';
 import type { MapTokenInfo } from '../../types/mapToken';
 import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt } from '../../lib/mapTokens';
+import { pieceHexes } from '../../lib/occupancy';
 import type { Offset } from '../../lib/hexGrid';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 import { HexGridLayer } from './HexGridLayer';
@@ -65,7 +66,7 @@ const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y ==
 export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, picking = false }: MapCanvasProps) => {
   const { t } = useTranslation();
   const { draft, hexSize, view, panBy, zoomIn, zoomOut, centerOn, resizeMode, canEdit, setImageLayout } = useMapEditor();
-  const { mapTokens, canPlace, canPlaceOwn, placeCharacter, moveToken } = useMapToken();
+  const { mapTokens, canPlace, canPlaceOwn, placeCharacter, moveToken, setPosture } = useMapToken();
   const { party, currentSelection } = useCharacter();
   const { session } = useAuth();
   const movement = useTokenMovement();
@@ -138,6 +139,10 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
     if (draft.mapId === null || turnNo === null || token.tokenType === MAP_TOKEN_TYPE.object) return false;
     return canPlace || isOwnCharacter(token);
   };
+
+  /** Posture (031): the master on characters and NPCs, a player on his own characters. */
+  const canSetPosture = (token: MapTokenInfo): boolean =>
+    draft.mapId !== null && token.tokenType !== MAP_TOKEN_TYPE.object && (canPlace || isOwnCharacter(token));
 
   /** Movement mode: the path follows the hovered hex; in the facing phase the piece turns to the mouse. */
   const moveWithPointer = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -232,7 +237,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
     if (!hex) return;
     // Players only get a menu (Mover / Agir / Resetar turno) on the pieces of their own characters.
     const piece = tokenAt(mapTokens, hex.x, hex.y);
-    if (!canPlace && !(piece && (canMove(piece) || canTakeTurn(piece)))) return;
+    if (!canPlace && !(piece && (canMove(piece) || canTakeTurn(piece) || canSetPosture(piece)))) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setMenu({ hex, left: event.clientX - rect.left, top: event.clientY - rect.top });
     hover(hex);
@@ -291,11 +296,14 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
     if (!participation || !hex) return;
     if (!canPlace && participation.characterOwnerId !== session?.user.userId) return;
 
-    const action = characterDropAction({ hex, tokens: mapTokens, participation });
+    const action = characterDropAction({ hex, tokens: mapTokens, participation, columns: draft.gridWidth, rows: draft.gridHeight });
     try {
       switch (action.kind) {
         case 'occupied':
           toast.warning(t('mapTokens.hexOccupied'));
+          break;
+        case 'blocked':
+          toast.warning(t('mapTokens.doesNotFit'));
           break;
         case 'move':
           // Players move a piece already on the map with "Mover" (turn and move limits).
@@ -325,11 +333,21 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
   const trails = movementTrails(turnEntries, draft.mapId);
   const bubbles = lastActions(turnEntries);
   const menuToken = menu ? tokenAt(mapTokens, menu.hex.x, menu.hex.y) : undefined;
+  /** A hex, or the whole shape of the piece on it (031). */
+  const shapeAt = (hex: Offset | null): { hexes: Offset[]; pieceId: number | null } | null => {
+    if (!hex) return null;
+    const piece = tokenAt(mapTokens, hex.x, hex.y);
+    return piece ? { hexes: pieceHexes(piece), pieceId: piece.mapTokenId } : { hexes: [hex], pieceId: null };
+  };
+  const selectedShape = shapeAt(selectedHex);
+  const hoverShape = movement.active ? (hoverHex ? { hexes: [hoverHex], pieceId: null } : null) : shapeAt(hoverHex);
+  const sameShape = !!selectedShape && !!hoverShape && (sameHex(hoverHex, selectedHex)
+    || (hoverShape.pieceId !== null && hoverShape.pieceId === selectedShape.pieceId));
   const moveState = movement.state;
   const moveStatus = currentStatus(moveState);
   const movePreview = moveState.phase === 'idle' ? null : { mapTokenId: moveState.piece.mapTokenId, ...previewOf(moveState)! };
-  const moveDestination = moveState.phase === 'facing' ? moveState.destination
-    : moveState.phase === 'path' && moveState.cost !== null ? moveState.target : null;
+  const moveDestination = moveState.phase === 'facing' || (moveState.phase === 'path' && moveState.cost !== null)
+    ? previewHexes(moveState) : [];
 
   return (
     <>
@@ -353,8 +371,8 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
         <g transform={`translate(${view.panX} ${view.panY}) scale(${view.zoom})`}>
           <ImageLayer url={draft.imageUrl} left={draft.imageLeft} top={draft.imageTop} width={draft.imageWidth} height={draft.imageHeight} />
           <HexGridLayer columns={draft.gridWidth} rows={draft.gridHeight} hexSize={hexSize} />
-          <HexHighlight hex={selectedHex} hexSize={hexSize} variant="selected" />
-          <HexHighlight hex={sameHex(hoverHex, selectedHex) ? null : hoverHex} hexSize={hexSize} />
+          <HexHighlight hexes={selectedShape?.hexes ?? null} hexSize={hexSize} variant="selected" />
+          <HexHighlight hexes={sameShape ? null : hoverShape?.hexes ?? null} hexSize={hexSize} />
           {moveState.phase !== 'idle' && moveStatus && (
             <MovementLayer trail={moveState.trail} destination={moveDestination} status={moveStatus} hexSize={hexSize} />
           )}
@@ -384,6 +402,12 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
             ? () => onAct({ mapTokenId: menuToken.mapTokenId, name: menuToken.name }) : undefined}
           onResetTurn={menuToken && canTakeTurn(menuToken) && hasEntries(turnEntries, menuToken)
             ? () => onResetTurn({ mapTokenId: menuToken.mapTokenId, name: menuToken.name }) : undefined}
+          posture={menuToken?.posture ?? null}
+          onPosture={menuToken && canSetPosture(menuToken)
+            ? (posture) => setPosture(menuToken.mapTokenId, posture).catch((err: unknown) => {
+              toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+            })
+            : undefined}
           onClose={closeMenu}
           onAdd={() => {
             setPickedHex(menu.hex);
