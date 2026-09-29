@@ -1,5 +1,6 @@
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
+using System.Text.RegularExpressions;
 using Roll6.DTO.Image;
 using Roll6.Infra.Interfaces.AppServices;
 
@@ -21,6 +22,9 @@ public class ImageService : IImageService
     {
         ["application/pdf"] = "pdf"
     };
+
+    /// <summary>Names the storage hands out: a 32-hex guid plus an image extension. Anything else is refused.</summary>
+    private static readonly Regex STORED_IMAGE_NAME = new(@"^[0-9a-f]{32}\.(png|jpg|webp)$", RegexOptions.Compiled);
 
     private readonly IImageStorageAppService _storage;
 
@@ -51,6 +55,13 @@ public class ImageService : IImageService
             Url = _storage.GetUrl(fileName),
             Type = SheetFiles.TypeOf(fileName) ?? SheetFiles.IMAGE
         };
+    }
+
+    public async Task<StoredImageInfo?> OpenAsync(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) || !STORED_IMAGE_NAME.IsMatch(fileName))
+            return null;
+        return await _storage.OpenAsync(fileName);
     }
 
     private async Task<string> StoreAsync(Stream content, long length, string? contentType,

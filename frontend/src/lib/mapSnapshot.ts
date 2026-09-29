@@ -1,5 +1,6 @@
 import { gridPath, gridPixelSize, hexCenter } from './hexGrid';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
+import { imageService } from '../Services/imageService';
 
 /** Rectangle in map pixels (the image may start above or to the left of the grid). */
 export interface SnapshotBounds {
@@ -31,8 +32,16 @@ export interface SnapshotToken {
 }
 
 const BACKGROUND = '#1a1d21';
-const GRID_STROKE = 'rgba(230, 230, 240, 0.35)';
+/** A bit stronger than on screen: the shared picture is shrunk and then recompressed by WhatsApp. */
+const GRID_STROKE = 'rgba(235, 235, 245, 0.55)';
+/** Line widths in output pixels, whatever the scale (the screen uses non-scaling strokes too). */
+const GRID_LINE = 1.5;
+const DISC_LINE = 2;
+const MARK_LINE = 1;
 const MAX_SIDE = 2048;
+
+/** Names the storage hands out ({32-hex guid}.png|jpg|webp), as the backend checks them. */
+const STORED_IMAGE_NAME = /^[0-9a-f]{32}\.(png|jpg|webp)$/;
 
 const DISC: Record<number, { fill: string; stroke: string }> = {
   [MAP_TOKEN_TYPE.character]: { fill: 'rgba(13, 110, 253, 0.35)', stroke: 'rgba(110, 168, 254, 0.85)' },
@@ -79,15 +88,44 @@ export const snapshotScale = (bounds: SnapshotBounds, maxSide = MAX_SIDE): numbe
   return maxSide / side;
 };
 
-/** Loads an image for the canvas. A failure resolves null so the canvas stays exportable. */
-export const loadImage = (url: string): Promise<HTMLImageElement | null> =>
+/** File name of a stored image inside its (presigned) bucket URL, or null for any other URL. */
+export const storedImageName = (url: string): string | null => {
+  try {
+    const name = new URL(url).pathname.split('/').pop() ?? '';
+    return STORED_IMAGE_NAME.test(name) ? name : null;
+  } catch {
+    return null;
+  }
+};
+
+const decode = (src: string, crossOrigin: boolean): Promise<HTMLImageElement | null> =>
   new Promise((resolve) => {
     const image = new Image();
-    image.crossOrigin = 'anonymous';
+    if (crossOrigin) image.crossOrigin = 'anonymous';
     image.onload = () => resolve(image);
     image.onerror = () => resolve(null);
-    image.src = url;
+    image.src = src;
   });
+
+/**
+ * Loads an image for the canvas. The bucket sends no CORS headers, and a cross-origin image without them
+ * cannot be drawn on an exportable canvas — so stored images come through the API (same bytes, readable),
+ * and only other URLs are tried directly. A failure resolves null so the canvas stays exportable.
+ */
+export const loadImage = async (url: string): Promise<HTMLImageElement | null> => {
+  const name = storedImageName(url);
+  if (name) {
+    const blob = await imageService.fetchStored(name).catch(() => null);
+    if (blob) {
+      const objectUrl = URL.createObjectURL(blob);
+      const image = await decode(objectUrl, false);
+      // The decoded pixels stay in the element; the object URL is no longer needed.
+      URL.revokeObjectURL(objectUrl);
+      if (image) return image;
+    }
+  }
+  return decode(url, true);
+};
 
 const drawInitial = (ctx: CanvasRenderingContext2D, name: string, radius: number) => {
   const letter = name.trim().charAt(0).toUpperCase() || '?';
@@ -98,11 +136,21 @@ const drawInitial = (ctx: CanvasRenderingContext2D, name: string, radius: number
   ctx.fillText(letter, 0, 0);
 };
 
+/** Draws the picture over the 2r square like `preserveAspectRatio="xMidYMid slice"` on screen. */
+const drawCover = (ctx: CanvasRenderingContext2D, image: HTMLImageElement, radius: number) => {
+  const side = Math.min(image.naturalWidth, image.naturalHeight);
+  if (side <= 0) return;
+  const sx = (image.naturalWidth - side) / 2;
+  const sy = (image.naturalHeight - side) / 2;
+  ctx.drawImage(image, sx, sy, side, side, -radius, -radius, radius * 2, radius * 2);
+};
+
 const drawToken = (
   ctx: CanvasRenderingContext2D,
   token: SnapshotToken,
   hexSize: number,
   image: HTMLImageElement | null,
+  scale: number,
 ) => {
   const center = hexCenter(token.x, token.y, hexSize);
   const radius = hexSize * 0.8;
@@ -115,7 +163,7 @@ const drawToken = (
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = disc.fill;
   ctx.fill();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = DISC_LINE / scale;
   ctx.strokeStyle = disc.stroke;
   ctx.stroke();
   if (image) {
@@ -123,7 +171,7 @@ const drawToken = (
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(image, -radius, -radius, radius * 2, radius * 2);
+    drawCover(ctx, image, radius);
     ctx.restore();
   } else {
     drawInitial(ctx, token.name, radius);
@@ -135,7 +183,7 @@ const drawToken = (
   ctx.closePath();
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = MARK_LINE / scale;
   ctx.fill();
   ctx.stroke();
   ctx.restore();
@@ -169,11 +217,11 @@ export const renderMapSnapshot = async (input: {
   }
 
   ctx.strokeStyle = GRID_STROKE;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = GRID_LINE / scale;
   ctx.stroke(new Path2D(gridPath(draft.gridWidth, draft.gridHeight, hexSize)));
 
   const pictures = await Promise.all(tokens.map((token) => (token.upImageUrl ? loadImage(token.upImageUrl) : Promise.resolve(null))));
-  tokens.forEach((token, index) => drawToken(ctx, token, hexSize, pictures[index]));
+  tokens.forEach((token, index) => drawToken(ctx, token, hexSize, pictures[index], scale));
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((value) => resolve(value), 'image/jpeg', 0.9));
   if (!blob) throw new Error('snapshot');

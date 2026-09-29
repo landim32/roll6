@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { gridPixelSize, HEX_SIZE } from './hexGrid';
-import { snapshotBounds, snapshotScale } from './mapSnapshot';
+import { snapshotBounds, snapshotScale, storedImageName } from './mapSnapshot';
 import type { SnapshotDraft } from './mapSnapshot';
 
 const draft = (image: Partial<SnapshotDraft> = {}): SnapshotDraft => ({
@@ -48,5 +48,18 @@ describe('snapshotScale', () => {
 
   it('honors a smaller cap', () => {
     expect(snapshotScale({ x: 0, y: 0, width: 1000, height: 500 }, 500)).toBe(0.5);
+  });
+});
+
+describe('storedImageName', () => {
+  it('takes the file name out of a presigned bucket URL', () => {
+    expect(storedImageName('https://emagine.nyc3.digitaloceanspaces.com/roll6/1612de9f0756477f9411236b1ff576c2.png?AWSAccessKeyId=X&Expires=1&Signature=a%3D'))
+      .toBe('1612de9f0756477f9411236b1ff576c2.png');
+  });
+
+  it('ignores URLs that are not stored images', () => {
+    expect(storedImageName('https://example.test/token.png')).toBeNull();
+    expect(storedImageName('https://example.test/0123456789abcdef0123456789abcdef.pdf')).toBeNull();
+    expect(storedImageName('not a url')).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ using FluentAssertions;
 using Moq;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Services;
+using Roll6.DTO.Image;
 using Roll6.Infra.Interfaces.AppServices;
 
 namespace Roll6.Tests.Domain.Services;
@@ -132,5 +133,32 @@ public class ImageServiceTests
         var act = () => _service.UploadDocumentAsync(new MemoryStream(PDF_BYTES), length, "application/pdf");
 
         (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("file");
+    }
+
+    // ---- 029: reading a stored image back through the API ----
+
+    [Fact]
+    public async Task Open_StoredImageName_ReadsFromTheStorage()
+    {
+        var stored = new StoredImageInfo { Content = new MemoryStream(PNG_BYTES), ContentType = "image/png" };
+        _storage.Setup(s => s.OpenAsync("0123456789abcdef0123456789abcdef.png")).ReturnsAsync(stored);
+
+        var result = await _service.OpenAsync("0123456789abcdef0123456789abcdef.png");
+
+        result.Should().BeSameAs(stored);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("../secret.png")]
+    [InlineData("0123456789abcdef0123456789abcdef.pdf")]
+    [InlineData("0123456789ABCDEF0123456789abcdef.png")]
+    [InlineData("pasta/0123456789abcdef0123456789abcdef.png")]
+    public async Task Open_NameTheStorageNeverHandsOut_ReturnsNullWithoutReading(string fileName)
+    {
+        var result = await _service.OpenAsync(fileName);
+
+        result.Should().BeNull();
+        _storage.Verify(s => s.OpenAsync(It.IsAny<string>()), Times.Never);
     }
 }
