@@ -1,4 +1,4 @@
--- Roll6 — full database schema (PostgreSQL), generated from the EF Core migrations.
+﻿-- Roll6 — full database schema (PostgreSQL), generated from the EF Core migrations.
 -- Idempotent: runs on an empty database or on one already partly migrated (it applies only the missing
 -- migrations and records them in "__EFMigrationsHistory", so the API's startup migrations stay in sync).
 --
@@ -6,7 +6,6 @@
 -- Regenerate after adding a migration (from backend/):
 --   dotnet ef migrations script --idempotent --project Roll6.Infra --startup-project Roll6.API -o ../database/roll6.sql
 -- (then put this header back)
-
 CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
     "MigrationId" character varying(150) NOT NULL,
     "ProductVersion" character varying(32) NOT NULL,
@@ -1028,6 +1027,135 @@ BEGIN
     IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260928184156_TurnNarration') THEN
     INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
     VALUES ('20260928184156_TurnNarration', '9.0.20');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929114755_AddSlugs') THEN
+    ALTER TABLE campaigns ADD slug character varying(100);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929114755_AddSlugs') THEN
+    ALTER TABLE maps ADD slug character varying(100);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929114755_AddSlugs') THEN
+    UPDATE campaigns AS c
+    SET slug = s.slug
+    FROM (
+        SELECT campaign_id,
+               CASE WHEN n = 1 THEN base ELSE base || '-' || n::text END AS slug
+        FROM (
+            SELECT campaign_id,
+                   base,
+                   row_number() OVER (PARTITION BY base ORDER BY campaign_id) AS n
+            FROM (
+                SELECT campaign_id,
+                       CASE WHEN base = '' THEN 'campanha' ELSE base END AS base
+                FROM (
+                    SELECT campaign_id,
+                           rtrim(left(btrim(regexp_replace(lower(translate(name,
+                               'ÁÀÂÃÄáàâãäÉÈÊËéèêëÍÌÎÏíìîïÓÒÔÕÖóòôõöÚÙÛÜúùûüÇçÑñÝý',
+                               'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNnYy')),
+                               '[^a-z0-9]+', '-', 'g'), '-'), 80), '-') AS base
+                    FROM campaigns
+                ) raw
+            ) normalized
+        ) numbered
+    ) s
+    WHERE c.campaign_id = s.campaign_id;
+
+    UPDATE campaigns AS c
+    SET slug = c.slug || '-' || c.campaign_id::text
+    WHERE c.campaign_id IN (
+        SELECT campaign_id
+        FROM (
+            SELECT campaign_id,
+                   row_number() OVER (PARTITION BY slug ORDER BY campaign_id) AS n
+            FROM campaigns
+        ) d
+        WHERE d.n > 1
+    );
+
+    UPDATE maps AS m
+    SET slug = s.slug
+    FROM (
+        SELECT map_id,
+               CASE WHEN n = 1 THEN base ELSE base || '-' || n::text END AS slug
+        FROM (
+            SELECT map_id,
+                   base,
+                   row_number() OVER (PARTITION BY base ORDER BY map_id) AS n
+            FROM (
+                SELECT map_id,
+                       CASE WHEN base = '' THEN 'mapa' ELSE base END AS base
+                FROM (
+                    SELECT map_id,
+                           rtrim(left(btrim(regexp_replace(lower(translate(name,
+                               'ÁÀÂÃÄáàâãäÉÈÊËéèêëÍÌÎÏíìîïÓÒÔÕÖóòôõöÚÙÛÜúùûüÇçÑñÝý',
+                               'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNnYy')),
+                               '[^a-z0-9]+', '-', 'g'), '-'), 80), '-') AS base
+                    FROM maps
+                ) raw
+            ) normalized
+        ) numbered
+    ) s
+    WHERE m.map_id = s.map_id;
+
+    UPDATE maps AS m
+    SET slug = m.slug || '-' || m.map_id::text
+    WHERE m.map_id IN (
+        SELECT map_id
+        FROM (
+            SELECT map_id,
+                   row_number() OVER (PARTITION BY slug ORDER BY map_id) AS n
+            FROM maps
+        ) d
+        WHERE d.n > 1
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929114755_AddSlugs') THEN
+    ALTER TABLE campaigns ALTER COLUMN slug SET NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929114755_AddSlugs') THEN
+    ALTER TABLE maps ALTER COLUMN slug SET NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929114755_AddSlugs') THEN
+    CREATE UNIQUE INDEX ix_campaigns_slug ON campaigns (slug);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929114755_AddSlugs') THEN
+    CREATE UNIQUE INDEX ix_maps_slug ON maps (slug);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260929114755_AddSlugs') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260929114755_AddSlugs', '9.0.20');
     END IF;
 END $EF$;
 COMMIT;

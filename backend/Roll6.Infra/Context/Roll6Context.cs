@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Models;
+using Roll6.Domain.Slugs;
 
 namespace Roll6.Infra.Context;
 
@@ -75,6 +76,8 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CampaignId).HasColumnName("campaign_id").UseIdentityAlwaysColumn();
             entity.Property(e => e.UserId).HasColumnName("user_id");
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(260).IsRequired();
+            entity.Property(e => e.Slug).HasColumnName("slug").HasMaxLength(Slug.MAX_LENGTH).IsRequired();
+            entity.HasIndex(e => e.Slug).IsUnique().HasDatabaseName("ix_campaigns_slug");
             entity.Property(e => e.Open).HasColumnName("open");
             entity.Property(e => e.CurrentTurn).HasColumnName("current_turn").HasDefaultValue(1).HasSentinel(0);
             entity.Property(e => e.CurrentMapId).HasColumnName("current_map_id");
@@ -96,6 +99,8 @@ public class Roll6Context : DbContext
             entity.Property(e => e.UserId).HasColumnName("user_id");
             entity.Property(e => e.Sequence).HasColumnName("sequence");
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(260).IsRequired();
+            entity.Property(e => e.Slug).HasColumnName("slug").HasMaxLength(Slug.MAX_LENGTH).IsRequired();
+            entity.HasIndex(e => e.Slug).IsUnique().HasDatabaseName("ix_maps_slug");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>().HasDefaultValue(MapStatus.Active).HasSentinel((MapStatus)0);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");

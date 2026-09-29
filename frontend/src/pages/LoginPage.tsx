@@ -1,10 +1,17 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Tabs } from '../components/ui/Tabs';
 import { useAuth } from '../hooks/useAuth';
+import { isTablePath } from '../lib/tableRoute';
+
+/** Address to open after login: the campaign or map the user asked for, otherwise the table root. */
+const destinationFrom = (state: unknown): string => {
+  const from = (state as { from?: string } | null)?.from;
+  return from && isTablePath(from) ? from : '/';
+};
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -12,13 +19,14 @@ const MIN_PASSWORD_LENGTH = 8;
 export const LoginPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, login, register, loading } = useAuth();
   const [tab, setTab] = useState('signIn');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (isAuthenticated) return <Navigate to={destinationFrom(location.state)} replace />;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -36,7 +44,7 @@ export const LoginPage = () => {
         ? await register({ name: name.trim(), email: email.trim(), password })
         : await login({ email: email.trim(), password });
       toast.success(t(isSignUp ? 'toast.accountCreated' : 'toast.welcome', { name: session.user.name }));
-      navigate('/', { replace: true });
+      navigate(destinationFrom(location.state), { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
     }

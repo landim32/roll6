@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Models;
+using Roll6.Domain.Slugs;
 using Roll6.Infra.Context;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -23,6 +24,20 @@ public class MapRepository : IMapRepository<Map>
         return await _context.Maps.AsNoTracking().FirstOrDefaultAsync(e => e.MapId == id);
     }
 
+    public async Task<Map?> GetBySlugAsync(string slug)
+    {
+        return await _context.Maps.AsNoTracking().FirstOrDefaultAsync(e => e.Slug == slug);
+    }
+
+    public async Task<List<string>> ListSlugsWithPrefixAsync(string baseSlug)
+    {
+        var prefixed = baseSlug + "-";
+        return await _context.Maps.AsNoTracking()
+            .Where(e => e.Slug == baseSlug || e.Slug.StartsWith(prefixed))
+            .Select(e => e.Slug)
+            .ToListAsync();
+    }
+
     public async Task<(List<Map> Items, int TotalCount)> ListByCampaignPagedAsync(long campaignId, int skip, int take)
     {
         var query = _context.Maps.AsNoTracking()
@@ -41,6 +56,9 @@ public class MapRepository : IMapRepository<Map>
                 .MaxAsync(e => (int?)e.Sequence) ?? 0;
             entity.Sequence = maxSequence + 1;
             entity.Name = $"{mapModelName} {entity.Sequence}";
+            var baseSlug = Slug.From(entity.Name, "mapa");
+            var taken = await ListSlugsWithPrefixAsync(baseSlug);
+            entity.AssignSlug(Slug.NextFree(baseSlug, taken));
 
             _context.Maps.Add(entity);
             try
@@ -49,9 +67,11 @@ public class MapRepository : IMapRepository<Map>
                 return entity;
             }
             catch (DbUpdateException ex) when (attempt < MAX_INSERT_ATTEMPTS
-                                               && ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+                                               && ex.InnerException is PostgresException pg
+                                               && pg.SqlState == PostgresErrorCodes.UniqueViolation
+                                               && pg.ConstraintName is "ix_maps_campaign_model_sequence" or "ix_maps_slug")
             {
-                // Another request took the same sequence; recalculate and try again.
+                // Another request took the same sequence or slug; recalculate and try again.
                 _context.Entry(entity).State = EntityState.Detached;
             }
         }

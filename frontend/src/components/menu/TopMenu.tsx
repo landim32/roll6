@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { FakeSelect } from '../ui/FakeSelect';
 import { UserMenu } from './UserMenu';
+import { TableSelect } from './TableSelect';
 import { CharacterSelect } from './CharacterSelect';
 import { NotificationBell } from './NotificationBell';
 import { TurnControls } from './TurnControls';
@@ -31,15 +32,16 @@ interface TopMenuProps {
 }
 
 /**
- * Top menu: current campaign (with the master's settings gear, 018), current map, current character (with the character modals),
+ * Top menu: the table combo (campaign and its map, with the master's settings gear, 018), current character (with the character modals),
  * the turn ("Turno N" and, for the master, "Finalizar turno"), "Salvar mapa" (only when unsaved), the user
  * submenu and the notifications (invites and finished turns).
  */
 export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { logout } = useAuth();
   const { currentCampaign, isMaster } = useCampaign();
-  const { draft, isDirty, canEdit, loading, loadMapModel } = useMapEditor();
+  const { isDirty, canEdit, loading } = useMapEditor();
   const [editOpen, setEditOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -52,15 +54,10 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
 
   /** "Abrir" in the settings' Mapas tab: same as opening from the maps window (the table follows it, 017). */
-  const openMapFromSettings = async (map: MapInfo) => {
-    if (!(await guard())) return;
-    try {
-      const opened = await loadMapModel(map.mapModelId, map);
-      setSettingsOpen(false);
-      toast.success(t('toast.mapLoaded', { name: opened.name }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-    }
+  const openMapFromSettings = (map: MapInfo) => {
+    navigate(`/map/${encodeURIComponent(map.slug)}`);
+    setSettingsOpen(false);
+    toast.success(t('toast.mapLoaded', { name: map.name }));
   };
 
   const onLogout = async () => {
@@ -72,14 +69,15 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
   return (
     <header className="stm-menu">
       <span className="stm-brand me-2">{t('common.appName')}</span>
-      <FakeSelect caption={t('menu.currentCampaign')} label={currentCampaign?.name ?? t('menu.chooseCampaign')} onClick={onOpenCampaign} />
+      {/* Phones: the three selects wrap to a second row below this break (CSS order). */}
+      <span className="stm-menu-break" aria-hidden="true" />
+      <TableSelect onOpenCampaign={onOpenCampaign} onOpenMap={onOpenMap} />
       {isMaster && currentCampaign && (
         <button type="button" className="btn btn-sm btn-outline-secondary stm-settings-btn" onClick={() => setSettingsOpen(true)}
           title={t('campaignSettings.open')} aria-label={t('campaignSettings.open')}>
           <GearIcon />
         </button>
       )}
-      <FakeSelect caption={t('menu.currentMap')} label={draft.name || t('menu.unnamedMap')} onClick={onOpenMap} />
       <CharacterSelect
         onManage={() => setManageOpen(true)}
         onSelectCharacter={() => setSelectOpen(true)}

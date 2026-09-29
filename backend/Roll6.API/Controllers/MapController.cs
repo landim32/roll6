@@ -21,6 +21,20 @@ public class MapController : ApiControllerBase
         _mapNpcService = mapNpcService;
     }
 
+    [HttpGet("slug/{slug}")]
+    [ProducesResponseType(typeof(MapInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBySlug(string slug)
+    {
+        try
+        {
+            return Ok(await _mapService.GetBySlugAsync(CurrentUserId, slug));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(MapInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetById(long id)

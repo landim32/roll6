@@ -50,6 +50,10 @@ public class MapInfo
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Unique URL slug. Set on creation and never changed, including after rename or delete.</summary>
+    [JsonPropertyName("slug")]
+    public string Slug { get; set; } = string.Empty;
+
     [JsonPropertyName("status")]
     public int Status { get; set; }
 

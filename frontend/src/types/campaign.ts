@@ -7,6 +7,8 @@ export interface CampaignInfo {
   userId: number;
   ownerName: string;
   name: string;
+  /** Unique URL slug. Set on creation and never changed. */
+  slug: string;
   /** Open campaigns approve access requests immediately. */
   open: boolean;
   /** Turn in progress (016), starts at 1. */
@@ -15,6 +17,17 @@ export interface CampaignInfo {
   currentMapId: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Campaign in the table combo, with the active map the table follows. */
+export interface CampaignTableInfo {
+  campaignId: number;
+  name: string;
+  slug: string;
+  isMaster: boolean;
+  currentMapId: number | null;
+  currentMapName: string | null;
+  currentMapSlug: string | null;
 }
 
 /** Data to create a campaign. */

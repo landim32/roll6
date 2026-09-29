@@ -11,8 +11,8 @@ namespace Roll6.Mcp.Tools;
 public static class CampaignTools
 {
     private const string CAMPAIGN_FIELDS = """
-        Campaign fields: campaignId, userId (the master), ownerName, name, open (open campaigns approve access requests at
-        once), currentTurn, currentMapId (the map players follow), createdAt, updatedAt.
+        Campaign fields: campaignId, userId (the master), ownerName, name, slug (immutable URL slug), open (open campaigns
+        approve access requests at once), currentTurn, currentMapId (the map players follow), createdAt, updatedAt.
         """;
 
     [McpServerTool(Name = "list_campaigns", Title = "List campaigns", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -46,6 +46,33 @@ public static class CampaignTools
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
         api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}");
+
+    [McpServerTool(Name = "get_campaign_by_slug", Title = "Get campaign by slug", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/campaign/slug/{slug}")]
+    [Description($$"""
+        What it does: returns one campaign by its URL slug (the same public data as get_campaign).
+        Who can use it: any authenticated user.
+        Returns: the campaign. {{CAMPAIGN_FIELDS}}
+        Common errors: 404 slug not found.
+        Related tools: get_campaign, get_map_by_slug, list_my_table_campaigns.
+        """)]
+    public static Task<CallToolResult> GetCampaignBySlug(
+        Roll6ApiClient api,
+        [Description(McpDocs.SLUG)] string slug) =>
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/slug/{slug}");
+
+    [McpServerTool(Name = "list_my_table_campaigns", Title = "List my table campaigns", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/campaign/table")]
+    [Description("""
+        What it does: lists the campaigns where the current user is the master or has an approved character, each with
+        the active map the table follows (omitted when there is no current map or it is archived or deleted).
+        Who can use it: any authenticated user (the list is only their own table).
+        Returns: [{ campaignId, name, slug, isMaster, currentMapId, currentMapName, currentMapSlug }].
+        Common errors: none.
+        Related tools: get_campaign_by_slug, get_map_by_slug, set_current_map.
+        """)]
+    public static Task<CallToolResult> ListMyTableCampaigns(Roll6ApiClient api) =>
+        api.SendAsync(HttpMethod.Get, "/api/campaign/table");
 
     [McpServerTool(Name = "create_campaign", Title = "Create campaign", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaign")]

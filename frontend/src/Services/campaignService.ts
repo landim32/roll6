@@ -1,4 +1,4 @@
-import type { CampaignInfo, CampaignInsertInfo } from '../types/campaign';
+import type { CampaignInfo, CampaignInsertInfo, CampaignTableInfo } from '../types/campaign';
 import type { ListQuery, PagedList } from '../types/common';
 import { API_URL, getHeaders, handleApiResponse, toQuery } from './apiHelpers';
 
@@ -29,6 +29,18 @@ class CampaignService {
   /** Gets a campaign by id. */
   async getById(id: number): Promise<CampaignInfo> {
     const response = await fetch(`${API_BASE}/${id}`, { headers: getHeaders(true) });
+    return this.handleResponse<CampaignInfo>(response);
+  }
+
+  /** Campaigns the user masters or plays, with the active map the table follows. */
+  async listTable(): Promise<CampaignTableInfo[]> {
+    const response = await fetch(`${API_BASE}/table`, { headers: getHeaders(true) });
+    return this.handleResponse<CampaignTableInfo[]>(response);
+  }
+
+  /** Gets a campaign by its URL slug. */
+  async getBySlug(slug: string): Promise<CampaignInfo> {
+    const response = await fetch(`${API_BASE}/slug/${encodeURIComponent(slug)}`, { headers: getHeaders(true) });
     return this.handleResponse<CampaignInfo>(response);
   }
 

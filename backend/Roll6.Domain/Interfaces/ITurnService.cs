@@ -10,6 +10,9 @@ public interface ITurnService
     /// <summary>Readable markdown of a turn (024); without turnNo, the turn in progress.</summary>
     Task<TurnSummaryInfo> GetSummaryAsync(long userId, long campaignId, int? turnNo);
 
+    /// <summary>Narration of a turn, or of the latest finished turn that has one (029). Null when there is none.</summary>
+    Task<TurnNarrationInfo?> GetNarrationAsync(long userId, long campaignId, int? turnNo);
+
     /// <summary>The whole table for an AI assistant (027): approved characters, NPC occurrences and the turn's actions.</summary>
     Task<TurnDataInfo> GetDataAsync(long userId, long campaignId, int? turnNo);
 

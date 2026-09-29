@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
@@ -24,6 +25,7 @@ const PAGE_SIZE = 10;
 /** Current map picker: "Mapas da campanha", "Meus mapas" and "Buscar mapas". */
 export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { currentCampaign } = useCampaign();
   const { loadMapModel, newMap } = useMapEditor();
   const [tab, setTab] = useState('campaign');
@@ -53,6 +55,12 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
   }, [open, tab, currentCampaign]);
 
   const open_ = async (mapModelId: number, map: MapInfo | null) => {
+    if (map) {
+      navigate(`/map/${encodeURIComponent(map.slug)}`);
+      toast.success(t('toast.mapLoaded', { name: map.name }));
+      onOpenChange(false);
+      return;
+    }
     if (!(await guard())) return;
     try {
       const draft = await loadMapModel(mapModelId, map);

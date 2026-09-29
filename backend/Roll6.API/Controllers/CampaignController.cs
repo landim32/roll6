@@ -51,6 +51,34 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    [HttpGet("table")]
+    [ProducesResponseType(typeof(List<CampaignTableInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Table()
+    {
+        try
+        {
+            return Ok(await _campaignService.ListTableAsync(CurrentUserId));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    [HttpGet("slug/{slug}")]
+    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBySlug(string slug)
+    {
+        try
+        {
+            return Ok(await _campaignService.GetBySlugAsync(slug));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetById(long id)
@@ -160,6 +188,23 @@ public class CampaignController : ApiControllerBase
         try
         {
             return Ok(await _turnService.GetSummaryAsync(CurrentUserId, id, turnNo));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Narration of a turn, or the latest finished turn that has one (029). 204 when there is none.</summary>
+    [HttpGet("{id:long}/turn/narration")]
+    [ProducesResponseType(typeof(TurnNarrationInfo), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> GetTurnNarration(long id, [FromQuery] int? turnNo)
+    {
+        try
+        {
+            var narration = await _turnService.GetNarrationAsync(CurrentUserId, id, turnNo);
+            return narration is null ? NoContent() : Ok(narration);
         }
         catch (Exception ex)
         {

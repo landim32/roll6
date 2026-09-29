@@ -31,9 +31,9 @@ public class McpRouteParityTests
         api.ApiKeyHeader.Should().Be(FakeApi.API_KEY, $"{name} must forward the caller's API key");
     }
 
-    /// <summary>"/api/map/{id}/token" → ^/api/map/\d+/token$ (sample ids are numbers).</summary>
+    /// <summary>"/api/map/{id}/token" → ^/api/map/[^/]+/token$ (sample ids are numbers; slugs are words).</summary>
     private static string RoutePattern(string route) =>
-        "^" + Regex.Replace(Regex.Escape(route), @"\\\{\w+}", @"\d+") + "$";
+        "^" + Regex.Replace(Regex.Escape(route), @"\\\{\w+}", @"[^/]+") + "$";
 
     /// <summary>Calls a tool with sample values: numbers 11, 12…, texts "sample", base64 for content, defaults for optionals.</summary>
     private static async Task<CallToolResult> Invoke(MethodInfo method, Roll6ApiClient api)

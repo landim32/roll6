@@ -52,6 +52,9 @@ interface MapCanvasProps {
 /** Moves under this distance (px) between press and release count as a click, not a pan. */
 const CLICK_TOLERANCE = 4;
 
+/** Zoom used to show the user's character when a map opens. */
+const FOCUS_ZOOM = 1.5;
+
 const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y === b?.y;
 
 /**
@@ -61,9 +64,9 @@ const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y ==
  */
 export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, picking = false }: MapCanvasProps) => {
   const { t } = useTranslation();
-  const { draft, hexSize, view, panBy, zoomIn, zoomOut, resizeMode, canEdit, setImageLayout } = useMapEditor();
+  const { draft, hexSize, view, panBy, zoomIn, zoomOut, centerOn, resizeMode, canEdit, setImageLayout } = useMapEditor();
   const { mapTokens, canPlace, canPlaceOwn, placeCharacter, moveToken } = useMapToken();
-  const { party } = useCharacter();
+  const { party, currentSelection } = useCharacter();
   const { session } = useAuth();
   const movement = useTokenMovement();
   const { placeOnMap } = useNpc();
@@ -89,6 +92,23 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
 
   // Another map (or campaign) closes the menu.
   useEffect(() => closeMenu(), [draft.mapId, closeMenu]);
+
+  // Opening a map shows the user's chosen character centered and zoomed in, once its pieces are loaded.
+  const centeredFor = useRef<number | null>(null);
+  useEffect(() => {
+    const mapId = draft.mapId;
+    if (mapId === null || centeredFor.current === mapId) return;
+    const onThisMap = mapTokens.filter((token) => token.mapId === mapId);
+    if (onThisMap.length === 0 || currentSelection === null) return;
+    // The GM has no character to show; a character waits for the party (loaded separately).
+    const own = currentSelection === 'gm' ? undefined : party.find((p) => p.characterId === currentSelection);
+    if (currentSelection !== 'gm' && !own) return;
+    centeredFor.current = mapId;
+    const piece = own && onThisMap.find((token) => token.campaignCharacterId === own.campaignCharacterId);
+    if (!piece) return;
+    const center = hexCenter(piece.x, piece.y, hexSize);
+    centerOn(center.x, center.y, FOCUS_ZOOM);
+  }, [draft.mapId, mapTokens, party, currentSelection, hexSize, centerOn]);
 
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (event.button !== 0) return;
@@ -130,10 +150,19 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
     }
   };
 
-  /** Movement mode clicks: pick the destination, then confirm the facing. */
-  const clickWhileMoving = async () => {
+  /**
+   * Movement mode clicks: pick the destination, then confirm the facing. A touch screen has no hover, so a tap
+   * on another hex (or toward another side) first shows that path/facing; tapping it again confirms. With a
+   * mouse the hover already did that, so one click still confirms.
+   */
+  const clickWhileMoving = async (event: ReactPointerEvent<SVGSVGElement>) => {
     const { state } = movement;
     if (state.phase === 'path') {
+      const hex = hexAt(event);
+      if (!sameHex(state.target, hex)) {
+        movement.hover(hex);
+        return;
+      }
       if (state.cost === null) {
         if (state.target) toast.warning(t('movement.unreachable'));
         return;
@@ -146,6 +175,12 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
       return;
     }
     if (state.phase !== 'facing') return;
+    const point = toMapPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), view);
+    const look = lookToward(hexCenter(state.destination.x, state.destination.y, hexSize), point, state.look);
+    if (look !== state.look) {
+      movement.face(look);
+      return;
+    }
     if (!canConfirm(state, canPlace)) {
       toast.warning(t('movement.overLimit'));
       return;
@@ -190,7 +225,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
       && Math.abs(event.clientY - start.y) < CLICK_TOLERANCE;
     if (!clicked || resizeMode) return;
     if (movement.active) {
-      void clickWhileMoving();
+      void clickWhileMoving(event);
       return;
     }
     const hex = hexAt(event);

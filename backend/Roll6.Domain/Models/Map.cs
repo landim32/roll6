@@ -12,6 +12,13 @@ public class Map
     public long UserId { get; set; }
     public int Sequence { get; set; }
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Unique URL slug. Assigned only on insert (<see cref="AssignSlug"/>); <see cref="Update"/> never changes it.
+    /// Deleted maps keep the slug.
+    /// </summary>
+    public string Slug { get; set; } = string.Empty;
+
     public MapStatus Status { get; set; } = MapStatus.Active;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -26,6 +33,12 @@ public class Map
         Name = Guard.RequiredText(name, "name", 260);
         Status = (MapStatus)status;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Sets the slug. Called only when the map is inserted.</summary>
+    public void AssignSlug(string slug)
+    {
+        Slug = slug;
     }
 
     public void MarkDeleted()

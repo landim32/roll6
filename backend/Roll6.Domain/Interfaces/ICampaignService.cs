@@ -8,6 +8,10 @@ public interface ICampaignService
     /// <summary>All campaigns of all users (feature 005), or only those of <paramref name="ownerUserId"/>; optional name search.</summary>
     Task<PagedList<CampaignInfo>> ListAsync(PageQuery query, long? ownerUserId = null);
     Task<CampaignInfo> GetByIdAsync(long campaignId);
+    /// <summary>Same rule as <see cref="GetByIdAsync"/>: any logged-in user. 404 when the slug does not exist.</summary>
+    Task<CampaignInfo> GetBySlugAsync(string slug);
+    /// <summary>Campaigns the user masters or plays, with the active map the table follows.</summary>
+    Task<List<CampaignTableInfo>> ListTableAsync(long userId);
     Task<CampaignInfo> CreateAsync(long userId, CampaignInsertInfo info);
     Task<CampaignInfo> RenameAsync(long userId, long campaignId, CampaignInsertInfo info);
     Task<CampaignInfo> SetOpenAsync(long userId, long campaignId, CampaignOpenInfo info);

@@ -31,7 +31,16 @@
     "currentMap": "Mapa atual",
     "unnamedMap": "Mapa sem nome",
     "saveMap": "Salvar mapa",
-    "readOnly": "Somente leitura"
+    "readOnly": "Somente leitura",
+    "tableSelect": "Mesa",
+    "noActiveMap": "Sem mapa ativo",
+    "noMapOpen": "Sem mapa",
+    "otherCampaigns": "Outras campanhas…",
+    "maps": "Mapas…"
+  },
+  "route": {
+    "notFound": "Campanha ou mapa não encontrado.",
+    "forbidden": "Você não tem acesso a este mapa."
   },
   "userMenu": {
     "label": "Menu do usuário",
@@ -235,7 +244,7 @@
   },
   "movement": {
     "counter": "Movimento",
-    "hint": "Clique no destino, depois no sentido. Esc cancela.",
+    "hint": "Escolha o destino e depois o sentido (no celular, toque duas vezes em cada). Esc ou botão direito cancela.",
     "overLimit": "O movimento passou do máximo.",
     "unreachable": "Não há caminho até esse hex."
   },
@@ -292,7 +301,13 @@
     "image": "Imagem",
     "resize": "Ajustar imagem",
     "zoom": "Zoom {{value}}%",
-    "unsaved": "Não salvo"
+    "unsaved": "Não salvo",
+    "share": "Compartilhar"
+  },
+  "share": {
+    "fallback": "Imagem baixada e texto copiado — cole no WhatsApp.",
+    "error": "Não foi possível gerar a imagem do mapa.",
+    "turn": "Turno {{no}}"
   },
   "campaign": {
     "title": "Campanhas",
@@ -337,8 +352,7 @@
     "footer": "Grid {{cols}} × {{rows}}",
     "columns": "Colunas",
     "rows": "Linhas",
-    "range": "Colunas e linhas devem estar entre 1 e 500.",
-    "hexSize": "Hexágono {{size}} px"
+    "range": "Colunas e linhas devem estar entre 1 e 500."
   },
   "save": {
     "title": "Salvar mapa",
@@ -473,6 +487,7 @@
     "alreadyMoved": "Já se moveu neste turno.",
     "summaryTitle": "Resumo do turno {{no}}",
     "summaryEmpty": "Nada foi feito neste turno.",
+    "noNarration": "Este turno não teve narração.",
     "moved": "moveu de ({{fromX}}, {{fromY}}) para ({{x}}, {{y}})",
     "movement": "Movimento",
     "action": "Ação",

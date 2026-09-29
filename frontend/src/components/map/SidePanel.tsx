@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 interface SidePanelProps {
@@ -23,24 +23,39 @@ const readCollapsed = (key: string): boolean => {
   }
 };
 
+/** Phones fit only one panel: opening one collapses the other (Bootstrap's `md` breakpoint). */
+const PHONE_QUERY = '(max-width: 767.98px)';
+const isPhone = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches;
+const EXPANDED_EVENT = 'roll6:side-panel-expanded';
+
 /**
  * Fixed, compact panel over the map, below the menu, on the left (party) or right (NPCs): header with the
  * title and a collapse button, a scrolling list and an optional footer. Collapsed, it becomes a narrow
- * vertical tab; the choice is remembered in this browser.
+ * vertical tab; the choice is remembered in this browser. On phones only one panel is open at a time and the
+ * right one starts collapsed.
  */
 export const SidePanel = ({ side, title, storageKey, collapseLabel, expandLabel, children, footer }: SidePanelProps) => {
-  const [collapsed, setCollapsed] = useState(() => readCollapsed(storageKey));
+  const [collapsed, setCollapsed] = useState(() => readCollapsed(storageKey) || (side === 'right' && isPhone()));
   const sideClass = side === 'right' ? ' stm-side-right' : '';
 
+  // Another panel was opened on a phone: this one steps aside (without changing the remembered choice).
+  useEffect(() => {
+    const onExpanded = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== side && isPhone()) setCollapsed(true);
+    };
+    window.addEventListener(EXPANDED_EVENT, onExpanded);
+    return () => window.removeEventListener(EXPANDED_EVENT, onExpanded);
+  }, [side]);
+
   const toggle = () => {
-    setCollapsed((prev) => {
-      try {
-        localStorage.setItem(storageKey, prev ? '0' : '1');
-      } catch {
-        // Not remembered when storage is blocked.
-      }
-      return !prev;
-    });
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      localStorage.setItem(storageKey, next ? '1' : '0');
+    } catch {
+      // Not remembered when storage is blocked.
+    }
+    if (!next) window.dispatchEvent(new CustomEvent(EXPANDED_EVENT, { detail: side }));
   };
 
   if (collapsed) {
