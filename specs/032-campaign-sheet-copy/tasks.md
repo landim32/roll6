@@ -28,19 +28,20 @@ verificáveis. Dentro de cada fase, os testes vêm antes da implementação.
 | `npm run build` | ✓ 719 módulos, sem erro de tipo |
 | `McpCoverageTests` | 86 operações / 87 ferramentas preservados |
 
-**9 tarefas pendentes — todas bloqueadas por falta de ambiente, não por código.** `CLAUDE.md` registra que não há
-PostgreSQL nem Docker na máquina de dev, e `backend/Roll6.API/appsettings.Development.json` não existe (só
-`appsettings.json`, `.Docker.json`, `.Production.json` e `.Template.json`), portanto não há banco alcançável:
+**8 tarefas pendentes — todas de verificação manual em ambiente completo, não de código.** Restam apenas os
+roteiros que exigem API + banco + S3 + navegador com dois usuários (mestre e jogador):
 
-- **T007** — `dotnet ef database update` e as consultas de conferência do backfill. A migration e os dois scripts
-  SQL foram gerados e revisados (`database/migrations/032-campaign-sheet.sql`, `database/roll6.sql`), mas **o
-  backfill nunca foi executado contra um banco real**.
-- **T019, T030, T038, T043, T047** — roteiros manuais ponta a ponta de US1…US5 (precisam de API + banco + S3 +
-  navegador e de dois usuários, mestre e jogador).
+- **T019, T030, T038, T043, T047** — roteiros manuais ponta a ponta de US1…US5.
 - **T048** — tempo real em duas sessões de navegador.
 - **T053** — checklist de regressão de `contracts/ui-contracts.md` §9 e "Definição de pronto" do `quickstart.md` §7
   (itens de UI).
 - **T054** — `/speckit.analyze` (comando separado).
+
+**T007 concluída**: a migration e o backfill foram aplicados contra um PostgreSQL real por
+`database/migrations/032-campaign-sheet.sql`, sem erro — a coluna `campaign_characters.sheet_file` existe, o
+`UPDATE` de cópia rodou e a linha entrou em `__EFMigrationsHistory`. O que **não** foi feito é a conferência
+item por item das consultas de `quickstart.md` §2 (participações sem `sheet`, notas íntegras, nenhum `sheet`
+acima de 20.000, `characters` intocado): recomenda-se rodá-las antes de fechar a feature.
 
 Ressalvas registradas:
 - **T042** foi marcada como concluída pela parte de código: a asserção de que a peça lê `participation.Sheet` já
@@ -59,8 +60,8 @@ Ressalvas registradas:
 (`invalid reference to FROM-clause entry for table "cc"`). Os dois itens do `FROM` agora são unidos no `WHERE`, no
 mesmo formato de `ClearCopiedCampaignNotes`. Corrigido em `20261001001517_AddCampaignSheetFile.cs` (com comentário
 explicando por que não é `JOIN`) e nos dois scripts regenerados, `database/migrations/032-campaign-sheet.sql` e
-`database/roll6.sql`. **A SQL corrigida continua sem execução contra um banco real** (T007 bloqueado): foi revisada
-e o projeto compila, mas não foi corrida.
+`database/roll6.sql`. **O script corrigido foi executado contra um banco real sem erro**, o que confirma o
+diagnóstico; a conferência item por item do backfill (consultas de `quickstart.md` §2) é que ainda não foi feita.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -94,7 +95,7 @@ Aplicação web (Opção 2 do plano): `backend/` (Clean Architecture, `Roll6.sln
 - [X] T004 Mapear a coluna em `backend/Roll6.Infra/Context/Roll6Context.cs`, dentro de `modelBuilder.Entity<CampaignCharacter>` (bloco das linhas 194-220), imediatamente após a linha de `Sheet`: `entity.Property(e => e.SheetFile).HasColumnName("sheet_file").HasMaxLength(260);`. Sem índice, sem default, sem FK (é nome de arquivo armazenado, como `characters.sheet_file`).
 - [X] T005 Gerar a migration (depende de T003 e T004): `cd backend && dotnet ef migrations add AddCampaignSheetFile --project Roll6.Infra --startup-project Roll6.API`. Conferir que o `AddColumn<string>` saiu como `character varying(260)` anulável em `campaign_characters` e que nada mais foi alterado.
 - [X] T006 Acrescentar o backfill ao arquivo `backend/Roll6.Infra/Migrations/<timestamp>_AddCampaignSheetFile.cs` gerado no T005, usando `migrationBuilder.Sql(""" … """)` com a CTE `prepared` + `UPDATE` de `specs/032-campaign-sheet-copy/research.md` (D5): `sheet_file = c.sheet_file` e `sheet = left(left(coalesce(c.sheet,''), greatest(0, 20000 - length(p.suffix))) || p.suffix, 20000)`, onde `suffix` é `E'\n\n## Anotações anteriores da campanha\n\n' || cc.sheet` quando as notas existem. O `left(..., 20000)` externo é obrigatório (a coluna é `varchar(20000)`). Escrever o `Down` com `DropColumn("sheet_file", "campaign_characters")` e um comentário de que o `sheet` não é revertido.
-- [ ] T007 Aplicar e conferir: `dotnet ef database update --project Roll6.Infra --startup-project Roll6.API` e executar as consultas de verificação de `specs/032-campaign-sheet-copy/quickstart.md` §2 (nenhuma participação sem `sheet` quando o personagem tem; notas íntegras após a seção; nenhum `sheet` > 20.000; `cc.sheet_file = c.sheet_file`; `characters.sheet`/`sheet_file` inalterados).
+- [X] T007 Aplicar e conferir: `dotnet ef database update --project Roll6.Infra --startup-project Roll6.API` e executar as consultas de verificação de `specs/032-campaign-sheet-copy/quickstart.md` §2 (nenhuma participação sem `sheet` quando o personagem tem; notas íntegras após a seção; nenhum `sheet` > 20.000; `cc.sheet_file = c.sheet_file`; `characters.sheet`/`sheet_file` inalterados).
 - [X] T008 [P] Criar `database/migrations/032-campaign-sheet.sql` a partir de `dotnet ef migrations script 20260929215843_AddPostureAndTokenSpaces <timestamp>_AddCampaignSheetFile --idempotent --project Roll6.Infra --startup-project Roll6.API`, com cabeçalho de 5 linhas no padrão de `database/migrations/031-posture-footprint.sql` (o que muda, idempotência, uso com `psql`, comando de regeneração).
 - [X] T009 [P] Regenerar `database/roll6.sql` com `dotnet ef migrations script --idempotent --project Roll6.Infra --startup-project Roll6.API -o ../database/roll6.sql` e **recolocar o cabeçalho manual de 3 linhas** que o comando sobrescreve.
 - [X] T010 [P] Atualizar `backend/Roll6.DTO/CampaignCharacter/CampaignCharacterDetailInfo.cs`: acrescentar `SheetFile` (`string?`) com `[JsonPropertyName("sheetFile")]` e reescrever os XML docs de `Sheet` (ficha da campanha, cópia feita na entrada), `SheetFileUrl` e `SheetFileType` (agora os **da campanha**), mantendo `CharacterSheet` documentado como a ficha original somente-leitura.
