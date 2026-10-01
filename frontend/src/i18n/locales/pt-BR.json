@@ -74,6 +74,7 @@
     "waitInvite": "Aguarde um convite do mestre",
     "use": "Usar",
     "current": "Atual",
+    "edit": "Editar {{name}}",
     "empty": "Você ainda não tem personagens."
   },
   "transfer": {
@@ -115,6 +116,7 @@
     "imageAlt": "Ficha do personagem",
     "openFullSize": "Abrir em tamanho real",
     "openPdf": "Abrir ficha (PDF)",
+    "noneCampaign": "Não há ficha em arquivo nesta campanha.",
     "errors": {
       "type": "Formato não suportado. Use PNG, JPG, WebP ou PDF.",
       "tooLarge": "O arquivo deve ter no máximo 10 MB."
@@ -134,7 +136,7 @@
       "notInteger": "Vida, energia e movimento devem ser números inteiros.",
       "negative": "Vida, energia e movimento não podem ser negativos.",
       "characterStatusTooLong": "O status pode ter no máximo 260 caracteres.",
-      "campaignSheetTooLong": "As anotações da campanha podem ter no máximo 20.000 caracteres.",
+      "campaignSheetTooLong": "A ficha da campanha pode ter no máximo 20.000 caracteres.",
       "sheetTooLong": "A ficha deve ter no máximo 20.000 caracteres.",
       "aboveTotal": "O valor atual não pode passar do total.",
       "vitalsNotInteger": "Vida e energia atuais devem ser números inteiros."
@@ -147,11 +149,12 @@
     "sheetHint": "A ficha aceita Markdown: títulos (#), **negrito**, listas e tabelas.",
     "editTitle": "Editar Personagem",
     "viewTitle": "Ver Personagem",
+    "campaignTitle": "Personagem na Campanha",
     "characterStatus": "Status",
-    "campaignSheetTab": "Anotações da Campanha",
-    "campaignSheetHint": "Anote só o que mudou nesta campanha em relação à ficha do personagem (itens perdidos ou ganhos, ferimentos, atributos alterados). A ficha original não muda.",
-    "campaignSheetPlaceholder": "Ex.: - Perdeu a espada longa na caverna dos goblins.",
-    "campaignSheetEmpty": "Nenhuma anotação nesta campanha.",
+    "campaignSheetTab": "Ficha da Campanha",
+    "campaignSheetHint": "É a ficha do personagem nesta campanha: começou como cópia da ficha dele quando entrou e só vale aqui. A ficha original não muda.",
+    "campaignSheetPlaceholder": "Ex.: # Thorin\n\nForça 5, espada longa, armadura de couro.",
+    "campaignSheetEmpty": "Sem ficha nesta campanha.",
     "token": "Token",
     "noToken": "Sem token",
     "chooseToken": "Escolher token",
@@ -166,11 +169,11 @@
     "chooseImage": "Escolher imagem",
     "permanentSection": "Ficha permanente",
     "permanentHint": "Valores totais do personagem, os mesmos em todas as campanhas.",
-    "vitalsHint": "Podem ficar em zero ou negativos (personagem caído), mas não passar do total."
+    "vitalsHint": "Podem ficar em zero ou negativos, mas não passar do total."
   },
   "tokens": {
     "modalTitle": "Tokens",
-    "cropHint": "Arraste a imagem para enquadrar, use o zoom (ou a roda do mouse) e gire se precisar. O recorte é quadrado e salvo em 240 × 240 px.",
+    "cropHint": "Arraste a imagem para enquadrar, use o zoom (ou a roda do mouse) e gire se precisar. O recorte segue o espaço e é salvo em {{width}} × {{height}} px.",
     "mineTab": "Meus Tokens",
     "mineEmpty": "Você ainda não cadastrou tokens. Use a aba Incluir token ou procure na biblioteca.",
     "edit": "Editar {{name}}",
@@ -281,7 +284,6 @@
     "expand": "Mostrar personagens",
     "edit": "Editar {{name}}",
     "view": "Ver {{name}}",
-    "fallen": "Caído",
     "life": "Vida",
     "energy": "Energia",
     "vital": "{{label}} {{current}} de {{total}}"
@@ -418,6 +420,7 @@
     "characterCreatedRequested": "{{name}} criado. Aguardando aprovação do mestre.",
     "characterRequestFailed": "{{name}} criado, mas o pedido de acesso falhou: {{error}}. Tente em Selecionar Personagem.",
     "characterUpdated": "{{name}} atualizado.",
+    "campaignCharacterUpdated": "{{name}} atualizado nesta campanha.",
     "tokenCreated": "Token {{name}} cadastrado.",
     "tokenUpdated": "Token {{name}} atualizado.",
     "npcAdded": "{{name}} incluído na campanha.",

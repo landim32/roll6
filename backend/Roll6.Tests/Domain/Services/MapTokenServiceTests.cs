@@ -366,6 +366,8 @@ public class MapTokenServiceTests
         (aria.Name, aria.Life, aria.Energy, aria.Status, aria.Sheet, aria.Move, aria.CharacterId)
             .Should().Be(("Aria", 8, 3, "ferida", "Força 3", 5, (long?)ARIA));
         // 026: character pieces keep reading the participation, with the character's totals.
+        // 032: the participation's Sheet is now this campaign's copy of the character's sheet, so a piece shows the
+        // campaign sheet — here the character has none of its own, which is exactly the point.
         (aria.TotalLife, aria.TotalEnergy).Should().Be((12, 6));
         var goblin = result.Single(t => t.MapTokenId == 41);
         (goblin.Name, goblin.Life, goblin.CharacterId).Should().Be(("Goblin", 4, (long?)null));

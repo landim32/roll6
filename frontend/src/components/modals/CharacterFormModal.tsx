@@ -9,7 +9,6 @@ import { ImageCropper } from '../ui/ImageCropper';
 import { TokenModal } from './TokenModal';
 import { SheetFileField } from '../characters/SheetFileField';
 import type { SheetFileValue } from '../characters/SheetFileField';
-import { SheetFileView } from '../characters/SheetFileView';
 import type { ImageCrop } from '../ui/ImageCropper';
 import { useCharacter } from '../../hooks/useCharacter';
 import { imageService } from '../../Services/imageService';
@@ -18,31 +17,17 @@ import {
   emptyCharacterForm, MAX_CHARACTER_NAME, MAX_CHARACTER_SHEET, toCharacterInsert, validateCharacterForm,
 } from '../../lib/characterForm';
 import type { CharacterForm } from '../../lib/characterForm';
-import {
-  MAX_CAMPAIGN_SHEET, MAX_CHARACTER_STATUS, PARTICIPATION_MODE, toCampaignUpdate, validateCampaignArea,
-} from '../../lib/campaignCharacterForm';
-import type { ParticipationMode } from '../../lib/campaignCharacterForm';
-import { validateVitals } from '../../lib/vitals';
 import type { CharacterInfo } from '../../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../../types/campaignCharacter';
-import type { CampaignCharacterDetailInfo, CampaignCharacterInfo } from '../../types/campaignCharacter';
-import { POSTURE, POSTURES } from '../../types/mapToken';
-import type { Posture } from '../../types/mapToken';
 
-// The markdown editor/viewer are heavy: loaded only when this form is opened.
+// The markdown editor is heavy: loaded only when this form is opened.
 const MarkdownEditor = lazy(() => import('../ui/MarkdownEditor'));
-const MarkdownView = lazy(() => import('../ui/MarkdownView'));
-
-/** A party card opened in the form: the participation and what the user may do with it. */
-export interface CharacterEditTarget {
-  participation: CampaignCharacterInfo;
-  mode: ParticipationMode;
-}
 
 interface CharacterFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editing?: CharacterEditTarget | null;
+  /** Without a character the form creates one ("Incluir Personagem"); with one, its owner edits it. */
+  character?: CharacterInfo | null;
 }
 
 const toForm = (c: CharacterInfo): CharacterForm => ({
@@ -54,31 +39,25 @@ const toForm = (c: CharacterInfo): CharacterForm => ({
 });
 
 /**
- * Character form with tabs "Dados" (name + picture on one line, "Nesta campanha" = current life/energy, status and
- * token, "Ficha permanente" = total life/energy and move), "Anotações da Campanha" (only from a party card),
- * "Ficha" (markdown) and "Ficha em arquivo".
- * Create ("Incluir Personagem"): creates and, with a current campaign, joins it right away —
- * approved for the master (or in open campaigns), otherwise as an access request (008 FR-015/016).
- * Party card (010): the owner changes everything; the master only "Nesta campanha" and the campaign notes (the
- * token is saved on the character); everyone else only reads. Ficha / Ficha em arquivo are read-only for non-owners.
+ * The character itself (032), opened from the character combo: tabs "Dados" (name + picture on one line, token and
+ * "Ficha permanente" = total life/energy and move), "Ficha" (markdown) and "Ficha em arquivo". Only the owner reaches
+ * it, so every field is editable and nothing here belongs to a campaign — what a campaign holds about the character
+ * lives in CampaignCharacterModal.
+ * Create ("Incluir Personagem"): creates and, with a current campaign, joins it right away — approved for the master
+ * (or in open campaigns), otherwise as an access request (008 FR-015/016).
+ * Update replaces every field, so the token and the sheet file are seeded from the character and sent back unchanged
+ * unless they are changed here.
  */
-export const CharacterFormModal = ({ open, onOpenChange, editing = null }: CharacterFormModalProps) => {
+export const CharacterFormModal = ({ open, onOpenChange, character = null }: CharacterFormModalProps) => {
   const { t } = useTranslation();
-  const { createCharacter, getCharacter, updateCharacter, getParticipation, updateParticipation } = useCharacter();
+  const { createCharacter, updateCharacter } = useCharacter();
   const [tab, setTab] = useState('data');
   const [form, setForm] = useState<CharacterForm>(emptyCharacterForm);
   const [crop, setCrop] = useState<ImageCrop | null>(null);
   const [saving, setSaving] = useState(false);
-  const [original, setOriginal] = useState<CharacterInfo | null>(null);
-  const [detail, setDetail] = useState<CampaignCharacterDetailInfo | null>(null);
   /** Saved picture kept on edit (null once removed). */
   const [keptImage, setKeptImage] = useState<{ file: string; url: string | null } | null>(null);
-  const [currentLife, setCurrentLife] = useState('');
-  const [currentEnergy, setCurrentEnergy] = useState('');
-  const [characterStatus, setCharacterStatus] = useState('');
-  const [posture, setPosture] = useState<Posture>(POSTURE.standing);
-  const [campaignSheet, setCampaignSheet] = useState('');
-  /** The character's own token (011 US5): chosen in the tokens modal, saved with the character. */
+  /** The character's token (011 US5): chosen in the tokens modal, saved with the character. */
   const [token, setToken] = useState<{ tokenId: number; name: string; imageUrl: string | null } | null>(null);
   const [pickingToken, setPickingToken] = useState(false);
   /** A new picture is being cropped: the picture area takes the whole line. */
@@ -87,136 +66,59 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
   const [sheetFile, setSheetFile] = useState<SheetFileValue | null>(null);
   const [uploadingSheet, setUploadingSheet] = useState(false);
 
-  const participationId = editing?.participation.campaignCharacterId ?? null;
-  const mode = editing?.mode ?? null;
-  const isOwner = mode === PARTICIPATION_MODE.owner;
-  const isViewer = mode === PARTICIPATION_MODE.viewer;
-  /** The character's own fields are editable when creating or for the owner. */
-  const characterEditable = editing === null || isOwner;
+  const characterId = character?.characterId ?? null;
 
   useEffect(() => {
     if (!open) return;
     setTab('data');
     setCrop(null);
     setCropping(false);
-    setOriginal(null);
-    setDetail(null);
-    setKeptImage(null);
     setForm(emptyCharacterForm());
-    setToken(null);
+    setKeptImage(null);
     setSheetFile(null);
-    if (!editing) return;
-    let cancelled = false;
-    const loadCharacter = isOwner ? getCharacter(editing.participation.characterId) : Promise.resolve(null);
-    Promise.all([getParticipation(editing.participation.campaignCharacterId), loadCharacter])
-      .then(([participation, character]) => {
-        if (cancelled) return;
-        setDetail(participation);
-        setCurrentLife(String(participation.currentLife));
-        setCurrentEnergy(String(participation.currentEnergy));
-        setCharacterStatus(participation.characterStatus ?? '');
-        setPosture(participation.posture);
-        setCampaignSheet(participation.sheet ?? '');
-        // The token belongs to the character, but the owner and the master both choose it here.
-        setToken(participation.characterTokenId !== null
-          ? { tokenId: participation.characterTokenId, name: participation.characterTokenName ?? '', imageUrl: participation.characterTokenImageUrl }
-          : null);
-        if (character) {
-          setOriginal(character);
-          setForm(toForm(character));
-          setKeptImage(character.image ? { file: character.image, url: character.imageUrl } : null);
-          setSheetFile(character.sheetFile && character.sheetFileType
-            ? { fileName: character.sheetFile, url: character.sheetFileUrl, type: character.sheetFileType, originalName: null }
-            : null);
-        }
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-        onOpenChange(false);
-      });
-    return () => { cancelled = true; };
-  // Load once per opening/target.
+    setToken(null);
+    if (!character) return;
+    setForm(toForm(character));
+    setKeptImage(character.image ? { file: character.image, url: character.imageUrl } : null);
+    setSheetFile(character.sheetFile && character.sheetFileType
+      ? { fileName: character.sheetFile, url: character.sheetFileUrl, type: character.sheetFileType, originalName: null }
+      : null);
+    setToken(character.tokenId !== null
+      ? { tokenId: character.tokenId, name: character.tokenName ?? '', imageUrl: character.tokenImageUrl }
+      : null);
+  // Seed once per opening/target.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, participationId, mode]);
+  }, [open, characterId]);
 
   const set = (field: keyof CharacterForm) => (value: string) => setForm((prev) => ({ ...prev, [field]: value }));
 
-  const loading = editing !== null && (detail === null || (isOwner && original === null));
-
-  /**
-   * Current values to save: when the owner lowers a total below an untouched current value the
-   * current follows the total (009 FR-011); a current typed above the total is an error.
-   */
-  const vitalsToSave = (before: CampaignCharacterDetailInfo, totalLife: number, totalEnergy: number) => {
-    const follow = (typed: string, previous: number, total: number) =>
-      (Number(typed) === previous && previous > total ? String(total) : typed);
-    return {
-      life: follow(currentLife, before.currentLife, totalLife),
-      energy: follow(currentEnergy, before.currentEnergy, totalEnergy),
-    };
-  };
-
-  const saveParticipation = async (before: CampaignCharacterDetailInfo) => {
-    const draft = isOwner ? toCharacterInsert(form, null, token?.tokenId ?? null, sheetFile?.fileName ?? null) : null;
-    const totalLife = draft?.life ?? before.totalLife;
-    const totalEnergy = draft?.energy ?? before.totalEnergy;
-    const vitals = vitalsToSave(before, totalLife, totalEnergy);
-    const vitalsError = validateVitals({ currentLife: vitals.life, currentEnergy: vitals.energy, totalLife, totalEnergy });
-    if (vitalsError) {
-      setTab('data');
-      return toast.error(t(`characterForm.errors.${vitalsError}`));
-    }
-    const areaError = validateCampaignArea({ characterStatus, sheet: campaignSheet });
-    if (areaError) {
-      setTab(areaError === 'campaignSheetTooLong' ? 'campaignSheet' : 'data');
-      return toast.error(t(`characterForm.errors.${areaError}`));
-    }
-
-    setSaving(true);
-    try {
-      let name = before.characterName;
-      if (draft) {
-        const image = crop ? (await imageService.upload(await cropToFile(crop.src, crop.area, { rotation: crop.rotation }))).fileName : keptImage?.file ?? null;
-        name = (await updateCharacter(before.characterId, { ...draft, image })).name;
-      }
-      await updateParticipation(before.campaignCharacterId, toCampaignUpdate({
-        currentLife: vitals.life, currentEnergy: vitals.energy, characterStatus, sheet: campaignSheet, posture,
-        // The owner's token goes with the character (it may be removed); the master changes it here.
-        tokenId: draft ? null : token?.tokenId ?? null,
-      }));
-      toast.success(t('toast.characterUpdated', { name }));
-      onOpenChange(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (loading || isViewer || uploadingSheet) return;
-    if (characterEditable) {
-      const error = validateCharacterForm(form);
-      if (error) {
-        // Show the tab where the problem is.
-        setTab(error === 'sheetTooLong' ? 'sheet' : 'data');
-        return toast.error(t(`characterForm.errors.${error}`));
-      }
+    if (saving || uploadingSheet) return;
+    const error = validateCharacterForm(form);
+    if (error) {
+      // Show the tab where the problem is.
+      setTab(error === 'sheetTooLong' ? 'sheet' : 'data');
+      return toast.error(t(`characterForm.errors.${error}`));
     }
-
-    if (detail) return saveParticipation(detail);
 
     setSaving(true);
     try {
-      const image = crop ? (await imageService.upload(await cropToFile(crop.src, crop.area, { rotation: crop.rotation }))).fileName : null;
-      const { character, participation, requestError } = await createCharacter(toCharacterInsert(form, image, token?.tokenId ?? null, sheetFile?.fileName ?? null));
-      const name = character.name;
-      if (requestError) toast.warning(t('toast.characterRequestFailed', { name, error: requestError }));
-      else if (!participation) toast.success(t('toast.characterCreated', { name }));
-      else if (participation.status === CAMPAIGN_CHARACTER_STATUS.approved) toast.success(t('toast.characterCreatedApproved', { name }));
-      else toast.success(t('toast.characterCreatedRequested', { name }));
+      const image = crop
+        ? (await imageService.upload(await cropToFile(crop.src, crop.area, { rotation: crop.rotation }))).fileName
+        : character ? keptImage?.file ?? null : null;
+      const payload = toCharacterInsert(form, image, token?.tokenId ?? null, sheetFile?.fileName ?? null);
+      if (character) {
+        const updated = await updateCharacter(character.characterId, payload);
+        toast.success(t('toast.characterUpdated', { name: updated.name }));
+      } else {
+        const { character: created, participation, requestError } = await createCharacter(payload);
+        const name = created.name;
+        if (requestError) toast.warning(t('toast.characterRequestFailed', { name, error: requestError }));
+        else if (!participation) toast.success(t('toast.characterCreated', { name }));
+        else if (participation.status === CAMPAIGN_CHARACTER_STATUS.approved) toast.success(t('toast.characterCreatedApproved', { name }));
+        else toast.success(t('toast.characterCreatedRequested', { name }));
+      }
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
@@ -233,198 +135,99 @@ export const CharacterFormModal = ({ open, onOpenChange, editing = null }: Chara
     </div>
   );
 
-  /** The character's data as read by the master or another participant (from the participation). */
-  const readOnlyField = (id: string, label: string, value: string | number) => (
-    <div className="col-4">
-      <label className="form-label" htmlFor={`character-${id}`}>{label}</label>
-      <input id={`character-${id}`} className="form-control" value={value} readOnly disabled />
-    </div>
-  );
-
   const tabs = [
     { key: 'data', label: t('characterForm.dataTab') },
-    ...(editing ? [{ key: 'campaignSheet', label: t('characterForm.campaignSheetTab') }] : []),
     { key: 'sheet', label: t('characterForm.sheetTab') },
-    ...(characterEditable || detail?.sheetFileUrl ? [{ key: 'sheetFile', label: t('sheetFile.tab') }] : []),
+    { key: 'sheetFile', label: t('sheetFile.tab') },
   ];
-
-  const title = editing === null ? 'characterForm.title' : isViewer ? 'characterForm.viewTitle' : 'characterForm.editTitle';
 
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title={t(title)}
+      title={t(character === null ? 'characterForm.title' : 'characterForm.editTitle')}
       large
       hidden={pickingToken}
-      footer={isViewer ? (
-        <button type="button" className="btn btn-secondary" onClick={() => onOpenChange(false)}>{t('common.close')}</button>
-      ) : (
+      footer={(
         <>
           <button type="button" className="btn btn-secondary" onClick={() => onOpenChange(false)} disabled={saving}>{t('common.cancel')}</button>
-          <button type="submit" form="character-form" className="btn btn-primary" disabled={saving || loading || uploadingSheet}>
+          <button type="submit" form="character-form" className="btn btn-primary" disabled={saving || uploadingSheet}>
             {saving && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
             {t('common.save')}
           </button>
         </>
       )}
     >
-      {loading ? <p className="text-body-secondary">{t('common.loading')}</p> : (
-        <>
-          <Tabs tabs={tabs} active={tab} onChange={setTab} />
-          <form id="character-form" onSubmit={onSubmit} noValidate>
-            {/* Tabs stay mounted (hidden) so the chosen crop and the sheets survive tab switches. */}
-            <div className="row g-3" hidden={tab !== 'data'}>
-              <div className="col-12">
-                <div className="d-flex flex-wrap align-items-end gap-3">
-                  <div className="flex-grow-1" style={{ minWidth: '12rem' }}>
-                    <label className="form-label" htmlFor="character-name">{t('characterForm.name')}</label>
-                    {characterEditable ? (
-                      <input id="character-name" className="form-control" maxLength={MAX_CHARACTER_NAME} autoFocus
-                        value={form.name} onChange={(e) => set('name')(e.target.value)} />
-                    ) : (
-                      <input id="character-name" className="form-control" value={detail?.characterName ?? ''} readOnly disabled />
-                    )}
-                  </div>
-                  <div className={cropping ? 'w-100' : undefined}>
-                    <label className="form-label d-block" htmlFor="character-image">{t('characterForm.image')}</label>
-                    {characterEditable ? (
-                      <ImageCropper
-                        id="character-image"
-                        compact
-                        onChange={setCrop}
-                        onCroppingChange={setCropping}
-                        hasCurrent={keptImage !== null}
-                        currentUrl={keptImage?.url}
-                        currentName={form.name}
-                        onRemoveCurrent={() => setKeptImage(null)}
-                      />
-                    ) : (
-                      <CharacterAvatar name={detail?.characterName ?? ''} imageUrl={detail?.characterImageUrl} size={64} />
-                    )}
-                  </div>
-                </div>
+      <Tabs tabs={tabs} active={tab} onChange={setTab} />
+      <form id="character-form" onSubmit={onSubmit} noValidate>
+        {/* Tabs stay mounted (hidden) so the chosen crop and the sheet survive tab switches. */}
+        <div className="row g-3" hidden={tab !== 'data'}>
+          <div className="col-12">
+            <div className="d-flex flex-wrap align-items-end gap-3">
+              <div className="flex-grow-1" style={{ minWidth: '12rem' }}>
+                <label className="form-label" htmlFor="character-name">{t('characterForm.name')}</label>
+                <input id="character-name" className="form-control" maxLength={MAX_CHARACTER_NAME} autoFocus
+                  value={form.name} onChange={(e) => set('name')(e.target.value)} />
               </div>
-              <fieldset className="col-12" disabled={isViewer}>
-                {editing && <legend className="fs-6 fw-semibold mb-2">{t('characterForm.campaignSection')}</legend>}
-                <div className="row g-3">
-                  {editing && (
-                    <>
-                      <div className="col-6">
-                        <label className="form-label" htmlFor="character-current-life">{t('characterForm.currentLife')}</label>
-                        <input id="character-current-life" type="number" step={1} className="form-control"
-                          value={currentLife} onChange={(e) => setCurrentLife(e.target.value)} />
-                      </div>
-                      <div className="col-6">
-                        <label className="form-label" htmlFor="character-current-energy">{t('characterForm.currentEnergy')}</label>
-                        <input id="character-current-energy" type="number" step={1} className="form-control"
-                          value={currentEnergy} onChange={(e) => setCurrentEnergy(e.target.value)} />
-                      </div>
-                      <div className="col-sm-8">
-                        <label className="form-label" htmlFor="character-status">{t('characterForm.characterStatus')}</label>
-                        <input id="character-status" className="form-control" maxLength={MAX_CHARACTER_STATUS}
-                          value={characterStatus} onChange={(e) => setCharacterStatus(e.target.value)} />
-                      </div>
-                      <div className="col-sm-4">
-                        <label className="form-label" htmlFor="character-posture">{t('posture.label')}</label>
-                        <select id="character-posture" className="form-select" value={posture}
-                          onChange={(e) => setPosture(Number(e.target.value) as Posture)}>
-                          {POSTURES.map((value) => <option key={value} value={value}>{t(`posture.${value}`)}</option>)}
-                        </select>
-                      </div>
-                    </>
-                  )}
-                  <div className="col-12">
-                    <span className="form-label d-block">{t('characterForm.token')}</span>
-                    <div className="d-flex align-items-center gap-2">
-                      {token && <CharacterAvatar name={token.name} imageUrl={token.imageUrl} size={40} />}
-                      <span className={token ? '' : 'text-body-secondary'}>{token ? token.name : t('characterForm.noToken')}</span>
-                      {!isViewer && (
-                        <button type="button" className="btn btn-outline-secondary btn-sm ms-auto" onClick={() => setPickingToken(true)}>
-                          {t('characterForm.chooseToken')}
-                        </button>
-                      )}
-                      {token && characterEditable && (
-                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setToken(null)}>
-                          {t('characterForm.removeToken')}
-                        </button>
-                      )}
-                    </div>
-                    <div className="form-text">{t('characterForm.tokenHint')}</div>
-                  </div>
-                </div>
-                {editing && !isViewer && <div className="form-text">{t('characterForm.vitalsHint')}</div>}
-              </fieldset>
-              <fieldset className="col-12">
-                <legend className="fs-6 fw-semibold mb-2">{t('characterForm.permanentSection')}</legend>
-                <div className="row g-3">
-                  {characterEditable ? (
-                    <>
-                      {numberField('life')}
-                      {numberField('energy')}
-                      {numberField('move')}
-                    </>
-                  ) : detail && (
-                    <>
-                      {readOnlyField('life', t('characterForm.life'), detail.totalLife)}
-                      {readOnlyField('energy', t('characterForm.energy'), detail.totalEnergy)}
-                      {readOnlyField('move', t('characterForm.move'), detail.characterMove)}
-                    </>
-                  )}
-                </div>
-                <div className="form-text">
-                  {t('characterForm.permanentHint')}{!characterEditable && ` ${t('characterForm.readOnlyHint')}`}
-                </div>
-              </fieldset>
+              <div className={cropping ? 'w-100' : undefined}>
+                <label className="form-label d-block" htmlFor="character-image">{t('characterForm.image')}</label>
+                <ImageCropper
+                  id="character-image"
+                  compact
+                  onChange={setCrop}
+                  onCroppingChange={setCropping}
+                  hasCurrent={keptImage !== null}
+                  currentUrl={keptImage?.url}
+                  currentName={form.name}
+                  onRemoveCurrent={() => setKeptImage(null)}
+                />
+              </div>
             </div>
-            {characterEditable ? (
-              <div hidden={tab !== 'sheet'}>
-                <label className="form-label" htmlFor="character-sheet">{t('characterForm.sheet')}</label>
-                <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
-                  <MarkdownEditor id="character-sheet" value={form.sheet} onChange={set('sheet')} maxLength={MAX_CHARACTER_SHEET}
-                    initialMode={editing ? 'preview' : 'live'} />
-                </Suspense>
-                <div className="form-text">{t('characterForm.sheetHint')}</div>
-              </div>
-            ) : (
-              <div hidden={tab !== 'sheet'}>
-                <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
-                  <MarkdownView value={detail?.characterSheet ?? ''} />
-                </Suspense>
-              </div>
-            )}
-            {characterEditable ? (
-              <div hidden={tab !== 'sheetFile'}>
-                <label className="form-label" htmlFor="character-sheet-file">{t('sheetFile.tab')}</label>
-                <SheetFileField id="character-sheet-file" value={sheetFile} onChange={setSheetFile} onUploadingChange={setUploadingSheet} />
-              </div>
-            ) : detail?.sheetFileUrl && detail.sheetFileType && (
-              <div hidden={tab !== 'sheetFile'}>
-                <SheetFileView url={detail.sheetFileUrl} type={detail.sheetFileType} />
-              </div>
-            )}
-            {editing && (
-              <div hidden={tab !== 'campaignSheet'}>
-                <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
-                  {isViewer ? <MarkdownView value={campaignSheet} emptyText={t('characterForm.campaignSheetEmpty')} /> : (
-                    <>
-                      <label className="form-label" htmlFor="campaign-sheet">{t('characterForm.campaignSheetTab')}</label>
-                      <MarkdownEditor id="campaign-sheet" value={campaignSheet} onChange={setCampaignSheet} maxLength={MAX_CAMPAIGN_SHEET}
-                        placeholder={t('characterForm.campaignSheetPlaceholder')} initialMode="preview" />
-                    </>
-                  )}
-                </Suspense>
-                <div className="form-text">{t('characterForm.campaignSheetHint')}</div>
-              </div>
-            )}
-          </form>
-          <TokenModal
-            open={pickingToken}
-            onOpenChange={setPickingToken}
-            onSelect={(chosen) => setToken({ tokenId: chosen.tokenId, name: chosen.name, imageUrl: chosen.upImageUrl })}
-          />
-        </>
-      )}
+          </div>
+          <div className="col-12">
+            <span className="form-label d-block">{t('characterForm.token')}</span>
+            <div className="d-flex align-items-center gap-2">
+              {token && <CharacterAvatar name={token.name} imageUrl={token.imageUrl} size={40} />}
+              <span className={token ? '' : 'text-body-secondary'}>{token ? token.name : t('characterForm.noToken')}</span>
+              <button type="button" className="btn btn-outline-secondary btn-sm ms-auto" onClick={() => setPickingToken(true)}>
+                {t('characterForm.chooseToken')}
+              </button>
+              {token && (
+                <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setToken(null)}>
+                  {t('characterForm.removeToken')}
+                </button>
+              )}
+            </div>
+            <div className="form-text">{t('characterForm.tokenHint')}</div>
+          </div>
+          <fieldset className="col-12">
+            <legend className="fs-6 fw-semibold mb-2">{t('characterForm.permanentSection')}</legend>
+            <div className="row g-3">
+              {numberField('life')}
+              {numberField('energy')}
+              {numberField('move')}
+            </div>
+            <div className="form-text">{t('characterForm.permanentHint')}</div>
+          </fieldset>
+        </div>
+        <div hidden={tab !== 'sheet'}>
+          <label className="form-label" htmlFor="character-sheet">{t('characterForm.sheet')}</label>
+          <Suspense fallback={<p className="text-body-secondary">{t('common.loading')}</p>}>
+            <MarkdownEditor id="character-sheet" value={form.sheet} onChange={set('sheet')} maxLength={MAX_CHARACTER_SHEET}
+              initialMode={character ? 'preview' : 'live'} />
+          </Suspense>
+          <div className="form-text">{t('characterForm.sheetHint')}</div>
+        </div>
+        <div hidden={tab !== 'sheetFile'}>
+          <label className="form-label" htmlFor="character-sheet-file">{t('sheetFile.tab')}</label>
+          <SheetFileField id="character-sheet-file" value={sheetFile} onChange={setSheetFile} onUploadingChange={setUploadingSheet} />
+        </div>
+      </form>
+      <TokenModal
+        open={pickingToken}
+        onOpenChange={setPickingToken}
+        onSelect={(chosen) => setToken({ tokenId: chosen.tokenId, name: chosen.name, imageUrl: chosen.upImageUrl })}
+      />
     </Modal>
   );
 };

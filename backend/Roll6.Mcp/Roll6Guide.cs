@@ -38,6 +38,8 @@ public static class Roll6Guide
           character to another user by e-mail (`transfer_character`): only the owner changes — participations, campaign
           values, pieces and turn entries stay exactly as they were. Besides the markdown `sheet`, a character may have a
           **sheet file** (image or PDF, stored as sent): `upload_document` → `sheetFile` on create/update_character.
+          Both are copied to each participation when the character joins that campaign, and from then on the campaign's
+          copy changes only there.
         - **NPCs**: belong to a master's library (require a token). The master adds his own NPCs to a campaign
           (campaign NPC) and places **occurrences** on maps (each occurrence has its own name, status and current
           life/energy, at most the NPC's totals; its piece shows them with the NPC's sheet).
@@ -50,11 +52,11 @@ public static class Roll6Guide
         - Participation status: `1 Invited`, `2 RequestedAccess`, `3 Approved`, `4 Denied`.
           Player: `request_campaign_access`, `accept_invite`, `decline_invite`. Master: `invite_character`,
           `approve_access_request`, `deny_access_request`, `remove_participation`.
-        - Each participation holds the campaign values of the character: current life/energy (may go to 0 or below =
-          fallen), a free-text status and the **campaign notes** (`sheet` of the participation, `update_participation`,
-          by the owner or the master). The notes are not a copy of the character's sheet: they start empty when the
-          character joins and record only what changed in this campaign (e.g. the character had a sword and lost it).
-          The character's own sheet stays the reference and is never changed by campaign play.
+        - Each participation holds the campaign values of the character: current life/energy (may go to 0 or below;
+          that does not change posture), a free-text status, the posture, and the character's **campaign sheet** — the
+          participation's `sheet` and `sheetFile`, copied from the character when they join and from then on editable
+          only here, by the owner or the master (`update_participation`). The character's own sheet and sheet file are
+          never changed by campaign play, and the master cannot change them at all.
         - The campaign's **current map** (`set_current_map`, master) is the map all players follow in the app.
         - Every campaign and every campaign map has an immutable **slug** (built from the name, unique on the whole
           site; renaming does not change it). `get_campaign_by_slug` and `get_map_by_slug` open them.
@@ -85,7 +87,8 @@ public static class Roll6Guide
           combat ("Fora de combate", lying and in black and white). The character's owner or the master changes a
           character's (for all its pieces in the campaign); only the master changes an NPC's. Tools:
           `set_piece_posture`, or `posture` in `update_participation`, `update_map_npc` and `process_turn`. It is logged
-          in the turn and is separate from the free-text status. Objects have none.
+          in the turn and is separate from the free-text status and from life: 0 or below does not lay the piece down.
+          Objects have none.
         - Tokens have a standing size (`upSpace`) and an optional down size (`downSpace`), each **1, 2, 3, 7 or 10**
           hexes; a piece takes the down size while down or out of combat. Pieces return `space` = hexes taken now.
         - Shapes, around the piece's position (`x`/`y`) and the side it faces (`look`): 1 = the position; 2 = the

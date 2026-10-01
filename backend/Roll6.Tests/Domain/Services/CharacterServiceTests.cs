@@ -329,4 +329,19 @@ public class CharacterServiceTests
 
         _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
     }
+
+    // ---- 032: the campaign sheet is not the character's ----
+
+    [Fact]
+    public async Task Update_ChangesTheCharacterOnly_NeverAParticipation()
+    {
+        await _service.UpdateAsync(OWNER, CHARACTER, new CharacterInsertInfo
+        {
+            Name = "Aria", Life = 12, Energy = 6, Sheet = "Nova ficha", SheetFile = "0123456789abcdef0123456789abcdef.pdf"
+        });
+
+        // FR-004/FR-008: every campaign keeps its own copy of the sheet and of the sheet file. The only thing a
+        // character update still does to participations is lower current values when a total drops (009).
+        _campaignCharacterRepository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+    }
 }

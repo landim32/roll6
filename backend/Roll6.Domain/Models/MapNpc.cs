@@ -15,7 +15,7 @@ public class MapNpc
     public long MapId { get; set; }
     public long NpcId { get; set; }
     public string Name { get; set; } = string.Empty;
-    /// <summary>Current life (at most the NPC's life; 0 or below = fallen).</summary>
+    /// <summary>Current life (at most the NPC's life; 0 or below is allowed and does not change posture).</summary>
     public int CurrentLife { get; set; }
 
     /// <summary>Current energy (at most the NPC's energy).</summary>
@@ -46,7 +46,7 @@ public class MapNpc
     }
 
     /// <summary>
-    /// Changes only this occurrence; current life and energy may go to zero or below (fallen) but never above the
+    /// Changes only this occurrence; current life and energy may go to zero or below but never above the
     /// NPC's totals.
     /// </summary>
     public void Update(string? name, int currentLife, int currentEnergy, string? status, int totalLife, int totalEnergy)

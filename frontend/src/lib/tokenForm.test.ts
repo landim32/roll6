@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { emptyTokenForm, MAX_TOKEN_DESCRIPTION, MAX_TOKEN_NAME, toTokenForm, toTokenInsert, validateTokenForm } from './tokenForm';
+import { downImageSpace, emptyTokenForm, MAX_TOKEN_DESCRIPTION, MAX_TOKEN_NAME, toTokenForm, toTokenInsert, validateTokenForm } from './tokenForm';
 import type { TokenInfo } from '../types/token';
 
 const form = (changes = {}) => ({ ...emptyTokenForm(), name: 'Goblin', ...changes });
+
+describe('downImageSpace', () => {
+  it('uses 2 when the lying space is left on the default', () => {
+    expect(downImageSpace('')).toBe(2);
+    expect(downImageSpace('3')).toBe(3);
+  });
+});
 
 describe('validateTokenForm', () => {
   it.each([

@@ -52,7 +52,7 @@ public static class MapNpcTools
         Roll6ApiClient api,
         [Description("Id of the occurrence (mapNpcId from list_map_npcs or the piece's mapNpcId in list_map_tokens).")] long mapNpcId,
         [Description("Occurrence name (required, up to 260 characters). Example: \"Goblin 2\".")] string name,
-        [Description("Current life of this occurrence, at most the NPC's life (totalLife); 0 or negative = fallen.")] int currentLife,
+        [Description("Current life of this occurrence, at most the NPC's life (totalLife); 0 or negative is allowed and does not change posture.")] int currentLife,
         [Description("Current energy of this occurrence, at most the NPC's energy (totalEnergy).")] int currentEnergy,
         [Description("Free-text status (up to 260 characters), e.g. \"stunned\". Null clears it.")] string? status = null,
         [Description(McpDocs.POSTURE_OPTIONAL)] int? posture = null) =>

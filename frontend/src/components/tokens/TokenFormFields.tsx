@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { ImageCropper } from '../ui/ImageCropper';
 import type { ImageCrop } from '../ui/ImageCropper';
-import { MAX_TOKEN_DESCRIPTION, MAX_TOKEN_NAME, TOKEN_SPACES } from '../../lib/tokenForm';
+import { tokenImageSize } from '../../lib/cropImage';
+import { downImageSpace, MAX_TOKEN_DESCRIPTION, MAX_TOKEN_NAME, TOKEN_SPACES } from '../../lib/tokenForm';
 import type { TokenForm } from '../../lib/tokenForm';
 
 interface TokenFormFieldsProps {
@@ -19,11 +20,13 @@ interface TokenFormFieldsProps {
 
 /**
  * Fields of a library token, shared by "Incluir token" and "Editar token": name, description, standing
- * and lying images (square crop with zoom and rotation, saved at 240 × 240) and the spaces.
+ * and lying images (crop with zoom and rotation, saved at the footprint's pixel size) and the spaces.
  */
 export const TokenFormFields = ({ idPrefix, form, onField, onUpCrop, onDownCrop, current, onRemoveDown }: TokenFormFieldsProps) => {
   const { t } = useTranslation();
   const id = (name: string) => `${idPrefix}-${name}`;
+  const upSize = tokenImageSize(Number(form.upSpace));
+  const downSize = tokenImageSize(downImageSpace(form.downSpace));
 
   return (
     <div className="row g-3">
@@ -42,8 +45,9 @@ export const TokenFormFields = ({ idPrefix, form, onField, onUpCrop, onDownCrop,
           id={id('up-image')}
           onChange={onUpCrop}
           shape="square"
+          aspect={upSize.width / upSize.height}
           rotatable
-          hint={t('tokens.cropHint')}
+          hint={t('tokens.cropHint', { width: upSize.width, height: upSize.height })}
           hasCurrent={current?.hasUp}
           currentUrl={current?.upUrl}
           currentName={current?.name}
@@ -55,8 +59,9 @@ export const TokenFormFields = ({ idPrefix, form, onField, onUpCrop, onDownCrop,
           id={id('down-image')}
           onChange={onDownCrop}
           shape="square"
+          aspect={downSize.width / downSize.height}
           rotatable
-          hint={t('tokens.cropHint')}
+          hint={t('tokens.cropHint', { width: downSize.width, height: downSize.height })}
           hasCurrent={current?.hasDown}
           currentUrl={current?.downUrl}
           currentName={current?.name}

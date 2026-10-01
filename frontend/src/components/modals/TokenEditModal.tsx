@@ -7,8 +7,8 @@ import type { ImageCrop } from '../ui/ImageCropper';
 import { TokenFormFields } from '../tokens/TokenFormFields';
 import { useToken } from '../../hooks/useToken';
 import { imageService } from '../../Services/imageService';
-import { cropToFile, TOKEN_IMAGE_SIZE } from '../../lib/cropImage';
-import { toTokenForm, toTokenInsert, validateTokenForm } from '../../lib/tokenForm';
+import { cropToFile, tokenImageSize } from '../../lib/cropImage';
+import { downImageSpace, toTokenForm, toTokenInsert, validateTokenForm } from '../../lib/tokenForm';
 import type { TokenForm } from '../../lib/tokenForm';
 import type { TokenInfo } from '../../types/token';
 
@@ -19,9 +19,9 @@ interface TokenEditModalProps {
   onClose: (saved: boolean) => void;
 }
 
-/** Uploads a token image cropped square at 240 × 240 (with the chosen rotation). */
-const uploadTokenImage = async (crop: ImageCrop): Promise<string> =>
-  (await imageService.upload(await cropToFile(crop.src, crop.area, { exactSize: TOKEN_IMAGE_SIZE, rotation: crop.rotation, name: 'token' }))).fileName;
+/** Uploads a token image at the pixel size of its footprint (with the chosen rotation). */
+const uploadTokenImage = async (crop: ImageCrop, space: number): Promise<string> =>
+  (await imageService.upload(await cropToFile(crop.src, crop.area, { exactSize: tokenImageSize(space), rotation: crop.rotation, name: 'token' }))).fileName;
 
 /** "Editar token": the creator changes a library token with the same fields and crop as the create tab. */
 export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) => {
@@ -48,8 +48,8 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
     if (error) return toast.error(t(`tokens.errors.${error}`));
     setSaving(true);
     try {
-      const upImage = upCrop ? await uploadTokenImage(upCrop) : token.upImage;
-      const downImage = downCrop ? await uploadTokenImage(downCrop) : keepDown ? token.downImage : null;
+      const upImage = upCrop ? await uploadTokenImage(upCrop, Number(form.upSpace)) : token.upImage;
+      const downImage = downCrop ? await uploadTokenImage(downCrop, downImageSpace(form.downSpace)) : keepDown ? token.downImage : null;
       const saved = await update(token.tokenId, toTokenInsert(form, upImage, downImage));
       toast.success(t('toast.tokenUpdated', { name: saved.name }));
       onClose(true);

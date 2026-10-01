@@ -25,10 +25,18 @@ public class CampaignCharacter
     public string? CharacterStatus { get; set; }
 
     /// <summary>
-    /// Campaign notes ("Anotações da Campanha"): only what changed in this campaign compared to the character's sheet
-    /// (e.g. the sword lost in combat). Starts empty; the character's sheet stays the reference.
+    /// The character's sheet in this campaign ("Ficha da Campanha"): copied from <see cref="Character.Sheet"/> when
+    /// the participation is created or becomes approved, and from then on it evolves only here (032, reverting the
+    /// campaign notes of 023). The character's own sheet never changes through campaign play.
     /// </summary>
     public string? Sheet { get; set; }
+
+    /// <summary>
+    /// Stored name ({guid}.{ext}) of this campaign's sheet file (image or PDF). Copied from
+    /// <see cref="Character.SheetFile"/> when the participation is created or becomes approved; afterwards the two
+    /// references are independent, because stored files are write-once and never overwritten (032).
+    /// </summary>
+    public string? SheetFile { get; set; }
 
     /// <summary>Standing, down or out of combat in this campaign (031); every piece of the character shows it.</summary>
     public Posture Posture { get; set; } = Posture.Standing;
@@ -93,7 +101,7 @@ public class CampaignCharacter
     public void DenyRequest() => Transition(CampaignCharacterStatus.RequestedAccess, CampaignCharacterStatus.Denied, "Não há pedido de acesso pendente para recusar.");
 
     /// <summary>
-    /// What changes during play: current life/energy (never above the totals, may be negative = fallen),
+    /// What changes during play: current life/energy (never above the totals, may be negative; that does not change posture),
     /// the character status and the campaign notes. Only while approved.
     /// </summary>
     public void UpdatePlay(int currentLife, int currentEnergy, string? characterStatus, string? sheet, int totalLife, int totalEnergy)
@@ -124,6 +132,24 @@ public class CampaignCharacter
         return true;
     }
 
+    /// <summary>
+    /// Changes this campaign's sheet file (032): a stored name from POST /api/document replaces it, an empty string
+    /// removes it and null keeps the current one — this update is partial, unlike the character's. Only while approved;
+    /// who may call it (owner or campaign master) is checked by the service.
+    /// </summary>
+    public void ChangeSheetFile(string? sheetFile)
+    {
+        if (Status != CampaignCharacterStatus.Approved)
+            throw new ConflictException("Só personagens aprovados na campanha podem ter os dados da campanha alterados.");
+        if (sheetFile is null)
+            return;
+        var value = Guard.SheetFileName(sheetFile, "sheetFile");
+        if (value == SheetFile)
+            return;
+        SheetFile = value;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     private static CampaignCharacter Create(long campaignId, Character character, CampaignCharacterStatus status)
     {
         var now = DateTime.UtcNow;
@@ -147,14 +173,16 @@ public class CampaignCharacter
     }
 
     /// <summary>
-    /// Fresh start in the campaign (010 FR-003): current values at the character's totals, no campaign notes
-    /// no status and standing. Done when the participation is created or becomes approved.
+    /// Fresh start in the campaign (032 FR-003): current values at the character's totals, the campaign sheet and
+    /// its file copied from the character, no status and standing. Done when the participation is created or
+    /// becomes approved — the only copy there is, nothing re-syncs afterwards.
     /// </summary>
     private void ResetFrom(Character character)
     {
         CurrentLife = character.Life;
         CurrentEnergy = character.Energy;
-        Sheet = null;
+        Sheet = character.Sheet;
+        SheetFile = character.SheetFile;
         CharacterStatus = null;
         Posture = Posture.Standing;
     }

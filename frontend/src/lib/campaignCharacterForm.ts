@@ -34,15 +34,16 @@ export const validateCampaignArea = ({ characterStatus, sheet }: { characterStat
 
 /**
  * API payload from valid values: numbers, trimmed status and blank texts as null; no token keeps the current one,
- * and so does no posture (031).
+ * and so does no posture (031) and no sheet file (032 — an empty string removes it).
  */
-export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, sheet, tokenId = null, posture = null }: {
+export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, sheet, tokenId = null, posture = null, sheetFile = null }: {
   currentLife: string;
   currentEnergy: string;
   characterStatus: string;
   sheet: string;
   tokenId?: number | null;
   posture?: Posture | null;
+  sheetFile?: string | null;
 }): CampaignCharacterUpdateInfo => ({
   currentLife: Number(currentLife),
   currentEnergy: Number(currentEnergy),
@@ -50,4 +51,5 @@ export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, 
   sheet: sheet.trim() ? sheet : null,
   tokenId,
   posture,
+  sheetFile,
 });

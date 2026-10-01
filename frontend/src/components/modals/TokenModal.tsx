@@ -11,8 +11,8 @@ import { TokenEditModal } from './TokenEditModal';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useToken } from '../../hooks/useToken';
 import { imageService } from '../../Services/imageService';
-import { cropToFile, TOKEN_IMAGE_SIZE } from '../../lib/cropImage';
-import { emptyTokenForm, toTokenInsert, validateTokenForm } from '../../lib/tokenForm';
+import { cropToFile, tokenImageSize } from '../../lib/cropImage';
+import { downImageSpace, emptyTokenForm, toTokenInsert, validateTokenForm } from '../../lib/tokenForm';
 import type { TokenForm } from '../../lib/tokenForm';
 import type { PagedList } from '../../types/common';
 import type { TokenInfo } from '../../types/token';
@@ -29,9 +29,9 @@ interface TokenModalProps {
 const PAGE_SIZE = 12;
 const SEARCH_DELAY_MS = 300;
 
-/** Token images are always square and saved at 240 × 240 px (upscaled or downscaled). */
-const uploadTokenImage = async (crop: ImageCrop): Promise<string> =>
-  (await imageService.upload(await cropToFile(crop.src, crop.area, { exactSize: TOKEN_IMAGE_SIZE, rotation: crop.rotation, name: 'token' }))).fileName;
+/** Uploads a token image at the pixel size of its footprint (upscaled or downscaled). */
+const uploadTokenImage = async (crop: ImageCrop, space: number): Promise<string> =>
+  (await imageService.upload(await cropToFile(crop.src, crop.area, { exactSize: tokenImageSize(space), rotation: crop.rotation, name: 'token' }))).fileName;
 
 /**
  * One list tab ("Meus Tokens" or "Buscar tokens"): its own search (debounced), page and result, loaded
@@ -127,8 +127,8 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
     setBusy(true);
     let token: TokenInfo;
     try {
-      const upImage = upCrop ? await uploadTokenImage(upCrop) : null;
-      const downImage = downCrop ? await uploadTokenImage(downCrop) : null;
+      const upImage = upCrop ? await uploadTokenImage(upCrop, Number(form.upSpace)) : null;
+      const downImage = downCrop ? await uploadTokenImage(downCrop, downImageSpace(form.downSpace)) : null;
       token = await create(toTokenInsert(form, upImage, downImage));
       toast.success(t('toast.tokenCreated', { name: token.name }));
     } catch (err) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFallen, validateVitals, vitalPercent } from './vitals';
+import { validateVitals, vitalPercent } from './vitals';
 
 describe('vitalPercent', () => {
   it.each([
@@ -11,14 +11,6 @@ describe('vitalPercent', () => {
     [5, 0, 0],
   ])('%i of %i → %i%%', (current, total, percent) => {
     expect(vitalPercent(current, total)).toBeCloseTo(percent);
-  });
-});
-
-describe('isFallen', () => {
-  it('is true at zero or below', () => {
-    expect(isFallen(0)).toBe(true);
-    expect(isFallen(-2)).toBe(true);
-    expect(isFallen(1)).toBe(false);
   });
 });
 

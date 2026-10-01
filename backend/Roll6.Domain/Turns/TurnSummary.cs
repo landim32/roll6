@@ -117,8 +117,12 @@ public static class TurnSummary
 
     private static string Change(TurnChange change, bool isNpc)
     {
+        // Shown only as changed: the campaign sheet can be 20000 characters long and a stored file name means nothing
+        // to a reader. "notes" is the key persisted before 032 turned the field into the campaign sheet.
         if (change.Field == "notes")
-            return "Anotações alteradas";
+            return "Ficha da campanha alterada";
+        if (change.Field == "sheetFile")
+            return "Ficha em arquivo alterada";
         var label = change.Field switch
         {
             "currentLife" => "Vida",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CROP_OUTPUT_SIZE, cropOutputSize, rotatedBoundingBox } from './cropImage';
+import { CROP_OUTPUT_SIZE, cropOutputSize, rotatedBoundingBox, tokenImageSize } from './cropImage';
 
 describe('cropOutputSize', () => {
   it('limits large crops to the output size', () => {
@@ -13,6 +13,22 @@ describe('cropOutputSize', () => {
   it('uses the smaller side and is at least 1', () => {
     expect(cropOutputSize({ x: 0, y: 0, width: 300, height: 299 })).toBe(299);
     expect(cropOutputSize({ x: 0, y: 0, width: 0, height: 0 })).toBe(1);
+  });
+});
+
+describe('tokenImageSize', () => {
+  it.each([
+    [1, 240, 240],
+    [2, 240, 480],
+    [3, 240, 720],
+    [7, 480, 480],
+    [10, 480, 720],
+  ])('space %i is %i×%i', (space, width, height) => {
+    expect(tokenImageSize(space)).toEqual({ width, height });
+  });
+
+  it('uses the 1-hex square for any other size', () => {
+    expect(tokenImageSize(4)).toEqual({ width: 240, height: 240 });
   });
 });
 

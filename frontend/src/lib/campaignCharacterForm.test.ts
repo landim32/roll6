@@ -34,7 +34,7 @@ describe('validateCampaignArea', () => {
 describe('toCampaignUpdate', () => {
   it('converts numbers, trims the status and turns blank texts into null', () => {
     expect(toCampaignUpdate({ currentLife: '-2', currentEnergy: '6', characterStatus: '   ', sheet: ' \n ' })).toEqual({
-      currentLife: -2, currentEnergy: 6, characterStatus: null, sheet: null, tokenId: null, posture: null,
+      currentLife: -2, currentEnergy: 6, characterStatus: null, sheet: null, tokenId: null, posture: null, sheetFile: null,
     });
   });
 
@@ -50,5 +50,15 @@ describe('toCampaignUpdate', () => {
     const result = toCampaignUpdate({ currentLife: '1', currentEnergy: '1', characterStatus: ' envenenado ', sheet: 'Força 3\n' });
     expect(result.characterStatus).toBe('envenenado');
     expect(result.sheet).toBe('Força 3\n');
+  });
+
+  it('sends the chosen campaign sheet file (032)', () => {
+    const name = '0123456789abcdef0123456789abcdef.pdf';
+    expect(toCampaignUpdate({ currentLife: '1', currentEnergy: '1', characterStatus: '', sheet: '', sheetFile: name }).sheetFile).toBe(name);
+  });
+
+  it('removes the campaign sheet file with an empty string and keeps it when omitted (032)', () => {
+    expect(toCampaignUpdate({ currentLife: '1', currentEnergy: '1', characterStatus: '', sheet: '', sheetFile: '' }).sheetFile).toBe('');
+    expect(toCampaignUpdate({ currentLife: '1', currentEnergy: '1', characterStatus: '', sheet: '' }).sheetFile).toBeNull();
   });
 });

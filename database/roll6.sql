@@ -1194,5 +1194,42 @@ BEGIN
     VALUES ('20260929215843_AddPostureAndTokenSpaces', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261001001517_AddCampaignSheetFile') THEN
+    ALTER TABLE campaign_characters ADD sheet_file character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261001001517_AddCampaignSheetFile') THEN
+    WITH prepared AS (
+        SELECT cc.campaign_character_id,
+               CASE WHEN cc.sheet IS NULL OR btrim(cc.sheet) = ''
+                    THEN ''
+                    ELSE E'\n\n## Anotações anteriores da campanha\n\n' || cc.sheet
+               END AS suffix
+        FROM campaign_characters AS cc
+    )
+    UPDATE campaign_characters AS cc
+    SET sheet_file = c.sheet_file,
+        sheet = left(
+                  left(coalesce(c.sheet, ''), greatest(0, 20000 - length(p.suffix))) || p.suffix,
+                  20000)
+    FROM characters AS c, prepared AS p
+    WHERE c.character_id = cc.character_id
+      AND p.campaign_character_id = cc.character_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261001001517_AddCampaignSheetFile') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261001001517_AddCampaignSheetFile', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

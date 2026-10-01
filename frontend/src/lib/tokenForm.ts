@@ -5,6 +5,8 @@ import type { TokenInfo, TokenInsertInfo } from '../types/token';
 export const MAX_TOKEN_NAME = 260;
 export const MAX_TOKEN_DESCRIPTION = 2000;
 export const DEFAULT_UP_SPACE = 1;
+/** A lying image with no chosen space is saved as 2 hexes (Token.DEFAULT_DOWN_SPACE). */
+export const DEFAULT_DOWN_SPACE = 2;
 /** Sizes a token may take, in hexes (031); same list as the backend. */
 export { ALLOWED_SPACES as TOKEN_SPACES } from './hexGrid';
 
@@ -28,6 +30,12 @@ export const toTokenForm = (token: TokenInfo): TokenForm => ({
   upSpace: String(token.upSpace),
   downSpace: token.downSpace === null ? '' : String(token.downSpace),
 });
+
+/** Footprint of the lying picture: the chosen space, or 2 when the field stays on the default. */
+export const downImageSpace = (downSpace: string): number => {
+  const space = Number(downSpace);
+  return ALLOWED_SPACES.includes(space) ? space : DEFAULT_DOWN_SPACE;
+};
 
 const isSpace = (value: string, optional: boolean): boolean => {
   if (value.trim() === '') return optional;

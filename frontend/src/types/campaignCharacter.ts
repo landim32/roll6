@@ -25,7 +25,7 @@ export interface CampaignCharacterInfo {
   characterOwnerId: number;
   characterOwnerName: string;
   status: CampaignCharacterStatus;
-  /** Current life/energy in this campaign (may be zero or negative: fallen). */
+  /** Current life/energy in this campaign (may be zero or negative). Posture is separate. */
   currentLife: number;
   currentEnergy: number;
   /** The character's totals. */
@@ -49,15 +49,17 @@ export interface CampaignCharacterRequestInfo {
   characterId: number;
 }
 
-/** A participation with the campaign notes (the lists leave them out). */
+/** A participation with the campaign's own copy of the character sheet (the lists leave it out). */
 export interface CampaignCharacterDetailInfo extends CampaignCharacterInfo {
-  /** Campaign notes ("Anotações da Campanha"): only what changed in this campaign. */
+  /** The character's sheet in this campaign ("Ficha da Campanha"), copied when they joined (032). */
   sheet: string | null;
   /** The character's own sheet, read-only here (only the owner changes it). */
   characterSheet: string | null;
   characterTokenName: string | null;
   characterTokenImageUrl: string | null;
-  /** The character's sheet file (022), the same in every campaign. */
+  /** Stored name ({guid}.{ext}) of this campaign's sheet file; send it back to keep the file (032). */
+  sheetFile: string | null;
+  /** Presigned URL of this campaign's sheet file (032) — not the character's. */
   sheetFileUrl: string | null;
   sheetFileType: SheetFileType | null;
 }
@@ -72,4 +74,6 @@ export interface CampaignCharacterUpdateInfo {
   tokenId: number | null;
   /** New posture (031); null/omitted keeps the current one. */
   posture?: Posture | null;
+  /** This campaign's sheet file: a stored name replaces it, '' removes it, null/omitted keeps it (032). */
+  sheetFile?: string | null;
 }
