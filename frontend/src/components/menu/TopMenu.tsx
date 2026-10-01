@@ -47,6 +47,8 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
   const [manageOpen, setManageOpen] = useState(false);
   const [selectOpen, setSelectOpen] = useState(false);
   const [includeOpen, setIncludeOpen] = useState(false);
+  /** Character being edited by its owner; null while the form creates one instead (032). */
+  const [editingCharacter, setEditingCharacter] = useState<CharacterInfo | null>(null);
   const [transferring, setTransferring] = useState<CharacterInfo | null>(null);
   /** Finished turn whose summary is open (from the bell). */
   const [summaryTurn, setSummaryTurn] = useState<number | null>(null);
@@ -98,13 +100,17 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
       <ChangePasswordModal open={passwordOpen} onOpenChange={setPasswordOpen} />
       <ApiKeysModal open={apiKeysOpen} onOpenChange={setApiKeysOpen} />
       {isMaster && <ManageCharactersModal open={manageOpen} onOpenChange={setManageOpen} />}
-      <SelectCharacterModal open={selectOpen} onOpenChange={setSelectOpen} onInclude={() => setIncludeOpen(true)} onTransfer={setTransferring} />
+      <SelectCharacterModal open={selectOpen} onOpenChange={setSelectOpen} onInclude={() => setIncludeOpen(true)} onEdit={setEditingCharacter} onTransfer={setTransferring} />
       <TransferCharacterModal
         open={transferring !== null}
         onOpenChange={(value) => { if (!value) setTransferring(null); }}
         character={transferring}
       />
-      <CharacterFormModal open={includeOpen} onOpenChange={setIncludeOpen} />
+      <CharacterFormModal
+        open={includeOpen || editingCharacter !== null}
+        onOpenChange={(value) => { if (!value) { setIncludeOpen(false); setEditingCharacter(null); } }}
+        character={editingCharacter}
+      />
       <TurnSummaryModal turnNo={summaryTurn} onClose={() => setSummaryTurn(null)} />
       {isMaster && (
         <CampaignSettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} onOpenMap={(map) => { void openMapFromSettings(map); }} />

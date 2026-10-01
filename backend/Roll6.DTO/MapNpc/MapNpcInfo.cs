@@ -20,7 +20,7 @@ public class MapNpcInfo
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Current life of this occurrence (0 or below = fallen).</summary>
+    /// <summary>Current life of this occurrence (0 or below is allowed and does not change posture).</summary>
     [JsonPropertyName("currentLife")]
     public int CurrentLife { get; set; }
 

@@ -28,8 +28,10 @@ interface ImageCropperProps {
   currentName?: string;
   /** Removes the saved picture (edit mode). */
   onRemoveCurrent?: () => void;
-  /** Crop guide: round (character pictures) or square (token images). The saved crop is always square. */
+  /** Crop guide: round (character pictures) or rectangular (token images). */
   shape?: 'round' | 'square';
+  /** Width ÷ height of the crop. 1 keeps a square; token images follow the footprint. */
+  aspect?: number;
   /** Shows the rotation controls (90° buttons + fine slider). */
   rotatable?: boolean;
   /** Help text under the cropper (defaults to the character picture hint). */
@@ -56,13 +58,14 @@ const normalizeRotation = (degrees: number): number => {
 };
 
 /**
- * File picker + square crop with a round (character pictures) or square (token images) guide, zoom by
- * slider or wheel and, when `rotatable`, rotation by 90° buttons or a slider. In
- * edit mode the saved picture is shown with "Trocar imagem" / "Remover imagem" until a new file is chosen.
+ * File picker + crop with a round (character pictures) or rectangular (token images) guide, zoom by
+ * slider or wheel and, when `rotatable`, rotation by 90° buttons or a slider. Token images pass
+ * `aspect` so the frame matches the footprint. In edit mode the saved picture is shown with
+ * "Trocar imagem" / "Remover imagem" until a new file is chosen.
  */
 export const ImageCropper = ({
-  id, onChange, hasCurrent = false, currentUrl, currentName = '', onRemoveCurrent, shape = 'round', rotatable = false, hint,
-  compact = false, onCroppingChange,
+  id, onChange, hasCurrent = false, currentUrl, currentName = '', onRemoveCurrent, shape = 'round', aspect = 1,
+  rotatable = false, hint, compact = false, onCroppingChange,
 }: ImageCropperProps) => {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
@@ -121,7 +124,11 @@ export const ImageCropper = ({
       )}
       {showCurrent && !compact && (
         <div className="d-flex align-items-center gap-3">
-          <CharacterAvatar name={currentName} imageUrl={currentUrl} size={96} />
+          {shape === 'square' && currentUrl ? (
+            <img src={currentUrl} alt={currentName} className="stm-token-preview" style={{ aspectRatio: aspect }} />
+          ) : (
+            <CharacterAvatar name={currentName} imageUrl={currentUrl} size={96} />
+          )}
           <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => input.current?.click()}>{t('characterForm.changeImage')}</button>
           {onRemoveCurrent && (
             <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onRemoveCurrent}>{t('characterForm.removeImage')}</button>
@@ -132,6 +139,7 @@ export const ImageCropper = ({
         <>
           <div className="stm-cropper mt-2">
             <Cropper
+              key={aspect}
               image={src}
               crop={crop}
               zoom={zoom}
@@ -139,7 +147,7 @@ export const ImageCropper = ({
               minZoom={MIN_ZOOM}
               restrictPosition={false}
               maxZoom={MAX_ZOOM}
-              aspect={1}
+              aspect={aspect}
               cropShape={shape === 'square' ? 'rect' : 'round'}
               showGrid={shape === 'square'}
               onCropChange={setCrop}

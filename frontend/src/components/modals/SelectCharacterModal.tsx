@@ -8,13 +8,15 @@ import { useCharacter } from '../../hooks/useCharacter';
 import { participationAction } from '../../lib/characterSelection';
 import type { CharacterInfo } from '../../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../../types/campaignCharacter';
-import { TransferIcon } from '../ui/icons';
+import { TransferIcon, PencilIcon } from '../ui/icons';
 
 interface SelectCharacterModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Opens "Incluir Personagem" (empty state). */
   onInclude: () => void;
+  /** Opens the character modal to edit it; this modal closes first (one modal at a time). */
+  onEdit: (character: CharacterInfo) => void;
   /** Opens the transfer modal for the character; this modal closes first (one modal at a time). */
   onTransfer: (character: CharacterInfo) => void;
 }
@@ -22,7 +24,7 @@ interface SelectCharacterModalProps {
 const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** The user's characters with their status in the current campaign and the action for each (FR-013/014). */
-export const SelectCharacterModal = ({ open, onOpenChange, onInclude, onTransfer }: SelectCharacterModalProps) => {
+export const SelectCharacterModal = ({ open, onOpenChange, onInclude, onEdit, onTransfer }: SelectCharacterModalProps) => {
   const { t } = useTranslation();
   const {
     myCharacters, myParticipations, currentSelection, loading, refresh, select, requestAccess, acceptInvite, declineInvite,
@@ -114,6 +116,11 @@ export const SelectCharacterModal = ({ open, onOpenChange, onInclude, onTransfer
               </div>
               <div className="stm-character-actions">
                 {renderActions(character)}
+                <button type="button" className="btn btn-sm btn-outline-secondary"
+                  title={t('selectCharacter.edit', { name: character.name })} aria-label={t('selectCharacter.edit', { name: character.name })}
+                  onClick={() => { onOpenChange(false); onEdit(character); }}>
+                  <PencilIcon size={14} />
+                </button>
                 <button type="button" className="btn btn-sm btn-outline-secondary" disabled={busyId === character.characterId}
                   title={t('transfer.action')} aria-label={t('transfer.action')} onClick={() => { onOpenChange(false); onTransfer(character); }}>
                   <TransferIcon size={14} />

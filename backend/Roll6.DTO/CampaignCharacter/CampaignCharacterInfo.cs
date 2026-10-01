@@ -34,7 +34,7 @@ public class CampaignCharacterInfo
     [JsonPropertyName("status")]
     public int Status { get; set; }
 
-    /// <summary>Current life in this campaign (may be zero or negative: fallen).</summary>
+    /// <summary>Current life in this campaign (may be zero or negative; that does not change posture).</summary>
     [JsonPropertyName("currentLife")]
     public int CurrentLife { get; set; }
 

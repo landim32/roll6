@@ -19,6 +19,8 @@ public class CampaignCharacterServiceTests
     private const long OPEN_CAMPAIGN = 10;
     private const long CLOSED_CAMPAIGN = 11;
     private const long CHARACTER = 20;
+    /// <summary>The character's own sheet file, copied to the participation when it joins (032).</summary>
+    private const string SHEET_FILE = "0123456789abcdef0123456789abcdef.pdf";
 
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _repository = new();
     private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
@@ -43,7 +45,7 @@ public class CampaignCharacterServiceTests
             _campaignRepository.Setup(r => r.GetByIdAsync(campaign.CampaignId)).ReturnsAsync(campaign);
         _campaignRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(campaigns);
 
-        var character = new Character { CharacterId = CHARACTER, UserId = PLAYER_ID, Name = "Thorin", Life = 12, Energy = 6, Move = 5, Sheet = "Força 3" };
+        var character = new Character { CharacterId = CHARACTER, UserId = PLAYER_ID, Name = "Thorin", Life = 12, Energy = 6, Move = 5, Sheet = "Força 3", SheetFile = SHEET_FILE };
         _characterRepository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(character);
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character> { character });
 
@@ -316,13 +318,15 @@ public class CampaignCharacterServiceTests
 
 
     [Fact]
-    public async Task ApproveRequest_StartsWithEmptyCampaignNotes()
+    public async Task ApproveRequest_CopiesTheCharactersSheet()
     {
         SetupParticipation(84, CLOSED_CAMPAIGN, CampaignCharacterStatus.RequestedAccess);
 
         await _service.ApproveRequestAsync(MASTER_ID, 84);
 
-        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(p => p.Sheet == null && p.CharacterStatus == null)), Times.Once);
+        // 032 FR-003: the campaign sheet and its file are copied from the character; only the status starts empty.
+        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(
+            p => p.Sheet == "Força 3" && p.SheetFile == SHEET_FILE && p.CharacterStatus == null)), Times.Once);
     }
 
     private static CampaignCharacterUpdateInfo Play(int life = -2, int energy = 6) =>
@@ -444,34 +448,145 @@ public class CampaignCharacterServiceTests
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
-    // ---- 022: sheet file in the participation detail ----
+    // ---- 032: the campaign's own sheet file in the participation detail ----
 
     [Theory]
     [InlineData(MASTER_ID, false)]
     [InlineData(OUTSIDER_ID, true)]
-    public async Task GetById_ReturnsTheCharactersSheetFile(long userId, bool approvedParticipant)
+    public async Task GetById_ReturnsTheCampaignSheetFile(long userId, bool approvedParticipant)
     {
-        const string pdf = "0123456789abcdef0123456789abcdef.pdf";
-        _characterRepository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(
-            new Character { CharacterId = CHARACTER, UserId = PLAYER_ID, Name = "Thorin", Life = 12, Energy = 6, SheetFile = pdf });
-        SetupParticipation(87, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+        const string campaignPdf = "fedcba9876543210fedcba9876543210.pdf";
+        _repository.Setup(r => r.GetByIdAsync(87)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = 87, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER,
+            Status = CampaignCharacterStatus.Approved, SheetFile = campaignPdf
+        });
         _repository.Setup(r => r.HasApprovedCharacterAsync(CLOSED_CAMPAIGN, OUTSIDER_ID)).ReturnsAsync(approvedParticipant);
 
         var result = await _service.GetByIdAsync(userId, 87);
 
-        result.SheetFileUrl.Should().Be("https://cdn/" + pdf);
+        result.SheetFile.Should().Be(campaignPdf);
+        result.SheetFileUrl.Should().Be("https://cdn/" + campaignPdf);
         result.SheetFileType.Should().Be("pdf");
     }
 
     [Fact]
-    public async Task GetById_WithoutSheetFile_ReturnsNulls()
+    public async Task GetById_ParticipationWithoutSheetFile_ReturnsNullsEvenWhenTheCharacterHasOne()
     {
+        // The fixture character has SHEET_FILE; the participation has none, and FR-025 shows no file at all.
         SetupParticipation(88, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
 
         var result = await _service.GetByIdAsync(MASTER_ID, 88);
 
+        result.SheetFile.Should().BeNull();
         result.SheetFileUrl.Should().BeNull();
         result.SheetFileType.Should().BeNull();
+    }
+
+    // ---- 032: the campaign sheet file in an update ----
+
+    private void SetupParticipationWithFile(long id) =>
+        _repository.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = id, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER,
+            Status = CampaignCharacterStatus.Approved, CurrentLife = 10, CurrentEnergy = 6, SheetFile = SHEET_FILE
+        });
+
+    [Fact]
+    public async Task Update_Master_ReplacesTheCampaignSheetFile_WithoutTouchingTheCharacter()
+    {
+        const string campaignPdf = "fedcba9876543210fedcba9876543210.pdf";
+        SetupParticipation(93, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+
+        var result = await _service.UpdateAsync(MASTER_ID, 93,
+            new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6, SheetFile = campaignPdf });
+
+        result.SheetFile.Should().Be(campaignPdf);
+        result.SheetFileUrl.Should().Be("https://cdn/" + campaignPdf);
+        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(p => p.SheetFile == campaignPdf)), Times.Once);
+        // 032 FR-010: the master never writes to the character through a participation update.
+        _characterRepository.Verify(r => r.UpdateAsync(It.IsAny<Character>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_NullSheetFile_KeepsTheCurrentOne()
+    {
+        SetupParticipationWithFile(94);
+
+        var result = await _service.UpdateAsync(PLAYER_ID, 94,
+            new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6 });
+
+        result.SheetFile.Should().Be(SHEET_FILE);
+    }
+
+    [Fact]
+    public async Task Update_EmptySheetFile_RemovesIt()
+    {
+        SetupParticipationWithFile(95);
+
+        var result = await _service.UpdateAsync(PLAYER_ID, 95,
+            new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6, SheetFile = string.Empty });
+
+        result.SheetFile.Should().BeNull();
+        result.SheetFileUrl.Should().BeNull();
+        result.SheetFileType.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_SheetFile_NotApproved_Throws()
+    {
+        SetupParticipation(96, CLOSED_CAMPAIGN, CampaignCharacterStatus.Invited);
+
+        var act = () => _service.UpdateAsync(MASTER_ID, 96,
+            new CampaignCharacterUpdateInfo { CurrentLife = 1, CurrentEnergy = 1, SheetFile = SHEET_FILE });
+
+        await act.Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task Update_OnlyTheSheetFile_RecordsItInTheTurn()
+    {
+        SetupParticipationWithFile(97);
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        await _service.UpdateAsync(MASTER_ID, 97, new CampaignCharacterUpdateInfo
+        {
+            CurrentLife = 10, CurrentEnergy = 6, SheetFile = "fedcba9876543210fedcba9876543210.pdf"
+        });
+
+        recorded!.UserId.Should().Be(MASTER_ID);
+        recorded.Changes.Should().ContainSingle().Which.Field.Should().Be("sheetFile");
+    }
+
+    // ---- 032: independence between the campaign sheet and the character's ----
+
+    [Fact]
+    public async Task GetById_AfterTheCharacterSheetChanges_KeepsTheCampaignCopy()
+    {
+        // FR-004: the character's sheet moved on; this campaign keeps the copy it was given when it joined.
+        _repository.Setup(r => r.GetByIdAsync(98)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = 98, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER,
+            Status = CampaignCharacterStatus.Approved, Sheet = "Força 5"
+        });
+
+        var result = await _service.GetByIdAsync(MASTER_ID, 98);
+
+        result.Sheet.Should().Be("Força 5");
+        result.CharacterSheet.Should().Be("Força 3", "the character's own sheet, read-only here");
+    }
+
+    [Fact]
+    public async Task AcceptInvite_ReCopiesTheCharactersSheet()
+    {
+        // US5 AS3: joining again is a fresh start, sheet and file included.
+        SetupParticipation(99, CLOSED_CAMPAIGN, CampaignCharacterStatus.Invited);
+
+        await _service.AcceptInviteAsync(PLAYER_ID, 99);
+
+        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(
+            p => p.Sheet == "Força 3" && p.SheetFile == SHEET_FILE && p.CharacterStatus == null)), Times.Once);
     }
 
     // ---- 024: character updates in the turn ----
@@ -516,7 +631,7 @@ public class CampaignCharacterServiceTests
     }
 
     [Fact]
-    public async Task Update_OnlyTheNotes_RecordsTheNotesByTheOwner()
+    public async Task Update_OnlyTheCampaignSheet_RecordsItByTheOwner()
     {
         _repository.Setup(r => r.GetByIdAsync(92)).ReturnsAsync(new CampaignCharacter
         {

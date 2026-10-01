@@ -10,7 +10,7 @@ import { PartyPanel } from '../components/map/PartyPanel';
 import { TopMenu } from '../components/menu/TopMenu';
 import { ActModal } from '../components/modals/ActModal';
 import { CampaignModal } from '../components/modals/CampaignModal';
-import { CharacterFormModal } from '../components/modals/CharacterFormModal';
+import { CampaignCharacterModal } from '../components/modals/CampaignCharacterModal';
 import { GridSizeModal } from '../components/modals/GridSizeModal';
 import { ImageModal } from '../components/modals/ImageModal';
 import { MapModal } from '../components/modals/MapModal';
@@ -25,7 +25,7 @@ import { useMapToken } from '../hooks/useMapToken';
 import { useTurn } from '../hooks/useTurn';
 import { useTableRoute } from '../hooks/useTableRoute';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
-import type { CharacterEditTarget } from '../components/modals/CharacterFormModal';
+import type { CharacterEditTarget } from '../components/modals/CampaignCharacterModal';
 import type { CampaignNpcInfo } from '../types/npc';
 import type { TokenInfo } from '../types/token';
 
@@ -168,7 +168,7 @@ export const MainPage = () => {
         onConfirm={onConfirmReset}
         danger
       />
-      <CharacterFormModal
+      <CampaignCharacterModal
         open={editing !== null}
         onOpenChange={(o) => { if (!o) setEditing(null); }}
         editing={editing}

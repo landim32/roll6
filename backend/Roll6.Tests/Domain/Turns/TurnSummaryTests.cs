@@ -62,9 +62,23 @@ public class TurnSummaryTests
     {
         var line = Line(TurnType.CharacterUpdate, "Cedric (José)") with { Changes = new[] { new TurnChange("notes", "a", "b") } };
 
+        // 032: "notes" is the key persisted before the campaign notes became the campaign sheet; only the label changed.
         TurnSummary.Build(new[] { line }, Array.Empty<SummaryPosition>())
-            .Should().Contain("Cedric (José): Alterou: Anotações alteradas\n")
+            .Should().Contain("Cedric (José): Alterou: Ficha da campanha alterada\n")
             .And.Contain("## Posições\nNenhuma peça no mapa.\n");
+    }
+
+    [Fact]
+    public void Build_CampaignSheetFile_WritesOnlyThatItChanged()
+    {
+        var line = Line(TurnType.CharacterUpdate, "Cedric (José)") with
+        {
+            Changes = new[] { new TurnChange("sheetFile", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.pdf") }
+        };
+
+        TurnSummary.Build(new[] { line }, Array.Empty<SummaryPosition>())
+            .Should().Contain("Cedric (José): Alterou: Ficha em arquivo alterada\n")
+            .And.NotContain(".pdf", "a stored file name means nothing to a reader");
     }
 
     [Fact]

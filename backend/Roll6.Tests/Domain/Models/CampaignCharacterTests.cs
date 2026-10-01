@@ -10,14 +10,19 @@ public class CampaignCharacterTests
     private const int LIFE = 12;
     private const int ENERGY = 6;
     private const string SHEET = "Força 3";
+    private const string SHEET_FILE = "0123456789abcdef0123456789abcdef.pdf";
 
-    private static readonly Character Hero = new() { CharacterId = 2, Life = LIFE, Energy = ENERGY, Sheet = SHEET };
+    /// <summary>What a participation already holds before joining: its own campaign sheet, not the character's.</summary>
+    private const string CAMPAIGN_SHEET = "Ficha antiga da campanha";
+    private const string CAMPAIGN_SHEET_FILE = "fedcba9876543210fedcba9876543210.png";
+
+    private static readonly Character Hero = new() { CharacterId = 2, Life = LIFE, Energy = ENERGY, Sheet = SHEET, SheetFile = SHEET_FILE };
 
     private static CampaignCharacter With(CampaignCharacterStatus status, int currentLife = 3, int currentEnergy = 1) =>
         new()
         {
             CampaignId = 1, CharacterId = 2, Status = status, CurrentLife = currentLife, CurrentEnergy = currentEnergy,
-            CharacterStatus = "envenenado", Sheet = "Anotações antigas"
+            CharacterStatus = "envenenado", Sheet = CAMPAIGN_SHEET, SheetFile = CAMPAIGN_SHEET_FILE
         };
 
     [Theory]
@@ -45,7 +50,8 @@ public class CampaignCharacterTests
             participation.CharacterId.Should().Be(Hero.CharacterId);
             participation.CurrentLife.Should().Be(LIFE);
             participation.CurrentEnergy.Should().Be(ENERGY);
-            participation.Sheet.Should().BeNull("the campaign notes start empty");
+            participation.Sheet.Should().Be(SHEET, "the campaign sheet is copied from the character (032)");
+            participation.SheetFile.Should().Be(SHEET_FILE);
             participation.CharacterStatus.Should().BeNull();
         }
     }
@@ -136,7 +142,8 @@ public class CampaignCharacterTests
         {
             participation.CurrentLife.Should().Be(LIFE);
             participation.CurrentEnergy.Should().Be(ENERGY);
-            participation.Sheet.Should().BeNull("the campaign notes start empty");
+            participation.Sheet.Should().Be(SHEET, "the campaign sheet is copied from the character (032)");
+            participation.SheetFile.Should().Be(SHEET_FILE);
             participation.CharacterStatus.Should().BeNull();
         }
     }
@@ -146,9 +153,11 @@ public class CampaignCharacterTests
     {
         var participation = With(CampaignCharacterStatus.Denied);
 
+        // Denied → Invited goes through Invite/ChangeTo and not Join, so nothing is re-copied (032 FR-006).
         participation.Invite(Hero);
 
-        participation.Sheet.Should().Be("Anotações antigas");
+        participation.Sheet.Should().Be(CAMPAIGN_SHEET);
+        participation.SheetFile.Should().Be(CAMPAIGN_SHEET_FILE);
         participation.CharacterStatus.Should().Be("envenenado");
     }
 
@@ -249,5 +258,76 @@ public class CampaignCharacterTests
         participation.ApproveRequest(Hero);
 
         participation.Posture.Should().Be(Posture.Standing);
+    }
+
+    // ---- 032: campaign sheet file ----
+
+    [Fact]
+    public void ChangeSheetFile_Null_KeepsTheCurrentOne()
+    {
+        var participation = With(CampaignCharacterStatus.Approved);
+        var before = participation.UpdatedAt;
+
+        participation.ChangeSheetFile(null);
+
+        participation.SheetFile.Should().Be(CAMPAIGN_SHEET_FILE);
+        participation.UpdatedAt.Should().Be(before, "keeping the file changes nothing");
+    }
+
+    [Fact]
+    public void ChangeSheetFile_EmptyString_RemovesIt()
+    {
+        var participation = With(CampaignCharacterStatus.Approved);
+
+        participation.ChangeSheetFile(string.Empty);
+
+        participation.SheetFile.Should().BeNull();
+        participation.UpdatedAt.Should().NotBe(default);
+    }
+
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef.pdf")]
+    [InlineData("fedcba9876543210fedcba9876543210.webp")]
+    public void ChangeSheetFile_StoredName_ReplacesIt(string fileName)
+    {
+        var participation = With(CampaignCharacterStatus.Approved);
+
+        participation.ChangeSheetFile(fileName);
+
+        participation.SheetFile.Should().Be(fileName);
+        participation.UpdatedAt.Should().NotBe(default);
+    }
+
+    [Fact]
+    public void ChangeSheetFile_SameValue_DoesNotTouchUpdatedAt()
+    {
+        var participation = With(CampaignCharacterStatus.Approved);
+        var before = participation.UpdatedAt;
+
+        participation.ChangeSheetFile(CAMPAIGN_SHEET_FILE);
+
+        participation.UpdatedAt.Should().Be(before);
+    }
+
+    [Theory]
+    [InlineData("ficha.pdf")]
+    [InlineData("0123456789abcdef0123456789abcdef.docx")]
+    [InlineData("not-a-file-name")]
+    public void ChangeSheetFile_InvalidName_Throws(string fileName)
+    {
+        var act = () => With(CampaignCharacterStatus.Approved).ChangeSheetFile(fileName);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("sheetFile");
+    }
+
+    [Theory]
+    [InlineData(CampaignCharacterStatus.Invited)]
+    [InlineData(CampaignCharacterStatus.RequestedAccess)]
+    [InlineData(CampaignCharacterStatus.Denied)]
+    public void ChangeSheetFile_NotApproved_Throws(CampaignCharacterStatus status)
+    {
+        var act = () => With(status).ChangeSheetFile(SHEET_FILE);
+
+        act.Should().Throw<ConflictException>();
     }
 }

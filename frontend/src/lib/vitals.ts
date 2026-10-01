@@ -4,9 +4,6 @@ export const vitalPercent = (current: number, total: number): number => {
   return Math.min(Math.max(current / total, 0), 1) * 100;
 };
 
-/** A character at zero or negative life is fallen. */
-export const isFallen = (currentLife: number): boolean => currentLife <= 0;
-
 export type VitalsError = 'vitalsNotInteger' | 'aboveTotal';
 
 /**

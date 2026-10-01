@@ -4,7 +4,6 @@ import { TurnStatusDot } from '../ui/TurnStatusDot';
 import { useTurn } from '../../hooks/useTurn';
 import { characterStatus } from '../../lib/turnStatus';
 import { VitalBar } from './VitalBar';
-import { isFallen } from '../../lib/vitals';
 import { PARTICIPATION_MODE } from '../../lib/campaignCharacterForm';
 import { PARTICIPATION_DRAG_TYPE } from '../../lib/mapTokens';
 import type { ParticipationMode } from '../../lib/campaignCharacterForm';
@@ -31,11 +30,10 @@ interface PartyCardProps {
 export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: PartyCardProps) => {
   const { t } = useTranslation();
   const { turnNo, entries } = useTurn();
-  const fallen = isFallen(member.currentLife);
   const view = mode === PARTICIPATION_MODE.viewer;
   return (
     <li
-      className={`stm-party-card${current ? ' is-current' : ''}${fallen ? ' stm-party-fallen' : ''}${draggable ? ' stm-party-draggable' : ''}`}
+      className={`stm-party-card${current ? ' is-current' : ''}${draggable ? ' stm-party-draggable' : ''}`}
       draggable={draggable}
       onDragStart={draggable ? (event) => {
         event.dataTransfer.setData(PARTICIPATION_DRAG_TYPE, String(member.campaignCharacterId));
@@ -49,9 +47,7 @@ export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: 
         <div className="stm-party-name">
           {turnNo !== null && <TurnStatusDot status={characterStatus(entries, member.characterId)} />}
           <span title={member.characterName}>{member.characterName}</span>
-          {member.posture !== POSTURE.standing
-            ? <PostureBadge posture={member.posture} />
-            : fallen && <span className="badge text-bg-danger">{t('party.fallen')}</span>}
+          <PostureBadge posture={member.posture} />
           <button
             type="button"
             className="btn btn-link btn-sm p-0 ms-auto"

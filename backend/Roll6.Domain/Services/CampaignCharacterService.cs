@@ -151,8 +151,9 @@ public class CampaignCharacterService : ICampaignCharacterService
     }
 
     /// <summary>
-    /// Current life/energy, status, campaign notes and the character's token; the character owner or the campaign
-    /// master (010 FR-007). The token is saved on the character (the master's only change to someone else's character).
+    /// Current life/energy, status, the campaign sheet and its file (032) and the character's token; the character
+    /// owner or the campaign master (010 FR-007). The token is saved on the character (the master's only change to
+    /// someone else's character); nothing else of the character is reachable through here (032 FR-010).
     /// </summary>
     public async Task<CampaignCharacterDetailInfo> UpdateAsync(long userId, long campaignCharacterId, CampaignCharacterUpdateInfo info)
     {
@@ -162,8 +163,9 @@ public class CampaignCharacterService : ICampaignCharacterService
         if (character.UserId != userId && campaign.UserId != userId)
             throw new UnauthorizedAccessException("Apenas o dono do personagem ou o mestre da campanha podem alterar os dados na campanha.");
 
-        var before = (participation.CurrentLife, participation.CurrentEnergy, participation.CharacterStatus, participation.Sheet, participation.Posture);
+        var before = (participation.CurrentLife, participation.CurrentEnergy, participation.CharacterStatus, participation.Sheet, participation.SheetFile, participation.Posture);
         participation.UpdatePlay(info.CurrentLife, info.CurrentEnergy, info.CharacterStatus, info.Sheet, character.Life, character.Energy);
+        participation.ChangeSheetFile(info.SheetFile);
         if (info.Posture is int posture)
             participation.ChangePosture(posture);
         // Every change during the turn is recorded with who made it (024).
@@ -172,6 +174,7 @@ public class CampaignCharacterService : ICampaignCharacterService
             ("currentEnergy", before.CurrentEnergy, participation.CurrentEnergy),
             ("characterStatus", before.CharacterStatus, participation.CharacterStatus),
             ("notes", before.Sheet, participation.Sheet),
+            ("sheetFile", before.SheetFile, participation.SheetFile),
             ("posture", (int)before.Posture, (int)participation.Posture));
         var turn = changes.Count == 0 ? null
             : Turn.CharacterUpdate(campaign.CampaignId, campaign.CurrentMapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes);
@@ -245,9 +248,10 @@ public class CampaignCharacterService : ICampaignCharacterService
     private async Task<CampaignCharacterDetailInfo> MapToDetailAsync(CampaignCharacter participation)
     {
         var info = (await MapToDtoAsync(new[] { participation })).Single();
-        // The sheet, its file (022) and the token belong to the character: every campaign shows the same, latest ones.
+        // The sheet and its file belong to this campaign (032): copied from the character when it joined and then
+        // changed only here. The token still belongs to the character, so every campaign shows the same one.
         var character = await _characterRepository.GetByIdAsync(participation.CharacterId);
-        var sheetFile = character?.SheetFile;
+        var sheetFile = participation.SheetFile;
         var token = character?.TokenId is long tokenId ? await _tokenRepository.GetByIdAsync(tokenId) : null;
         return new CampaignCharacterDetailInfo
         {
@@ -275,6 +279,7 @@ public class CampaignCharacterService : ICampaignCharacterService
             CharacterSheet = character?.Sheet,
             CharacterTokenName = token?.Name,
             CharacterTokenImageUrl = _imageStorage.GetUrl(token?.UpImage),
+            SheetFile = participation.SheetFile,
             SheetFileUrl = _imageStorage.GetUrl(sheetFile),
             SheetFileType = SheetFiles.TypeOf(sheetFile)
         };

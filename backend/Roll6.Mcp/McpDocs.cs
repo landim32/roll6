@@ -17,6 +17,9 @@ public static class McpDocs
 
     public const string IMAGE_FILE = "File name returned by upload_image ({32 hex}.png|jpg|webp). Not a URL. Omit or null for no image.";
     public const string SHEET = "Character sheet in markdown (free text, up to 20000 characters). Optional.";
+    /// <summary>Campaign-side counterparts of <see cref="SHEET"/> and of the character's sheet file (032).</summary>
+    public const string CAMPAIGN_SHEET = "Sheet of the character in this campaign, in markdown (up to 20000 characters): copied from the character's sheet when they joined, then changed only here. Send the current sheet (from get_participation) to keep it; null clears it.";
+    public const string CAMPAIGN_SHEET_FILE_OPTIONAL = "Sheet file of this campaign (image or PDF): the fileName returned by upload_document, or the current sheetFile from get_participation to keep it. An empty string removes it; omitting it also keeps it.";
 
     public const string CAMPAIGN_ID = "Id of the campaign (campaignId from list_campaigns / get_campaign).";
     public const string SLUG = "URL slug (lowercase, from the name at creation; it never changes). Example: \"tormento-vil\".";

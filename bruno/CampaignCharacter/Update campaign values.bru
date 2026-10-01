@@ -15,8 +15,15 @@ body:json {
     "currentLife": 20,
     "currentEnergy": 8,
     "characterStatus": "Ferido no braço",
-    "sheet": "## Na campanha\n- Espada +1"
+    "sheet": "# Thorin nesta campanha\n\nForça 5, espada +1",
+    "sheetFile": null
   }
+}
+
+docs {
+  sheetFile (032): null ou ausente = mantém o arquivo desta campanha, "" = remove, "{32-hex}.png|jpg|webp|pdf"
+  (fileName retornado por POST /api/document) = troca. sheet é a ficha desta campanha, cópia da ficha do personagem
+  feita na entrada — a ficha original não muda por aqui.
 }
 
 assert {

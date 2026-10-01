@@ -2,10 +2,10 @@ using System.Text.Json.Serialization;
 
 namespace Roll6.DTO.CampaignCharacter;
 
-/// <summary>A participation with the campaign notes (<see cref="Sheet"/>), which the lists leave out (they are polled).</summary>
+/// <summary>A participation with the campaign's own copy of the character sheet, which the lists leave out (they are polled).</summary>
 public class CampaignCharacterDetailInfo : CampaignCharacterInfo
 {
-    /// <summary>Campaign notes: what changed in this campaign compared to the character's sheet (markdown).</summary>
+    /// <summary>The character's sheet in this campaign (markdown): copied from the character's sheet when they joined (032).</summary>
     [JsonPropertyName("sheet")]
     public string? Sheet { get; set; }
 
@@ -19,7 +19,11 @@ public class CampaignCharacterDetailInfo : CampaignCharacterInfo
     [JsonPropertyName("characterTokenImageUrl")]
     public string? CharacterTokenImageUrl { get; set; }
 
-    /// <summary>Presigned URL of the character's sheet file (image or PDF, 022); same for every campaign.</summary>
+    /// <summary>Stored name ({guid}.{ext}) of this campaign's sheet file; send it back in an update to keep the file (032).</summary>
+    [JsonPropertyName("sheetFile")]
+    public string? SheetFile { get; set; }
+
+    /// <summary>Presigned URL of this campaign's sheet file (image or PDF); this campaign's own copy, not the character's (032).</summary>
     [JsonPropertyName("sheetFileUrl")]
     public string? SheetFileUrl { get; set; }
 

@@ -63,7 +63,7 @@ export interface MapNpcInfo {
   npcId: number;
   mapTokenId: number | null;
   name: string;
-  /** Current values of this occurrence (026); 0 or below = fallen. */
+  /** Current values of this occurrence (026); 0 or below is allowed. Posture is separate. */
   currentLife: number;
   currentEnergy: number;
   /** The NPC's totals. */
