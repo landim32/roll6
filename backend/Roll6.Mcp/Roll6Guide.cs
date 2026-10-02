@@ -105,8 +105,8 @@ public static class Roll6Guide
           change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the
           fields before/after. `get_turn_summary` returns the whole turn as readable markdown (actions + positions).
         - Running a turn as an assistant: `get_turn_data` (characters, NPC occurrences and actions in one call) → decide →
-          `process_turn` (all changes + narration in one atomic call; it also finishes the turn). Older turns:
-          `get_turn_history` (finished turns, newest first, a few at a time). `get_turn_narration` returns only the
+          `process_turn` (all changes + narration in one atomic call; it also finishes the turn). Older story:
+          `get_turn_history` (one item per narration, newest first, a few pages at a time). `get_turn_narration` returns only the
           narration of one turn, or of the latest finished turn that has one (204 / `{ ok: true }` when there is none).
         - `finish_turn` (master) moves to the next turn; without `force` it only lists the approved characters that
           have not acted yet. NPCs never block.
