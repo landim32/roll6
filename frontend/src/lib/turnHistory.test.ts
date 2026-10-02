@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { mergeTurnPages, newTurnsCount, turnLogMarkdown } from './turnHistory';
 
-const item = (turnNo: number, actions = `## Ações\nTurno ${turnNo}\n`) => ({ turnNo, actions, finishedAt: null });
+const item = (turnNo: number, actions = `GM (Ana):\n\nTexto ${turnNo}\n`, turnId = turnNo) =>
+  ({ turnId, turnNo, actions, finishedAt: null });
 
 describe('mergeTurnPages', () => {
   it('keeps the newest first without duplicates', () => {
@@ -12,6 +13,14 @@ describe('mergeTurnPages', () => {
 
   it('appends older pages at the end', () => {
     expect(mergeTurnPages([item(5), item(4)], [item(3), item(2)]).map((i) => i.turnNo)).toEqual([5, 4, 3, 2]);
+  });
+
+  it('keeps every narration of the same turn', () => {
+    // One turn narrated twice, and the turn in progress on top: deduplicating by turnNo would silently drop one of
+    // them, which is exactly the defect the list is keyed by entry to avoid.
+    const merged = mergeTurnPages([item(11, 'b', 202), item(11, 'a', 201)], [item(12, 'c', 210)]);
+    expect(merged.map((i) => i.turnId)).toEqual([210, 202, 201]);
+    expect(merged.map((i) => i.turnNo)).toEqual([12, 11, 11]);
   });
 });
 

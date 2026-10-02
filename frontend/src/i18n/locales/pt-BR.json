@@ -454,7 +454,6 @@
     "open": "Abrir o console de turnos",
     "close": "Fechar o console de turnos",
     "expand": "Ampliar",
-    "turn": "Turno {{no}}",
     "empty": "Nada para mostrar aqui ainda.",
     "start": "Início da campanha",
     "error": "Não foi possível carregar.",

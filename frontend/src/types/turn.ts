@@ -79,12 +79,15 @@ export interface TurnSummaryInfo {
   markdown: string;
 }
 
-/** One finished turn of the turn console (028). */
+/** One narration for the turn console (028). A turn can hold several, so the entry id is the identity. */
 export interface TurnHistoryItemInfo {
+  /** Id of the narration entry — unique. `turnNo` repeats when a turn has more than one narration. */
+  turnId: number;
+  /** Turn the narration was written in; used for ordering only, the console does not show it. */
   turnNo: number;
-  /** "## Ações" text of the turn summary. */
+  /** The narration as the summary renders it: "GM (name):" and the text, without the "## Ações" heading. */
   actions: string;
-  /** UTC time of the turn's last entry, without zone. */
+  /** UTC time the narration was written, without zone. */
   finishedAt: string | null;
 }
 

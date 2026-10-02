@@ -2,16 +2,17 @@ using System.Text.Json.Serialization;
 
 namespace Roll6.DTO.Turn;
 
-/// <summary>A page of finished turns, newest first (028: turn console).</summary>
+/// <summary>A page of narrations, newest first (028: turn console).</summary>
 public class TurnHistoryPageInfo
 {
     [JsonPropertyName("campaignId")]
     public long CampaignId { get; set; }
 
-    /// <summary>Turn in progress (not listed).</summary>
+    /// <summary>Turn in progress — its narrations are listed too, the story is told while the turn is open.</summary>
     [JsonPropertyName("currentTurn")]
     public int CurrentTurn { get; set; }
 
+    /// <summary>One item per narration entry: a turn can hold any number of them.</summary>
     [JsonPropertyName("items")]
     public List<TurnHistoryItemInfo> Items { get; set; } = new();
 
@@ -20,17 +21,21 @@ public class TurnHistoryPageInfo
     public int? NextBefore { get; set; }
 }
 
-/// <summary>One finished turn: its number and the "## Ações" text of its summary.</summary>
+/// <summary>One narration of the master: the entry, the turn it was written in and its markdown.</summary>
 public class TurnHistoryItemInfo
 {
+    /// <summary>Id of the narration entry — unique, because a turn may hold several items.</summary>
+    [JsonPropertyName("turnId")]
+    public long TurnId { get; set; }
+
     [JsonPropertyName("turnNo")]
     public int TurnNo { get; set; }
 
-    /// <summary>Same text as the "## Ações" section of the turn summary.</summary>
+    /// <summary>The narration as the summary renders it: "GM (name):" and the text, without the "## Ações" heading.</summary>
     [JsonPropertyName("actions")]
     public string Actions { get; set; } = string.Empty;
 
-    /// <summary>Time of the turn's last entry (UTC), null when the turn has none.</summary>
+    /// <summary>When the narration was written (UTC).</summary>
     [JsonPropertyName("finishedAt")]
     public DateTime? FinishedAt { get; set; }
 }

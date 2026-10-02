@@ -667,27 +667,31 @@ public class TurnServiceTests
     // ---- 028: turn history ----
 
     [Fact]
-    public async Task History_TurnInProgressComesFirst_PagedByTurnNumber()
+    public async Task History_OneItemPerNarration_CurrentTurnFirst()
     {
         _campaign.CurrentTurn = 12;
         var at = new DateTime(2026, 9, 28, 20, 0, 0);
-        // Turn 12 is still being played and already has a narration: it belongs at the top of the console.
-        var twelve = Turn.Narration(CAMPAIGN, MAP, 12, MASTER, "O turno segue aberto.");
-        twelve.CreatedAt = at.AddHours(2);
-        var eleven = Turn.Narration(CAMPAIGN, MAP, 11, MASTER, "Causa 6 de dano");
-        eleven.CreatedAt = at;
+        // Turn 11 was closed with two narrations; turn 12 is still being played and already has one.
+        var first = Turn.Narration(CAMPAIGN, MAP, 11, MASTER, "Causa 6 de dano");
+        var second = Turn.Narration(CAMPAIGN, MAP, 11, MASTER, "A tocha apaga.");
+        var open = Turn.Narration(CAMPAIGN, MAP, 12, MASTER, "O turno segue aberto.");
+        (first.TurnId, second.TurnId, open.TurnId) = (201, 202, 210);
+        (first.CreatedAt, second.CreatedAt, open.CreatedAt) = (at, at.AddHours(1), at.AddHours(2));
         _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 8, 12))
-            .ReturnsAsync(new List<Turn> { eleven, twelve });
+            .ReturnsAsync(new List<Turn> { first, second, open });
 
         var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, null);
 
-        // Only 12 and 11 are listed: 10 down to 8 have no narration, and the console hides them. The cursor still
-        // walks the whole range, so the next page continues from 8 and nothing is skipped.
-        page.Items.Select(i => i.TurnNo).Should().Equal(12, 11);
+        // Three items, not two: the turn is not the unit of the console, the narration is. Newest entry wins inside a
+        // turn, and turns 10 to 8 are absent because they have no narration — the cursor still walks the range.
+        page.Items.Select(i => i.TurnId).Should().Equal(210, 202, 201);
+        page.Items.Select(i => i.TurnNo).Should().Equal(12, 11, 11);
         (page.CurrentTurn, page.NextBefore).Should().Be((12, (int?)8));
-        page.Items[0].Actions.Should().Be("## Ações\nGM (User 1):\n\nO turno segue aberto.\n\n");
-        page.Items[1].Actions.Should().Be("## Ações\nGM (User 1):\n\nCausa 6 de dano\n\n");
-        page.Items[1].FinishedAt.Should().Be(at);
+        page.Items.Select(i => i.Actions).Should().Equal(
+            "GM (User 1):\n\nO turno segue aberto.",
+            "GM (User 1):\n\nA tocha apaga.",
+            "GM (User 1):\n\nCausa 6 de dano");
+        page.Items[2].FinishedAt.Should().Be(at);
     }
 
     [Fact]
@@ -709,13 +713,11 @@ public class TurnServiceTests
 
         var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, null);
 
-        // The whole text is compared, not searched: anything the turn still held that is not the narration would show
-        // up here — the move, the speech, the character change and the action result of the same turn are left out.
+        // The move, the speech, the character change and the action result of the same turn are all left out, and so
+        // is the whole of turn 4.
         page.Items.Select(i => i.TurnNo).Should().Equal(5);
         page.NextBefore.Should().Be(2);
-        page.Items[0].Actions.Should().Be("## Ações\nGM (User 1):\n\nA tocha apaga.\n\n");
-        // The time of the turn comes from every entry, not only from the one shown.
-        page.Items[0].FinishedAt.Should().NotBeNull();
+        page.Items[0].Actions.Should().Be("GM (User 1):\n\nA tocha apaga.");
     }
 
     [Fact]

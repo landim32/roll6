@@ -459,27 +459,21 @@ public partial class TurnService
         var oldest = Math.Max(1, newest - size + 1);
         var entries = await _repository.ListByCampaignTurnRangeAsync(campaignId, oldest, newest);
         var names = await LoadNamesAsync(campaign, entries, Array.Empty<long>(), Array.Empty<long>());
-        var byTurn = entries.GroupBy(e => e.TurnNo).ToDictionary(g => g.Key, g => g.ToList());
 
-        for (var turnNo = newest; turnNo >= oldest; turnNo--)
-        {
-            var turnEntries = byTurn.GetValueOrDefault(turnNo) ?? new List<Turn>();
-            // The console shows the master's narration of the turn and nothing else. Moves, speech, action results and
-            // character changes stay in the full summary (get_turn_summary) and in the turn log — and a turn without
-            // narration is not listed, instead of coming out as "Nenhuma ação registrada".
-            var lines = BuildLines(turnEntries, names)
-                .Where(line => line.Type == TurnType.Narration)
-                .ToList();
-            if (lines.Count == 0)
-                continue;
+        // One item per narration, newest first: a turn commonly holds several (the master narrates more than once
+        // before closing it), and each one is a block of the console. `limit` bounds the range of turns read, not the
+        // items returned — a page can hold more or fewer, since a turn without narration yields none. Moves, speech,
+        // action results and character changes stay in the full summary (get_turn_summary) and in the turn log.
+        foreach (var entry in entries.Where(e => e.TurnType == TurnType.Narration)
+                     .OrderByDescending(e => e.TurnNo).ThenByDescending(e => e.TurnId))
             page.Items.Add(new TurnHistoryItemInfo
             {
-                TurnNo = turnNo,
-                Actions = TurnSummary.BuildActions(lines),
-                // The time of the turn still comes from every entry, not only from the ones shown.
-                FinishedAt = turnEntries.Max(e => e.CreatedAt)
+                TurnId = entry.TurnId,
+                TurnNo = entry.TurnNo,
+                Actions = TurnSummary.BuildNarration(names.AuthorLabel(entry), entry.Description),
+                FinishedAt = entry.CreatedAt
             });
-        }
+
         page.NextBefore = oldest > 1 ? oldest : null;
         return page;
     }

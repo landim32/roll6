@@ -104,12 +104,13 @@ public static class TurnTools
     [McpServerTool(Name = "get_turn_history", Title = "Get turn history", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/turn/history")]
     [Description("""
-        What it does: pages through the turns of a campaign, newest first — the turn in progress comes first, then the
-        finished ones, because the story is told while the turn is still open. Each item is one turn: turnNo, finishedAt
-        and "actions" — the "## Ações" markdown of that turn, kept to the master's narration only. Moves, speech, action
-        results and character changes are left out here; read them with get_turn_summary or get_turn_data, which keep the
-        whole turn. A turn without narration is not listed. Use it to read the story of the campaign, a few turns at a
-        time.
+        What it does: pages through the narrations of a campaign, newest first — one item per narration, so a turn that
+        was narrated three times gives three items, and the turn in progress is included because the story is told
+        while the turn is still open. Each item is one narration: turnId, turnNo (the turn it was written in, for
+        ordering), finishedAt and "actions" — the narration as the summary renders it, "GM (name):" and the text,
+        without the "## Ações" heading. Only narrations are listed: moves, speech, action results and character
+        changes are left out; read them with get_turn_summary or get_turn_data, which keep the whole turn. Use it to
+        read the story of the campaign, a few pages at a time.
         Who can use it: the campaign master or a player with an approved character in the campaign.
         Returns: { campaignId, currentTurn, items[], nextBefore }. Pass nextBefore as "before" to get older turns; null means
         turn 1 was reached. Without "before" it starts at the turn in progress.
