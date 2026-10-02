@@ -5,12 +5,13 @@ import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapShare } from '../../hooks/useMapShare';
 import { ImageIcon, MinusIcon, PlusIcon, ResizeIcon, ShareIcon } from '../ui/icons';
+import { DiceRoller } from './DiceRoller';
 
 interface MapControlsProps {
   onOpenImage: () => void;
 }
 
-/** Buttons at the bottom-right corner: zoom in/out, share, scene image and image resize mode. */
+/** Buttons at the bottom-right corner: zoom in/out, dice, share, scene image and image resize mode. */
 export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   const { t } = useTranslation();
   const { currentCampaign } = useCampaign();
@@ -35,6 +36,8 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
         disabled={view.zoom >= MAX_ZOOM} onClick={() => zoomIn(...center())}><PlusIcon size={20} /></button>
       <button type="button" className="btn btn-secondary" title={t('map.zoomOut')} aria-label={t('map.zoomOut')}
         disabled={view.zoom <= MIN_ZOOM} onClick={() => zoomOut(...center())}><MinusIcon size={20} /></button>
+      {/* 3d6 on this screen only: it reads no campaign and stores nothing. */}
+      <DiceRoller />
       {canShare && (
         <button type="button" className="btn btn-secondary" title={t('map.share')} aria-label={t('map.share')}
           aria-busy={sharing} disabled={sharing} onClick={() => { void share(); }}>
