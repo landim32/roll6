@@ -671,7 +671,7 @@ public class TurnServiceTests
     {
         _campaign.CurrentTurn = 12;
         var at = new DateTime(2026, 9, 28, 20, 0, 0);
-        var eleven = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 11, PLAYER, "Ataca");
+        var eleven = Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 11, MASTER, "Causa 6 de dano");
         eleven.CreatedAt = at;
         _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 7, 11)).ReturnsAsync(new List<Turn> { eleven });
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
@@ -679,18 +679,53 @@ public class TurnServiceTests
 
         var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, null);
 
-        page.Items.Select(i => i.TurnNo).Should().Equal(11, 10, 9, 8, 7);
+        // Only turn 11 is listed: 10 down to 7 have no result and no narration, and the console hides them. The cursor
+        // still walks the whole range, so the next page continues from 7 and nothing is skipped.
+        page.Items.Select(i => i.TurnNo).Should().Equal(11);
         (page.CurrentTurn, page.NextBefore).Should().Be((12, (int?)7));
-        page.Items[0].Actions.Should().Be("## Ações\nAria (User 2): \"Ataca\"\n");
+        page.Items[0].Actions.Should().Be("## Ações\nGM (User 1): Resultado para Aria (User 2): Causa 6 de dano\n");
         page.Items[0].FinishedAt.Should().Be(at);
-        (page.Items[1].Actions, page.Items[1].FinishedAt).Should().Be(("## Ações\nNenhuma ação registrada.\n", (DateTime?)null));
+    }
+
+    [Fact]
+    public async Task History_ConsoleKeepsOnlyResultsAndNarration()
+    {
+        _campaign.CurrentTurn = 6;
+        _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 1, 5)).ReturnsAsync(new List<Turn>
+        {
+            Turn.Movement(CAMPAIGN, MAP, ARIA, null, null, 5, PLAYER, (1, 1, 0), (2, 1, 0), 1),
+            Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 5, PLAYER, "Ataco o goblin"),
+            Turn.CharacterUpdate(CAMPAIGN, MAP, ARIA, null, null, 5, PLAYER, new[] { new TurnChange("currentLife", "10", "6") }),
+            Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 5, MASTER, "O goblin cai"),
+            Turn.Narration(CAMPAIGN, MAP, 5, MASTER, "A tocha apaga."),
+            // Turn 4 is nothing but an action: the console leaves it out entirely.
+            Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 4, PLAYER, "Procuro uma saída"),
+        });
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync(new List<Character> { new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria" } });
+
+        var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, null);
+
+        page.Items.Select(i => i.TurnNo).Should().Equal(5);
+        page.Items[0].Actions.Should()
+            .Contain("Resultado para Aria (User 2): O goblin cai").And.Contain("A tocha apaga.");
+        // The move, the speech and the character change of this same turn are left out, and the time still comes from
+        // every entry of the turn, not only from the ones shown.
+        page.Items[0].Actions.Should().NotContain("Moveu").And.NotContain("Ataco o goblin").And.NotContain("Alterou");
+        page.Items[0].FinishedAt.Should().NotBeNull();
     }
 
     [Fact]
     public async Task History_LastPage_ReachesTurnOne()
     {
         _campaign.CurrentTurn = 12;
-        _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 1, 2)).ReturnsAsync(new List<Turn>());
+        _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 1, 2)).ReturnsAsync(new List<Turn>
+        {
+            Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 2, MASTER, "Passo 1"),
+            Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 1, MASTER, "Passo 2"),
+        });
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync(new List<Character> { new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria" } });
 
         var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, 3, 5);
 
@@ -710,14 +745,19 @@ public class TurnServiceTests
     }
 
     [Theory]
-    [InlineData(0, 1)]
-    [InlineData(50, 20)]
-    public async Task History_LimitIsClamped(int limit, int expected)
+    [InlineData(0, 39, 39)]
+    [InlineData(50, 20, 39)]
+    public async Task History_LimitIsClamped(int limit, int expectedOldest, int expectedNewest)
     {
         _campaign.CurrentTurn = 40;
-        _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, It.IsAny<int>(), 39)).ReturnsAsync(new List<Turn>());
+        _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync(new List<Turn>());
 
-        (await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, limit)).Items.Should().HaveCount(expected);
+        await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, limit);
+
+        // The clamp shows in the range of turns asked for; no turn is listed here because none has a result or a
+        // narration, which is what the console does with an empty turn.
+        _repository.Verify(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, expectedOldest, expectedNewest), Times.Once);
     }
 
     [Fact]

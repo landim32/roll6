@@ -462,11 +462,20 @@ public partial class TurnService
         for (var turnNo = newest; turnNo >= oldest; turnNo--)
         {
             var turnEntries = byTurn.GetValueOrDefault(turnNo) ?? new List<Turn>();
+            // The console shows the outcome of a turn: what an action did and what the master narrated. Moves, speech
+            // and character changes stay in the full summary (get_turn_summary) and in the turn log — and a turn with
+            // nothing to show is not listed, instead of coming out as "Nenhuma ação registrada".
+            var lines = BuildLines(turnEntries, names)
+                .Where(line => line.Type is TurnType.ActionResult or TurnType.Narration)
+                .ToList();
+            if (lines.Count == 0)
+                continue;
             page.Items.Add(new TurnHistoryItemInfo
             {
                 TurnNo = turnNo,
-                Actions = TurnSummary.BuildActions(BuildLines(turnEntries, names)),
-                FinishedAt = turnEntries.Count == 0 ? null : turnEntries.Max(e => e.CreatedAt)
+                Actions = TurnSummary.BuildActions(lines),
+                // The time of the turn still comes from every entry, not only from the ones shown.
+                FinishedAt = turnEntries.Max(e => e.CreatedAt)
             });
         }
         page.NextBefore = oldest > 1 ? oldest : null;
