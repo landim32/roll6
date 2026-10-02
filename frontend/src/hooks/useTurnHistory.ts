@@ -8,7 +8,7 @@ import type { TurnHistoryItemInfo } from '../types/turn';
 const PAGE_SIZE = 5;
 
 export interface TurnHistoryState {
-  /** Finished turns, newest first. */
+  /** Turns with narration, newest first — the turn being played comes first. */
   items: TurnHistoryItemInfo[];
   loading: boolean;
   error: string | null;
@@ -21,9 +21,9 @@ export interface TurnHistoryState {
 }
 
 /**
- * Finished turns of the current campaign for the turn console (028): first page on open/campaign change, older pages
- * on demand, and the newly finished turns put at the top whenever the turn in progress advances — `TurnContext`
- * follows `turn.finished` from the real-time channel, or its periodic check when offline.
+ * The turns of the current campaign for the turn console (028), the turn being played first: first page on
+ * open/campaign change, older pages on demand, and the newer turns put at the top whenever the turn in progress
+ * advances — `TurnContext` follows `turn.finished` from the real-time channel, or its periodic check when offline.
  */
 export const useTurnHistory = (enabled: boolean): TurnHistoryState => {
   const { currentCampaign } = useCampaign();
@@ -68,14 +68,16 @@ export const useTurnHistory = (enabled: boolean): TurnHistoryState => {
     if (active) void fetchPage(undefined, true);
   }, [active, campaignId, fetchPage]);
 
-  // Turns finished meanwhile go to the top.
+  // The turns newer than what is listed go to the top. The list already holds the turn that was in progress, so the
+  // page is asked from turnNo + 1 ("only turns below it") to keep it, and it re-reads that turn as well because the
+  // one that just closed may have gained its final narration after it was first shown.
   useEffect(() => {
     if (!active || turnNo === null || campaignId === null || loaded.current === null || turnNo <= loaded.current) return;
     const newest = items.length > 0 ? items[0].turnNo : null;
     const count = newTurnsCount(newest, turnNo);
     loaded.current = turnNo;
     if (count === 0) return;
-    turnService.history(campaignId, turnNo, count)
+    turnService.history(campaignId, turnNo + 1, count)
       .then((page) => {
         setItems((prev) => mergeTurnPages(prev, page.items));
         setPrependedAt((n) => n + 1);

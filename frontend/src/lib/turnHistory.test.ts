@@ -32,9 +32,12 @@ describe('turnLogMarkdown', () => {
 });
 
 describe('newTurnsCount', () => {
-  it('counts finished turns newer than the loaded ones', () => {
-    expect(newTurnsCount(9, 12)).toBe(2);
-    expect(newTurnsCount(11, 12)).toBe(0);
-    expect(newTurnsCount(null, 3)).toBe(2);
+  it('counts the turns newer than the newest listed, plus that one to re-read', () => {
+    // Newest listed is 9 and the table moved to 12: read 12, 11, 10 and 9 again — 9 was shown as the turn in
+    // progress and may have received its closing narration since.
+    expect(newTurnsCount(9, 12)).toBe(4);
+    expect(newTurnsCount(11, 12)).toBe(2);
+    // Nothing listed yet (every turn so far was hidden): a page from the turn in progress down to turn 1.
+    expect(newTurnsCount(null, 3)).toBe(4);
   });
 });

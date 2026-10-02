@@ -6,8 +6,9 @@ import { useTurnHistory } from '../../hooks/useTurnHistory';
 import { OpenIcon } from '../ui/icons';
 
 /**
- * Turn console over the map (028): a translucent strip above the footer with the finished turns, newest first, and
- * "Ampliar" to read them in a full-screen window (same history, no reload).
+ * Turn console over the map (028): a translucent strip above the footer with the narration of each turn of the
+ * campaign — the turn being played comes first — newest first, and "Ampliar" to read them in a full-screen window
+ * (same history, no reload).
  */
 export const TurnConsole = () => {
   const { t } = useTranslation();
