@@ -671,24 +671,22 @@ public class TurnServiceTests
     {
         _campaign.CurrentTurn = 12;
         var at = new DateTime(2026, 9, 28, 20, 0, 0);
-        var eleven = Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 11, MASTER, "Causa 6 de dano");
+        var eleven = Turn.Narration(CAMPAIGN, MAP, 11, MASTER, "Causa 6 de dano");
         eleven.CreatedAt = at;
         _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 7, 11)).ReturnsAsync(new List<Turn> { eleven });
-        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
-            .ReturnsAsync(new List<Character> { new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria" } });
 
         var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, null);
 
-        // Only turn 11 is listed: 10 down to 7 have no result and no narration, and the console hides them. The cursor
-        // still walks the whole range, so the next page continues from 7 and nothing is skipped.
+        // Only turn 11 is listed: 10 down to 7 have no narration, and the console hides them. The cursor still walks
+        // the whole range, so the next page continues from 7 and nothing is skipped.
         page.Items.Select(i => i.TurnNo).Should().Equal(11);
         (page.CurrentTurn, page.NextBefore).Should().Be((12, (int?)7));
-        page.Items[0].Actions.Should().Be("## Ações\nGM (User 1): Resultado para Aria (User 2): Causa 6 de dano\n");
+        page.Items[0].Actions.Should().Be("## Ações\nGM (User 1):\n\nCausa 6 de dano\n\n");
         page.Items[0].FinishedAt.Should().Be(at);
     }
 
     [Fact]
-    public async Task History_ConsoleKeepsOnlyResultsAndNarration()
+    public async Task History_ConsoleShowsOnlyNarration()
     {
         _campaign.CurrentTurn = 6;
         _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 1, 5)).ReturnsAsync(new List<Turn>
@@ -698,20 +696,19 @@ public class TurnServiceTests
             Turn.CharacterUpdate(CAMPAIGN, MAP, ARIA, null, null, 5, PLAYER, new[] { new TurnChange("currentLife", "10", "6") }),
             Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 5, MASTER, "O goblin cai"),
             Turn.Narration(CAMPAIGN, MAP, 5, MASTER, "A tocha apaga."),
-            // Turn 4 is nothing but an action: the console leaves it out entirely.
-            Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 4, PLAYER, "Procuro uma saída"),
+            // Turn 4 has an action result and no narration: the console leaves it out entirely.
+            Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 4, MASTER, "Leva 3 de dano"),
         });
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
             .ReturnsAsync(new List<Character> { new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria" } });
 
         var page = await _service.GetHistoryAsync(MASTER, CAMPAIGN, null, null);
 
+        // The whole text is compared, not searched: anything the turn still held that is not the narration would show
+        // up here — the move, the speech, the character change and the action result of the same turn are left out.
         page.Items.Select(i => i.TurnNo).Should().Equal(5);
-        page.Items[0].Actions.Should()
-            .Contain("Resultado para Aria (User 2): O goblin cai").And.Contain("A tocha apaga.");
-        // The move, the speech and the character change of this same turn are left out, and the time still comes from
-        // every entry of the turn, not only from the ones shown.
-        page.Items[0].Actions.Should().NotContain("Moveu").And.NotContain("Ataco o goblin").And.NotContain("Alterou");
+        page.Items[0].Actions.Should().Be("## Ações\nGM (User 1):\n\nA tocha apaga.\n\n");
+        // The time of the turn comes from every entry, not only from the one shown.
         page.Items[0].FinishedAt.Should().NotBeNull();
     }
 
@@ -721,8 +718,8 @@ public class TurnServiceTests
         _campaign.CurrentTurn = 12;
         _repository.Setup(r => r.ListByCampaignTurnRangeAsync(CAMPAIGN, 1, 2)).ReturnsAsync(new List<Turn>
         {
-            Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 2, MASTER, "Passo 1"),
-            Turn.ActionResult(CAMPAIGN, MAP, ARIA, null, null, 1, MASTER, "Passo 2"),
+            Turn.Narration(CAMPAIGN, MAP, 2, MASTER, "Passo 1"),
+            Turn.Narration(CAMPAIGN, MAP, 1, MASTER, "Passo 2"),
         });
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
             .ReturnsAsync(new List<Character> { new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria" } });
