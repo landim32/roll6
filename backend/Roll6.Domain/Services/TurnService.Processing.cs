@@ -440,8 +440,9 @@ public partial class TurnService
     public const int MAX_HISTORY_LIMIT = 20;
 
     /// <summary>
-    /// A page of finished turns (below the turn in progress), newest first, each with the "## Ações" text of its
-    /// summary; the cursor is the turn number, so turns finished meanwhile never shift the pages.
+    /// A page of turns, newest first: the turn in progress and the finished ones below it, each with the "## Ações"
+    /// text of its summary. The story of a campaign is told while its turn is still open, so the turn being played
+    /// belongs to the console. The cursor is the turn number, so turns finished meanwhile never shift the pages.
     /// </summary>
     public async Task<TurnHistoryPageInfo> GetHistoryAsync(long userId, long campaignId, int? before, int? limit)
     {
@@ -449,7 +450,8 @@ public partial class TurnService
         if (before < 1)
             throw new DomainValidationException("before", "O turno deve ser maior que zero.");
         var size = Math.Clamp(limit ?? DEFAULT_HISTORY_LIMIT, 1, MAX_HISTORY_LIMIT);
-        var newest = Math.Min(before ?? campaign.CurrentTurn, campaign.CurrentTurn) - 1;
+        // `before` keeps meaning "only turns below it"; without it the page starts at the turn in progress.
+        var newest = before.HasValue ? Math.Min(before.Value - 1, campaign.CurrentTurn) : campaign.CurrentTurn;
         var page = new TurnHistoryPageInfo { CampaignId = campaignId, CurrentTurn = campaign.CurrentTurn };
         if (newest < 1)
             return page;

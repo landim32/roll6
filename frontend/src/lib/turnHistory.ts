@@ -17,6 +17,10 @@ export const mergeTurnPages = (current: TurnHistoryItemInfo[], incoming: TurnHis
 export const turnLogMarkdown = (actions: string): string =>
   actions.replace(/\r\n/g, '\n').replace(/([^\n])\n(?!\n)/g, '$1  \n');
 
-/** How many finished turns are newer than the newest one loaded (turn in progress = turnNo). */
+/**
+ * How many turns to read from `turnNo` downwards to bring the console up to date: the turns newer than the newest one
+ * loaded, plus that newest one — the list holds the turn in progress too, and the turn that just closed may have
+ * gained its final narration after it was read. Null (nothing loaded yet) counts from turn 1.
+ */
 export const newTurnsCount = (newestLoaded: number | null, turnNo: number): number =>
-  Math.max(0, turnNo - 1 - (newestLoaded ?? 0));
+  Math.max(0, turnNo - (newestLoaded ?? 0) + 1);
