@@ -315,6 +315,8 @@
     "resize": "Ajustar imagem",
     "zoom": "Zoom {{value}}%",
     "unsaved": "Não salvo",
+    "dice": "Rolar 3d6 (só na sua tela)",
+    "diceTotal": "Total",
     "share": "Compartilhar"
   },
   "share": {
@@ -453,7 +455,7 @@
     "close": "Fechar o console de turnos",
     "expand": "Ampliar",
     "turn": "Turno {{no}}",
-    "empty": "Nenhum turno finalizado ainda.",
+    "empty": "Nada para mostrar aqui ainda.",
     "start": "Início da campanha",
     "error": "Não foi possível carregar.",
     "retry": "Tentar de novo",
