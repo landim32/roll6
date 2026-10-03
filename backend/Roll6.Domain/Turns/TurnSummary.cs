@@ -70,6 +70,14 @@ public static class TurnSummary
         return text.ToString();
     }
 
+    /// <summary>
+    /// One narration on its own (028 turn console, which lists narrations one by one): the author's label and the text
+    /// as the master wrote it, without the "## Ações" heading that groups a whole turn — repeating it on every
+    /// narration of the same turn would be noise.
+    /// </summary>
+    public static string BuildNarration(string? author, string? description)
+        => Narration(author == null ? null : Escape(author), description).TrimEnd('\n');
+
     private static string Write(SummaryLine line)
     {
         var actor = Escape(line.Actor);

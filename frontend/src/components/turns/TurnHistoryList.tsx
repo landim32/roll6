@@ -11,16 +11,10 @@ interface TurnHistoryListProps {
   compact?: boolean;
 }
 
-const formatTime = (value: string | null) => {
-  if (!value) return null;
-  // Backend dates are UTC without zone.
-  const date = new Date(value.endsWith('Z') ? value : `${value}Z`);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-};
-
 /**
- * Finished turns, newest first (028): one block per turn with its actions rendered as markdown, more loaded when the
- * end of the list shows up, and newer turns added at the top without moving whoever is reading older ones ("Novidades").
+ * The campaign's narrations, newest first (028): one block per narration — a turn can hold several, and the turn being
+ * played is included — with more loaded when the end of the list shows up, and newer ones added at the top without
+ * moving whoever is reading older ones ("Novidades"). No turn number and no date: it reads as one continuous story.
  */
 export const TurnHistoryList = ({ history, compact = false }: TurnHistoryListProps) => {
   const { t } = useTranslation();
@@ -72,11 +66,7 @@ export const TurnHistoryList = ({ history, compact = false }: TurnHistoryListPro
       )}
       <div ref={scroller} className="stm-turn-history-scroll" onScroll={(e) => { if (e.currentTarget.scrollTop === 0) setHasNews(false); }}>
         {items.map((item) => (
-          <section key={item.turnNo} className="stm-turn-history-item">
-            <header>
-              <strong>{t('turnConsole.turn', { no: item.turnNo })}</strong>
-              {formatTime(item.finishedAt) && <small className="text-body-secondary ms-2">{formatTime(item.finishedAt)}</small>}
-            </header>
+          <section key={item.turnId} className="stm-turn-history-item">
             <Suspense fallback={<div className="stm-turn-history-raw">{item.actions}</div>}>
               <MarkdownView value={turnLogMarkdown(item.actions)} emptyText="" />
             </Suspense>
