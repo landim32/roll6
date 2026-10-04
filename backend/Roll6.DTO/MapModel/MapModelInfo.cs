@@ -44,6 +44,21 @@ public class MapModelInfo
     [JsonPropertyName("hexSize")]
     public int HexSize { get; set; }
 
+    /// <summary>1 = 2D battle map, 2 = 2.5D story map (033).</summary>
+    [JsonPropertyName("kind")]
+    public int Kind { get; set; }
+
+    /// <summary>Wall cells as [[x, y], …]; empty when there are none (kept even on a 2D map, where they do nothing).</summary>
+    [JsonPropertyName("walls")]
+    public List<int[]> Walls { get; set; } = new();
+
+    [JsonPropertyName("skyImage")]
+    public string? SkyImage { get; set; }
+
+    /// <summary>Temporary URL of the sky image.</summary>
+    [JsonPropertyName("skyImageUrl")]
+    public string? SkyImageUrl { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

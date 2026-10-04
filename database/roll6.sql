@@ -1231,5 +1231,34 @@ BEGIN
     VALUES ('20261001001517_AddCampaignSheetFile', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004174459_AddStoryMap') THEN
+    ALTER TABLE map_models ADD kind integer NOT NULL DEFAULT 1;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004174459_AddStoryMap') THEN
+    ALTER TABLE map_models ADD sky_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004174459_AddStoryMap') THEN
+    ALTER TABLE map_models ADD walls jsonb;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004174459_AddStoryMap') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261004174459_AddStoryMap', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

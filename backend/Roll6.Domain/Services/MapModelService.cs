@@ -80,6 +80,7 @@ public class MapModelService : IMapModelService
         mapModel.Update(info.Name, info.Description, info.Image);
         mapModel.UpdateGrid(info.GridWidth, info.GridHeight);
         mapModel.UpdateImageLayout(info.ImageWidth, info.ImageHeight, info.ImageTop, info.ImageLeft);
+        mapModel.UpdateStory(info.Kind, info.Walls, info.SkyImage);
     }
 
     private async Task<MapModel> GetMapModelAsync(long mapModelId)
@@ -111,6 +112,10 @@ public class MapModelService : IMapModelService
         ImageTop = mapModel.ImageTop,
         ImageLeft = mapModel.ImageLeft,
         HexSize = HexGrid.HEX_SIZE,
+        Kind = (int)mapModel.Kind,
+        Walls = mapModel.Walls?.Select(w => new[] { w[0], w[1] }).ToList() ?? new List<int[]>(),
+        SkyImage = mapModel.SkyImage,
+        SkyImageUrl = _imageStorage.GetUrl(mapModel.SkyImage),
         CreatedAt = mapModel.CreatedAt,
         ChangedAt = mapModel.ChangedAt
     };

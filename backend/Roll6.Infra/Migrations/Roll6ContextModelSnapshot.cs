@@ -511,15 +511,30 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("image_width");
 
+                    b.Property<int>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("kind");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
                         .HasColumnName("name");
 
+                    b.Property<string>("SkyImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("sky_image");
+
                     b.Property<long>("UserId")
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");
+
+                    b.Property<string>("Walls")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("walls");
 
                     b.HasKey("MapModelId")
                         .HasName("map_models_pkey");

@@ -4,6 +4,7 @@ import { authService } from '../Services/authService';
 import {
   AUTH_STORAGE_KEY, CAMPAIGN_STORAGE_KEY, CHARACTER_STORAGE_KEY, MAP_STORAGE_KEY, TURN_STORAGE_KEY, readStoredSession, setUnauthorizedHandler,
 } from '../Services/apiHelpers';
+import { clearViewModes } from '../lib/viewMode';
 import type { UserInfo, UserInsertInfo, UserLoginInfo, UserPasswordInfo, UserTokenInfo } from '../types/auth';
 
 interface AuthContextType {
@@ -60,6 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
     localStorage.removeItem(TURN_STORAGE_KEY);
     localStorage.removeItem(MAP_STORAGE_KEY);
+    clearViewModes();
     setSession(null);
   }, []);
 

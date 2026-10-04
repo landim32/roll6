@@ -13,9 +13,16 @@ import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { gridPixelSize, HEX_SIZE } from '../lib/hexGrid';
 import {
-  createEmptyDraft, draftFromMapModel, isSameDraft, MAX_GRID_SIZE, MIN_GRID_SIZE, toMapModelInsert,
+  createEmptyDraft, draftFromMapModel, isSameDraft, isStoryMap, MAX_GRID_SIZE, MIN_GRID_SIZE, toMapModelInsert,
 } from '../lib/draft';
 import type { MapDraft } from '../lib/draft';
+import type { Offset } from '../lib/hexGrid';
+import { paintWalls as paintWallCells, trimWalls } from '../lib/storyWalls';
+import type { WallMode } from '../lib/storyWalls';
+import { clampFov, FOV_DEFAULT } from '../lib/storyCamera';
+import { readViewMode, writeViewMode } from '../lib/viewMode';
+import type { ViewMode } from '../lib/viewMode';
+import { MAP_KIND } from '../types/mapModel';
 import { MAP_STATUS_DELETED } from '../types/map';
 import type { MapInfo } from '../types/map';
 
@@ -87,6 +94,21 @@ interface MapEditorContextType {
   setImageLayout: (layout: ImageLayout) => void;
   setGridSize: (columns: number, rows: number) => void;
   toggleResizeMode: () => void;
+  // Story maps (033)
+  /** MAP_KIND of the draft; going back to 2D keeps the walls (they just do nothing). */
+  setKind: (kind: number) => void;
+  /** Paints or erases wall hexes of the draft (outside the grid ignored). */
+  paintWalls: (hexes: Offset[], mode: WallMode) => void;
+  setSkyImage: (fileName: string | null, url: string | null) => void;
+  /** Wall editing on the 2D map: null = off. */
+  wallMode: WallMode | null;
+  setWallMode: (mode: WallMode | null) => void;
+  /** 2D map or 3D view; always '2d' on a 2D map. */
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  /** Field of view (degrees) of the 3D view: its zoom. Not saved. */
+  fov: number;
+  setFov: (fov: number) => void;
   // Map lifecycle
   newMap: () => void;
   /** `keepView` keeps zoom/pan (the same map reloaded because someone saved it, 017). */
@@ -213,10 +235,57 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const setGridSize = useCallback((columns: number, rows: number) => {
     if (columns < MIN_GRID_SIZE || columns > MAX_GRID_SIZE || rows < MIN_GRID_SIZE || rows > MAX_GRID_SIZE)
       throw new RangeError('grid size out of range');
-    setDraft((prev) => ({ ...prev, gridWidth: columns, gridHeight: rows }));
+    // Walls left outside a smaller grid are dropped (the backend drops them too, 033).
+    setDraft((prev) => ({ ...prev, gridWidth: columns, gridHeight: rows, walls: trimWalls(prev.walls, columns, rows) }));
   }, []);
 
   const toggleResizeMode = useCallback(() => setResizeMode((prev) => !prev), []);
+
+  // ---------- story maps (033) ----------
+
+  const [wallMode, setWallModeState] = useState<WallMode | null>(null);
+  const [preferredView, setPreferredView] = useState<ViewMode>('2d');
+  const [fov, setFovState] = useState(FOV_DEFAULT);
+  const setFov = useCallback((value: number) => setFovState(clampFov(value)), []);
+  const story = isStoryMap(draft);
+  /** The 3D view exists only on story maps; a 2D map forces the 2D view without forgetting the preference. */
+  const viewMode: ViewMode = story ? preferredView : '2d';
+
+  const setKind = useCallback((kind: number) => {
+    setDraft((prev) => ({ ...prev, kind }));
+    if (kind !== MAP_KIND.story) setWallModeState(null);
+  }, []);
+
+  const paintWalls = useCallback((hexes: Offset[], mode: WallMode) => {
+    setDraft((prev) => {
+      const walls = paintWallCells(prev.walls, hexes, mode, prev.gridWidth, prev.gridHeight);
+      return walls === prev.walls ? prev : { ...prev, walls };
+    });
+  }, []);
+
+  const setSkyImage = useCallback((fileName: string | null, url: string | null) => {
+    setDraft((prev) => ({ ...prev, skyImage: fileName, skyImageUrl: url }));
+  }, []);
+
+  const setWallMode = useCallback((mode: WallMode | null) => {
+    setWallModeState(mode);
+    if (mode) setResizeMode(false);
+  }, []);
+
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setPreferredView(mode);
+    if (draft.mapModelId !== null) writeViewMode(draft.mapModelId, mode);
+    if (mode === '3d') {
+      setWallModeState(null);
+      setResizeMode(false);
+    }
+  }, [draft.mapModelId]);
+
+  // Each map reopens in the view last used for it on this device (story maps only).
+  useEffect(() => {
+    setPreferredView(draft.mapModelId !== null ? readViewMode(draft.mapModelId) : '2d');
+    setWallModeState(null);
+  }, [draft.mapModelId]);
 
   // ---------- map lifecycle ----------
 
@@ -252,6 +321,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const discardChanges = useCallback(() => {
     setDraft(saved);
     setResizeMode(false);
+    setWallModeState(null);
   }, [saved]);
 
   /**
@@ -427,6 +497,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, loading, error,
     zoomAt, zoomIn, zoomOut, panBy, centerOn,
     setImage, setImageLayout, setGridSize, toggleResizeMode,
+    setKind, paintWalls, setSkyImage, wallMode, setWallMode, viewMode, setViewMode, fov, setFov,
     newMap, loadMapModel, openCampaignMapBySlug, discardChanges, saveMap, clearError,
   };
 

@@ -1,4 +1,7 @@
 import { gridPath, gridPixelSize, hexCenter } from './hexGrid';
+import type { Offset } from './hexGrid';
+import { wallsPath } from './storyWalls';
+import { MAP_KIND } from '../types/mapModel';
 import { isOutOfCombat, pieceGeometry, pieceImage } from './pieceDrawing';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import type { Posture } from '../types/mapToken';
@@ -21,6 +24,9 @@ export interface SnapshotDraft {
   imageTop: number;
   imageWidth: number | null;
   imageHeight: number | null;
+  /** Story maps (033): their walls are drawn like on screen. */
+  kind?: number;
+  walls?: Offset[];
 }
 
 /** What the snapshot needs from a piece. */
@@ -41,6 +47,9 @@ export interface SnapshotToken {
 const BACKGROUND = '#1a1d21';
 /** A bit stronger than on screen: the shared picture is shrunk and then recompressed by WhatsApp. */
 const GRID_STROKE = 'rgba(235, 235, 245, 0.55)';
+/** Walls of a story map (033), as `.stm-walls` on screen. */
+const WALL_FILL = 'rgba(20, 22, 26, 0.62)';
+const WALL_STROKE = 'rgba(222, 226, 230, 0.45)';
 /** Line widths in output pixels, whatever the scale (the screen uses non-scaling strokes too). */
 const GRID_LINE = 1.5;
 const DISC_LINE = 2;
@@ -74,8 +83,11 @@ export const toGrayscale = (pixels: Uint8ClampedArray): Uint8ClampedArray => {
   return pixels;
 };
 
-/** A black and white copy of a loaded picture, or the picture itself when the canvas can't be read. */
-const grayCopy = (image: HTMLImageElement): CanvasImageSource => {
+/**
+ * A black and white copy of a loaded picture, or the picture itself when the canvas can't be read. Also used by the
+ * 3D view of story maps (033).
+ */
+export const grayCopy = (image: HTMLImageElement): CanvasImageSource => {
   const canvas = document.createElement('canvas');
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
@@ -309,6 +321,17 @@ export const renderMapSnapshot = async (input: {
   ctx.strokeStyle = GRID_STROKE;
   ctx.lineWidth = GRID_LINE / scale;
   ctx.stroke(new Path2D(gridPath(draft.gridWidth, draft.gridHeight, hexSize)));
+
+  // Walls of a story map (033), with the colors of the screen's WallLayer.
+  const walls = draft.kind === MAP_KIND.story ? draft.walls ?? [] : [];
+  if (walls.length > 0) {
+    const path = new Path2D(wallsPath(walls, hexSize));
+    ctx.fillStyle = WALL_FILL;
+    ctx.fill(path);
+    ctx.strokeStyle = WALL_STROKE;
+    ctx.lineWidth = GRID_LINE / scale;
+    ctx.stroke(path);
+  }
 
   const pictures = await Promise.all(tokens.map((token) => {
     const { url } = pieceImage(token);

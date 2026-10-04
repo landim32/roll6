@@ -1,5 +1,8 @@
+import { MAP_KIND } from '../types/mapModel';
 import type { MapModelInfo, MapModelInsertInfo } from '../types/mapModel';
 import type { MapInfo } from '../types/map';
+import type { Offset } from './hexGrid';
+import { fromWallPairs, sameWalls, toWallPairs, trimWalls } from './storyWalls';
 
 /** Default grid (same as the backend). */
 export const DEFAULT_GRID_SIZE = 20;
@@ -31,6 +34,14 @@ export interface MapDraft {
   imageHeight: number | null;
   imageTop: number;
   imageLeft: number;
+  /** MAP_KIND value (033). */
+  kind: number;
+  /** Wall cells, sorted by row then column (see lib/storyWalls). Kept on a 2D map, where they do nothing. */
+  walls: Offset[];
+  /** Stored sky/horizon image of the 3D view. */
+  skyImage: string | null;
+  /** Temporary URL of the sky image. Not saved. */
+  skyImageUrl: string | null;
 }
 
 /** A brand-new map: default grid, no image. */
@@ -51,6 +62,10 @@ export const createEmptyDraft = (): MapDraft => ({
   imageHeight: null,
   imageTop: 0,
   imageLeft: 0,
+  kind: MAP_KIND.battle,
+  walls: [],
+  skyImage: null,
+  skyImageUrl: null,
 });
 
 /** Draft from a library map, optionally opened through a campaign map. */
@@ -71,15 +86,26 @@ export const draftFromMapModel = (model: MapModelInfo, map?: MapInfo | null): Ma
   imageHeight: model.imageHeight,
   imageTop: model.imageTop,
   imageLeft: model.imageLeft,
+  kind: model.kind ?? MAP_KIND.battle,
+  walls: fromWallPairs(model.walls),
+  skyImage: model.skyImage ?? null,
+  skyImageUrl: model.skyImageUrl ?? null,
 });
 
 /** Fields that are saved; anything else (ids, URLs, display name) does not make the map dirty. */
 const SAVED_FIELDS: (keyof MapDraft)[] = [
-  'image', 'gridWidth', 'gridHeight', 'imageWidth', 'imageHeight', 'imageTop', 'imageLeft',
+  'image', 'gridWidth', 'gridHeight', 'imageWidth', 'imageHeight', 'imageTop', 'imageLeft', 'kind', 'skyImage',
 ];
 
 /** True when both drafts would save the same content. */
-export const isSameDraft = (a: MapDraft, b: MapDraft): boolean => SAVED_FIELDS.every((field) => a[field] === b[field]);
+export const isSameDraft = (a: MapDraft, b: MapDraft): boolean =>
+  SAVED_FIELDS.every((field) => a[field] === b[field]) && sameWalls(a.walls, b.walls);
+
+/** True when the draft is a story map (033): walls block pieces and the 3D view is offered. */
+export const isStoryMap = (draft: Pick<MapDraft, 'kind'>): boolean => draft.kind === MAP_KIND.story;
+
+/** Walls that count now: those of a story map, none on a 2D map (mirror of MapModel.ActiveWalls). */
+export const activeWalls = (draft: Pick<MapDraft, 'kind' | 'walls'>): Offset[] => (isStoryMap(draft) ? draft.walls : []);
 
 /** Payload for create/update of the map model. */
 export const toMapModelInsert = (draft: MapDraft, name: string, description: string | null): MapModelInsertInfo => ({
@@ -92,4 +118,7 @@ export const toMapModelInsert = (draft: MapDraft, name: string, description: str
   imageHeight: draft.imageHeight,
   imageTop: draft.imageTop,
   imageLeft: draft.imageLeft,
+  kind: draft.kind,
+  walls: toWallPairs(trimWalls(draft.walls, draft.gridWidth, draft.gridHeight)),
+  skyImage: draft.skyImage,
 });

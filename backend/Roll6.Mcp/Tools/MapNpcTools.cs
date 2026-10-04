@@ -23,8 +23,8 @@ public static class MapNpcTools
         current, totalLife/totalEnergy = the NPC's, sheet = the NPC's sheet).
         Who can use it: only the master; the NPC must be in the campaign (add_npc_to_campaign).
         {{RETURNS}}
-        Common errors: 403 not the master, 404 map/NPC not found, 409 NPC not in the campaign or a hex of the token's shape
-        occupied, 400 shape outside the grid.
+        Common errors: 403 not the master, 404 map/NPC not found, 409 NPC not in the campaign, a hex of the token's shape
+        occupied or a wall is on that hex (story maps), 400 shape outside the grid.
         Related tools: list_campaign_npcs, list_map_tokens, move_map_token, update_map_npc.
         """)]
     public static Task<CallToolResult> PlaceNpcOnMap(

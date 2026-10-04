@@ -53,6 +53,33 @@ describe('npcDropAction', () => {
   });
 });
 
+describe('walls of a story map (033)', () => {
+  const walls = [{ x: 4, y: 4 }, { x: 0, y: 1 }];
+
+  it('refuses to place or move a character onto a wall', () => {
+    expect(characterDropAction({ hex: { x: 4, y: 4 }, tokens, columns: 10, rows: 10, participation: member(8, 3), walls }))
+      .toEqual({ kind: 'wall' });
+    expect(characterDropAction({ hex: { x: 4, y: 4 }, tokens, columns: 10, rows: 10, participation: member(7, 3), walls }))
+      .toEqual({ kind: 'wall' });
+  });
+
+  it('refuses a big piece whose shape covers a wall', () => {
+    const horse = { ...piece(20, 5, 5, 9), space: 2 };
+    // Facing up, a 2-hex piece at (0, 0) also takes the hex behind it, (0, 1).
+    expect(characterDropAction({ hex: { x: 0, y: 0 }, tokens: [horse], columns: 10, rows: 10, participation: member(9, 3), walls }))
+      .toEqual({ kind: 'wall' });
+  });
+
+  it('refuses an NPC on a wall', () => {
+    expect(npcDropAction({ hex: { x: 4, y: 4 }, tokens, walls })).toEqual({ kind: 'wall' });
+    expect(npcDropAction({ hex: { x: 5, y: 5 }, tokens, walls })).toEqual({ kind: 'place' });
+  });
+
+  it('ignores walls that are not given (2D maps)', () => {
+    expect(npcDropAction({ hex: { x: 4, y: 4 }, tokens })).toEqual({ kind: 'place' });
+  });
+});
+
 describe('pieces of several hexes (031)', () => {
   const horse = { ...piece(20, 5, 5, 9), space: 2 };
   const big = [horse, piece(21, 7, 7)];

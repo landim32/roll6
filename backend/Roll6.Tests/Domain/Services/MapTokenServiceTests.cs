@@ -785,6 +785,93 @@ public class MapTokenServiceTests
         (result.Posture, result.Space).Should().Be(((int?)Posture.Down, 2));
     }
 
+    // ---- 033: walls of a story map block pieces like a taken hex, for everyone ----
+
+    private void Walls(MapKind kind, params (int X, int Y)[] walls)
+    {
+        var model = new MapModel { MapModelId = 50 };
+        model.UpdateGrid(10, 8);
+        model.UpdateStory((int)kind, walls.Select(w => new[] { w.X, w.Y }), null);
+        _mapModelRepository.Setup(r => r.GetByIdAsync(50)).ReturnsAsync(model);
+    }
+
+    [Fact]
+    public async Task Create_OnAWall_Throws()
+    {
+        Walls(MapKind.Story, (0, 0));
+
+        (await _service.Invoking(s => s.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 4 }))
+            .Should().ThrowAsync<ConflictException>()).WithMessage(MapLayout.WALL_MESSAGE);
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Walls_OfABattleMap_BlockNothing()
+    {
+        Walls(MapKind.Battle, (0, 0));
+
+        var result = await _service.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = 4 });
+
+        (result.X, result.Y).Should().Be((0, 0));
+    }
+
+    [Fact]
+    public async Task Move_OntoAWall_Throws_EvenForTheMaster()
+    {
+        AriaPiece();
+        Walls(MapKind.Story, (2, 0));
+
+        (await _service.Invoking(s => s.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 }))
+            .Should().ThrowAsync<ConflictException>()).WithMessage(MapLayout.WALL_MESSAGE);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Move_Player_PathGoesAroundTheWall()
+    {
+        AriaPiece();
+        Walls(MapKind.Story, (2, 1));
+
+        // Straight ahead costs 2; around the wall at (2, 1) it costs 7 > move 5.
+        (await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
+    }
+
+    [Fact]
+    public async Task Move_Master_JumpingPieces_StillGoesAroundTheWalls()
+    {
+        AriaPiece();
+        Walls(MapKind.Story, (2, 1));
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        await _service.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 });
+
+        recorded!.Moved.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Move_APieceOnAWall_LeavesIt()
+    {
+        AriaPiece();
+        Walls(MapKind.Story, (2, 2));
+
+        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 });
+
+        (moved.X, moved.Y).Should().Be((2, 1));
+    }
+
+    [Fact]
+    public async Task SetPosture_LyingDownOverAWall_IsNeverRefused()
+    {
+        SetupKnight(Posture.Standing);
+        Walls(MapKind.Story, (4, 5));
+
+        var result = await _service.SetPostureAsync(2, 60, new MapTokenPostureInfo { Posture = (int)Posture.Down });
+
+        result.Posture.Should().Be((int)Posture.Down);
+    }
+
     [Fact]
     public async Task LyingPiece_BlocksTheHexBehindIt()
     {

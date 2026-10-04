@@ -79,7 +79,7 @@ public static class TurnTools
         character (characterId) and NPC occurrence (mapNpcId) send only what changed: currentLife, currentEnergy (fatigue),
         status (or clearStatus: true), posture (1 standing, 2 down, 3 out of combat), x/y (together) and look. Also send "narration": what happened in the turn (up to 10000
         characters). Everything is validated first — current values never above the totals, the whole shape of each moved
-        piece inside the grid and on free hexes (checked after all moves, so two pieces may swap) — and saved together: if any item is invalid nothing
+        piece inside the grid, on free hexes and on no wall of a story map (checked after all moves, so two pieces may swap) — and saved together: if any item is invalid nothing
         changes and the turn does not advance. Every change is logged in the turn by the master (moves without the one-move
         limit). Campaign notes and sheets are not changed here (use update_participation). {{McpDocs.DESTRUCTIVE}}
         Who can use it: only the campaign master.
@@ -148,7 +148,7 @@ public static class TurnTools
     [Description($$"""
         What it does: deletes the move and the action of a piece's character/NPC occurrence in the current turn (changes to
         its life/energy/status stay in the log) and moves the piece back to where it was before its move (if that hex is
-        still free) — so it can move and act again. {{McpDocs.DESTRUCTIVE}}
+        still free and not a wall of a story map) — so it can move and act again. {{McpDocs.DESTRUCTIVE}}
         Who can use it: a player for his own approved character's piece; the master for any character or NPC piece.
         Returns: { removed (entries deleted), reverted (false when the former hex was taken and the piece stayed) }.
         Common errors: 403 not your piece, 400 object piece, 404 not found.
