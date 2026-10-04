@@ -87,6 +87,8 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
   const [form, setForm] = useState<TokenForm>(emptyTokenForm);
   const [upCrop, setUpCrop] = useState<ImageCrop | null>(null);
   const [downCrop, setDownCrop] = useState<ImageCrop | null>(null);
+  /** "2,5D frente" (034): the chosen file, uploaded as it is. */
+  const [frontFile, setFrontFile] = useState<File | null>(null);
   /** Own token being edited: this modal hides while "Editar token" is open. */
   const [editing, setEditing] = useState<TokenInfo | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -102,6 +104,7 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
     setForm(emptyTokenForm());
     setUpCrop(null);
     setDownCrop(null);
+    setFrontFile(null);
     mine.reset();
     library.reset();
   // Reset once per opening.
@@ -129,7 +132,8 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
     try {
       const upImage = upCrop ? await uploadTokenImage(upCrop, Number(form.upSpace)) : null;
       const downImage = downCrop ? await uploadTokenImage(downCrop, downImageSpace(form.downSpace)) : null;
-      token = await create(toTokenInsert(form, upImage, downImage));
+      const frontImage = frontFile ? (await imageService.upload(frontFile)).fileName : null;
+      token = await create(toTokenInsert(form, upImage, downImage, frontImage));
       toast.success(t('toast.tokenCreated', { name: token.name }));
     } catch (err) {
       setBusy(false);
@@ -200,6 +204,7 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
             onField={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))}
             onUpCrop={setUpCrop}
             onDownCrop={setDownCrop}
+            onFrontFile={setFrontFile}
           />
         </form>
       </Modal>

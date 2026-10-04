@@ -6,6 +6,7 @@ import { Modal } from '../ui/Modal';
 import { Tabs } from '../ui/Tabs';
 import { PagedListView } from '../ui/PagedListView';
 import { useMapEditor } from '../../hooks/useMapEditor';
+import { ThreeDImagesTab } from './ThreeDImagesTab';
 import { ACCEPTED_IMAGE_TYPES, imageService, MAX_IMAGE_BYTES } from '../../Services/imageService';
 import { mapModelService } from '../../Services/mapModelService';
 import type { PagedList } from '../../types/common';
@@ -18,10 +19,13 @@ interface ImageModalProps {
 
 const PAGE_SIZE = 10;
 
-/** Scene image: upload a new file or reuse the image of a library map. Changes only the draft. */
+/**
+ * Scene image: upload a new file or reuse the image of a library map, and (034) the 3D mask and background of the 3D
+ * view. Changes only the draft.
+ */
 export const ImageModal = ({ open, onOpenChange }: ImageModalProps) => {
   const { t } = useTranslation();
-  const { setImage } = useMapEditor();
+  const { setImage, canEdit } = useMapEditor();
   const [tab, setTab] = useState('upload');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -74,11 +78,17 @@ export const ImageModal = ({ open, onOpenChange }: ImageModalProps) => {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={t('image.title')} large>
       <Tabs
-        tabs={[{ key: 'upload', label: t('image.uploadTab') }, { key: 'library', label: t('image.libraryTab') }]}
+        tabs={[
+          { key: 'upload', label: t('image.uploadTab') },
+          { key: 'library', label: t('image.libraryTab') },
+          ...(canEdit ? [{ key: 'threeD', label: t('raycast.tab') }] : []),
+        ]}
         active={tab}
         onChange={setTab}
       />
-      {tab === 'upload' ? (
+      {tab === 'threeD' ? (
+        <ThreeDImagesTab />
+      ) : tab === 'upload' ? (
         <form onSubmit={onUpload}>
           <div className="mb-3">
             <label className="form-label" htmlFor="image-file">{t('image.file')}</label>

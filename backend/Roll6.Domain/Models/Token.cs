@@ -17,16 +17,19 @@ public class Token
     public int? DownSpace { get; set; }
     public string? UpImage { get; set; }
     public string? DownImage { get; set; }
+    /// <summary>"2.5D front" (034): the figure seen from the front, standing, used by the 3D view. Optional.</summary>
+    public string? FrontImage { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    public void Update(string? name, string? description, int? upSpace, int? downSpace, string? upImage, string? downImage)
+    public void Update(string? name, string? description, int? upSpace, int? downSpace, string? upImage, string? downImage, string? frontImage = null)
     {
         Name = Guard.RequiredText(name, "name", 260);
         Description = Guard.OptionalText(description, "description", 2000);
         UpSpace = Guard.TokenSpace(upSpace ?? DEFAULT_UP_SPACE, "upSpace");
         UpImage = Guard.ImageFileName(upImage, "upImage");
         DownImage = Guard.ImageFileName(downImage, "downImage");
+        FrontImage = Guard.ImageFileName(frontImage, "frontImage");
         DownSpace = ResolveDownSpace(downSpace, DownImage);
         UpdatedAt = DateTime.UtcNow;
     }

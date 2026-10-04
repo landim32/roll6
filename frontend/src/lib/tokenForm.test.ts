@@ -34,16 +34,22 @@ describe('validateTokenForm', () => {
 describe('toTokenInsert', () => {
   it('trims texts, converts spaces and keeps the images', () => {
     expect(toTokenInsert(form({ name: ' Goblin ', description: '  ', upSpace: '1', downSpace: '' }), 'a.png', null)).toEqual({
-      name: 'Goblin', description: null, upSpace: 1, downSpace: null, upImage: 'a.png', downImage: null,
+      name: 'Goblin', description: null, upSpace: 1, downSpace: null, upImage: 'a.png', downImage: null, frontImage: null,
     });
     expect(toTokenInsert(form({ downSpace: '2' }), null, 'b.png').downSpace).toBe(2);
+  });
+
+  it('sends the "2,5D frente" image when there is one (034)', () => {
+    expect(toTokenInsert(form(), 'a.png', null, 'front.png').frontImage).toBe('front.png');
+    expect(toTokenInsert(form(), 'a.png', null).frontImage).toBeNull();
   });
 });
 
 describe('toTokenForm', () => {
   const token = (changes: Partial<TokenInfo> = {}): TokenInfo => ({
     tokenId: 1, userId: 1, name: 'Goblin', description: null, upSpace: 1, downSpace: null,
-    upImage: null, downImage: null, upImageUrl: null, downImageUrl: null, createdAt: '', updatedAt: '', ...changes,
+    upImage: null, downImage: null, frontImage: null, upImageUrl: null, downImageUrl: null, frontImageUrl: null,
+    createdAt: '', updatedAt: '', ...changes,
   });
 
   it('fills the form with the saved values', () => {

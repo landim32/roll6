@@ -45,6 +45,45 @@ public class TokenLibraryServiceTests
         result.DownImage.Should().Be(DOWN_IMAGE);
     }
 
+    private const string FRONT_IMAGE = "fedcba9876543210fedcba9876543210.png";
+
+    [Fact]
+    public async Task Create_WithFrontImage_KeepsIt()
+    {
+        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Goblin", FrontImage = FRONT_IMAGE });
+
+        result.FrontImage.Should().Be(FRONT_IMAGE);
+    }
+
+    [Fact]
+    public async Task Create_WithoutFrontImage_HasNone()
+    {
+        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Goblin" });
+
+        result.FrontImage.Should().BeNull();
+        result.FrontImageUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Create_WithInvalidFrontImage_Throws()
+    {
+        var act = () => _service.CreateAsync(1, new TokenInsertInfo { Name = "Goblin", FrontImage = "front.gif" });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("frontImage");
+    }
+
+    [Fact]
+    public async Task Update_WithoutFrontImage_RemovesIt()
+    {
+        _repository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(new Token { TokenId = 7, UserId = 1, Name = "Goblin", FrontImage = FRONT_IMAGE });
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
+
+        // PUT replaces every field: an omitted frontImage is removed, like downImage.
+        var result = await _service.UpdateAsync(1, 7, new TokenInsertInfo { Name = "Goblin" });
+
+        result.FrontImage.Should().BeNull();
+    }
+
     [Fact]
     public async Task Create_WithDownSpaceAndNoDownImage_KeepsInformedValue()
     {

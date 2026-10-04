@@ -31,8 +31,6 @@ import { ResizeHandles } from './ResizeHandles';
 import { SpeechBubbleLayer } from './SpeechBubbleLayer';
 import { TokenLayer } from './TokenLayer';
 import { TurnTrailLayer } from './TurnTrailLayer';
-import { WallLayer } from './WallLayer';
-import { activeWalls, isStoryMap } from '../../lib/draft';
 
 /** What the tokens modal is opened for, from the map. */
 export type TokenPickRequest =
@@ -67,14 +65,7 @@ const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y ==
  */
 export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, picking = false }: MapCanvasProps) => {
   const { t } = useTranslation();
-  const {
-    draft, hexSize, view, panBy, zoomIn, zoomOut, centerOn, resizeMode, canEdit, setImageLayout, wallMode, paintWalls,
-  } = useMapEditor();
-  /** Walls of a story map (033): they block pieces and drops; none on a 2D map. */
-  const walls = activeWalls(draft);
-  const editingWalls = wallMode !== null && canEdit && isStoryMap(draft);
-  /** Last hex painted in the current wall stroke (a drag paints each hex once). */
-  const paintedHex = useRef<Offset | null>(null);
+  const { draft, hexSize, view, panBy, zoomIn, zoomOut, centerOn, resizeMode, canEdit, setImageLayout } = useMapEditor();
   const { mapTokens, canPlace, canPlaceOwn, placeCharacter, moveToken, setPosture } = useMapToken();
   const { party, currentSelection } = useCharacter();
   const { session } = useAuth();
@@ -120,24 +111,9 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
     centerOn(center.x, center.y, FOCUS_ZOOM);
   }, [draft.mapId, mapTokens, party, currentSelection, hexSize, centerOn]);
 
-  /** Wall editing (033): paints/erases the hex under the pointer, once per hex during a stroke. */
-  const paintAt = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const hex = hexAt(event);
-    if (!hex || !wallMode || sameHex(paintedHex.current, hex)) return;
-    paintedHex.current = hex;
-    paintWalls([hex], wallMode);
-  };
-
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    if (editingWalls) {
-      // A wall stroke instead of a pan; the wheel still zooms and the right button does nothing.
-      closeMenu();
-      paintedHex.current = null;
-      paintAt(event);
-      return;
-    }
     last.current = { x: event.clientX, y: event.clientY };
     pressedAt.current = { x: event.clientX, y: event.clientY };
     setPanning(true);
@@ -224,11 +200,6 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
   };
 
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (editingWalls) {
-      hover(hexAt(event));
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) paintAt(event);
-      return;
-    }
     if (!last.current) {
       hover(movement.active ? null : hexAt(event));
       if (movement.active) moveWithPointer(event);
@@ -251,11 +222,6 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
   };
 
   const onPointerUp = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (editingWalls) {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-      paintedHex.current = null;
-      return;
-    }
     const start = pressedAt.current;
     pressedAt.current = null;
     stopPan(event);
@@ -272,8 +238,6 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
     // Players only get a menu (Mover / Agir / Resetar turno) on the pieces of their own characters.
     const piece = tokenAt(mapTokens, hex.x, hex.y);
     if (!canPlace && !(piece && (canMove(piece) || canTakeTurn(piece) || canSetPosture(piece)))) return;
-    // Nothing can be added on a wall (033); a piece left on one still has its menu.
-    if (!piece && walls.some((w) => w.x === hex.x && w.y === hex.y)) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setMenu({ hex, left: event.clientX - rect.left, top: event.clientY - rect.top });
     hover(hex);
@@ -304,13 +268,9 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
   };
 
   const dropNpc = async (npcId: number, hex: Offset | null) => {
-    const action = npcDropAction({ hex, tokens: mapTokens, walls });
+    const action = npcDropAction({ hex, tokens: mapTokens });
     if (action.kind === 'occupied') {
       toast.warning(t('mapTokens.hexOccupied'));
-      return;
-    }
-    if (action.kind === 'wall') {
-      toast.warning(t('story.wallBlocked'));
       return;
     }
     if (action.kind !== 'place' || !hex) return;
@@ -336,16 +296,11 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
     if (!participation || !hex) return;
     if (!canPlace && participation.characterOwnerId !== session?.user.userId) return;
 
-    const action = characterDropAction({
-      hex, tokens: mapTokens, participation, columns: draft.gridWidth, rows: draft.gridHeight, walls,
-    });
+    const action = characterDropAction({ hex, tokens: mapTokens, participation, columns: draft.gridWidth, rows: draft.gridHeight });
     try {
       switch (action.kind) {
         case 'occupied':
           toast.warning(t('mapTokens.hexOccupied'));
-          break;
-        case 'wall':
-          toast.warning(t('story.wallBlocked'));
           break;
         case 'blocked':
           toast.warning(t('mapTokens.doesNotFit'));
@@ -397,7 +352,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
   return (
     <>
       <svg
-        className={`stm-map${panning ? ' stm-panning' : ''}${editingWalls ? ' stm-wall-editing' : ''}`}
+        className={`stm-map${panning ? ' stm-panning' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -416,7 +371,6 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
         <g transform={`translate(${view.panX} ${view.panY}) scale(${view.zoom})`}>
           <ImageLayer url={draft.imageUrl} left={draft.imageLeft} top={draft.imageTop} width={draft.imageWidth} height={draft.imageHeight} />
           <HexGridLayer columns={draft.gridWidth} rows={draft.gridHeight} hexSize={hexSize} />
-          <WallLayer walls={walls} hexSize={hexSize} editing={editingWalls} />
           <HexHighlight hexes={selectedShape?.hexes ?? null} hexSize={hexSize} variant="selected" />
           <HexHighlight hexes={sameShape ? null : hoverShape?.hexes ?? null} hexSize={hexSize} />
           {moveState.phase !== 'idle' && moveStatus && (

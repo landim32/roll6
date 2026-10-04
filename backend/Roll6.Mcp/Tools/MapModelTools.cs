@@ -13,21 +13,19 @@ public static class MapModelTools
         Fields: name (required, up to 260), description, image (background from upload_image), gridWidth (hex columns) and
         gridHeight (hex rows) — each 1 to 500, default 20 × 20 — and the background placement under the fixed grid (hexes
         are 40 px from center to corner): imageWidth/imageHeight (display size in px, 1 to 20000, send both or neither; neither = natural size) and
-        imageLeft/imageTop (offset in px, -20000 to 20000; negative values move the image right/down). Story maps (033): kind
-        (1 = 2D battle map, the default; 2 = 2.5D story map with walls and a 3D view in the web app), walls (wall cells of
-        the same hex grid as [[x, y], …]; duplicates and cells outside the grid are dropped; they block pieces like a taken
-        hex, for everyone, only while kind = 2) and skyImage (sky/horizon behind the walls in the 3D view, from upload_image).
+        imageLeft/imageTop (offset in px, -20000 to 20000; negative values move the image right/down). 3D view (034, shown
+        by the web app for every map): maskImage (a black and white image of the same proportion as the map image, from
+        upload_image: black = wall, white = empty space; it only draws the 3D view and never blocks pieces on the 2D map)
+        and backgroundImage (a 360° panorama shown behind the walls, like a sky, from upload_image).
         """;
 
-    private const string KIND = "Map kind: 1 = 2D battle map (default), 2 = 2.5D story map (walls, 3D view).";
+    private const string MASK_IMAGE = "3D mask: black = wall, white = empty, same proportion as the map image; only the 3D view uses it. " + McpDocs.IMAGE_FILE;
 
-    private const string WALLS = "Wall cells of a story map as [[x, y], …] (column/row, odd-q). Duplicates and cells outside the grid are dropped. Walls block pieces only when kind = 2. Omit for none.";
-
-    private const string SKY_IMAGE = "Sky/horizon image shown behind the walls in the 3D view. " + McpDocs.IMAGE_FILE;
+    private const string BACKGROUND_IMAGE = "Background of the 3D view, a 360° panorama shown where no wall stands in front (like a sky). " + McpDocs.IMAGE_FILE;
 
     private const string RETURNS = """
         Returns: { mapModelId, userId, name, description, image, imageUrl, gridWidth, gridHeight, imageWidth, imageHeight,
-        imageTop, imageLeft, hexSize, kind, walls, skyImage, skyImageUrl, createdAt, changedAt }.
+        imageTop, imageLeft, hexSize, maskImage, maskImageUrl, backgroundImage, backgroundImageUrl, createdAt, changedAt }.
         """;
 
     [McpServerTool(Name = "list_map_models", Title = "List map models", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -83,21 +81,20 @@ public static class MapModelTools
         [Description("Display height of the background in px (1 to 20000). Send together with imageWidth, or omit both.")] int? imageHeight = null,
         [Description("Vertical offset of the background in px (-20000 to 20000; negative moves it down). Default 0.")] int? imageTop = null,
         [Description("Horizontal offset of the background in px (-20000 to 20000; negative moves it right). Default 0.")] int? imageLeft = null,
-        [Description(KIND)] int? kind = null,
-        [Description(WALLS)] int[][]? walls = null,
-        [Description(SKY_IMAGE)] string? skyImage = null) =>
+        [Description(MASK_IMAGE)] string? maskImage = null,
+        [Description(BACKGROUND_IMAGE)] string? backgroundImage = null) =>
         api.SendAsync(HttpMethod.Post, "/api/mapmodel", new MapModelInsertInfo
         {
             Name = name, Description = description, Image = image, GridWidth = gridWidth, GridHeight = gridHeight,
             ImageWidth = imageWidth, ImageHeight = imageHeight, ImageTop = imageTop, ImageLeft = imageLeft,
-            Kind = kind, Walls = walls?.ToList(), SkyImage = skyImage
+            MaskImage = maskImage, BackgroundImage = backgroundImage
         });
 
     [McpServerTool(Name = "update_map_model", Title = "Update map model", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/mapmodel/{id}")]
     [Description($$"""
         What it does: replaces all fields of a map model (read it with get_map_model and send unchanged values back — an
-        omitted kind turns the map back into 2D, omitted walls erase them, an omitted skyImage removes it).
+        an omitted maskImage or backgroundImage is removed).
         Everyone with a campaign map of this model open sees the change at once.
         Who can use it: only the owner of the model.
         {{FIELDS}}
@@ -117,14 +114,13 @@ public static class MapModelTools
         [Description("Display height of the background in px (1 to 20000); together with imageWidth.")] int? imageHeight = null,
         [Description("Vertical offset of the background in px (-20000 to 20000).")] int? imageTop = null,
         [Description("Horizontal offset of the background in px (-20000 to 20000).")] int? imageLeft = null,
-        [Description(KIND)] int? kind = null,
-        [Description(WALLS)] int[][]? walls = null,
-        [Description(SKY_IMAGE)] string? skyImage = null) =>
+        [Description(MASK_IMAGE)] string? maskImage = null,
+        [Description(BACKGROUND_IMAGE)] string? backgroundImage = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/mapmodel/{mapModelId}", new MapModelInsertInfo
         {
             Name = name, Description = description, Image = image, GridWidth = gridWidth, GridHeight = gridHeight,
             ImageWidth = imageWidth, ImageHeight = imageHeight, ImageTop = imageTop, ImageLeft = imageLeft,
-            Kind = kind, Walls = walls?.ToList(), SkyImage = skyImage
+            MaskImage = maskImage, BackgroundImage = backgroundImage
         });
 
     [McpServerTool(Name = "delete_map_model", Title = "Delete map model", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

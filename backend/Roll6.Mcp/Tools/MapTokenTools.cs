@@ -10,7 +10,7 @@ namespace Roll6.Mcp.Tools;
 public static class MapTokenTools
 {
     private const string RETURNS = """
-        Returns: the piece { mapTokenId, mapId, tokenId, tokenName, upImageUrl, campaignCharacterId, characterId, mapNpcId,
+        Returns: the piece { mapTokenId, mapId, tokenId, tokenName, upImageUrl, frontImageUrl (the token's "2.5D front" image, null when it has none), campaignCharacterId, characterId, mapNpcId,
         npcId, name, tokenType (1 Character, 2 Npc, 4 Object), sheet, life, energy, status, move, x, y, look, posture
         (1 standing, 2 down, 3 out of combat; null for objects), space (hexes it takes now: 1, 2, 3, 7 or 10), … }.
         Character pieces show the participation's values; their sheet is the campaign notes, not the character sheet.
@@ -23,8 +23,8 @@ public static class MapTokenTools
         use place_character_on_map and NPCs place_npc_on_map instead.
         Who can use it: only the master.
         {{RETURNS}}
-        Common errors: 403 not the master, 404 map/token not found, 409 a hex of the piece's shape occupied or a wall is on
-        that hex (story maps), 400 shape outside the grid or tokenType other than 4.
+        Common errors: 403 not the master, 404 map/token not found, 409 a hex of the piece's shape occupied, 400 shape
+        outside the grid or tokenType other than 4.
         Related tools: list_tokens, list_map_tokens, move_map_token.
         """)]
     public static Task<CallToolResult> AddObjectToMap(
@@ -56,7 +56,7 @@ public static class MapTokenTools
         the map, players move it with move_map_token (turn and move limits apply).
         {{RETURNS}}
         Common errors: 403 neither the master nor the character's owner, 404 not found, 409 not approved / already on this map / a hex of the
-        shape occupied / a wall is on that hex (story maps), 400 no token or shape outside the grid.
+        shape occupied, 400 no token or shape outside the grid.
         Related tools: list_campaign_characters (campaignCharacterId, characterTokenId), move_map_token.
         """)]
     public static Task<CallToolResult> PlaceCharacterOnMap(
@@ -82,11 +82,9 @@ public static class MapTokenTools
         Coordinates: x = column, y = row of the rectangular flat-top hex grid (odd columns shifted half a hex down),
         0-based, inside gridWidth × gridHeight of the map. look = side the piece faces, 0-5 clockwise from the top side
         (0 up, 1 up-right, 2 down-right, 3 down, 4 down-left, 5 up-left).
-        Cost (players): 1 per step into the hex ahead + 1 per 60° turn, shortest path around other pieces (and around the
-        walls of a story map, which nobody crosses — not even the master).
+        Cost (players): 1 per step into the hex ahead + 1 per 60° turn, shortest path around other pieces.
         Returns: the updated piece.
-        Common errors: 409 a hex of the piece's shape occupied, a wall is on that hex (story maps) or already moved this
-        turn, 400 beyond the move or shape
+        Common errors: 409 a hex of the piece's shape occupied or already moved this turn, 400 beyond the move or shape
         outside the grid (big pieces need their whole shape free at every step and turn), 403 not your piece.
         Related tools: list_map_tokens (ids and positions), get_map (grid size), get_turn_state, reset_turn.
         """)]

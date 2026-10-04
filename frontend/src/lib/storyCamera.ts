@@ -1,47 +1,34 @@
-import { gridPixelSize, HEX_SIZE, isInsideGrid, pixelToHex } from './hexGrid';
-import type { Offset, Point } from './hexGrid';
-import { toWallSet, wallKey } from './storyWalls';
+import { gridPixelSize, HEX_SIZE } from './hexGrid';
+import type { Point } from './hexGrid';
+import { isWallAt } from './raycaster';
+import type { CameraPose, MaskGrid } from './raycaster';
+
+export type { CameraPose } from './raycaster';
 
 /**
- * Camera of the 3D view of a story map (033): third person behind the chosen character, free when the user walks
- * away, never through walls. Pure (no three.js) so the rules are unit-tested. Map units: 1 = 1 px of the 2D map; the
- * map's x is the scene's X and the map's y is the scene's Z. `yaw` 0 faces north (−Z, the top of the 2D map) and
- * grows clockwise, like `look`.
+ * Camera of the 3D view (034): third person behind the chosen character, free when the user walks away, never through
+ * the walls of the 3D mask and never leaving the map. It only turns sideways — no tilt — and the user is just an
+ * observer: nothing here touches a piece. Pure (no DOM), so the rules are unit-tested. Map units: 1 = 1 px of the 2D
+ * map; `yaw` 0 faces north (−y, the top of the 2D map) and grows clockwise, like `look`.
  */
 
 /** Distance from the followed piece to the camera behind it. */
 export const FOLLOW_DISTANCE = 4 * HEX_SIZE;
-/** Camera height above the floor. */
-export const EYE_HEIGHT = 1.6 * HEX_SIZE;
-/** Room the camera keeps from walls and from the edge of the grid. */
+/** Room the camera keeps from walls and from the edge of the map. */
 export const CAMERA_RADIUS = HEX_SIZE / 3;
-/** Zoom = field of view (degrees). */
+/** Zoom = horizontal field of view (degrees). */
 export const FOV_MIN = 30;
 export const FOV_MAX = 90;
 export const FOV_DEFAULT = 70;
 export const FOV_STEP = 10;
-/** Up/down look limit (radians, ±35°). */
-export const PITCH_LIMIT = (35 * Math.PI) / 180;
 /** Steps along a segment when looking for walls. */
 const SEGMENT_STEP = HEX_SIZE / 4;
 
-export interface CameraPose {
-  x: number;
-  z: number;
-  /** Radians; 0 = north, clockwise. */
-  yaw: number;
-  /** Radians; negative looks down. */
-  pitch: number;
-  /** True while following the chosen character's piece. */
-  attached: boolean;
-}
-
-/** One frame of user input: distances in map units, angles in radians. */
+/** One frame of user input: distances in map units, the turn in radians. */
 export interface CameraInput {
   forward?: number;
   strafe?: number;
   turn?: number;
-  tilt?: number;
 }
 
 /** True where the camera may not be. */
@@ -55,19 +42,15 @@ export const forwardOf = (yaw: number): Point => ({ x: Math.sin(yaw), y: -Math.c
 
 export const clampFov = (fov: number): number => Math.min(FOV_MAX, Math.max(FOV_MIN, fov));
 
-const clampPitch = (pitch: number): number => Math.min(PITCH_LIMIT, Math.max(-PITCH_LIMIT, pitch));
-
 /**
- * Where the camera may not be: on a wall hex or outside the grid, with its radius around it. Hexes come from
- * `pixelToHex` (cube rounding), never from ad-hoc math.
+ * Where the camera may not be: on a wall of the mask or outside the map (the hex grid's rectangle), with its radius
+ * around it. Without a mask only the edge of the map blocks.
  */
-export const cameraBlocker = (walls: readonly Offset[], columns: number, rows: number): CameraBlocked => {
-  const wallSet = toWallSet(walls);
+export const cameraBlocker = (grid: MaskGrid | null, columns: number, rows: number): CameraBlocked => {
   const { width, height } = gridPixelSize(columns, rows, HEX_SIZE);
   const blockedPoint = (x: number, z: number): boolean => {
     if (x < 0 || z < 0 || x > width || z > height) return true;
-    const hex = pixelToHex({ x, y: z }, HEX_SIZE);
-    return !isInsideGrid(hex, columns, rows) || wallSet.has(wallKey(hex.x, hex.y));
+    return grid !== null && isWallAt(grid, x, z);
   };
   return (x, z) =>
     blockedPoint(x, z)
@@ -88,7 +71,7 @@ export const segmentHitsWall = (from: Point, to: Point, blocked: CameraBlocked):
 
 /**
  * Behind the piece at `target` (map px of its center), looking the way it faces; with a wall in between the camera
- * comes closer to the piece instead of standing behind the wall (FR-011).
+ * comes closer to the piece instead of standing behind the wall (FR-012).
  */
 export const followPose = (target: Point, look: number, blocked: CameraBlocked): CameraPose => {
   const yaw = lookToYaw(look);
@@ -101,18 +84,17 @@ export const followPose = (target: Point, look: number, blocked: CameraBlocked):
     x: target.x + (wanted.x - target.x) * reach,
     z: target.y + (wanted.y - target.y) * reach,
     yaw,
-    pitch: -0.18,
     attached: true,
   };
 };
 
 /**
- * One step of free navigation: turn/tilt, then walk/strafe one axis at a time so the camera slides along a wall
- * instead of stopping dead. Any input lets go of the character (FR-010c).
+ * One step of free navigation: turn, then walk/strafe one axis at a time so the camera slides along a wall instead of
+ * stopping dead. Any input lets go of the character (FR-013).
  */
 export const stepCamera = (pose: CameraPose, input: CameraInput, blocked: CameraBlocked): CameraPose => {
-  const { forward = 0, strafe = 0, turn = 0, tilt = 0 } = input;
-  if (forward === 0 && strafe === 0 && turn === 0 && tilt === 0) return pose;
+  const { forward = 0, strafe = 0, turn = 0 } = input;
+  if (forward === 0 && strafe === 0 && turn === 0) return pose;
   const yaw = pose.yaw + turn;
   const ahead = forwardOf(yaw);
   // Right of the facing = the facing turned 90° clockwise.
@@ -122,12 +104,12 @@ export const stepCamera = (pose: CameraPose, input: CameraInput, blocked: Camera
   let { x, z } = pose;
   if (dx !== 0 && !blocked(x + dx, z)) x += dx;
   if (dz !== 0 && !blocked(x, z + dz)) z += dz;
-  return { x, z, yaw, pitch: clampPitch(pose.pitch + tilt), attached: false };
+  return { x, z, yaw, attached: false };
 };
 
 /**
- * Where the camera starts (FR-010a/d): behind the chosen character's piece, or — for the GM or a character without a
- * piece on this map — free at the center of the grid, facing north.
+ * Where the camera starts (FR-013): behind the chosen character's piece, or — for the GM or a character without a
+ * piece on this map — free at the center of the map, facing north.
  */
 export const initialCamera = (
   piece: { center: Point; look: number } | null,
@@ -137,5 +119,5 @@ export const initialCamera = (
 ): CameraPose => {
   if (piece) return followPose(piece.center, piece.look, blocked);
   const { width, height } = gridPixelSize(columns, rows, HEX_SIZE);
-  return { x: width / 2, z: height / 2, yaw: 0, pitch: 0, attached: false };
+  return { x: width / 2, z: height / 2, yaw: 0, attached: false };
 };

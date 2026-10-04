@@ -1260,5 +1260,48 @@ BEGIN
     VALUES ('20261004174459_AddStoryMap', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004212901_ReplaceStoryMapWithRaycast') THEN
+    ALTER TABLE map_models DROP COLUMN kind;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004212901_ReplaceStoryMapWithRaycast') THEN
+    ALTER TABLE map_models DROP COLUMN walls;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004212901_ReplaceStoryMapWithRaycast') THEN
+    ALTER TABLE map_models RENAME COLUMN sky_image TO background_image;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004212901_ReplaceStoryMapWithRaycast') THEN
+    ALTER TABLE map_models ADD mask_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004212901_ReplaceStoryMapWithRaycast') THEN
+    ALTER TABLE tokens ADD front_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004212901_ReplaceStoryMapWithRaycast') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261004212901_ReplaceStoryMapWithRaycast', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

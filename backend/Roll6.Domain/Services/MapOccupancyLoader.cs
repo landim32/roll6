@@ -6,10 +6,7 @@ using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Domain.Services;
 
-/// <summary>
-/// The grid size and the hexes taken on a map (031): every piece with its current size, plus the walls of a story map
-/// (033).
-/// </summary>
+/// <summary>The grid size and the hexes taken on a map (031): every piece with its current size.</summary>
 public sealed class MapLayout
 {
     public required Occupancy Occupancy { get; init; }
@@ -21,19 +18,14 @@ public sealed class MapLayout
 
     public int SpaceOf(MapToken piece) => Spaces.GetValueOrDefault(piece.MapTokenId, Token.DEFAULT_UP_SPACE);
 
-    /// <summary>
-    /// Cheapest movement cost of a piece around the others, or ignoring them (the master jumping over pieces). Walls of
-    /// a story map always block, even for the master (033).
-    /// </summary>
+    /// <summary>Cheapest movement cost of a piece around the others, or ignoring them (the master jumping over pieces).</summary>
     public int? MovementCost(MapToken piece, int x, int y, int look, bool ignorePieces = false) =>
         HexGrid.MovementCost(piece.X, piece.Y, piece.Look, x, y, look, Columns, Rows,
-            ignorePieces ? (hx, hy) => Occupancy.IsWall(hx, hy) : (hx, hy) => Occupancy.IsBlocked(hx, hy, piece.MapTokenId),
-            SpaceOf(piece));
+            ignorePieces ? (_, _) => false : (hx, hy) => Occupancy.IsBlocked(hx, hy, piece.MapTokenId), SpaceOf(piece));
 
     /// <summary>
-    /// The whole shape must be inside the grid (400 on x), on no wall of a story map (409, 033) and on hexes no other
-    /// piece takes (409). Changing the posture never calls this: lying down over another piece is allowed until the
-    /// piece moves (031 Q2).
+    /// The whole shape must be inside the grid (400 on x) and on hexes no other piece takes (409). Changing the posture
+    /// never calls this: lying down over another piece is allowed until the piece moves (031 Q2).
     /// </summary>
     public void EnsureFits(int x, int y, int look, int space, long? exceptMapTokenId)
     {
@@ -43,14 +35,10 @@ public sealed class MapLayout
                 throw new DomainValidationException("x", space == 1
                     ? "A posição está fora da grid do mapa."
                     : "A peça não cabe na grid do mapa nessa posição.");
-            case FitResult.Wall:
-                throw new ConflictException(MapLayout.WALL_MESSAGE);
             case FitResult.Occupied:
                 throw new ConflictException("O hex já está ocupado.");
         }
     }
-
-    public const string WALL_MESSAGE = "Há uma parede nessa posição.";
 }
 
 /// <summary>
@@ -90,8 +78,7 @@ public sealed class MapOccupancyLoader
         var spaces = await SpacesAsync(pieces);
         return new MapLayout
         {
-            Occupancy = Occupancy.Build(pieces.Select(p => new PieceShape(p.MapTokenId, p.X, p.Y, p.Look, spaces[p.MapTokenId])),
-                model?.ActiveWalls()),
+            Occupancy = Occupancy.Build(pieces.Select(p => new PieceShape(p.MapTokenId, p.X, p.Y, p.Look, spaces[p.MapTokenId]))),
             Columns = model?.GridWidth ?? int.MaxValue,
             Rows = model?.GridHeight ?? int.MaxValue,
             Spaces = spaces

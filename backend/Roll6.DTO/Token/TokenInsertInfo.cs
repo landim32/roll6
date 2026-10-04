@@ -21,4 +21,8 @@ public class TokenInsertInfo
 
     [JsonPropertyName("downImage")]
     public string? DownImage { get; set; }
+
+    /// <summary>"2.5D front" image (034): the figure seen from the front, used by the 3D view. Optional.</summary>
+    [JsonPropertyName("frontImage")]
+    public string? FrontImage { get; set; }
 }
