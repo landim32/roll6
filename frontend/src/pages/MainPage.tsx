@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { GridSizeFooter } from '../components/map/GridSizeFooter';
@@ -29,9 +29,12 @@ import type { CharacterEditTarget } from '../components/modals/CampaignCharacter
 import type { CampaignNpcInfo } from '../types/npc';
 import type { TokenInfo } from '../types/token';
 
+/** 3D view of story maps (033): its own chunk, so three.js is downloaded only when someone opens it. */
+const StoryView = lazy(() => import('../components/story/StoryView'));
+
 /** Main screen: always the map with the grid; every other window opens as a modal over it. */
 export const MainPage = () => {
-  const { isDirty, draft } = useMapEditor();
+  const { isDirty, draft, viewMode, setViewMode } = useMapEditor();
   const { guard, requestSave, saveModalProps, unsavedModalProps } = useUnsavedGuard();
   useTableRoute(guard);
   const [campaignOpen, setCampaignOpen] = useState(false);
@@ -117,13 +120,22 @@ export const MainPage = () => {
 
   return (
     <div className="stm-main">
-      <MapCanvas
-        onPickToken={setTokenPick}
-        onDeleteToken={setToDelete}
-        onAct={setActing}
-        onResetTurn={setToReset}
-        picking={tokenPick !== null || toDelete !== null}
-      />
+      {viewMode === '3d' ? (
+        <Suspense fallback={<div className="stm-story"><div className="stm-story-loading text-secondary small">{t('story.loading')}</div></div>}>
+          <StoryView onUnsupported={() => {
+            toast.error(t('story.noWebgl'));
+            setViewMode('2d');
+          }} />
+        </Suspense>
+      ) : (
+        <MapCanvas
+          onPickToken={setTokenPick}
+          onDeleteToken={setToDelete}
+          onAct={setActing}
+          onResetTurn={setToReset}
+          picking={tokenPick !== null || toDelete !== null}
+        />
+      )}
       <TopMenu
         onOpenCampaign={() => setCampaignOpen(true)}
         onOpenMap={() => setMapOpen(true)}

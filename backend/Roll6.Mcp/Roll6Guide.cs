@@ -97,6 +97,19 @@ public static class Roll6Guide
           each side. Placing, moving or turning needs the whole shape inside the grid and free; lying down never fails:
           the piece may overlap another one until it moves.
 
+        ## Story maps (2.5D)
+        - A map model has a **`kind`**: `1` 2D battle map (default) or `2` story map — a 2.5D place for telling the
+          story, shown in the web app as the normal 2D map plus a 3D view (Doom/Wolfenstein style) the players walk
+          through. The 3D camera is only in the app; tools change data, not the camera.
+        - **`walls`** are cells of the same hex grid, sent as `[[x, y], …]` in `create_map_model` / `update_map_model`
+          (duplicates and cells outside the grid are dropped). On a story map they block pieces like a taken hex, for
+          **everyone, the master included**: no placing, moving or turning onto a wall, and paths go around them (409
+          "Há uma parede nessa posição."). A piece already on a cell that became a wall may move off it. Changing the
+          posture is never refused. On a 2D map walls are kept but do nothing.
+        - **`skyImage`** (from `upload_image`) is the sky/horizon behind the walls in the 3D view; the map `image` is the
+          floor.
+        - `update_map_model` replaces every field: send `kind`, `walls` and `skyImage` back unchanged or they are reset.
+
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move
           once** per turn (moving records a Movement entry) and **act** any number of times (`act_in_turn`, text).

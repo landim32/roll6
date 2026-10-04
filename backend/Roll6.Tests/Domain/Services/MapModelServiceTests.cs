@@ -56,6 +56,37 @@ public class MapModelServiceTests
     }
 
     [Fact]
+    public async Task Update_StoryFields_AreSavedAndReturned()
+    {
+        var result = await _service.UpdateAsync(1, 20, new MapModelInsertInfo
+        {
+            Name = "Masmorra", Kind = 2, Walls = new List<int[]> { new[] { 3, 1 }, new[] { 0, 0 } },
+            SkyImage = "0123456789abcdef0123456789abcdef.webp"
+        });
+
+        result.Kind.Should().Be(2);
+        result.Walls.Select(w => (w[0], w[1])).Should().Equal((0, 0), (3, 1));
+        result.SkyImage.Should().Be("0123456789abcdef0123456789abcdef.webp");
+    }
+
+    [Fact]
+    public async Task Update_WithoutStoryFields_ReplacesThemWithDefaults()
+    {
+        await _service.UpdateAsync(1, 20, new MapModelInsertInfo
+        {
+            Name = "Masmorra", Kind = 2, Walls = new List<int[]> { new[] { 1, 1 } }, SkyImage = "0123456789abcdef0123456789abcdef.jpg"
+        });
+
+        // PUT replaces every field (033 D2): omitted kind/walls/sky go back to 2D, none, none.
+        var result = await _service.UpdateAsync(1, 20, new MapModelInsertInfo { Name = "Masmorra" });
+
+        result.Kind.Should().Be(1);
+        result.Walls.Should().BeEmpty();
+        result.SkyImage.Should().BeNull();
+        result.SkyImageUrl.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Update_WithFullLayout_KeepsFixedHexSize()
     {
         var result = await _service.UpdateAsync(1, 20, new MapModelInsertInfo

@@ -364,6 +364,28 @@
     "noFile": "Escolha um arquivo.",
     "noImage": "Este mapa não tem imagem."
   },
+  "story": {
+    "menu": "Mapa de história",
+    "kind": "Tipo de mapa",
+    "kindBattle": "Mapa 2D",
+    "kindStory": "Mapa de história (2,5D)",
+    "walls": "Paredes",
+    "paint": "Pintar parede",
+    "erase": "Apagar parede",
+    "wallsOff": "Não editar paredes",
+    "wallBlocked": "Há uma parede nessa posição.",
+    "sky": "Céu/horizonte",
+    "skyUpload": "Enviar imagem do céu",
+    "skyUploading": "Enviando…",
+    "skyRemove": "Remover céu",
+    "skySet": "Imagem do céu escolhida. Salve o mapa para guardá-la.",
+    "view2d": "Ver em 2D",
+    "view3d": "Ver em 3D",
+    "followCharacter": "Voltar ao personagem",
+    "noWebgl": "Este dispositivo não consegue exibir a vista 3D.",
+    "loading": "Carregando cena 3D…",
+    "joystick": "Andar"
+  },
   "grid": {
     "title": "Tamanho do mapa",
     "footer": "Grid {{cols}} × {{rows}}",

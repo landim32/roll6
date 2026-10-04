@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isLying, isOutOfCombat, pieceGeometry, pieceImage } from './pieceDrawing';
-import { POSTURE } from '../types/mapToken';
+import {
+  BASE_COLORS, isLying, isOutOfCombat, OBJECT_BASE_COLOR, OUT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec,
+} from './pieceDrawing';
+import { hexCenter } from './hexGrid';
+import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
+import type { MapTokenInfo } from '../types/mapToken';
 
 const images = { upImageUrl: 'up.png', downImageUrl: 'down.png' };
 
@@ -47,5 +51,45 @@ describe('pieceGeometry', () => {
     expect(two.front.y).toBeCloseTo(h / 2);
     // The 3-hex line has the hex ahead of the position in front.
     expect(pieceGeometry(3, size).front.y).toBeCloseTo(h * 1.5);
+  });
+});
+
+describe('spriteSpec (033 — figures of the 3D view)', () => {
+  const token = (overrides: Partial<MapTokenInfo>): MapTokenInfo => ({
+    mapTokenId: 1, mapId: 1, tokenId: 1, tokenName: '', upImageUrl: 'up.png', downImageUrl: 'down.png',
+    campaignCharacterId: 5, characterId: null, mapNpcId: null, npcId: null, name: 'Aria', tokenType: MAP_TOKEN_TYPE.character,
+    sheet: null, life: 0, energy: 0, totalLife: 0, totalEnergy: 0, status: null, move: 0, x: 3, y: 2, look: 0,
+    posture: POSTURE.standing, space: 1, createdAt: '', updatedAt: '',
+    ...overrides,
+  });
+
+  it('stands with the standing image, as wide as its shape, at the center of its hex', () => {
+    const spec = spriteSpec(token({}), 40);
+
+    expect(spec).toMatchObject({ imageUrl: 'up.png', standing: true, sideways: false, grayscale: false, baseColor: BASE_COLORS[MAP_TOKEN_TYPE.character] });
+    expect(spec.width).toBeCloseTo(pieceGeometry(1, 40).box.width);
+    expect(spec.center.x).toBeCloseTo(hexCenter(3, 2, 40).x);
+    expect(spec.center.y).toBeCloseTo(hexCenter(3, 2, 40).y);
+  });
+
+  it('lies on the floor when down, and is black and white out of combat', () => {
+    expect(spriteSpec(token({ posture: POSTURE.down }), 40)).toMatchObject({ imageUrl: 'down.png', standing: false, grayscale: false });
+    expect(spriteSpec(token({ posture: POSTURE.outOfCombat }), 40)).toMatchObject({ standing: false, grayscale: true, baseColor: OUT_BASE_COLOR });
+    expect(spriteSpec(token({ posture: POSTURE.down, downImageUrl: null }), 40)).toMatchObject({ imageUrl: 'up.png', sideways: true });
+  });
+
+  it('colors the base by type and keeps objects standing', () => {
+    expect(spriteSpec(token({ tokenType: MAP_TOKEN_TYPE.npc }), 40).baseColor).toBe(BASE_COLORS[MAP_TOKEN_TYPE.npc]);
+    expect(spriteSpec(token({ tokenType: MAP_TOKEN_TYPE.object, posture: null }), 40)).toMatchObject({ standing: true, baseColor: OBJECT_BASE_COLOR });
+  });
+
+  it('puts a 2-hex piece between its two hexes, turned with its facing', () => {
+    // Facing up (look 0), the 2-hex shape is the position + the hex below it.
+    const spec = spriteSpec(token({ space: 2, look: 0 }), 40);
+    const a = hexCenter(3, 2, 40);
+    const b = hexCenter(3, 3, 40);
+
+    expect(spec.center.x).toBeCloseTo((a.x + b.x) / 2);
+    expect(spec.center.y).toBeCloseTo((a.y + b.y) / 2);
   });
 });

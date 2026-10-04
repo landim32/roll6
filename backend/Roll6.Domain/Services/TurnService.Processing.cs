@@ -363,14 +363,15 @@ public partial class TurnService
         }
 
         // Positions are checked on the final state, each piece with its whole shape at its final size (031): pieces may
-        // swap hexes, but two can't end on the same one and no shape may leave the grid.
+        // swap hexes, but two can't end on the same one, no shape may leave the grid and none may cover a wall of a story
+        // map (033).
         Posture? PostureOf(MapToken piece) => piece.CampaignCharacterId is long cc
             ? participations.Values.FirstOrDefault(p => p.CampaignCharacterId == cc)?.Posture
             : piece.MapNpcId is long mn ? occurrences.GetValueOrDefault(mn)?.Posture : null;
         var spaces = await _occupancy.SpacesAsync(pieces, PostureOf);
         var movingIds = moved.Select(m => m.Piece!.MapTokenId).ToHashSet();
         var taken = Occupancy.Build(pieces.Where(p => !movingIds.Contains(p.MapTokenId))
-            .Select(p => new PieceShape(p.MapTokenId, p.X, p.Y, p.Look, spaces[p.MapTokenId])));
+            .Select(p => new PieceShape(p.MapTokenId, p.X, p.Y, p.Look, spaces[p.MapTokenId])), model?.ActiveWalls());
         var claimed = new HashSet<(int X, int Y)>();
         foreach (var change in moved)
         {
@@ -380,6 +381,8 @@ public partial class TurnService
             var hexes = HexGrid.Footprint(x, y, look, spaces[change.Piece!.MapTokenId]);
             if (model != null && hexes.Any(h => !HexGrid.IsInsideGrid(h.X, h.Y, model.GridWidth, model.GridHeight)))
                 Error(change.Key, "A peça não cabe na grid do mapa nessa posição.");
+            else if (hexes.Any(h => taken.IsWall(h.X, h.Y)))
+                Error(change.Key, MapLayout.WALL_MESSAGE);
             else if (hexes.Any(h => taken.IsBlocked(h.X, h.Y, change.Piece.MapTokenId) || claimed.Contains(h)))
                 Error(change.Key, $"O hex ({x}, {y}) já está ocupado.");
             claimed.UnionWith(hexes);
@@ -393,7 +396,7 @@ public partial class TurnService
             var piece = change.Piece!;
             var (x, y, look) = change.Target!.Value;
             var cost = HexGrid.MovementCost(piece.X, piece.Y, piece.Look, x, y, look,
-                model?.GridWidth ?? int.MaxValue, model?.GridHeight ?? int.MaxValue, (_, _) => false, spaces[piece.MapTokenId]);
+                model?.GridWidth ?? int.MaxValue, model?.GridHeight ?? int.MaxValue, (hx, hy) => taken.IsWall(hx, hy), spaces[piece.MapTokenId]);
             long? characterId = piece.CampaignCharacterId is long cc
                 ? participations.Values.FirstOrDefault(p => p.CampaignCharacterId == cc)?.CharacterId : null;
             long? npcId = piece.MapNpcId is long mn ? occurrences.GetValueOrDefault(mn)?.NpcId : null;

@@ -221,11 +221,103 @@ body,
   cursor: grabbing;
 }
 
+/* 3D view of a story map (033): fills the place of the 2D map, under the menu, panels, controls and footer. */
+.stm-story {
+  position: absolute;
+  inset: 0;
+  background: #1a1d21;
+}
+
+.stm-story-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+  outline: none;
+}
+
+.stm-story-canvas:active {
+  cursor: grabbing;
+}
+
+.stm-story-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.stm-story-follow {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--stm-footer-height) + 1rem);
+  transform: translateX(-50%);
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* Touch joystick: phones and touch screens only. */
+.stm-joystick {
+  display: none;
+  position: absolute;
+  left: 1.25rem;
+  bottom: calc(var(--stm-footer-height) + 1.25rem);
+  z-index: 9;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: rgba(27, 30, 36, 0.55);
+  border: 1px solid var(--stm-border);
+  touch-action: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.stm-joystick-knob {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(222, 226, 230, 0.75);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+@media (pointer: coarse), (max-width: 767.98px) {
+  .stm-joystick {
+    display: flex;
+  }
+}
+
 .stm-map .stm-grid {
   fill: none;
   stroke: var(--stm-grid-line);
   vector-effect: non-scaling-stroke;
   stroke-width: 1;
+}
+
+/* Walls of a story map (033). */
+.stm-map .stm-walls {
+  fill: rgba(20, 22, 26, 0.62);
+  stroke: rgba(222, 226, 230, 0.45);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.stm-map .stm-walls.is-editing {
+  fill: rgba(20, 22, 26, 0.78);
+  stroke: rgba(255, 193, 7, 0.75);
+}
+
+.stm-map.stm-wall-editing {
+  cursor: crosshair;
 }
 
 .stm-map .stm-resize-frame {

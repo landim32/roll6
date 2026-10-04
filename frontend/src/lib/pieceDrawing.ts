@@ -1,6 +1,6 @@
-import { footprintLocal, hexCorners } from './hexGrid';
+import { footprintLocal, hexCenter, hexCorners } from './hexGrid';
 import type { Point } from './hexGrid';
-import { POSTURE } from '../types/mapToken';
+import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
 import type { MapTokenInfo } from '../types/mapToken';
 
 /** How a piece is drawn (031), shared by the map (`TokenLayer`) and the shared snapshot (`mapSnapshot`). */
@@ -77,5 +77,68 @@ export const pieceGeometry = (space: number, size: number): PieceGeometry => {
     edgePath,
     box: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
     front: { x: 0, y: frontCenter.y + (Math.sqrt(3) / 2) * size },
+  };
+};
+
+/** Disc colors of the piece types on the map, also used under the 3D figures (033). */
+export const BASE_COLORS: Record<number, string> = {
+  [MAP_TOKEN_TYPE.character]: '#0d6efd',
+  [MAP_TOKEN_TYPE.npc]: '#dc3545',
+};
+export const OBJECT_BASE_COLOR = '#6c757d';
+export const OUT_BASE_COLOR = '#808080';
+
+/** How a piece shows in the 3D view of a story map (033). */
+export interface SpriteSpec {
+  mapTokenId: number;
+  name: string;
+  imageUrl: string | null;
+  /** Standing: a figure that always faces the camera. Lying (down/out of combat): flat on the floor. */
+  standing: boolean;
+  /** Lying with the standing image: turned 90° on the floor (no down image). */
+  sideways: boolean;
+  grayscale: boolean;
+  /** Width of the figure / size of the lying image (px): the width of the piece's shape on the map. */
+  width: number;
+  /** Depth of the shape (px), for lying pieces. */
+  depth: number;
+  /** Middle of the piece's shape on the map (px). */
+  center: Point;
+  /** Facing, for lying pieces (0–5 clockwise from the top). */
+  look: number;
+  baseColor: string;
+  /** Radius of the disc under the figure (px). */
+  baseRadius: number;
+}
+
+/**
+ * The 3D figure of a piece, with the same rules as the 2D map: lying image, black and white out of combat, disc
+ * color by type, size and middle of the shape turned with the piece (shape drawn in the look-3 frame, `pieceGeometry`).
+ */
+export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
+  const geometry = pieceGeometry(token.space, size);
+  const image = pieceImage(token);
+  const out = isOutOfCombat(token);
+  // Middle of the shape in the piece's frame, turned like TokenLayer: (look − 3) × 60°.
+  const local = { x: geometry.box.x + geometry.box.width / 2, y: geometry.box.y + geometry.box.height / 2 };
+  const angle = ((token.look - 3) * Math.PI) / 3;
+  const position = hexCenter(token.x, token.y, size);
+  const center = {
+    x: position.x + local.x * Math.cos(angle) - local.y * Math.sin(angle),
+    y: position.y + local.x * Math.sin(angle) + local.y * Math.cos(angle),
+  };
+  return {
+    mapTokenId: token.mapTokenId,
+    name: token.name,
+    imageUrl: image.url,
+    standing: !isLying(token),
+    sideways: image.sideways,
+    grayscale: out,
+    width: geometry.box.width,
+    depth: geometry.box.height,
+    center,
+    look: token.look,
+    baseColor: out ? OUT_BASE_COLOR : BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
+    baseRadius: Math.min(geometry.box.width, geometry.box.height) / 2,
   };
 };

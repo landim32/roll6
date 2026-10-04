@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useMapEditor } from './useMapEditor';
 import { useMapToken } from './useMapToken';
 import { movementField } from '../lib/hexGrid';
+import { activeWalls } from '../lib/draft';
 import { buildOccupancy, isBlocked } from '../lib/occupancy';
 import type { Offset } from '../lib/hexGrid';
 import { hoverPath, IDLE, MOVEMENT_KIND, pickDestination, pointFacing, startMovement } from '../lib/movement';
@@ -36,8 +37,9 @@ export const useTokenMovement = () => {
   }, [active]);
 
   const start = useCallback((token: MapTokenInfo) => {
-    // Every hex of the other pieces blocks, and the whole shape of this one must fit at each step and turn (031).
-    const occupancy = buildOccupancy(mapTokens);
+    // Every hex of the other pieces blocks, and the whole shape of this one must fit at each step and turn (031);
+    // so do the walls of a story map (033).
+    const occupancy = buildOccupancy(mapTokens, activeWalls(draft));
     const field = movementField({ x: token.x, y: token.y, look: token.look }, draft.gridWidth, draft.gridHeight,
       (x, y) => isBlocked(occupancy, x, y, token.mapTokenId), token.space);
     const free = token.tokenType === MAP_TOKEN_TYPE.object;
@@ -51,7 +53,7 @@ export const useTokenMovement = () => {
       total: free ? null : token.move,
       space: token.space,
     }, field));
-  }, [mapTokens, draft.gridWidth, draft.gridHeight]);
+  }, [mapTokens, draft]);
 
   // Someone else moved or removed the piece meanwhile (real-time, 017): the planned path is no longer valid.
   useEffect(() => {
