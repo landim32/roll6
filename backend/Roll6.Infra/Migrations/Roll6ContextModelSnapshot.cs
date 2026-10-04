@@ -457,6 +457,11 @@ namespace Roll6.Infra.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("MapModelId"));
 
+                    b.Property<string>("BackgroundImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("background_image");
+
                     b.Property<DateTime>("ChangedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -511,11 +516,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("image_width");
 
-                    b.Property<int>("Kind")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("kind");
+                    b.Property<string>("MaskImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("mask_image");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -523,18 +527,9 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("name");
 
-                    b.Property<string>("SkyImage")
-                        .HasMaxLength(260)
-                        .HasColumnType("character varying(260)")
-                        .HasColumnName("sky_image");
-
                     b.Property<long>("UserId")
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");
-
-                    b.Property<string>("Walls")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("walls");
 
                     b.HasKey("MapModelId")
                         .HasName("map_models_pkey");
@@ -811,6 +806,11 @@ namespace Roll6.Infra.Migrations
                     b.Property<int?>("DownSpace")
                         .HasColumnType("integer")
                         .HasColumnName("down_space");
+
+                    b.Property<string>("FrontImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("front_image");
 
                     b.Property<string>("Name")
                         .IsRequired()

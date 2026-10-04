@@ -34,6 +34,13 @@ public class TokenInfo
     [JsonPropertyName("downImageUrl")]
     public string? DownImageUrl { get; set; }
 
+    /// <summary>"2.5D front" image (034), used by the 3D view.</summary>
+    [JsonPropertyName("frontImage")]
+    public string? FrontImage { get; set; }
+
+    [JsonPropertyName("frontImageUrl")]
+    public string? FrontImageUrl { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

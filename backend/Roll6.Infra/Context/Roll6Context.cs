@@ -64,17 +64,9 @@ public class Roll6Context : DbContext
             entity.Property(e => e.ImageHeight).HasColumnName("image_height");
             entity.Property(e => e.ImageTop).HasColumnName("image_top").HasDefaultValue(0).HasSentinel(int.MinValue);
             entity.Property(e => e.ImageLeft).HasColumnName("image_left").HasDefaultValue(0).HasSentinel(int.MinValue);
-            // Story maps (033): kind, wall cells as a JSON array [[x, y], …] and the sky image of the 3D view.
-            entity.Property(e => e.Kind).HasColumnName("kind").HasConversion<int>().HasDefaultValue(MapKind.Battle).HasSentinel((MapKind)0);
-            entity.Property(e => e.Walls).HasColumnName("walls").HasColumnType("jsonb")
-                .HasConversion(
-                    walls => walls == null ? null : JsonSerializer.Serialize(walls, TURN_CHANGE_JSON),
-                    json => json == null ? null : JsonSerializer.Deserialize<List<int[]>>(json, TURN_CHANGE_JSON),
-                    new ValueComparer<List<int[]>?>(
-                        (a, b) => JsonSerializer.Serialize(a, TURN_CHANGE_JSON) == JsonSerializer.Serialize(b, TURN_CHANGE_JSON),
-                        v => JsonSerializer.Serialize(v, TURN_CHANGE_JSON).GetHashCode(),
-                        v => v == null ? null : v.Select(w => w.ToArray()).ToList()));
-            entity.Property(e => e.SkyImage).HasColumnName("sky_image").HasMaxLength(260);
+            // 3D view (034): the black and white mask (walls) and the panorama background.
+            entity.Property(e => e.MaskImage).HasColumnName("mask_image").HasMaxLength(260);
+            entity.Property(e => e.BackgroundImage).HasColumnName("background_image").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.ChangedAt).HasColumnName("changed_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_map_model");
@@ -137,6 +129,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.DownSpace).HasColumnName("down_space");
             entity.Property(e => e.UpImage).HasColumnName("up_image").HasMaxLength(260);
             entity.Property(e => e.DownImage).HasColumnName("down_image").HasMaxLength(260);
+            entity.Property(e => e.FrontImage).HasColumnName("front_image").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_token");

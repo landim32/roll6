@@ -52,11 +52,17 @@ export const validateTokenForm = (form: TokenForm): TokenFormError | null => {
 };
 
 /** API payload from a valid form (trimmed; empty texts and an empty lying space become null). */
-export const toTokenInsert = (form: TokenForm, upImage: string | null, downImage: string | null): TokenInsertInfo => ({
+export const toTokenInsert = (
+  form: TokenForm,
+  upImage: string | null,
+  downImage: string | null,
+  frontImage: string | null = null,
+): TokenInsertInfo => ({
   name: form.name.trim(),
   description: form.description.trim() || null,
   upSpace: Number(form.upSpace),
   downSpace: form.downSpace.trim() === '' ? null : Number(form.downSpace),
   upImage,
   downImage,
+  frontImage,
 });

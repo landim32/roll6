@@ -22,6 +22,10 @@ public class MapTokenInfo
     [JsonPropertyName("downImageUrl")]
     public string? DownImageUrl { get; set; }
 
+    /// <summary>"2.5D front" image of the piece's token (034), standing figure of the 3D view; null when it has none.</summary>
+    [JsonPropertyName("frontImageUrl")]
+    public string? FrontImageUrl { get; set; }
+
     /// <summary>Participation of a Character token (its name/vitals/status/sheet are shown).</summary>
     [JsonPropertyName("campaignCharacterId")]
     public long? CampaignCharacterId { get; set; }

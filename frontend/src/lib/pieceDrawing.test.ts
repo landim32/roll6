@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BASE_COLORS, isLying, isOutOfCombat, OBJECT_BASE_COLOR, OUT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec,
+  BASE_COLORS, isLying, isOutOfCombat, LYING_HEIGHT_RATIO, OBJECT_BASE_COLOR, OUT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec,
 } from './pieceDrawing';
 import { hexCenter } from './hexGrid';
 import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
@@ -54,9 +54,9 @@ describe('pieceGeometry', () => {
   });
 });
 
-describe('spriteSpec (033 — figures of the 3D view)', () => {
+describe('spriteSpec (034 — figures of the 3D view)', () => {
   const token = (overrides: Partial<MapTokenInfo>): MapTokenInfo => ({
-    mapTokenId: 1, mapId: 1, tokenId: 1, tokenName: '', upImageUrl: 'up.png', downImageUrl: 'down.png',
+    mapTokenId: 1, mapId: 1, tokenId: 1, tokenName: '', upImageUrl: 'up.png', downImageUrl: 'down.png', frontImageUrl: null,
     campaignCharacterId: 5, characterId: null, mapNpcId: null, npcId: null, name: 'Aria', tokenType: MAP_TOKEN_TYPE.character,
     sheet: null, life: 0, energy: 0, totalLife: 0, totalEnergy: 0, status: null, move: 0, x: 3, y: 2, look: 0,
     posture: POSTURE.standing, space: 1, createdAt: '', updatedAt: '',
@@ -76,6 +76,24 @@ describe('spriteSpec (033 — figures of the 3D view)', () => {
     expect(spriteSpec(token({ posture: POSTURE.down }), 40)).toMatchObject({ imageUrl: 'down.png', standing: false, grayscale: false });
     expect(spriteSpec(token({ posture: POSTURE.outOfCombat }), 40)).toMatchObject({ standing: false, grayscale: true, baseColor: OUT_BASE_COLOR });
     expect(spriteSpec(token({ posture: POSTURE.down, downImageUrl: null }), 40)).toMatchObject({ imageUrl: 'up.png', sideways: true });
+  });
+
+  it('uses the "2,5D frente" image of the token while standing, and the 2D images when lying', () => {
+    const front = { frontImageUrl: 'front.png' };
+
+    expect(spriteSpec(token(front), 40)).toMatchObject({ imageUrl: 'front.png', standing: true, heightRatio: 1 });
+    expect(spriteSpec(token({ ...front, posture: POSTURE.down }), 40)).toMatchObject({ imageUrl: 'down.png', standing: false });
+    expect(spriteSpec(token({ ...front, posture: POSTURE.down, downImageUrl: null }), 40)).toMatchObject({ imageUrl: 'up.png', sideways: true });
+    expect(spriteSpec(token({ ...front, tokenType: MAP_TOKEN_TYPE.object, posture: null }), 40).imageUrl).toBe('front.png');
+  });
+
+  it('falls back to the current image when the token has no "2,5D frente"', () => {
+    expect(spriteSpec(token({ frontImageUrl: null }), 40).imageUrl).toBe('up.png');
+  });
+
+  it('draws a lying figure lower than a standing one', () => {
+    expect(spriteSpec(token({ posture: POSTURE.down }), 40).heightRatio).toBe(LYING_HEIGHT_RATIO);
+    expect(spriteSpec(token({ posture: POSTURE.outOfCombat }), 40).heightRatio).toBeLessThan(1);
   });
 
   it('colors the base by type and keeps objects standing', () => {

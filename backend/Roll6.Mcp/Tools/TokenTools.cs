@@ -15,7 +15,9 @@ public static class TokenTools
         down) and downSpace (hexes when down or out of combat: 1, 2, 3, 7 or 10; default 2 with a downImage, else
         none = the standing size). Shapes: 2 = the position + the hex behind; 3 = a line along the facing, position in
         the middle; 7 = the position + its 6 neighbors; 10 = a line of 4 along the facing (position 2nd from the front)
-        + a line of 3 on each side. Any other size is refused (400).
+        + a line of 3 on each side. Any other size is refused (400). frontImage (optional, "2.5D front"): the figure seen
+        from the front, standing, drawn by the 3D view of the web app (a PNG with a transparent background works best);
+        without it the 3D view uses upImage.
         """;
 
     [McpServerTool(Name = "list_tokens", Title = "List tokens", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -24,7 +26,7 @@ public static class TokenTools
         What it does: lists the token library (images that draw pieces on maps), paged and searchable by name.
         Who can use it: any authenticated user (the library is shared).
         Returns: { items: [{ tokenId, userId, name, description, upSpace, downSpace, upImage, downImage, upImageUrl,
-        downImageUrl, createdAt }], page, pageSize, totalCount }.
+        downImageUrl, frontImage, frontImageUrl, createdAt }], page, pageSize, totalCount }.
         Common errors: none.
         Related tools: create_token, add_object_to_map, create_npc (needs a tokenId), create_character (tokenId).
         """)]
@@ -67,10 +69,11 @@ public static class TokenTools
         [Description("Hexes the standing token occupies: 1, 2, 3, 7 or 10. Default 1.")] int? upSpace = null,
         [Description("Hexes the token occupies when down or out of combat: 1, 2, 3, 7 or 10. Default 2 with downImage.")] int? downSpace = null,
         [Description("Image of the token standing. " + McpDocs.IMAGE_FILE)] string? upImage = null,
-        [Description("Optional image of the token lying down. " + McpDocs.IMAGE_FILE)] string? downImage = null) =>
+        [Description("Optional image of the token lying down. " + McpDocs.IMAGE_FILE)] string? downImage = null,
+        [Description("Optional \"2.5D front\" image for the 3D view: the figure standing, seen from the front. " + McpDocs.IMAGE_FILE)] string? frontImage = null) =>
         api.SendAsync(HttpMethod.Post, "/api/token", new TokenInsertInfo
         {
-            Name = name, Description = description, UpSpace = upSpace, DownSpace = downSpace, UpImage = upImage, DownImage = downImage
+            Name = name, Description = description, UpSpace = upSpace, DownSpace = downSpace, UpImage = upImage, DownImage = downImage, FrontImage = frontImage
         });
 
     [McpServerTool(Name = "update_token", Title = "Update token", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -92,10 +95,11 @@ public static class TokenTools
         [Description("Hexes the standing token occupies: 1, 2, 3, 7 or 10. Default 1.")] int? upSpace = null,
         [Description("Hexes the token occupies when down or out of combat: 1, 2, 3, 7 or 10. Default 2 with downImage.")] int? downSpace = null,
         [Description("Image of the token standing. " + McpDocs.IMAGE_FILE)] string? upImage = null,
-        [Description("Optional image of the token lying down. " + McpDocs.IMAGE_FILE)] string? downImage = null) =>
+        [Description("Optional image of the token lying down. " + McpDocs.IMAGE_FILE)] string? downImage = null,
+        [Description("Optional \"2.5D front\" image for the 3D view: the figure standing, seen from the front. " + McpDocs.IMAGE_FILE)] string? frontImage = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/token/{tokenId}", new TokenInsertInfo
         {
-            Name = name, Description = description, UpSpace = upSpace, DownSpace = downSpace, UpImage = upImage, DownImage = downImage
+            Name = name, Description = description, UpSpace = upSpace, DownSpace = downSpace, UpImage = upImage, DownImage = downImage, FrontImage = frontImage
         });
 
     [McpServerTool(Name = "delete_token", Title = "Delete token", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

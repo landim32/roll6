@@ -237,6 +237,7 @@ body,
   touch-action: none;
   cursor: grab;
   outline: none;
+  image-rendering: pixelated;
 }
 
 .stm-story-canvas:active {
@@ -302,23 +303,6 @@ body,
   stroke-width: 1;
 }
 
-/* Walls of a story map (033). */
-.stm-map .stm-walls {
-  fill: rgba(20, 22, 26, 0.62);
-  stroke: rgba(222, 226, 230, 0.45);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-
-.stm-map .stm-walls.is-editing {
-  fill: rgba(20, 22, 26, 0.78);
-  stroke: rgba(255, 193, 7, 0.75);
-}
-
-.stm-map.stm-wall-editing {
-  cursor: crosshair;
-}
 
 .stm-map .stm-resize-frame {
   fill: transparent;
@@ -1495,4 +1479,20 @@ button.stm-turn-badge:hover {
 .stm-api-key-table td.text-break {
   white-space: normal;
   min-width: 8rem;
+}
+
+/* "2,5D frente" token image and the 3D mask / background previews (034): a checkerboard shows transparency. */
+.stm-front-preview,
+.stm-mask-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  border: 1px solid var(--stm-border);
+  border-radius: 0.375rem;
+  background: conic-gradient(#3a3f4a 25%, #2a2e36 0 50%, #3a3f4a 0 75%, #2a2e36 0) 0 0 / 16px 16px;
+}
+
+.stm-front-preview {
+  height: 120px;
+  width: auto;
 }

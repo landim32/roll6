@@ -80,7 +80,7 @@ export const pieceGeometry = (space: number, size: number): PieceGeometry => {
   };
 };
 
-/** Disc colors of the piece types on the map, also used under the 3D figures (033). */
+/** Disc colors of the piece types on the map. */
 export const BASE_COLORS: Record<number, string> = {
   [MAP_TOKEN_TYPE.character]: '#0d6efd',
   [MAP_TOKEN_TYPE.npc]: '#dc3545',
@@ -88,7 +88,7 @@ export const BASE_COLORS: Record<number, string> = {
 export const OBJECT_BASE_COLOR = '#6c757d';
 export const OUT_BASE_COLOR = '#808080';
 
-/** How a piece shows in the 3D view of a story map (033). */
+/** How a piece shows in the 3D view (034). */
 export interface SpriteSpec {
   mapTokenId: number;
   name: string;
@@ -109,7 +109,12 @@ export interface SpriteSpec {
   baseColor: string;
   /** Radius of the disc under the figure (px). */
   baseRadius: number;
+  /** Height of the figure relative to its image's natural proportion: 1 standing, less when lying (034). */
+  heightRatio: number;
 }
+
+/** A lying figure is drawn this fraction of its natural height in the 3D view (034). */
+export const LYING_HEIGHT_RATIO = 0.4;
 
 /**
  * The 3D figure of a piece, with the same rules as the 2D map: lying image, black and white out of combat, disc
@@ -130,7 +135,8 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
   return {
     mapTokenId: token.mapTokenId,
     name: token.name,
-    imageUrl: image.url,
+    // Standing pieces use the token's "2,5D frente" image when it has one; lying ones keep the 2D rules (034).
+    imageUrl: isLying(token) ? image.url : token.frontImageUrl ?? image.url,
     standing: !isLying(token),
     sideways: image.sideways,
     grayscale: out,
@@ -140,5 +146,6 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     look: token.look,
     baseColor: out ? OUT_BASE_COLOR : BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
     baseRadius: Math.min(geometry.box.width, geometry.box.height) / 2,
+    heightRatio: isLying(token) ? LYING_HEIGHT_RATIO : 1,
   };
 };

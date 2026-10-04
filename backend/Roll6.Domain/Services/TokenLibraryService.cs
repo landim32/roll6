@@ -50,7 +50,7 @@ public class TokenLibraryService : ITokenLibraryService
     public async Task<TokenInfo> CreateAsync(long userId, TokenInsertInfo info)
     {
         var token = new Token { UserId = userId };
-        token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
+        token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage, info.FrontImage);
         token.CreatedAt = token.UpdatedAt;
         return MapToDto(await _repository.InsertAsync(token));
     }
@@ -58,7 +58,7 @@ public class TokenLibraryService : ITokenLibraryService
     public async Task<TokenInfo> UpdateAsync(long userId, long tokenId, TokenInsertInfo info)
     {
         var token = await GetOwnedAsync(userId, tokenId);
-        token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
+        token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage, info.FrontImage);
         return MapToDto(await _repository.UpdateAsync(token));
     }
 
@@ -100,6 +100,8 @@ public class TokenLibraryService : ITokenLibraryService
         UpImageUrl = _imageStorage.GetUrl(token.UpImage),
         DownImage = token.DownImage,
         DownImageUrl = _imageStorage.GetUrl(token.DownImage),
+        FrontImage = token.FrontImage,
+        FrontImageUrl = _imageStorage.GetUrl(token.FrontImage),
         CreatedAt = token.CreatedAt,
         UpdatedAt = token.UpdatedAt
     };

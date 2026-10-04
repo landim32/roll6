@@ -8,7 +8,7 @@ import type { CameraBlocked, CameraPose } from '../lib/storyCamera';
 /** Walking speed (map px per second) and turning speed (radians per second). */
 const WALK_SPEED = 5 * HEX_SIZE;
 const TURN_SPEED = 1.8;
-/** Radians per dragged pixel. */
+/** Radians per horizontally dragged pixel. */
 const DRAG_TURN = 0.005;
 
 export interface FollowedPiece {
@@ -48,8 +48,8 @@ const axes = (keys: Set<string>) => {
 };
 
 /**
- * Camera of the 3D view (033): starts behind the chosen character and follows its piece; keyboard (W/A/S/D, Q/E,
- * arrows), mouse drag and the touch joystick walk and turn freely (letting go of the character); the wheel and a
+ * Camera of the 3D view (034): starts behind the chosen character and follows its piece; keyboard (W/A/S/D, Q/E,
+ * arrows), mouse drag (sideways) and the touch joystick walk and turn freely (letting go of the character); the wheel and a
  * pinch zoom through the field of view. Every rule lives in the pure `lib/storyCamera`.
  */
 export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed, fov, setFov }: UseStoryCameraOptions) => {
@@ -147,7 +147,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     };
   }, [setPose]);
 
-  // Mouse/finger drag turns and tilts; two fingers pinch the zoom.
+  // Mouse/finger drag turns sideways; two fingers pinch the zoom.
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.focus();
@@ -171,11 +171,11 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     }
     const pose = poseRef.current;
     if (!drag.current || !pose) return;
+    // Only the horizontal drag turns the camera: it never looks up or down (034).
     const dx = event.clientX - drag.current.x;
-    const dy = event.clientY - drag.current.y;
     drag.current = { x: event.clientX, y: event.clientY };
-    if (dx === 0 && dy === 0) return;
-    setPose(stepCamera(pose, { turn: dx * DRAG_TURN, tilt: -dy * DRAG_TURN }, latest.current.blocked));
+    if (dx === 0) return;
+    setPose(stepCamera(pose, { turn: dx * DRAG_TURN }, latest.current.blocked));
   }, [setPose]);
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {

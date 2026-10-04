@@ -13,16 +13,13 @@ import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { gridPixelSize, HEX_SIZE } from '../lib/hexGrid';
 import {
-  createEmptyDraft, draftFromMapModel, isSameDraft, isStoryMap, MAX_GRID_SIZE, MIN_GRID_SIZE, toMapModelInsert,
+  createEmptyDraft, draftFromMapModel, isSameDraft, MAX_GRID_SIZE, MIN_GRID_SIZE, toMapModelInsert,
 } from '../lib/draft';
 import type { MapDraft } from '../lib/draft';
-import type { Offset } from '../lib/hexGrid';
-import { paintWalls as paintWallCells, trimWalls } from '../lib/storyWalls';
-import type { WallMode } from '../lib/storyWalls';
+import { sameRatio } from '../lib/maskImage';
 import { clampFov, FOV_DEFAULT } from '../lib/storyCamera';
 import { readViewMode, writeViewMode } from '../lib/viewMode';
 import type { ViewMode } from '../lib/viewMode';
-import { MAP_KIND } from '../types/mapModel';
 import { MAP_STATUS_DELETED } from '../types/map';
 import type { MapInfo } from '../types/map';
 
@@ -94,16 +91,12 @@ interface MapEditorContextType {
   setImageLayout: (layout: ImageLayout) => void;
   setGridSize: (columns: number, rows: number) => void;
   toggleResizeMode: () => void;
-  // Story maps (033)
-  /** MAP_KIND of the draft; going back to 2D keeps the walls (they just do nothing). */
-  setKind: (kind: number) => void;
-  /** Paints or erases wall hexes of the draft (outside the grid ignored). */
-  paintWalls: (hexes: Offset[], mode: WallMode) => void;
-  setSkyImage: (fileName: string | null, url: string | null) => void;
-  /** Wall editing on the 2D map: null = off. */
-  wallMode: WallMode | null;
-  setWallMode: (mode: WallMode | null) => void;
-  /** 2D map or 3D view; always '2d' on a 2D map. */
+  // 3D view (034)
+  /** 3D mask of the draft (black = wall); null removes it. */
+  setMaskImage: (fileName: string | null, url: string | null) => void;
+  /** Background (360° panorama) of the 3D view; null removes it. */
+  setBackgroundImage: (fileName: string | null, url: string | null) => void;
+  /** 2D map or 3D view of the open map (any map has the 3D view). */
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   /** Field of view (degrees) of the 3D view: its zoom. Not saved. */
@@ -163,6 +156,10 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
   const { currentCampaign, isMaster, refreshTableCampaigns } = useCampaign();
   const [draft, setDraft] = useState<MapDraft>(createEmptyDraft);
+  const { t } = useTranslation();
+  /** Mask URL of the draft, read by `setImage` without making it depend on the draft. */
+  const maskUrlRef = useRef<string | null>(null);
+  maskUrlRef.current = draft.maskImageUrl;
   const [saved, setSaved] = useState<MapDraft>(createEmptyDraft);
   const [view, setView] = useState<MapView>(INITIAL_VIEW);
   const [resizeMode, setResizeMode] = useState(false);
@@ -210,6 +207,11 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   const setImage = useCallback(async (fileName: string, url: string | null) => {
     const size = url ? await loadImageSize(url) : null;
+    // A 3D mask covers the map image, so it must keep its proportion: warn when a new image breaks it (034).
+    if (size && maskUrlRef.current) {
+      const mask = await loadImageSize(maskUrlRef.current);
+      if (mask && !sameRatio(mask, size)) toast.warning(t('raycast.maskMismatch'));
+    }
     setDraft((prev) => ({
       ...prev,
       image: fileName,
@@ -219,7 +221,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
       imageLeft: 0,
       imageTop: 0,
     }));
-  }, []);
+  }, [t]);
 
   /** Moves/resizes the image under the fixed grid (backend: size ≥ 1, offset within ±20000). */
   const setImageLayout = useCallback((layout: ImageLayout) => {
@@ -235,56 +237,34 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const setGridSize = useCallback((columns: number, rows: number) => {
     if (columns < MIN_GRID_SIZE || columns > MAX_GRID_SIZE || rows < MIN_GRID_SIZE || rows > MAX_GRID_SIZE)
       throw new RangeError('grid size out of range');
-    // Walls left outside a smaller grid are dropped (the backend drops them too, 033).
-    setDraft((prev) => ({ ...prev, gridWidth: columns, gridHeight: rows, walls: trimWalls(prev.walls, columns, rows) }));
+    setDraft((prev) => ({ ...prev, gridWidth: columns, gridHeight: rows }));
   }, []);
 
   const toggleResizeMode = useCallback(() => setResizeMode((prev) => !prev), []);
 
-  // ---------- story maps (033) ----------
+  // ---------- 3D view (034) ----------
 
-  const [wallMode, setWallModeState] = useState<WallMode | null>(null);
-  const [preferredView, setPreferredView] = useState<ViewMode>('2d');
+  const [viewMode, setViewModeState] = useState<ViewMode>('2d');
   const [fov, setFovState] = useState(FOV_DEFAULT);
   const setFov = useCallback((value: number) => setFovState(clampFov(value)), []);
-  const story = isStoryMap(draft);
-  /** The 3D view exists only on story maps; a 2D map forces the 2D view without forgetting the preference. */
-  const viewMode: ViewMode = story ? preferredView : '2d';
 
-  const setKind = useCallback((kind: number) => {
-    setDraft((prev) => ({ ...prev, kind }));
-    if (kind !== MAP_KIND.story) setWallModeState(null);
+  const setMaskImage = useCallback((fileName: string | null, url: string | null) => {
+    setDraft((prev) => ({ ...prev, maskImage: fileName, maskImageUrl: url }));
   }, []);
 
-  const paintWalls = useCallback((hexes: Offset[], mode: WallMode) => {
-    setDraft((prev) => {
-      const walls = paintWallCells(prev.walls, hexes, mode, prev.gridWidth, prev.gridHeight);
-      return walls === prev.walls ? prev : { ...prev, walls };
-    });
-  }, []);
-
-  const setSkyImage = useCallback((fileName: string | null, url: string | null) => {
-    setDraft((prev) => ({ ...prev, skyImage: fileName, skyImageUrl: url }));
-  }, []);
-
-  const setWallMode = useCallback((mode: WallMode | null) => {
-    setWallModeState(mode);
-    if (mode) setResizeMode(false);
+  const setBackgroundImage = useCallback((fileName: string | null, url: string | null) => {
+    setDraft((prev) => ({ ...prev, backgroundImage: fileName, backgroundImageUrl: url }));
   }, []);
 
   const setViewMode = useCallback((mode: ViewMode) => {
-    setPreferredView(mode);
+    setViewModeState(mode);
     if (draft.mapModelId !== null) writeViewMode(draft.mapModelId, mode);
-    if (mode === '3d') {
-      setWallModeState(null);
-      setResizeMode(false);
-    }
+    if (mode === '3d') setResizeMode(false);
   }, [draft.mapModelId]);
 
-  // Each map reopens in the view last used for it on this device (story maps only).
+  // Each map reopens in the view last used for it on this device.
   useEffect(() => {
-    setPreferredView(draft.mapModelId !== null ? readViewMode(draft.mapModelId) : '2d');
-    setWallModeState(null);
+    setViewModeState(draft.mapModelId !== null ? readViewMode(draft.mapModelId) : '2d');
   }, [draft.mapModelId]);
 
   // ---------- map lifecycle ----------
@@ -321,7 +301,6 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const discardChanges = useCallback(() => {
     setDraft(saved);
     setResizeMode(false);
-    setWallModeState(null);
   }, [saved]);
 
   /**
@@ -417,7 +396,6 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   // ---------- real-time table (017) ----------
 
-  const { t } = useTranslation();
   const { selectCampaign } = useCampaign();
   const campaignId = currentCampaign?.campaignId ?? null;
   const currentMapId = currentCampaign?.currentMapId ?? null;
@@ -497,7 +475,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, loading, error,
     zoomAt, zoomIn, zoomOut, panBy, centerOn,
     setImage, setImageLayout, setGridSize, toggleResizeMode,
-    setKind, paintWalls, setSkyImage, wallMode, setWallMode, viewMode, setViewMode, fov, setFov,
+    setMaskImage, setBackgroundImage, viewMode, setViewMode, fov, setFov,
     newMap, loadMapModel, openCampaignMapBySlug, discardChanges, saveMap, clearError,
   };
 

@@ -99,19 +99,6 @@ public class MapNpcServiceTests
     }
 
     [Fact]
-    public async Task Create_OnAWallOfAStoryMap_Throws()
-    {
-        var model = new MapModel { MapModelId = 50 };
-        model.UpdateGrid(10, 8);
-        model.UpdateStory((int)MapKind.Story, new[] { new[] { 1, 1 } }, null);
-        _mapModelRepository.Setup(r => r.GetByIdAsync(50)).ReturnsAsync(model);
-
-        (await _service.Invoking(s => s.CreateAsync(MASTER, At(1, 1))).Should().ThrowAsync<ConflictException>())
-            .WithMessage(MapLayout.WALL_MESSAGE);
-        _repository.Verify(r => r.InsertAsync(It.IsAny<MapNpc>()), Times.Never);
-    }
-
-    [Fact]
     public async Task Create_NotMaster_Throws()
     {
         await _service.Invoking(s => s.CreateAsync(PLAYER, At(1, 1))).Should().ThrowAsync<UnauthorizedAccessException>();

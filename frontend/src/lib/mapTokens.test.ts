@@ -5,7 +5,7 @@ import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import type { MapTokenInfo } from '../types/mapToken';
 
 const piece = (mapTokenId: number, x: number, y: number, campaignCharacterId: number | null = null): MapTokenInfo => ({
-  mapTokenId, mapId: 1, tokenId: 1, tokenName: '', upImageUrl: null, downImageUrl: null,
+  mapTokenId, mapId: 1, tokenId: 1, tokenName: '', upImageUrl: null, downImageUrl: null, frontImageUrl: null,
   campaignCharacterId, characterId: null, mapNpcId: null, npcId: null, name: '', tokenType: campaignCharacterId ? MAP_TOKEN_TYPE.character : MAP_TOKEN_TYPE.object,
   sheet: null, life: 0, energy: 0, totalLife: 0, totalEnergy: 0, status: null, move: 0, x, y, look: 0, posture: null, space: 1, createdAt: '', updatedAt: '',
 });
@@ -50,33 +50,6 @@ describe('npcDropAction', () => {
     expect(npcDropAction({ hex: null, tokens })).toEqual({ kind: 'none' });
     expect(npcDropAction({ hex: { x: 1, y: 1 }, tokens })).toEqual({ kind: 'occupied' });
     expect(npcDropAction({ hex: { x: 0, y: 0 }, tokens })).toEqual({ kind: 'place' });
-  });
-});
-
-describe('walls of a story map (033)', () => {
-  const walls = [{ x: 4, y: 4 }, { x: 0, y: 1 }];
-
-  it('refuses to place or move a character onto a wall', () => {
-    expect(characterDropAction({ hex: { x: 4, y: 4 }, tokens, columns: 10, rows: 10, participation: member(8, 3), walls }))
-      .toEqual({ kind: 'wall' });
-    expect(characterDropAction({ hex: { x: 4, y: 4 }, tokens, columns: 10, rows: 10, participation: member(7, 3), walls }))
-      .toEqual({ kind: 'wall' });
-  });
-
-  it('refuses a big piece whose shape covers a wall', () => {
-    const horse = { ...piece(20, 5, 5, 9), space: 2 };
-    // Facing up, a 2-hex piece at (0, 0) also takes the hex behind it, (0, 1).
-    expect(characterDropAction({ hex: { x: 0, y: 0 }, tokens: [horse], columns: 10, rows: 10, participation: member(9, 3), walls }))
-      .toEqual({ kind: 'wall' });
-  });
-
-  it('refuses an NPC on a wall', () => {
-    expect(npcDropAction({ hex: { x: 4, y: 4 }, tokens, walls })).toEqual({ kind: 'wall' });
-    expect(npcDropAction({ hex: { x: 5, y: 5 }, tokens, walls })).toEqual({ kind: 'place' });
-  });
-
-  it('ignores walls that are not given (2D maps)', () => {
-    expect(npcDropAction({ hex: { x: 4, y: 4 }, tokens })).toEqual({ kind: 'place' });
   });
 });
 

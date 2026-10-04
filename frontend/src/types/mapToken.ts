@@ -33,6 +33,8 @@ export interface MapTokenInfo {
   tokenId: number;
   tokenName: string;
   upImageUrl: string | null;
+  /** "2,5D frente" image of the piece's token (034), the standing figure of the 3D view. */
+  frontImageUrl: string | null;
   downImageUrl: string | null;
   campaignCharacterId: number | null;
   characterId: number | null;

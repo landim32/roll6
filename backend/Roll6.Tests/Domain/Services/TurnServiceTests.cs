@@ -284,30 +284,6 @@ public class TurnServiceTests
         _mapTokenRepository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
     }
 
-    /// <summary>A story map (033) of 10 × 10 with these walls, for any map model id.</summary>
-    private void StoryWalls(params (int X, int Y)[] walls)
-    {
-        var model = new MapModel { MapModelId = 50 };
-        model.UpdateGrid(10, 10);
-        model.UpdateStory((int)MapKind.Story, walls.Select(w => new[] { w.X, w.Y }), null);
-        _mapModelRepository.Setup(r => r.GetByIdAsync(It.IsAny<long>())).ReturnsAsync(model);
-    }
-
-    [Fact]
-    public async Task Reset_FormerHexIsNowAWall_KeepsThePieceWhereItIs()
-    {
-        _ariaPiece.MoveTo(4, 2);
-        _repository.Setup(r => r.ListByActorTurnAsync(CAMPAIGN, 3, ARIA, null))
-            .ReturnsAsync(new List<Turn> { Turn.Movement(CAMPAIGN, MAP, ARIA, null, null, 3, 1, (4, 4, 3), (4, 2, 0)) });
-        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken> { _ariaPiece });
-        StoryWalls((4, 4));
-
-        var result = await _service.ResetAsync(PLAYER, new TurnPieceInfo { MapTokenId = ARIA_PIECE });
-
-        (result.Removed, result.Reverted).Should().Be((1, false));
-        (_ariaPiece.X, _ariaPiece.Y).Should().Be((4, 2));
-    }
-
     [Fact]
     public async Task Reset_AnotherPlayersCharacter_Throws()
     {
@@ -637,24 +613,6 @@ public class TurnServiceTests
         });
 
         ((_ariaPiece.X, _ariaPiece.Y), (bram.X, bram.Y)).Should().Be(((1, 1), (4, 4)));
-    }
-
-    [Fact]
-    public async Task Process_TargetOnAWall_IsRefusedForThatItem()
-    {
-        Table();
-        StoryWalls((3, 3));
-
-        var act = () => _service.ProcessAsync(MASTER, CAMPAIGN, new TurnProcessInfo
-        {
-            Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 3, Y = 3 } },
-            Npcs = new() { new TurnProcessNpcInfo { MapNpcId = MAP_NPC, X = 3, Y = 3 } }
-        });
-
-        var errors = (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors;
-        errors["characters[0].x"].Should().Contain(MapLayout.WALL_MESSAGE);
-        errors["npcs[0].x"].Should().Contain(MapLayout.WALL_MESSAGE);
-        (_ariaPiece.X, _ariaPiece.Y).Should().Be((4, 4));
     }
 
     public static IEnumerable<object[]> InvalidBatches() => new[]

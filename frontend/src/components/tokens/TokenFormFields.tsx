@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { FrontImageField } from './FrontImageField';
 import { ImageCropper } from '../ui/ImageCropper';
 import type { ImageCrop } from '../ui/ImageCropper';
 import { tokenImageSize } from '../../lib/cropImage';
@@ -12,17 +13,27 @@ interface TokenFormFieldsProps {
   onField: (field: keyof TokenForm, value: string) => void;
   onUpCrop: (crop: ImageCrop | null) => void;
   onDownCrop: (crop: ImageCrop | null) => void;
+  /** The optional "2,5D frente" image of the 3D view (034): the chosen file, uploaded as it is. */
+  onFrontFile: (file: File | null) => void;
   /** Edit: the saved images, shown until new ones are chosen. */
-  current?: { name: string; upUrl: string | null; hasUp: boolean; downUrl: string | null; hasDown: boolean };
+  current?: {
+    name: string; upUrl: string | null; hasUp: boolean; downUrl: string | null; hasDown: boolean;
+    frontUrl: string | null; hasFront: boolean;
+  };
   /** Edit: removes the saved lying image (the standing image can only be replaced). */
   onRemoveDown?: () => void;
+  /** Edit: removes the saved "2,5D frente" image. */
+  onRemoveFront?: () => void;
 }
 
 /**
  * Fields of a library token, shared by "Incluir token" and "Editar token": name, description, standing
- * and lying images (crop with zoom and rotation, saved at the footprint's pixel size) and the spaces.
+ * and lying images (crop with zoom and rotation, saved at the footprint's pixel size), the optional "2,5D frente"
+ * image for the 3D view and the spaces.
  */
-export const TokenFormFields = ({ idPrefix, form, onField, onUpCrop, onDownCrop, current, onRemoveDown }: TokenFormFieldsProps) => {
+export const TokenFormFields = ({
+  idPrefix, form, onField, onUpCrop, onDownCrop, onFrontFile, current, onRemoveDown, onRemoveFront,
+}: TokenFormFieldsProps) => {
   const { t } = useTranslation();
   const id = (name: string) => `${idPrefix}-${name}`;
   const upSize = tokenImageSize(Number(form.upSpace));
@@ -66,6 +77,16 @@ export const TokenFormFields = ({ idPrefix, form, onField, onUpCrop, onDownCrop,
           currentUrl={current?.downUrl}
           currentName={current?.name}
           onRemoveCurrent={onRemoveDown}
+        />
+      </div>
+      <div className="col-12">
+        <label className="form-label" htmlFor={id('front-image')}>{t('tokens.frontImage')}</label>
+        <FrontImageField
+          id={id('front-image')}
+          onChange={onFrontFile}
+          hasCurrent={current?.hasFront}
+          currentUrl={current?.frontUrl}
+          onRemoveCurrent={onRemoveFront}
         />
       </div>
       <div className="col-6">

@@ -56,34 +56,33 @@ public class MapModelServiceTests
     }
 
     [Fact]
-    public async Task Update_StoryFields_AreSavedAndReturned()
+    public async Task Update_ThreeDImages_AreSavedAndReturned()
     {
         var result = await _service.UpdateAsync(1, 20, new MapModelInsertInfo
         {
-            Name = "Masmorra", Kind = 2, Walls = new List<int[]> { new[] { 3, 1 }, new[] { 0, 0 } },
-            SkyImage = "0123456789abcdef0123456789abcdef.webp"
+            Name = "Masmorra", MaskImage = "0123456789abcdef0123456789abcdef.png",
+            BackgroundImage = "fedcba9876543210fedcba9876543210.webp"
         });
 
-        result.Kind.Should().Be(2);
-        result.Walls.Select(w => (w[0], w[1])).Should().Equal((0, 0), (3, 1));
-        result.SkyImage.Should().Be("0123456789abcdef0123456789abcdef.webp");
+        result.MaskImage.Should().Be("0123456789abcdef0123456789abcdef.png");
+        result.BackgroundImage.Should().Be("fedcba9876543210fedcba9876543210.webp");
     }
 
     [Fact]
-    public async Task Update_WithoutStoryFields_ReplacesThemWithDefaults()
+    public async Task Update_WithoutThreeDImages_RemovesThem()
     {
         await _service.UpdateAsync(1, 20, new MapModelInsertInfo
         {
-            Name = "Masmorra", Kind = 2, Walls = new List<int[]> { new[] { 1, 1 } }, SkyImage = "0123456789abcdef0123456789abcdef.jpg"
+            Name = "Masmorra", MaskImage = "0123456789abcdef0123456789abcdef.png", BackgroundImage = "fedcba9876543210fedcba9876543210.jpg"
         });
 
-        // PUT replaces every field (033 D2): omitted kind/walls/sky go back to 2D, none, none.
+        // PUT replaces every field: an omitted mask/background is removed.
         var result = await _service.UpdateAsync(1, 20, new MapModelInsertInfo { Name = "Masmorra" });
 
-        result.Kind.Should().Be(1);
-        result.Walls.Should().BeEmpty();
-        result.SkyImage.Should().BeNull();
-        result.SkyImageUrl.Should().BeNull();
+        result.MaskImage.Should().BeNull();
+        result.MaskImageUrl.Should().BeNull();
+        result.BackgroundImage.Should().BeNull();
+        result.BackgroundImageUrl.Should().BeNull();
     }
 
     [Fact]

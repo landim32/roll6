@@ -5,26 +5,40 @@ import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useStoryCamera } from '../../hooks/useStoryCamera';
 import type { FollowedPiece } from '../../hooks/useStoryCamera';
-import { activeWalls } from '../../lib/draft';
 import { HEX_SIZE } from '../../lib/hexGrid';
-import { loadImage } from '../../lib/mapSnapshot';
+import { loadImage, toGrayscale } from '../../lib/mapSnapshot';
 import { spriteSpec } from '../../lib/pieceDrawing';
+import type { SpriteSpec } from '../../lib/pieceDrawing';
+import { buildMaskGrid } from '../../lib/raycaster';
+import type { MapArea, MaskGrid } from '../../lib/raycaster';
 import { cameraBlocker } from '../../lib/storyCamera';
 import { FollowCharacterIcon } from '../ui/icons';
-import { createStoryScene } from './storyScene';
-import type { StoryScene } from './storyScene';
+import { initialPixels, rotateQuarter, toPixels } from './imagePixels';
+import type { PixelBuffer } from './imagePixels';
+import { CanvasUnavailableError, createRaycastRenderer } from './raycastRenderer';
+import type { RaycastRenderer, RenderSprite } from './raycastRenderer';
 import { VirtualJoystick } from './VirtualJoystick';
 
 interface StoryViewProps {
-  /** The device cannot draw 3D: the page goes back to the 2D map (FR-018). */
+  /** The device cannot draw the 3D view: the page goes back to the 2D map (FR-017). */
   onUnsupported: () => void;
 }
 
+/** Longest side (px) the map image, the mask and the background are read at, and the figures' images. */
+const MAP_MAX_SIDE = 2048;
+const SPRITE_MAX_SIDE = 256;
+
+/** Pixels of a stored image, or null when it can't be loaded or read. */
+const readImage = async (url: string, maxSide: number): Promise<PixelBuffer | null> => {
+  const image = await loadImage(url);
+  return image ? toPixels(image, maxSide) : null;
+};
+
 /**
- * 3D view of a story map (033), in the place of the 2D map: the map image as the floor, the walls, the sky and every
- * piece as a figure, seen by a camera behind the chosen character. It only reads the editor, pieces and character
- * contexts, so real-time changes (017) show up here the same way they do on the 2D map. Loaded lazily (three.js stays
- * out of the main bundle).
+ * 3D view of the open map (034), in the place of the 2D map: the walls of the 3D mask drawn like Wolfenstein 3D, the
+ * map image as the floor, the background as a panorama and every piece as a figure seen from a camera behind the chosen
+ * character. The user only observes: nothing here changes a piece. It reads the editor, pieces and character contexts,
+ * so real-time changes (017) show up the same way they do on the 2D map. Loaded lazily to keep it out of the main bundle.
  */
 export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   const { t } = useTranslation();
@@ -32,19 +46,17 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   const { mapTokens } = useMapToken();
   const { party, currentSelection } = useCharacter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sceneRef = useRef<StoryScene | null>(null);
+  const rendererRef = useRef<RaycastRenderer | null>(null);
   const [ready, setReady] = useState(false);
+  const [mask, setMask] = useState<MaskGrid | null>(null);
   const fovRef = useRef(fov);
   fovRef.current = fov;
   const unsupported = useRef(onUnsupported);
   unsupported.current = onUnsupported;
+  /** Figure images by URL, read once (a failed one is null and the figure shows its initial). */
+  const spriteImages = useRef(new Map<string, Promise<PixelBuffer | null>>());
 
-  const { kind, walls: draftWalls } = draft;
-  const walls = useMemo(() => activeWalls({ kind, walls: draftWalls }), [kind, draftWalls]);
-  const blocked = useMemo(
-    () => cameraBlocker(walls, draft.gridWidth, draft.gridHeight),
-    [walls, draft.gridWidth, draft.gridHeight],
-  );
+  const blocked = useMemo(() => cameraBlocker(mask, draft.gridWidth, draft.gridHeight), [mask, draft.gridWidth, draft.gridHeight]);
   const pieces = useMemo(
     () => (draft.mapId === null ? [] : mapTokens.filter((token) => token.mapId === draft.mapId)),
     [mapTokens, draft.mapId],
@@ -59,31 +71,33 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     return { mapTokenId: piece.mapTokenId, center: spriteSpec(piece, HEX_SIZE).center, look: piece.look };
   }, [currentSelection, party, pieces]);
 
-  // Create the scene once; a device without WebGL goes back to 2D.
+  // Create the renderer once; a device without a 2D canvas goes back to 2D.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    let scene: StoryScene;
+    let renderer: RaycastRenderer;
     try {
-      scene = createStoryScene(canvas);
-    } catch {
-      unsupported.current();
+      renderer = createRaycastRenderer(canvas);
+    } catch (err) {
+      if (err instanceof CanvasUnavailableError) unsupported.current();
+      else throw err;
       return;
     }
-    sceneRef.current = scene;
-    const observer = new ResizeObserver(([entry]) => scene.resize(entry.contentRect.width, entry.contentRect.height));
+    rendererRef.current = renderer;
+    const observer = new ResizeObserver(([entry]) => renderer.resize(entry.contentRect.width, entry.contentRect.height));
     observer.observe(canvas);
+    renderer.resize(canvas.clientWidth, canvas.clientHeight);
     setReady(true);
     return () => {
       observer.disconnect();
-      scene.dispose();
-      sceneRef.current = null;
+      renderer.dispose();
+      rendererRef.current = null;
       setReady(false);
     };
   }, []);
 
   const camera = useStoryCamera({
-    apply: (pose) => sceneRef.current?.setCamera(pose, fovRef.current),
+    apply: (pose) => rendererRef.current?.setCamera(pose, fovRef.current),
     active: ready,
     blocked,
     columns: draft.gridWidth,
@@ -93,46 +107,91 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     setFov,
   });
 
-  useEffect(() => {
-    if (ready) sceneRef.current?.setGrid(draft.gridWidth, draft.gridHeight);
-  }, [ready, draft.gridWidth, draft.gridHeight]);
-
-  // The map image as the floor; a picture that fails to load is just left out (as in Share).
+  // The map image, which is also the floor and the color of the walls. A picture that fails to load is left out.
   const { imageUrl, imageLeft, imageTop, imageWidth, imageHeight } = draft;
+  const area = useMemo((): MapArea | null => (
+    imageWidth && imageHeight ? { x: -imageLeft, y: -imageTop, width: imageWidth, height: imageHeight } : null
+  ), [imageLeft, imageTop, imageWidth, imageHeight]);
+
   useEffect(() => {
     if (!ready) return;
-    if (!imageUrl || !imageWidth || !imageHeight) {
-      sceneRef.current?.setGround(null, null);
+    if (!imageUrl || !area) {
+      rendererRef.current?.setMap(null, null);
       return;
     }
     let cancelled = false;
-    void loadImage(imageUrl).then((image) => {
-      if (!cancelled) sceneRef.current?.setGround(image, { left: imageLeft, top: imageTop, width: imageWidth, height: imageHeight });
+    void readImage(imageUrl, MAP_MAX_SIDE).then((pixels) => {
+      if (!cancelled) rendererRef.current?.setMap(pixels, area);
     });
     return () => { cancelled = true; };
-  }, [ready, imageUrl, imageLeft, imageTop, imageWidth, imageHeight]);
+  }, [ready, imageUrl, area]);
 
-  useEffect(() => {
-    if (ready) sceneRef.current?.setWalls(walls);
-  }, [ready, walls]);
-
-  // The sky; it is sized from the grid, so it follows grid changes too.
-  const { skyImageUrl } = draft;
+  // The 3D mask → the walls (also what blocks the camera). No mask: no walls.
+  const { maskImageUrl } = draft;
   useEffect(() => {
     if (!ready) return;
-    if (!skyImageUrl) {
-      sceneRef.current?.setSky(null);
+    if (!maskImageUrl || !area) {
+      setMask(null);
+      rendererRef.current?.setMask(null);
       return;
     }
     let cancelled = false;
-    void loadImage(skyImageUrl).then((image) => {
-      if (!cancelled) sceneRef.current?.setSky(image);
+    void readImage(maskImageUrl, MAP_MAX_SIDE).then((pixels) => {
+      if (cancelled) return;
+      const grid = pixels ? buildMaskGrid(pixels.data, pixels.width, pixels.height, area) : null;
+      setMask(grid);
+      rendererRef.current?.setMask(grid);
     });
     return () => { cancelled = true; };
-  }, [ready, skyImageUrl, draft.gridWidth, draft.gridHeight]);
+  }, [ready, maskImageUrl, area]);
 
+  // The background panorama.
+  const { backgroundImageUrl } = draft;
   useEffect(() => {
-    if (ready) sceneRef.current?.setPieces(pieces.map((piece) => spriteSpec(piece, HEX_SIZE)));
+    if (!ready) return;
+    if (!backgroundImageUrl) {
+      rendererRef.current?.setBackground(null);
+      return;
+    }
+    let cancelled = false;
+    void readImage(backgroundImageUrl, MAP_MAX_SIDE).then((pixels) => {
+      if (!cancelled) rendererRef.current?.setBackground(pixels);
+    });
+    return () => { cancelled = true; };
+  }, [ready, backgroundImageUrl]);
+
+  // The figures: each piece with the image its posture and token ask for, read once per URL.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    const figure = async (spec: SpriteSpec): Promise<RenderSprite> => {
+      let pixels: PixelBuffer | null = null;
+      if (spec.imageUrl) {
+        let pending = spriteImages.current.get(spec.imageUrl);
+        if (!pending) {
+          pending = readImage(spec.imageUrl, SPRITE_MAX_SIDE);
+          spriteImages.current.set(spec.imageUrl, pending);
+        }
+        const source = await pending;
+        if (source) {
+          // Each figure gets its own copy: lying on its side and black and white change the pixels.
+          pixels = { data: new Uint8ClampedArray(source.data), width: source.width, height: source.height };
+          if (spec.sideways) pixels = rotateQuarter(pixels);
+          if (spec.grayscale) toGrayscale(pixels.data);
+        }
+      }
+      return {
+        id: spec.mapTokenId,
+        pixels: pixels ?? initialPixels(spec.name, spec.baseColor),
+        center: spec.center,
+        width: spec.width,
+        heightRatio: spec.heightRatio,
+      };
+    };
+    void Promise.all(pieces.map((piece) => figure(spriteSpec(piece, HEX_SIZE)))).then((sprites) => {
+      if (!cancelled) rendererRef.current?.setSprites(sprites);
+    });
+    return () => { cancelled = true; };
   }, [ready, pieces]);
 
   return (

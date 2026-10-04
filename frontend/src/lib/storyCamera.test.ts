@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { gridPixelSize, hexCenter, HEX_SIZE, pixelToHex } from './hexGrid';
+import { gridPixelSize, HEX_SIZE } from './hexGrid';
+import { buildMaskGrid } from './raycaster';
+import type { MaskGrid } from './raycaster';
 import {
-  cameraBlocker, clampFov, FOLLOW_DISTANCE, followPose, FOV_MAX, FOV_MIN, initialCamera, lookToYaw, PITCH_LIMIT,
-  segmentHitsWall, stepCamera,
+  cameraBlocker, clampFov, FOLLOW_DISTANCE, followPose, FOV_MAX, FOV_MIN, initialCamera, lookToYaw, segmentHitsWall, stepCamera,
 } from './storyCamera';
+import type { CameraPose } from './storyCamera';
 
-const open = cameraBlocker([], 20, 20);
-const center = (x: number, y: number) => hexCenter(x, y, HEX_SIZE);
+const COLUMNS = 20;
+const ROWS = 15;
+const MAP = gridPixelSize(COLUMNS, ROWS, HEX_SIZE);
+
+/** A mask over the whole map of 40 × 40 px cells (one source pixel per cell) with walls at these (col, row) cells. */
+const maskWith = (walls: Array<[number, number]>): MaskGrid => {
+  const cols = Math.round(MAP.width / 40);
+  const rows = Math.round(MAP.height / 40);
+  const pixels = new Uint8ClampedArray(cols * rows * 4).fill(255);
+  for (const [col, row] of walls) pixels.set([0, 0, 0, 255], (row * cols + col) * 4);
+  return buildMaskGrid(pixels, cols, rows, { x: 0, y: 0, width: MAP.width, height: MAP.height });
+};
+
+const open = cameraBlocker(null, COLUMNS, ROWS);
+const target = { x: 400, y: 300 };
 
 describe('storyCamera', () => {
   it('turns look 0–5 into yaw steps of 60° clockwise from north', () => {
@@ -17,8 +32,6 @@ describe('storyCamera', () => {
   });
 
   it('stands behind the piece, facing the way it looks', () => {
-    const target = center(10, 10);
-
     const facingNorth = followPose(target, 0, open);
     expect(facingNorth.x).toBeCloseTo(target.x);
     expect(facingNorth.z).toBeCloseTo(target.y + FOLLOW_DISTANCE);
@@ -29,34 +42,37 @@ describe('storyCamera', () => {
     expect(facingSouth.yaw).toBeCloseTo(Math.PI);
   });
 
-  it('comes closer to the piece when a wall stands behind it', () => {
-    const blocked = cameraBlocker([{ x: 10, y: 12 }], 20, 20);
-    const target = center(10, 10);
+  it('has no tilt: the pose is only a position, a heading and whether it follows', () => {
+    expect(Object.keys(followPose(target, 0, open)).sort()).toEqual(['attached', 'x', 'yaw', 'z']);
+  });
+
+  it('comes closer to the piece when a wall of the mask stands behind it', () => {
+    // 40 px cells: row 10 is y 400–440; the camera would be at y 300 + 160 = 460, behind that wall.
+    const blocked = cameraBlocker(maskWith([[10, 10], [9, 10], [11, 10]]), COLUMNS, ROWS);
 
     const pose = followPose(target, 0, blocked);
 
     expect(pose.z - target.y).toBeLessThan(FOLLOW_DISTANCE);
     expect(pose.z).toBeGreaterThanOrEqual(target.y);
     expect(blocked(pose.x, pose.z)).toBe(false);
-    expect(pixelToHex({ x: pose.x, y: pose.z }, HEX_SIZE)).not.toEqual({ x: 10, y: 12 });
+    expect(pose.z).toBeLessThan(400);
   });
 
   it('finds the first wall on a segment', () => {
-    const blocked = cameraBlocker([{ x: 10, y: 12 }], 20, 20);
+    const blocked = cameraBlocker(maskWith([[10, 10]]), COLUMNS, ROWS);
 
-    expect(segmentHitsWall(center(10, 10), center(10, 14), blocked)).not.toBeNull();
-    expect(segmentHitsWall(center(10, 10), center(10, 8), blocked)).toBeNull();
+    expect(segmentHitsWall({ x: 420, y: 300 }, { x: 420, y: 500 }, blocked)).not.toBeNull();
+    expect(segmentHitsWall({ x: 420, y: 300 }, { x: 420, y: 200 }, blocked)).toBeNull();
   });
 
-  it('walks, turns and lets go of the character', () => {
-    const start = { ...followPose(center(10, 10), 0, open) };
+  it('walks, strafes, turns and lets go of the character', () => {
+    const start: CameraPose = { x: 400, z: 400, yaw: 0, attached: true };
 
     const walked = stepCamera(start, { forward: 20 }, open);
-    expect(walked.z).toBeCloseTo(start.z - 20);
+    expect(walked.z).toBeCloseTo(380);
     expect(walked.attached).toBe(false);
 
-    const strafed = stepCamera({ ...start, yaw: 0 }, { strafe: 10 }, open);
-    expect(strafed.x).toBeCloseTo(start.x + 10);
+    expect(stepCamera(start, { strafe: 10 }, open).x).toBeCloseTo(410);
 
     const turned = stepCamera(start, { turn: Math.PI / 2 }, open);
     expect(turned.yaw).toBeCloseTo(Math.PI / 2);
@@ -65,43 +81,39 @@ describe('storyCamera', () => {
     expect(stepCamera(start, {}, open)).toBe(start);
   });
 
-  it('never enters a wall and slides along it', () => {
-    const blocked = cameraBlocker([{ x: 10, y: 9 }], 20, 20);
-    const start = { x: center(10, 10).x, z: center(10, 10).y, yaw: 0, pitch: 0, attached: false };
+  it('never enters a wall of the mask and slides along it', () => {
+    // A wall to the north of the camera: cell (10, 9) is y 360–400, x 400–440.
+    const blocked = cameraBlocker(maskWith([[10, 9]]), COLUMNS, ROWS);
+    let pose: CameraPose = { x: 420, z: 440, yaw: 0, attached: false };
 
-    let pose = start;
-    for (let i = 0; i < 20; i++) pose = stepCamera(pose, { forward: 5 }, blocked);
+    for (let i = 0; i < 30; i++) pose = stepCamera(pose, { forward: 5 }, blocked);
     expect(blocked(pose.x, pose.z)).toBe(false);
-    expect(pixelToHex({ x: pose.x, y: pose.z }, HEX_SIZE)).toEqual({ x: 10, y: 10 });
+    expect(pose.z).toBeGreaterThan(400);
 
     // Walking diagonally into the wall still moves along the free axis.
     const slid = stepCamera(pose, { forward: 5, strafe: 5 }, blocked);
     expect(slid.x).toBeGreaterThan(pose.x);
   });
 
-  it('never leaves the grid', () => {
-    let pose = { x: 30, z: 30, yaw: 0, pitch: 0, attached: false };
+  it('never leaves the map', () => {
+    let pose: CameraPose = { x: 30, z: 30, yaw: 0, attached: false };
     for (let i = 0; i < 50; i++) pose = stepCamera(pose, { forward: 10 }, open);
 
     expect(pose.z).toBeGreaterThan(0);
     expect(open(pose.x, pose.z)).toBe(false);
   });
 
-  it('limits the look up/down and the field of view', () => {
-    const pose = stepCamera({ x: 400, z: 400, yaw: 0, pitch: 0, attached: false }, { tilt: 5 }, open);
-
-    expect(pose.pitch).toBeCloseTo(PITCH_LIMIT);
+  it('limits the field of view', () => {
     expect(clampFov(10)).toBe(FOV_MIN);
     expect(clampFov(200)).toBe(FOV_MAX);
     expect(clampFov(60)).toBe(60);
   });
 
-  it('starts behind the chosen character, or free at the center for the GM', () => {
-    const behind = initialCamera({ center: center(5, 5), look: 0 }, 20, 20, open);
+  it('starts behind the chosen character, or free at the center of the map for the GM', () => {
+    const behind = initialCamera({ center: { x: 300, y: 300 }, look: 0 }, COLUMNS, ROWS, open);
     expect(behind.attached).toBe(true);
 
-    const gm = initialCamera(null, 20, 20, open);
-    const { width, height } = gridPixelSize(20, 20, HEX_SIZE);
-    expect(gm).toEqual({ x: width / 2, z: height / 2, yaw: 0, pitch: 0, attached: false });
+    const gm = initialCamera(null, COLUMNS, ROWS, open);
+    expect(gm).toEqual({ x: MAP.width / 2, z: MAP.height / 2, yaw: 0, attached: false });
   });
 });

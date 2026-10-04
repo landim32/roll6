@@ -12,9 +12,12 @@ export interface TokenInfo {
   /** Stored file names ({guid}.{ext}). */
   upImage: string | null;
   downImage: string | null;
+  /** "2,5D frente" (034): the figure seen from the front, used by the 3D view. */
+  frontImage: string | null;
   /** Presigned URLs for display. */
   upImageUrl: string | null;
   downImageUrl: string | null;
+  frontImageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,4 +30,5 @@ export interface TokenInsertInfo {
   downSpace: number | null;
   upImage: string | null;
   downImage: string | null;
+  frontImage: string | null;
 }
