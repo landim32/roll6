@@ -39,6 +39,12 @@ public class MapModel
     /// <summary>Background of the 3D view (034): a 360° panorama shown where no wall stands in front (the old sky).</summary>
     public string? BackgroundImage { get; set; }
 
+    /// <summary>
+    /// Wall texture of the 3D view (036): one picture that covers every wall the mask draws, instead of the colors of the
+    /// map image. Null keeps the walls as they were. Stored file name ({guid}.{ext}).
+    /// </summary>
+    public string? WallTextureImage { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime ChangedAt { get; set; }
 
@@ -77,11 +83,12 @@ public class MapModel
         ChangedAt = DateTime.UtcNow;
     }
 
-    /// <summary>The 3D view images (034): the mask and the background. Null removes them.</summary>
-    public void UpdateThreeD(string? maskImage, string? backgroundImage)
+    /// <summary>The 3D view images: the mask and the background (034) and the wall texture (036). Null removes them.</summary>
+    public void UpdateThreeD(string? maskImage, string? backgroundImage, string? wallTextureImage = null)
     {
         MaskImage = Guard.ImageFileName(maskImage, "maskImage");
         BackgroundImage = Guard.ImageFileName(backgroundImage, "backgroundImage");
+        WallTextureImage = Guard.ImageFileName(wallTextureImage, "wallTextureImage");
         ChangedAt = DateTime.UtcNow;
     }
 

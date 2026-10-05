@@ -47,6 +47,48 @@ public class NpcServiceTests
     }
 
     [Fact]
+    public async Task Create_WithoutPosture_StartsStanding()
+    {
+        var result = await _service.CreateAsync(OWNER, Info());
+
+        result.Posture.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task Create_WithPosture_IsSavedAndReturned(int posture)
+    {
+        var info = Info();
+        info.Posture = posture;
+
+        var result = await _service.CreateAsync(OWNER, info);
+
+        result.Posture.Should().Be(posture);
+    }
+
+    [Fact]
+    public async Task Create_WithInvalidPosture_Throws()
+    {
+        var info = Info();
+        info.Posture = 9;
+
+        (await _service.Invoking(s => s.CreateAsync(OWNER, info)).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("posture");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<Npc>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_ReplacesThePosture_AndOmittingItGoesBackToStanding()
+    {
+        var down = Info();
+        down.Posture = 2;
+
+        (await _service.UpdateAsync(OWNER, NPC, down)).Posture.Should().Be(2);
+        (await _service.UpdateAsync(OWNER, NPC, Info())).Posture.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Create_WithUnknownToken_Throws()
     {
         await _service.Invoking(s => s.CreateAsync(OWNER, Info(tokenId: 99))).Should().ThrowAsync<KeyNotFoundException>();

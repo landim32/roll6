@@ -80,7 +80,7 @@ public class MapModelService : IMapModelService
         mapModel.Update(info.Name, info.Description, info.Image);
         mapModel.UpdateGrid(info.GridWidth, info.GridHeight);
         mapModel.UpdateImageLayout(info.ImageWidth, info.ImageHeight, info.ImageTop, info.ImageLeft);
-        mapModel.UpdateThreeD(info.MaskImage, info.BackgroundImage);
+        mapModel.UpdateThreeD(info.MaskImage, info.BackgroundImage, info.WallTextureImage);
     }
 
     private async Task<MapModel> GetMapModelAsync(long mapModelId)
@@ -116,6 +116,8 @@ public class MapModelService : IMapModelService
         MaskImageUrl = _imageStorage.GetUrl(mapModel.MaskImage),
         BackgroundImage = mapModel.BackgroundImage,
         BackgroundImageUrl = _imageStorage.GetUrl(mapModel.BackgroundImage),
+        WallTextureImage = mapModel.WallTextureImage,
+        WallTextureImageUrl = _imageStorage.GetUrl(mapModel.WallTextureImage),
         CreatedAt = mapModel.CreatedAt,
         ChangedAt = mapModel.ChangedAt
     };

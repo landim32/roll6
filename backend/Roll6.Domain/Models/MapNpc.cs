@@ -27,7 +27,7 @@ public class MapNpc
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    /// <summary>Starts with the NPC's name and status and the current values at the NPC's totals.</summary>
+    /// <summary>Starts with the NPC's name, status and posture and the current values at the NPC's totals.</summary>
     public static MapNpc FromNpc(long mapId, Npc npc)
     {
         var now = DateTime.UtcNow;
@@ -39,7 +39,7 @@ public class MapNpc
             CurrentLife = npc.Life,
             CurrentEnergy = npc.Energy,
             Status = npc.Status,
-            Posture = Posture.Standing,
+            Posture = npc.Posture,
             CreatedAt = now,
             UpdatedAt = now
         };

@@ -12,11 +12,11 @@ const ROWS = 15;
 const MAP = gridPixelSize(COLUMNS, ROWS, HEX_SIZE);
 
 /** A mask over the whole map of 40 × 40 px cells (one source pixel per cell) with walls at these (col, row) cells. */
-const maskWith = (walls: Array<[number, number]>): MaskGrid => {
+const maskWith = (walls: Array<[number, number]>, tone = 0): MaskGrid => {
   const cols = Math.round(MAP.width / 40);
   const rows = Math.round(MAP.height / 40);
   const pixels = new Uint8ClampedArray(cols * rows * 4).fill(255);
-  for (const [col, row] of walls) pixels.set([0, 0, 0, 255], (row * cols + col) * 4);
+  for (const [col, row] of walls) pixels.set([tone, tone, tone, 255], (row * cols + col) * 4);
   return buildMaskGrid(pixels, cols, rows, { x: 0, y: 0, width: MAP.width, height: MAP.height });
 };
 
@@ -63,6 +63,14 @@ describe('storyCamera', () => {
 
     expect(segmentHitsWall({ x: 420, y: 300 }, { x: 420, y: 500 }, blocked)).not.toBeNull();
     expect(segmentHitsWall({ x: 420, y: 300 }, { x: 420, y: 200 }, blocked)).toBeNull();
+  });
+
+  it('a low wall blocks the camera too: the camera only looks over it, it never walks through (036)', () => {
+    const blocked = cameraBlocker(maskWith([[10, 10]], 128), COLUMNS, ROWS); // half gray: half the height
+
+    expect(blocked(420, 420)).toBe(true);
+    expect(blocked(420, 300)).toBe(false);
+    expect(segmentHitsWall({ x: 420, y: 300 }, { x: 420, y: 500 }, blocked)).not.toBeNull();
   });
 
   it('walks, strafes, turns and lets go of the character', () => {

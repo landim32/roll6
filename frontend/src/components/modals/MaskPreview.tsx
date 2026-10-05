@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { loadImage } from '../../lib/mapSnapshot';
-import { thresholdPixels } from '../../lib/maskImage';
+import { grayscalePixels } from '../../lib/maskImage';
 
-/** Width (px) of the black-and-white preview of the mask. */
+/** Width (px) of the gray preview of the mask. */
 const PREVIEW_WIDTH = 320;
 
 interface MaskPreviewProps {
@@ -11,7 +11,7 @@ interface MaskPreviewProps {
   url: string;
 }
 
-/** The mask as the 3D view reads it: pure black (wall) and white (empty). */
+/** The mask as the 3D view reads it (036): the tone of every pixel is the height of the wall, so the preview keeps the grays. */
 export const MaskPreview = ({ url }: MaskPreviewProps) => {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,7 +31,7 @@ export const MaskPreview = ({ url }: MaskPreviewProps) => {
       ctx.drawImage(image, 0, 0, width, height);
       try {
         const pixels = ctx.getImageData(0, 0, width, height);
-        thresholdPixels(pixels.data);
+        grayscalePixels(pixels.data);
         ctx.putImageData(pixels, 0, 0);
       } catch {
         // A picture the canvas cannot read stays as it is.

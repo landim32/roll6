@@ -17,6 +17,8 @@ export interface NpcInfo {
   sheet: string | null;
   /** Free-text condition; each new map occurrence starts with it. */
   status: string | null;
+  /** Posture each new map occurrence starts with (031): standing, down or out of combat. */
+  posture: Posture;
   /** Stored file name ({guid}.{ext}). */
   image: string | null;
   imageUrl: string | null;
@@ -33,6 +35,8 @@ export interface NpcInsertInfo {
   move: number;
   sheet: string | null;
   status: string | null;
+  /** Posture each new map occurrence starts with; the backend takes an omitted one as standing. */
+  posture: Posture;
   image: string | null;
 }
 

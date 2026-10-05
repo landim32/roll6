@@ -23,6 +23,19 @@ export const SILHOUETTE_SHARE = 0.6;
 /** Proportions of the silhouette drawing (viewBox). */
 const VIEW_BOX = { width: 50, height: 120 };
 
+/**
+ * The stage of a "2,5D" field (036): the square every one of the four sides shows its picture in, whether the field is
+ * empty, holds a saved image or is cropping — so the four fields are the same size and the silhouette lands in the same
+ * place. `styles/app.css` (`.stm-stage`) and `ImageCropper` (`stage`) follow the numbers below.
+ */
+export const STAGE: ImageSize = { width: 1, height: 1 };
+
+/** Where the 3:4 crop frame sits inside the square stage: as tall as it, centered, the margin visible around it. */
+export const frameInStage = (): { left: number; top: number; width: number; height: number } => {
+  const width = STAGE.height * FRONT_IMAGE_ASPECT;
+  return { left: (STAGE.width - width) / 2, top: 0, width, height: STAGE.height };
+};
+
 /** Height (viewBox units, from the top) of the silhouette's eyes: a little above the center of the head, which is at 9. */
 const EYE_Y = 8;
 

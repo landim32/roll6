@@ -16,6 +16,17 @@ public class MapNpcTests
             .Should().Be((30L, 8L, "Goblin", 7, 2, "ferido"));
     }
 
+    [Theory]
+    [InlineData(Posture.Standing)]
+    [InlineData(Posture.Down)]
+    [InlineData(Posture.OutOfCombat)]
+    public void FromNpc_StartsWithThePostureOfTheNpc(Posture posture)
+    {
+        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7, Posture = posture });
+
+        mapNpc.Posture.Should().Be(posture);
+    }
+
     [Fact]
     public void Update_AllowsFallenValues()
     {

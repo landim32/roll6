@@ -65,19 +65,32 @@ describe('3D view figures (034)', () => {
   });
 
   describe('isShownIn3d', () => {
-    it('shows standing pieces and objects (which have no posture)', () => {
-      expect(isShownIn3d({ posture: POSTURE.standing })).toBe(true);
-      expect(isShownIn3d({ posture: null })).toBe(true);
+    const FRONT = 'https://files/front.png';
+
+    it('shows standing pieces and objects (which have no posture) whose token has the front image', () => {
+      expect(isShownIn3d({ posture: POSTURE.standing, frontImageUrl: FRONT })).toBe(true);
+      expect(isShownIn3d({ posture: null, frontImageUrl: FRONT })).toBe(true);
     });
 
     it('hides the pieces that are down and the ones out of combat: a figure is only drawn standing', () => {
-      expect(isShownIn3d({ posture: POSTURE.down })).toBe(false);
-      expect(isShownIn3d({ posture: POSTURE.outOfCombat })).toBe(false);
+      expect(isShownIn3d({ posture: POSTURE.down, frontImageUrl: FRONT })).toBe(false);
+      expect(isShownIn3d({ posture: POSTURE.outOfCombat, frontImageUrl: FRONT })).toBe(false);
+    });
+
+    it('hides the pieces whose token has no front image, even when it has the other sides (036)', () => {
+      expect(isShownIn3d({ posture: POSTURE.standing, frontImageUrl: null })).toBe(false);
+      expect(isShownIn3d({ posture: null, frontImageUrl: null })).toBe(false);
+      expect(isShownIn3d({ posture: POSTURE.standing, frontImageUrl: '' })).toBe(false);
+      expect(isShownIn3d(token({ frontImageUrl: null, rightImageUrl: 'r.png', leftImageUrl: 'l.png', backImageUrl: 'b.png' }))).toBe(false);
+    });
+
+    it('shows a piece with only the front image: the other sides are optional', () => {
+      expect(isShownIn3d(token({ frontImageUrl: FRONT, rightImageUrl: null, leftImageUrl: null, backImageUrl: null }))).toBe(true);
     });
 
     it('follows the 2D rule of lying pieces, which the 3D view leaves out', () => {
       for (const posture of [POSTURE.standing, POSTURE.down, POSTURE.outOfCombat, null]) {
-        expect(isShownIn3d({ posture })).toBe(!isLying({ posture }));
+        expect(isShownIn3d({ posture, frontImageUrl: FRONT })).toBe(!isLying({ posture }));
       }
     });
   });

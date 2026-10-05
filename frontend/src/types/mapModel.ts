@@ -29,6 +29,9 @@ export interface MapModelInfo {
   /** Background of the 3D view: a 360° panorama shown where no wall stands in front. */
   backgroundImage: string | null;
   backgroundImageUrl: string | null;
+  /** Wall texture of the 3D view (036): one picture that covers every wall; null keeps the map's colors. */
+  wallTextureImage: string | null;
+  wallTextureImageUrl: string | null;
   createdAt: string;
   changedAt: string;
 }
@@ -46,4 +49,5 @@ export interface MapModelInsertInfo {
   imageLeft: number;
   maskImage: string | null;
   backgroundImage: string | null;
+  wallTextureImage: string | null;
 }

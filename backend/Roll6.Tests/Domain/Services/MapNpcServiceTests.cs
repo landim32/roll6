@@ -213,6 +213,32 @@ public class MapNpcServiceTests
     }
 
     [Fact]
+    public async Task Create_NpcRegisteredDown_StartsDown()
+    {
+        _npcRepository.Setup(r => r.GetByIdAsync(NPC)).ReturnsAsync(new Npc { NpcId = NPC, UserId = MASTER, TokenId = 5, Name = "Goblin", Life = 7, Energy = 2, Posture = Posture.Down });
+
+        var result = await _service.CreateAsync(MASTER, At(5, 4));
+
+        result.Posture.Should().Be((int)Posture.Down);
+    }
+
+    [Fact]
+    public async Task Create_NpcRegisteredDown_NeedsTheRoomOfItsDownSize()
+    {
+        // Standing it takes 1 hex and would fit in the corner; lying down it takes 7, which do not.
+        _tokenRepository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, Name = "Goblin", UpSpace = 1, DownSpace = 7 });
+        _npcRepository.Setup(r => r.GetByIdAsync(NPC)).ReturnsAsync(new Npc { NpcId = NPC, UserId = MASTER, TokenId = 5, Name = "Goblin", Life = 7, Energy = 2, Posture = Posture.Down });
+
+        (await _service.Invoking(s => s.CreateAsync(MASTER, At(0, 0))).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("x");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapNpc>()), Times.Never);
+
+        // The same corner is fine for the same NPC standing.
+        _npcRepository.Setup(r => r.GetByIdAsync(NPC)).ReturnsAsync(new Npc { NpcId = NPC, UserId = MASTER, TokenId = 5, Name = "Goblin", Life = 7, Energy = 2 });
+        (await _service.CreateAsync(MASTER, At(0, 0))).Posture.Should().Be((int)Posture.Standing);
+    }
+
+    [Fact]
     public async Task Create_BigNpcToken_NeedsTheWholeShapeInsideTheGrid()
     {
         _tokenRepository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, Name = "Dragão", UpSpace = 7 });

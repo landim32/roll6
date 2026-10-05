@@ -1332,5 +1332,35 @@ BEGIN
     VALUES ('20261004234816_AddTokenDirectionImages', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261005145717_AddWallTextureImage') THEN
+    ALTER TABLE map_models ADD wall_texture_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261005145717_AddWallTextureImage') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261005145717_AddWallTextureImage', '9.0.20');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261005180820_AddNpcPosture') THEN
+    ALTER TABLE npcs ADD posture integer NOT NULL DEFAULT 1;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261005180820_AddNpcPosture') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261005180820_AddNpcPosture', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

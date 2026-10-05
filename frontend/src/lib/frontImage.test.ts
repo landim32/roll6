@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FACE_HEIGHT_SHARE, FRONT_IMAGE_ASPECT, FRONT_IMAGE_SIZE, SILHOUETTE_SHARE, silhouetteBox, silhouetteCropStyle, silhouetteSvg,
+  FACE_HEIGHT_SHARE, FRONT_IMAGE_ASPECT, FRONT_IMAGE_SIZE, SILHOUETTE_SHARE, STAGE, frameInStage, silhouetteBox,
+  silhouetteCropStyle, silhouetteSvg,
 } from './frontImage';
 
 describe('front image crop (034)', () => {
@@ -57,5 +58,35 @@ describe('front image crop (034)', () => {
     expect(style.backgroundPosition).toBe('center bottom');
     expect(style.backgroundRepeat).toBe('no-repeat');
     expect(String(style.backgroundImage)).toMatch(/^url\("data:image\/svg\+xml,%3Csvg/);
+  });
+});
+
+describe('the stage of a "2,5D" field (036)', () => {
+  it('keeps the crop frame in the stage proportions: width ÷ height is the crop aspect', () => {
+    const frame = frameInStage();
+
+    expect(STAGE.width / STAGE.height).toBe(1);
+    expect(frame.width / frame.height).toBeCloseTo(FRONT_IMAGE_ASPECT);
+    expect(frame.height).toBe(STAGE.height);
+  });
+
+  it('centers the frame in the stage', () => {
+    const frame = frameInStage();
+
+    expect(frame.left + frame.width / 2).toBeCloseTo(STAGE.width / 2);
+    expect(frame.top).toBe(0);
+  });
+
+  it('leaves the frame inside the stage, with margin at the sides for the transparent part', () => {
+    const frame = frameInStage();
+
+    expect(frame.left).toBeGreaterThanOrEqual(0);
+    expect(frame.left + frame.width).toBeLessThanOrEqual(STAGE.width);
+    expect(frame.top + frame.height).toBeLessThanOrEqual(STAGE.height);
+    // The margin is what the user sees when zooming out: some, not most of the stage.
+    expect(frame.left).toBeGreaterThan(0);
+    expect(frame.left).toBeLessThan(frame.width / 2);
+    expect(frame.width).toBeCloseTo(0.75);
+    expect(frame.left).toBeCloseTo(0.125);
   });
 });

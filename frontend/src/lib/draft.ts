@@ -39,6 +39,10 @@ export interface MapDraft {
   backgroundImage: string | null;
   /** Temporary URL of the background. Not saved. */
   backgroundImageUrl: string | null;
+  /** Wall texture of the 3D view (036); null keeps the walls painted with the map's colors. */
+  wallTextureImage: string | null;
+  /** Temporary URL of the wall texture. Not saved. */
+  wallTextureImageUrl: string | null;
 }
 
 /** A brand-new map: default grid, no image. */
@@ -63,6 +67,8 @@ export const createEmptyDraft = (): MapDraft => ({
   maskImageUrl: null,
   backgroundImage: null,
   backgroundImageUrl: null,
+  wallTextureImage: null,
+  wallTextureImageUrl: null,
 });
 
 /** Draft from a library map, optionally opened through a campaign map. */
@@ -87,11 +93,14 @@ export const draftFromMapModel = (model: MapModelInfo, map?: MapInfo | null): Ma
   maskImageUrl: model.maskImageUrl ?? null,
   backgroundImage: model.backgroundImage ?? null,
   backgroundImageUrl: model.backgroundImageUrl ?? null,
+  wallTextureImage: model.wallTextureImage ?? null,
+  wallTextureImageUrl: model.wallTextureImageUrl ?? null,
 });
 
 /** Fields that are saved; anything else (ids, URLs, display name) does not make the map dirty. */
 const SAVED_FIELDS: (keyof MapDraft)[] = [
   'image', 'gridWidth', 'gridHeight', 'imageWidth', 'imageHeight', 'imageTop', 'imageLeft', 'maskImage', 'backgroundImage',
+  'wallTextureImage',
 ];
 
 /** True when both drafts would save the same content. */
@@ -110,4 +119,5 @@ export const toMapModelInsert = (draft: MapDraft, name: string, description: str
   imageLeft: draft.imageLeft,
   maskImage: draft.maskImage,
   backgroundImage: draft.backgroundImage,
+  wallTextureImage: draft.wallTextureImage,
 });
