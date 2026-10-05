@@ -64,7 +64,7 @@ public class NpcService : INpcService
     public async Task<NpcInfo> CreateAsync(long userId, NpcInsertInfo info)
     {
         var npc = new Npc { UserId = userId };
-        npc.Update(info.TokenId, info.Name, info.Life, info.Energy, info.Move, info.Sheet, info.Image, info.Status);
+        npc.Update(info.TokenId, info.Name, info.Life, info.Energy, info.Move, info.Sheet, info.Image, info.Status, info.Posture);
         var token = await GetTokenAsync(npc.TokenId);
         npc.CreatedAt = npc.UpdatedAt;
         return MapToDto(await _repository.InsertAsync(npc), token);
@@ -73,7 +73,7 @@ public class NpcService : INpcService
     public async Task<NpcInfo> UpdateAsync(long userId, long npcId, NpcInsertInfo info)
     {
         var npc = await GetOwnedAsync(userId, npcId);
-        npc.Update(info.TokenId, info.Name, info.Life, info.Energy, info.Move, info.Sheet, info.Image, info.Status);
+        npc.Update(info.TokenId, info.Name, info.Life, info.Energy, info.Move, info.Sheet, info.Image, info.Status, info.Posture);
         var token = await GetTokenAsync(npc.TokenId);
         var result = MapToDto(await _repository.UpdateAsync(npc), token);
         // Lower totals also lower the current values of the occurrences above them (026, like characters).
@@ -124,6 +124,7 @@ public class NpcService : INpcService
         Move = npc.Move,
         Sheet = npc.Sheet,
         Status = npc.Status,
+        Posture = (int)npc.Posture,
         Image = npc.Image,
         ImageUrl = _imageStorage.GetUrl(npc.Image),
         CreatedAt = npc.CreatedAt,

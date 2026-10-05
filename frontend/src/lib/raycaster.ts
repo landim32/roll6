@@ -1,7 +1,7 @@
 import { FACE_HEIGHT_SHARE, FRONT_IMAGE_ASPECT } from './frontImage';
 import { HEX_SIZE } from './hexGrid';
 import type { Point } from './hexGrid';
-import { isMaskWall } from './maskImage';
+import { MASK_MIN_ALPHA, luminance, wallHeight } from './maskImage';
 
 /**
  * Raycasting of the 3D view (034), in the style of Wolfenstein 3D: one ray per screen column hits the walls of the 3D
@@ -33,7 +33,7 @@ export interface MapArea {
   height: number;
 }
 
-/** The 3D mask thresholded and reduced to a grid of cells over the map image's area. */
+/** The mask's tones reduced to a grid of cells over the map image's area. */
 export interface MaskGrid {
   cols: number;
   rows: number;
@@ -42,17 +42,19 @@ export interface MaskGrid {
   originY: number;
   cellWidth: number;
   cellHeight: number;
-  /** 1 = wall, row-major. */
-  walls: Uint8Array;
+  /** Height of the cell's wall, 0 (empty) to 255 (a wall of full height), row-major. */
+  heights: Uint8Array;
 }
 
-/** What a ray hit: the euclidean distance along the ray, the world point and the side of the cell that was struck. */
+/** What a ray met: the euclidean distance along the ray, the world point, the side of the cell struck and its height. */
 export interface RayHit {
   distance: number;
   x: number;
   y: number;
   /** 'ew': a face looking east/west (the ray crossed a column boundary); 'ns': north/south. */
   side: 'ew' | 'ns';
+  /** Height of that wall, 0–1. */
+  height: number;
 }
 
 /** Where the camera is and where it looks. */
@@ -68,9 +70,13 @@ export interface CameraPose {
 export const MAX_MASK_CELLS = 512;
 
 /**
- * Thresholds RGBA pixels (a mask `width × height`) into walls: each cell of the reduced grid is wall when most of its
- * source pixels are. The grid covers `area` (the map image's rectangle) and has at most `maxCells` cells on its longest
- * side — the cost of a ray depends on the grid, not on the size of the image.
+ * Reads the mask's tones into the grid of wall heights (036): every cell takes the MEDIAN of the luminance of its own
+ * source pixels, not the average — the average would turn the softened edge of an old black and white mask into a
+ * half-height wall, and FR-008 wants those masks to come out exactly as before. The median lands on the same "most of
+ * the cell is dark" rule the old threshold used: an even split of dark and light is empty.
+ * The grid covers `area` (the map image's rectangle) and has at most `maxCells` cells on its longest side — the cost of
+ * a ray depends on the grid, not on the size of the image. Only one cell row of the 256-band histogram is kept at a
+ * time (≤ 512 × 256 counters), finished when the source rows move to the next cell row.
  */
 export const buildMaskGrid = (
   pixels: Uint8ClampedArray,
@@ -82,35 +88,89 @@ export const buildMaskGrid = (
   const scale = Math.min(1, maxCells / Math.max(width, height));
   const cols = Math.max(1, Math.round(width * scale));
   const rows = Math.max(1, Math.round(height * scale));
-  const wallCount = new Uint32Array(cols * rows);
-  const total = new Uint32Array(cols * rows);
+  const heights = new Uint8Array(cols * rows);
+  const bands = new Uint32Array(cols * 256);
+  const total = new Uint32Array(cols);
+  const darkest = new Uint8Array(cols).fill(255);
+  const lightest = new Uint8Array(cols);
+  let cellRow = -1;
+
+  const finishRow = (row: number) => {
+    for (let col = 0; col < cols; col++) {
+      const count = total[col];
+      if (count === 0) continue;
+      const at = col * 256;
+      let median = lightest[col];
+      if (darkest[col] !== lightest[col]) {
+        // The band where the running count passes half of the cell's pixels.
+        const half = Math.floor(count / 2);
+        let seen = 0;
+        for (let band = darkest[col]; band <= lightest[col]; band++) {
+          seen += bands[at + band];
+          if (seen > half) {
+            median = band;
+            break;
+          }
+        }
+        bands.fill(0, at + darkest[col], at + lightest[col] + 1);
+      }
+      heights[row * cols + col] = Math.round(wallHeight(median) * 255);
+      total[col] = 0;
+      darkest[col] = 255;
+      lightest[col] = 0;
+    }
+  };
+
   for (let y = 0; y < height; y++) {
     const row = Math.min(rows - 1, Math.floor((y * rows) / height));
+    if (row !== cellRow) {
+      if (cellRow >= 0) finishRow(cellRow);
+      cellRow = row;
+    }
+    const offset = y * width;
     for (let x = 0; x < width; x++) {
-      const cell = row * cols + Math.min(cols - 1, Math.floor((x * cols) / width));
-      const i = (y * width + x) * 4;
-      total[cell] += 1;
-      if (isMaskWall(pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3])) wallCount[cell] += 1;
+      const i = (offset + x) * 4;
+      const col = Math.min(cols - 1, Math.floor((x * cols) / width));
+      // A transparent pixel is empty space: it reads as white.
+      const band = pixels[i + 3] < MASK_MIN_ALPHA ? 255 : Math.min(255, Math.round(luminance(pixels[i], pixels[i + 1], pixels[i + 2])));
+      bands[col * 256 + band] += 1;
+      total[col] += 1;
+      if (band < darkest[col]) darkest[col] = band;
+      if (band > lightest[col]) lightest[col] = band;
     }
   }
-  const walls = new Uint8Array(cols * rows);
-  for (let cell = 0; cell < walls.length; cell++) walls[cell] = wallCount[cell] * 2 > total[cell] ? 1 : 0;
-  return { cols, rows, originX: area.x, originY: area.y, cellWidth: area.width / cols, cellHeight: area.height / rows, walls };
+  if (cellRow >= 0) finishRow(cellRow);
+  return { cols, rows, originX: area.x, originY: area.y, cellWidth: area.width / cols, cellHeight: area.height / rows, heights };
 };
 
-/** True when the world point is on a wall; outside the mask's area there are no walls. */
+/** True when the world point is on a wall of any height; outside the mask's area there are no walls. */
 export const isWallAt = (grid: MaskGrid, x: number, y: number): boolean => {
   const col = Math.floor((x - grid.originX) / grid.cellWidth);
   const row = Math.floor((y - grid.originY) / grid.cellHeight);
   if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows) return false;
-  return grid.walls[row * grid.cols + col] === 1;
+  return grid.heights[row * grid.cols + col] > 0;
 };
 
+/** The wall height of the cell under a world point, 0 (empty, or outside the mask) to 255 (full). */
+export const heightAt = (grid: MaskGrid, x: number, y: number): number => {
+  const col = Math.floor((x - grid.originX) / grid.cellWidth);
+  const row = Math.floor((y - grid.originY) / grid.cellHeight);
+  if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows) return 0;
+  return grid.heights[row * grid.cols + col];
+};
+
+/** How many faces one ray may keep (036): a low wall lets the view go on, but the list cannot be unbounded. */
+export const MAX_FACES_PER_RAY = 8;
+
 /**
- * First wall along the ray from (`ox`, `oy`) at `angle` (a yaw), up to `maxDistance` — the DDA of Wolfenstein 3D over the
- * mask's cells. The cell the ray starts in never counts (a camera that stands next to a wall may be half inside it).
+ * The walls along the ray from (`ox`, `oy`) at `angle` (a yaw), up to `maxDistance` — the DDA of Wolfenstein 3D over
+ * the mask's cells, kept going past low walls (036): only a cell taller than the tallest one already seen is recorded,
+ * so the faces come back from the nearest to the farthest with growing heights, and it stops at a wall of full height,
+ * which hides everything behind it. A mask that is only black and white gives at most one face: the same view as before.
+ * The cell the ray starts in never counts (a camera that stands next to a wall may be half inside it).
  */
-export const castRay = (grid: MaskGrid, ox: number, oy: number, angle: number, maxDistance: number): RayHit | null => {
+export const castRay = (grid: MaskGrid, ox: number, oy: number, angle: number, maxDistance: number): RayHit[] => {
+  const hits: RayHit[] = [];
   const dx = Math.sin(angle);
   const dy = -Math.cos(angle);
   // Position in cell units.
@@ -125,6 +185,7 @@ export const castRay = (grid: MaskGrid, ox: number, oy: number, angle: number, m
   const deltaY = dy === 0 ? Infinity : grid.cellHeight / Math.abs(dy);
   let nextX = dx === 0 ? Infinity : ((dx > 0 ? col + 1 - gx : gx - col) * grid.cellWidth) / Math.abs(dx);
   let nextY = dy === 0 ? Infinity : ((dy > 0 ? row + 1 - gy : gy - row) * grid.cellHeight) / Math.abs(dy);
+  let tallest = 0;
 
   for (;;) {
     let distance: number;
@@ -140,15 +201,21 @@ export const castRay = (grid: MaskGrid, ox: number, oy: number, angle: number, m
       row += stepY;
       side = 'ns';
     }
-    if (distance > maxDistance) return null;
+    if (distance > maxDistance) break;
     // Left the grid going away from it: the ray can't come back.
     if ((col < 0 && stepX < 0) || (col >= grid.cols && stepX > 0) || (row < 0 && stepY < 0) || (row >= grid.rows && stepY > 0)) {
-      return null;
+      break;
     }
-    if (col >= 0 && row >= 0 && col < grid.cols && row < grid.rows && grid.walls[row * grid.cols + col] === 1) {
-      return { distance, x: ox + dx * distance, y: oy + dy * distance, side };
+    if (col >= 0 && row >= 0 && col < grid.cols && row < grid.rows) {
+      const height = grid.heights[row * grid.cols + col] / 255;
+      if (height > tallest) {
+        hits.push({ distance, x: ox + dx * distance, y: oy + dy * distance, side, height });
+        if (height >= 1 || hits.length >= MAX_FACES_PER_RAY) break;
+        tallest = height;
+      }
     }
   }
+  return hits;
 };
 
 /** Distance in screen pixels from the camera to the projection plane, for a frame `width` px wide and a horizontal FOV. */
@@ -162,11 +229,15 @@ export const columnAngle = (column: number, frameWidth: number, projection: numb
 /** Perpendicular distance of a hit (no fish-eye): the euclidean distance times the cosine of the column's angle. */
 export const perpendicularDistance = (hit: RayHit, offset: number): number => hit.distance * Math.cos(offset);
 
-/** Screen rows `[top, bottom)` of a wall at a perpendicular distance, with the horizon at the middle of the frame. */
-export const wallColumn = (perpendicular: number, frameHeight: number, projection: number): { top: number; bottom: number } => {
+/**
+ * Screen rows `[top, bottom)` of a wall of `height` (0–1) at a perpendicular distance, with the horizon at the middle
+ * of the frame. Every wall stands on the floor, so the bottom is the same; a wall lower than the camera's eyes has its
+ * top below the horizon (036) — one sees the ground behind it between the top of the wall and the horizon.
+ */
+export const wallColumn = (perpendicular: number, frameHeight: number, projection: number, height = 1): { top: number; bottom: number } => {
   const horizon = frameHeight / 2;
   const scale = projection / Math.max(perpendicular, 0.0001);
-  return { top: horizon - (WALL_HEIGHT - EYE_HEIGHT) * scale, bottom: horizon + EYE_HEIGHT * scale };
+  return { top: horizon - (height * WALL_HEIGHT - EYE_HEIGHT) * scale, bottom: horizon + EYE_HEIGHT * scale };
 };
 
 /** Brightness (0–1) at a distance; walls facing north/south are a bit darker, like in Wolfenstein 3D. */

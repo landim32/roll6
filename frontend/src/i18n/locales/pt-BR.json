@@ -201,6 +201,7 @@
       "back": "Personagem de pé, visto de costas."
     },
     "spriteCropHint": "A silhueta é só um guia e não vai para a imagem salva ({{width}}×{{height}}). Os pés ficam na borda de baixo: diminua o zoom para deixar o personagem menor na vista 3D, aumente para deixá-lo maior.",
+    "stageEmpty": "Escolha o arquivo",
     "downImage": "Imagem deitado (opcional)",
     "upSpace": "Espaço em pé",
     "downSpace": "Espaço deitado (opcional)",
@@ -242,6 +243,7 @@
     "dataTab": "Dados",
     "status": "Status",
     "statusHint": "Cada nova peça do NPC no mapa começa com este status.",
+    "postureHint": "Postura com que cada nova peça do NPC entra no mapa.",
     "remove": "Retirar da campanha",
     "removeTitle": "Retirar NPC",
     "removeMessage": "Retirar {{name}} da campanha? As peças dele saem dos mapas da campanha; o NPC continua na sua biblioteca.",
@@ -333,6 +335,7 @@
     "unsaved": "Não salvo",
     "dice": "Rolar 3d6 (só na sua tela)",
     "diceTotal": "Total",
+    "diceHide": "Clique para esconder os dados",
     "share": "Compartilhar"
   },
   "share": {
@@ -389,7 +392,7 @@
     "noFile": "Escolha um arquivo.",
     "noImage": "Este mapa não tem imagem.",
     "maskFile": "Máscara 3D (opcional)",
-    "maskHint": "Preto = parede, branco = espaço vazio. Mesma proporção da imagem. Só aparece na vista 3D."
+    "maskHint": "Preto = parede alta, branco = vazio, cinza = parede mais baixa. Mesma proporção da imagem. Só aparece na vista 3D."
   },
   "story": {
     "view2d": "Ver em 2D",
@@ -397,18 +400,22 @@
     "followCharacter": "Voltar ao personagem",
     "noWebgl": "Este dispositivo não consegue exibir a vista 3D.",
     "loading": "Carregando cena 3D…",
+    "bubbleLabel": "{{name}} diz: {{text}}",
     "joystick": "Andar"
   },
   "raycast": {
     "tab": "3D",
     "mask": "Máscara 3D",
-    "maskHint": "Preto = parede, branco = espaço vazio. Mesma proporção da imagem do mapa. Só aparece na vista 3D.",
+    "maskHint": "Preto = parede alta, branco = vazio, cinza = parede mais baixa (vê-se por cima dela). Mesma proporção da imagem do mapa. Só aparece na vista 3D.",
     "maskRatio": "A máscara ({{mask}}) não tem a proporção da imagem do mapa ({{map}}).",
     "maskNeedsImage": "Envie primeiro a imagem do mapa.",
     "maskMismatch": "A imagem do mapa mudou de proporção: troque ou remova a Máscara 3D.",
-    "maskPreview": "Prévia da máscara em preto e branco",
+    "maskPreview": "Prévia da máscara em tons de cinza",
     "background": "Imagem de fundo",
     "backgroundHint": "Gira com a câmera como um céu; uma imagem estreita se repete.",
+    "wallTexture": "Textura das paredes",
+    "wallTextureHint": "Uma imagem (pedra, tijolo, madeira…) que reveste todas as paredes da vista 3D e se repete ao longo delas. Sem ela, as paredes usam as cores da imagem do mapa.",
+    "wallTextureNone": "Nenhuma: as paredes usam as cores do mapa",
     "choose": "Escolher arquivo",
     "send": "Enviar",
     "sending": "Enviando…",

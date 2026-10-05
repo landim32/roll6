@@ -58,6 +58,13 @@ public class MapModelInfo
     [JsonPropertyName("backgroundImageUrl")]
     public string? BackgroundImageUrl { get; set; }
 
+    [JsonPropertyName("wallTextureImage")]
+    public string? WallTextureImage { get; set; }
+
+    /// <summary>Temporary URL of the wall texture of the 3D view (036).</summary>
+    [JsonPropertyName("wallTextureImageUrl")]
+    public string? WallTextureImageUrl { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

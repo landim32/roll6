@@ -1,3 +1,5 @@
+import { POSTURE, POSTURES } from '../types/mapToken';
+import type { Posture } from '../types/mapToken';
 import type { NpcInfo, NpcInsertInfo } from '../types/npc';
 
 /** Same limits as the backend Npc.Update. */
@@ -12,12 +14,14 @@ export interface NpcForm {
   energy: string;
   move: string;
   status: string;
+  /** The posture each new map occurrence starts with, as the select's value ("1", "2" or "3"). */
+  posture: string;
   sheet: string;
 }
 
 export type NpcFormError = 'nameRequired' | 'nameTooLong' | 'notInteger' | 'negative' | 'statusTooLong' | 'sheetTooLong' | 'tokenRequired';
 
-export const emptyNpcForm = (): NpcForm => ({ name: '', life: '0', energy: '0', move: '0', status: '', sheet: '' });
+export const emptyNpcForm = (): NpcForm => ({ name: '', life: '0', energy: '0', move: '0', status: '', posture: String(POSTURE.standing), sheet: '' });
 
 /** Form filled with a saved NPC (edit). */
 export const toNpcForm = (npc: NpcInfo): NpcForm => ({
@@ -26,6 +30,7 @@ export const toNpcForm = (npc: NpcInfo): NpcForm => ({
   energy: String(npc.energy),
   move: String(npc.move),
   status: npc.status ?? '',
+  posture: String(npc.posture ?? POSTURE.standing),
   sheet: npc.sheet ?? '',
 });
 
@@ -45,6 +50,12 @@ export const validateNpcForm = (form: NpcForm, tokenId: number | null): NpcFormE
   return null;
 };
 
+/** The posture of the form: one of the three, standing when it is anything else. */
+const toPosture = (value: string): Posture => {
+  const posture = Number(value);
+  return POSTURES.find((valid) => valid === posture) ?? POSTURE.standing;
+};
+
 /** API payload from a valid form (trimmed; empty texts become null). */
 export const toNpcInsert = (form: NpcForm, image: string | null, tokenId: number): NpcInsertInfo => ({
   tokenId,
@@ -54,5 +65,6 @@ export const toNpcInsert = (form: NpcForm, image: string | null, tokenId: number
   move: toNumber(form.move),
   sheet: form.sheet.trim() ? form.sheet : null,
   status: form.status.trim() || null,
+  posture: toPosture(form.posture),
   image,
 });

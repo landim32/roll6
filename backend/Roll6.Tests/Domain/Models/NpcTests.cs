@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 
@@ -27,6 +28,46 @@ public class NpcTests
         var act = () => new Npc().Update(tokenId, name, life, energy, move, null, null);
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey(field);
+    }
+
+    [Fact]
+    public void NewNpc_StartsStanding()
+    {
+        new Npc().Posture.Should().Be(Posture.Standing);
+    }
+
+    [Theory]
+    [InlineData(1, Posture.Standing)]
+    [InlineData(2, Posture.Down)]
+    [InlineData(3, Posture.OutOfCombat)]
+    public void Update_StoresThePosture(int posture, Posture expected)
+    {
+        var npc = new Npc();
+
+        npc.Update(5, "Goblin", 7, 2, 6, null, null, null, posture);
+
+        npc.Posture.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Update_WithoutPosture_GoesBackToStanding()
+    {
+        var npc = new Npc { Posture = Posture.Down };
+
+        npc.Update(5, "Goblin", 7, 2, 6, null, null);
+
+        npc.Posture.Should().Be(Posture.Standing);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    [InlineData(-1)]
+    public void Update_InvalidPosture_Throws(int posture)
+    {
+        var act = () => new Npc().Update(5, "Goblin", 1, 1, 1, null, null, null, posture);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("posture");
     }
 
     [Fact]

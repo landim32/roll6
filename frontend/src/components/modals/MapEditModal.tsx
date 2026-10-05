@@ -36,10 +36,10 @@ interface StoredImage {
   url: string | null;
 }
 
-type Kind = 'image' | 'mask' | 'background';
+type Kind = 'image' | 'mask' | 'background' | 'texture';
 
 /**
- * "Editar mapa": name, description, grid size, scene image, 3D mask and 3D background of a map, straight from the
+ * "Editar mapa": name, description, grid size, scene image, 3D mask, 3D background and wall texture of a map, straight from the
  * lists, without opening it on the table. The model fields are the owner's (PUT replaces the whole model); the name of
  * a campaign map is the master's.
  */
@@ -61,6 +61,7 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
   const [image, setImage] = useState<StoredImage | null>(null);
   const [mask, setMask] = useState<StoredImage | null>(null);
   const [background, setBackground] = useState<StoredImage | null>(null);
+  const [wallTexture, setWallTexture] = useState<StoredImage | null>(null);
   /** Natural size of the image picked here; null while the model's own image is kept. */
   const [newImageSize, setNewImageSize] = useState<ImageSize | null>(null);
 
@@ -83,6 +84,7 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
         setImage(loaded.image ? { fileName: loaded.image, url: loaded.imageUrl } : null);
         setMask(loaded.maskImage ? { fileName: loaded.maskImage, url: loaded.maskImageUrl } : null);
         setBackground(loaded.backgroundImage ? { fileName: loaded.backgroundImage, url: loaded.backgroundImageUrl } : null);
+        setWallTexture(loaded.wallTextureImage ? { fileName: loaded.wallTextureImage, url: loaded.wallTextureImageUrl } : null);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -128,8 +130,10 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
   const onPick = async (kind: Kind, event: ChangeEvent<HTMLInputElement>) => {
     const file = pickFile(event);
     if (!file) return;
-    const size = kind === 'background' ? null : await readFileImageSize(file);
-    if (kind !== 'background' && !size) return toast.error(t('image.invalidType'));
+    // The background and the wall texture have no proportion to respect: only the scene image and the mask are measured.
+    const measured = kind === 'image' || kind === 'mask';
+    const size = measured ? await readFileImageSize(file) : null;
+    if (measured && !size) return toast.error(t('image.invalidType'));
     if (kind === 'mask') {
       const imageSize = await currentImageSize();
       if (!imageSize) return toast.error(t('raycast.maskNeedsImage'));
@@ -149,6 +153,7 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
         setImage(stored);
         setNewImageSize(size);
       } else if (kind === 'mask') setMask(stored);
+      else if (kind === 'texture') setWallTexture(stored);
       else setBackground(stored);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
@@ -190,6 +195,7 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
           imageLeft: replaced ? 0 : model.imageLeft,
           maskImage: mask?.fileName ?? null,
           backgroundImage: background?.fileName ?? null,
+          wallTextureImage: wallTexture?.fileName ?? null,
         });
       }
       if (target.map && canRenameMap && name.trim() !== target.map.name)
@@ -282,14 +288,17 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
             </div>
           </div>
           <div className="row g-4">
-            <div className="col-12 col-lg-4">
+            <div className="col-12 col-lg-6">
               {picker('image', t('mapEdit.image'), t('mapEdit.imageHint'), image, null)}
             </div>
-            <div className="col-12 col-lg-4">
+            <div className="col-12 col-lg-6">
               {picker('mask', t('raycast.mask'), t('raycast.maskHint'), mask, () => setMask(null))}
             </div>
-            <div className="col-12 col-lg-4">
+            <div className="col-12 col-lg-6">
               {picker('background', t('raycast.background'), t('raycast.backgroundHint'), background, () => setBackground(null))}
+            </div>
+            <div className="col-12 col-lg-6">
+              {picker('texture', t('raycast.wallTexture'), t('raycast.wallTextureHint'), wallTexture, () => setWallTexture(null))}
             </div>
           </div>
         </form>

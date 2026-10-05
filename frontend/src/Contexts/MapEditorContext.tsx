@@ -96,6 +96,8 @@ interface MapEditorContextType {
   setMaskImage: (fileName: string | null, url: string | null) => void;
   /** Background (360° panorama) of the 3D view; null removes it. */
   setBackgroundImage: (fileName: string | null, url: string | null) => void;
+  /** Wall texture of the 3D view (036); null removes it and the walls take the map's colors again. */
+  setWallTextureImage: (fileName: string | null, url: string | null) => void;
   /** 2D map or 3D view of the open map (any map has the 3D view). */
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
@@ -254,6 +256,10 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   const setBackgroundImage = useCallback((fileName: string | null, url: string | null) => {
     setDraft((prev) => ({ ...prev, backgroundImage: fileName, backgroundImageUrl: url }));
+  }, []);
+
+  const setWallTextureImage = useCallback((fileName: string | null, url: string | null) => {
+    setDraft((prev) => ({ ...prev, wallTextureImage: fileName, wallTextureImageUrl: url }));
   }, []);
 
   const setViewMode = useCallback((mode: ViewMode) => {
@@ -475,7 +481,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, loading, error,
     zoomAt, zoomIn, zoomOut, panBy, centerOn,
     setImage, setImageLayout, setGridSize, toggleResizeMode,
-    setMaskImage, setBackgroundImage, viewMode, setViewMode, fov, setFov,
+    setMaskImage, setBackgroundImage, setWallTextureImage, viewMode, setViewMode, fov, setFov,
     newMap, loadMapModel, openCampaignMapBySlug, discardChanges, saveMap, clearError,
   };
 

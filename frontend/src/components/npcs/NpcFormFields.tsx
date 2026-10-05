@@ -7,6 +7,7 @@ import { Tabs } from '../ui/Tabs';
 import { TokenModal } from '../modals/TokenModal';
 import { MAX_NPC_NAME, MAX_NPC_SHEET, MAX_NPC_STATUS } from '../../lib/npcForm';
 import type { NpcForm } from '../../lib/npcForm';
+import { POSTURES } from '../../types/mapToken';
 
 // The markdown editor is heavy: loaded only when the form is shown.
 const MarkdownEditor = lazy(() => import('../ui/MarkdownEditor'));
@@ -36,7 +37,7 @@ interface NpcFormFieldsProps {
 
 /**
  * Fields of an NPC, shared by "Novo NPC" and "Editar NPC", laid out like the character form: tab "Dados" (name with
- * the round picture on the same line, status, required token picked in the tokens modal, life, energy, move) and
+ * the round picture on the same line, status with the starting posture of each new occurrence, required token picked in the tokens modal, life, energy, move) and
  * tab "Ficha" (markdown).
  */
 export const NpcFormFields = ({
@@ -90,10 +91,17 @@ export const NpcFormFields = ({
             </div>
           </div>
         </div>
-        <div className="col-12">
+        <div className="col-sm-8">
           <label className="form-label" htmlFor={id('status')}>{t('npcs.status')}</label>
           <input id={id('status')} className="form-control" maxLength={MAX_NPC_STATUS} value={form.status} onChange={(e) => onField('status', e.target.value)} />
           <div className="form-text">{t('npcs.statusHint')}</div>
+        </div>
+        <div className="col-sm-4">
+          <label className="form-label" htmlFor={id('posture')}>{t('posture.label')}</label>
+          <select id={id('posture')} className="form-select" value={form.posture} onChange={(e) => onField('posture', e.target.value)}>
+            {POSTURES.map((value) => <option key={value} value={String(value)}>{t(`posture.${value}`)}</option>)}
+          </select>
+          <div className="form-text">{t('npcs.postureHint')}</div>
         </div>
         <div className="col-12">
           <span className="form-label d-block">{t('npcs.token')}</span>

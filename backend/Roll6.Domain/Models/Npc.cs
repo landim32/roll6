@@ -1,3 +1,4 @@
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Validation;
 
@@ -21,11 +22,14 @@ public class Npc
 
     /// <summary>Free-text condition ("ferido"); each new map occurrence starts with it.</summary>
     public string? Status { get; set; }
+
+    /// <summary>Posture each new map occurrence starts with (031): standing unless the NPC is registered lying down.</summary>
+    public Posture Posture { get; set; } = Posture.Standing;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>Only the owner changes an NPC (checked by the service); same limits as a character.</summary>
-    public void Update(long tokenId, string? name, int life, int energy, int move, string? sheet, string? image, string? status = null)
+    public void Update(long tokenId, string? name, int life, int energy, int move, string? sheet, string? image, string? status = null, int? posture = null)
     {
         if (tokenId <= 0)
             throw new DomainValidationException("tokenId", "O token é obrigatório.");
@@ -37,6 +41,7 @@ public class Npc
         Sheet = Guard.OptionalText(sheet, "sheet", 20000);
         Image = Guard.ImageFileName(image, "image");
         Status = Guard.OptionalText(status, "status", 260);
+        Posture = posture is int value ? Guard.ValidPosture(value, "posture") : Posture.Standing;
         UpdatedAt = DateTime.UtcNow;
     }
 }

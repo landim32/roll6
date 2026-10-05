@@ -1,9 +1,10 @@
 import { drawRaycastFrame, skyGradient } from '../../lib/raycastFrame';
-import type { PixelBuffer, RenderSprite } from '../../lib/raycastFrame';
-import { skyRepeats } from '../../lib/raycaster';
+import type { FrameResult, PixelBuffer, RenderSprite } from '../../lib/raycastFrame';
 import type { CameraPose, MapArea, MaskGrid } from '../../lib/raycaster';
+import { skyRepeats } from '../../lib/raycaster';
 
 export type { RenderSprite } from '../../lib/raycastFrame';
+export type { FrameResult } from '../../lib/raycastFrame';
 
 /**
  * Puts the 3D view (034) on a canvas the way Wolfenstein 3D did: a small frame — one ray per column, at most
@@ -17,9 +18,13 @@ export interface RaycastRenderer {
   setMap: (pixels: PixelBuffer | null, area: MapArea | null) => void;
   setMask: (grid: MaskGrid | null) => void;
   setBackground: (pixels: PixelBuffer | null) => void;
+  /** The picture that covers every wall (036); null = the walls take the colors of the map image. */
+  setWallTexture: (pixels: PixelBuffer | null) => void;
   setSprites: (sprites: readonly RenderSprite[]) => void;
   setCamera: (pose: CameraPose, fov: number) => void;
   resize: (width: number, height: number) => void;
+  /** Draws again without anything changing (036: a new speech balloon must be placed at once). */
+  refresh: () => void;
   dispose: () => void;
 }
 
@@ -31,7 +36,7 @@ export class CanvasUnavailableError extends Error {
   }
 }
 
-export const createRaycastRenderer = (canvas: HTMLCanvasElement): RaycastRenderer => {
+export const createRaycastRenderer = (canvas: HTMLCanvasElement, onFrame?: (result: FrameResult) => void): RaycastRenderer => {
   const display = canvas.getContext('2d');
   const buffer = document.createElement('canvas');
   const bufferCtx = buffer.getContext('2d');
@@ -40,21 +45,24 @@ export const createRaycastRenderer = (canvas: HTMLCanvasElement): RaycastRendere
   let mask: MaskGrid | null = null;
   let map: { pixels: PixelBuffer; area: MapArea } | null = null;
   let background: { pixels: PixelBuffer; repeats: number } | null = null;
+  let wallTexture: PixelBuffer | null = null;
   let sprites: readonly RenderSprite[] = [];
   let pose: CameraPose = { x: 0, z: 0, yaw: 0, attached: false };
   let fov = 70;
   let image = bufferCtx.createImageData(1, 1);
-  let zBuffer = new Float32Array(1);
   let sky = skyGradient(1);
   let dirty = true;
   let disposed = false;
   let animation = 0;
 
   const draw = () => {
-    drawRaycastFrame(image, zBuffer, { mask, map, background, sprites }, pose, fov, sky);
+    const result = drawRaycastFrame(image, { mask, map, background, sprites, wallTexture }, pose, fov, sky);
     bufferCtx.putImageData(image, 0, 0);
     display.imageSmoothingEnabled = false;
     display.drawImage(buffer, 0, 0, canvas.width, canvas.height);
+
+    // What the frame drew, for the things laid over it (the speech balloons, 036).
+    onFrame?.(result);
   };
 
   const loop = () => {
@@ -78,6 +86,10 @@ export const createRaycastRenderer = (canvas: HTMLCanvasElement): RaycastRendere
       background = pixels ? { pixels, repeats: skyRepeats(pixels.width, pixels.height) } : null;
       dirty = true;
     },
+    setWallTexture: (pixels) => {
+      wallTexture = pixels;
+      dirty = true;
+    },
     setSprites: (next) => {
       sprites = next;
       dirty = true;
@@ -96,8 +108,10 @@ export const createRaycastRenderer = (canvas: HTMLCanvasElement): RaycastRendere
       buffer.width = columns;
       buffer.height = rows;
       image = bufferCtx.createImageData(columns, rows);
-      zBuffer = new Float32Array(columns);
       sky = skyGradient(Math.round(rows / 2));
+      dirty = true;
+    },
+    refresh: () => {
       dirty = true;
     },
     dispose: () => {

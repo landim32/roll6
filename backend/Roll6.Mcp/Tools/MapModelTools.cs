@@ -14,18 +14,27 @@ public static class MapModelTools
         gridHeight (hex rows) — each 1 to 500, default 20 × 20 — and the background placement under the fixed grid (hexes
         are 40 px from center to corner): imageWidth/imageHeight (display size in px, 1 to 20000, send both or neither; neither = natural size) and
         imageLeft/imageTop (offset in px, -20000 to 20000; negative values move the image right/down). 3D view (034, shown
-        by the web app for every map): maskImage (a black and white image of the same proportion as the map image, from
-        upload_image: black = wall, white = empty space; it only draws the 3D view and never blocks pieces on the 2D map)
-        and backgroundImage (a 360° panorama shown behind the walls, like a sky, from upload_image).
+        by the web app for every map): maskImage (an image of the same proportion as the map image whose gray tones set
+        the height of the walls — black = a wall of full height, white = empty, a 50% gray = half as tall and one sees
+        over it; from upload_image; it only draws the 3D view and never blocks pieces on the 2D map)
+        and backgroundImage (a 360° panorama shown behind the walls, like a sky, from upload_image) and wallTextureImage
+        (one texture that covers every wall of the 3D view, from upload_image; without it the walls take the colors of the
+        map image).
         """;
 
-    private const string MASK_IMAGE = "3D mask: black = wall, white = empty, same proportion as the map image; only the 3D view uses it. " + McpDocs.IMAGE_FILE;
+    private const string MASK_IMAGE = "3D mask: same proportion as the map image; only the 3D view uses it. The tone is the wall height: "
+        + "black = full-height wall, white = empty, a 50% gray = a wall half as tall (low walls can be seen over). "
+        + "Pure black and white work as before. " + McpDocs.IMAGE_FILE;
 
     private const string BACKGROUND_IMAGE = "Background of the 3D view, a 360° panorama shown where no wall stands in front (like a sky). " + McpDocs.IMAGE_FILE;
 
+    private const string WALL_TEXTURE_IMAGE = "Texture that covers every wall of the 3D view (a picture of stone, brick, wood…, "
+        + "repeated along the walls); without it the walls keep the colors of the map image. Only the 3D view uses it. " + McpDocs.IMAGE_FILE;
+
     private const string RETURNS = """
         Returns: { mapModelId, userId, name, description, image, imageUrl, gridWidth, gridHeight, imageWidth, imageHeight,
-        imageTop, imageLeft, hexSize, maskImage, maskImageUrl, backgroundImage, backgroundImageUrl, createdAt, changedAt }.
+        imageTop, imageLeft, hexSize, maskImage, maskImageUrl, backgroundImage, backgroundImageUrl, wallTextureImage,
+        wallTextureImageUrl, createdAt, changedAt }.
         """;
 
     [McpServerTool(Name = "list_map_models", Title = "List map models", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -82,19 +91,20 @@ public static class MapModelTools
         [Description("Vertical offset of the background in px (-20000 to 20000; negative moves it down). Default 0.")] int? imageTop = null,
         [Description("Horizontal offset of the background in px (-20000 to 20000; negative moves it right). Default 0.")] int? imageLeft = null,
         [Description(MASK_IMAGE)] string? maskImage = null,
-        [Description(BACKGROUND_IMAGE)] string? backgroundImage = null) =>
+        [Description(BACKGROUND_IMAGE)] string? backgroundImage = null,
+        [Description(WALL_TEXTURE_IMAGE)] string? wallTextureImage = null) =>
         api.SendAsync(HttpMethod.Post, "/api/mapmodel", new MapModelInsertInfo
         {
             Name = name, Description = description, Image = image, GridWidth = gridWidth, GridHeight = gridHeight,
             ImageWidth = imageWidth, ImageHeight = imageHeight, ImageTop = imageTop, ImageLeft = imageLeft,
-            MaskImage = maskImage, BackgroundImage = backgroundImage
+            MaskImage = maskImage, BackgroundImage = backgroundImage, WallTextureImage = wallTextureImage
         });
 
     [McpServerTool(Name = "update_map_model", Title = "Update map model", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/mapmodel/{id}")]
     [Description($$"""
         What it does: replaces all fields of a map model (read it with get_map_model and send unchanged values back — an
-        an omitted maskImage or backgroundImage is removed).
+        an omitted maskImage, backgroundImage or wallTextureImage is removed).
         Everyone with a campaign map of this model open sees the change at once.
         Who can use it: only the owner of the model.
         {{FIELDS}}
@@ -115,12 +125,13 @@ public static class MapModelTools
         [Description("Vertical offset of the background in px (-20000 to 20000).")] int? imageTop = null,
         [Description("Horizontal offset of the background in px (-20000 to 20000).")] int? imageLeft = null,
         [Description(MASK_IMAGE)] string? maskImage = null,
-        [Description(BACKGROUND_IMAGE)] string? backgroundImage = null) =>
+        [Description(BACKGROUND_IMAGE)] string? backgroundImage = null,
+        [Description(WALL_TEXTURE_IMAGE)] string? wallTextureImage = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/mapmodel/{mapModelId}", new MapModelInsertInfo
         {
             Name = name, Description = description, Image = image, GridWidth = gridWidth, GridHeight = gridHeight,
             ImageWidth = imageWidth, ImageHeight = imageHeight, ImageTop = imageTop, ImageLeft = imageLeft,
-            MaskImage = maskImage, BackgroundImage = backgroundImage
+            MaskImage = maskImage, BackgroundImage = backgroundImage, WallTextureImage = wallTextureImage
         });
 
     [McpServerTool(Name = "delete_map_model", Title = "Delete map model", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

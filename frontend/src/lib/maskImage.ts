@@ -1,7 +1,9 @@
 /**
- * The 3D mask (034): a black and white image with the same proportion as the map image, covering the same area —
- * black is wall and white is empty space in the 3D view. Pure rules shared by the map registration (ratio check and
- * black-and-white preview) and the raycaster (`lib/raycaster.buildMaskGrid`).
+ * The 3D mask: an image with the same proportion as the map image, covering the same area. Its TONE is the height of
+ * the wall (036) — black is a wall of full height, white is empty space and a gray in between is a lower wall the
+ * camera can see over. Before 036 the mask was read as black and white only, and a mask that is still only black and
+ * white gives exactly the same walls as it did then. Pure rules shared by the map registration (proportion check and
+ * gray preview) and the raycaster (`lib/raycaster.buildMaskGrid`).
  */
 
 export interface ImageSize {
@@ -12,11 +14,14 @@ export interface ImageSize {
 /** The mask may differ from the map image's proportion by up to 1%. */
 export const MASK_RATIO_TOLERANCE = 0.01;
 
-/** Luminance (0–255) under which a mask pixel is wall. */
-export const MASK_THRESHOLD = 128;
-
 /** Alpha under which a pixel counts as empty (a transparent mask pixel is white). */
 export const MASK_MIN_ALPHA = 128;
+
+/** A cell lighter than this share of the range is empty space, not a wall. */
+export const MASK_MIN_HEIGHT = 0.05;
+
+/** A cell darker than this is a wall of full height: the ends of the range land on 0 and 1, as the old threshold did. */
+export const MASK_FULL_HEIGHT = 0.95;
 
 const ratioOf = (size: ImageSize): number => size.width / size.height;
 
@@ -32,14 +37,25 @@ export const formatRatio = (size: ImageSize): string => `${ratioOf(size).toFixed
 /** Rec. 601 luma of an RGB pixel. */
 export const luminance = (r: number, g: number, b: number): number => 0.299 * r + 0.587 * g + 0.114 * b;
 
-/** Dark and opaque enough = wall; light or transparent = empty. */
-export const isMaskWall = (r: number, g: number, b: number, a = 255): boolean =>
-  a >= MASK_MIN_ALPHA && luminance(r, g, b) < MASK_THRESHOLD;
+/** Height (0–1) a single pixel asks for: the darker it is, the taller the wall. Transparent is empty. */
+export const pixelHeight = (r: number, g: number, b: number, a = 255): number =>
+  a < MASK_MIN_ALPHA ? 0 : 1 - luminance(r, g, b) / 255;
 
-/** RGBA pixels to pure black (wall) and white (empty), in place: the preview shows exactly what the 3D view reads. */
-export const thresholdPixels = (pixels: Uint8ClampedArray): Uint8ClampedArray => {
+/**
+ * The height of a cell from the median of its pixels' luminance (0–255): the ends are snapped to nothing or to a whole
+ * wall, so an old black and white mask — or a JPEG's noise at either end — comes out exactly as before (FR-008).
+ */
+export const wallHeight = (medianLuminance: number): number => {
+  const height = 1 - medianLuminance / 255;
+  if (height < MASK_MIN_HEIGHT) return 0;
+  if (height >= MASK_FULL_HEIGHT) return 1;
+  return height;
+};
+
+/** RGBA pixels as they will be seen: the luminance as gray, opaque. A transparent pixel reads as empty (white). */
+export const grayscalePixels = (pixels: Uint8ClampedArray): Uint8ClampedArray => {
   for (let i = 0; i < pixels.length; i += 4) {
-    const value = isMaskWall(pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]) ? 0 : 255;
+    const value = pixels[i + 3] < MASK_MIN_ALPHA ? 255 : Math.round(luminance(pixels[i], pixels[i + 1], pixels[i + 2]));
     pixels[i] = value;
     pixels[i + 1] = value;
     pixels[i + 2] = value;

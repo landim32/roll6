@@ -67,6 +67,7 @@ public class Roll6Context : DbContext
             // 3D view (034): the black and white mask (walls) and the panorama background.
             entity.Property(e => e.MaskImage).HasColumnName("mask_image").HasMaxLength(260);
             entity.Property(e => e.BackgroundImage).HasColumnName("background_image").HasMaxLength(260);
+            entity.Property(e => e.WallTextureImage).HasColumnName("wall_texture_image").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.ChangedAt).HasColumnName("changed_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_map_model");
@@ -237,6 +238,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Sheet).HasColumnName("sheet").HasMaxLength(20000);
             entity.Property(e => e.Image).HasColumnName("image").HasMaxLength(260);
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(260);
+            entity.Property(e => e.Posture).HasColumnName("posture").HasConversion<int>().HasDefaultValue(Posture.Standing).HasSentinel((Posture)0);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_npc");

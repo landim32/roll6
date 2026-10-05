@@ -109,19 +109,18 @@ export const TokenFormFields = ({
       </div>
       <div hidden={tab !== 'sprites'}>
         <div className="form-text mb-3">{t('tokens.spritesHelp')}</div>
-        <div className="row g-3">
+        <div className="stm-sprite-grid">
           {SPRITE_VIEWS.map((view) => (
-            <div className="col-12 col-md-6" key={view}>
-              <SpriteImageField
-                id={id(`sprite-${view}`)}
-                view={view}
-                onChange={(crop) => sprites.setCrop(view, crop)}
-                hasCurrent={sprites.has(view)}
-                currentUrl={sprites.savedUrls[view]}
-                currentName={current?.name ?? form.name}
-                onRemoveCurrent={() => sprites.remove(view)}
-              />
-            </div>
+            <SpriteImageField
+              key={view}
+              id={id(`sprite-${view}`)}
+              view={view}
+              onChange={(crop) => sprites.setCrop(view, crop)}
+              hasCurrent={sprites.has(view)}
+              currentUrl={sprites.savedUrls[view]}
+              currentName={current?.name ?? form.name}
+              onRemoveCurrent={() => sprites.remove(view)}
+            />
           ))}
         </div>
       </div>

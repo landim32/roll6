@@ -90,11 +90,14 @@ export const BASE_COLORS: Record<number, string> = {
 export const OBJECT_BASE_COLOR = '#6c757d';
 
 /**
- * Whether a piece is drawn in the 3D view (034): only the ones standing (objects have no posture and always stand).
+ * Whether a piece is drawn in the 3D view (034): only the ones standing (objects have no posture and always stand) and
+ * whose token has the "2,5D" front image (036) — a token without it has no figure to draw, so it is left out, and so is
+ * its speech balloon. The other three sides are optional: with the front alone the figure still shows from every side.
  * A piece that is down or out of combat is lying, and the 3D view only draws figures standing up, so it is left out
- * (the 2D map still shows it lying). The camera can still follow its character.
+ * too (the 2D map still shows it lying). The camera can still follow its character.
  */
-export const isShownIn3d = (token: Pick<MapTokenInfo, 'posture'>): boolean => !isLying(token);
+export const isShownIn3d = (token: Pick<MapTokenInfo, 'posture' | 'frontImageUrl'>): boolean =>
+  !isLying(token) && !!token.frontImageUrl;
 
 /** How a piece shows in the 3D view (035): a standing figure that draws the side the camera sees. */
 export interface SpriteSpec {

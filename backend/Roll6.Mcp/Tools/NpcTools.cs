@@ -12,7 +12,8 @@ public static class NpcTools
     private const string FIELDS = """
         Fields: tokenId (required: library token that draws the NPC on maps), name (required, up to 260), life, energy
         and move (base values, 0 or more; each map occurrence copies them and can change its own), status (free text up
-        to 260, e.g. "wounded"; copied to each new map occurrence), sheet (markdown) and image (picture from upload_image).
+        to 260, e.g. "wounded"; copied to each new map occurrence), posture (1 standing — the default —, 2 down or 3 out of
+        combat: the posture each new map occurrence starts with), sheet (markdown) and image (picture from upload_image).
         """;
 
     [McpServerTool(Name = "list_my_npcs", Title = "List my NPCs", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -21,7 +22,7 @@ public static class NpcTools
         What it does: lists the NPCs of the current user's library, paged and searchable by name.
         Who can use it: any authenticated user; only his own NPCs.
         Returns: { items: [{ npcId, userId, tokenId, tokenName, tokenImageUrl, name, life, energy, move, sheet, status, image,
-        imageUrl, createdAt, updatedAt }], page, pageSize, totalCount }.
+        imageUrl, posture, createdAt, updatedAt }], page, pageSize, totalCount }.
         Common errors: none.
         Related tools: create_npc, add_npc_to_campaign.
         """)]
@@ -66,10 +67,11 @@ public static class NpcTools
         [Description("Base movement points per turn (0 or more). Example: 6.")] int move,
         [Description("NPC sheet in markdown (up to 20000 characters). Optional.")] string? sheet = null,
         [Description("NPC picture. " + McpDocs.IMAGE_FILE)] string? image = null,
-        [Description("Free-text status (up to 260 characters), e.g. \"wounded\". Optional.")] string? status = null) =>
+        [Description("Free-text status (up to 260 characters), e.g. \"wounded\". Optional.")] string? status = null,
+        [Description("Posture each new map occurrence starts with: 1 standing (default), 2 down, 3 out of combat. Optional.")] int? posture = null) =>
         api.SendAsync(HttpMethod.Post, "/api/npc", new NpcInsertInfo
         {
-            TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, Status = status
+            TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, Status = status, Posture = posture
         });
 
     [McpServerTool(Name = "update_npc", Title = "Update NPC", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -93,10 +95,11 @@ public static class NpcTools
         [Description("Base movement points per turn (0 or more).")] int move,
         [Description("NPC sheet in markdown (up to 20000 characters). Optional.")] string? sheet = null,
         [Description("NPC picture. " + McpDocs.IMAGE_FILE)] string? image = null,
-        [Description("Free-text status (up to 260 characters); send the current one to keep it, null clears it.")] string? status = null) =>
+        [Description("Free-text status (up to 260 characters); send the current one to keep it, null clears it.")] string? status = null,
+        [Description("Posture each new map occurrence starts with: 1 standing, 2 down, 3 out of combat; send the current one to keep it (omitted = standing).")] int? posture = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/npc/{npcId}", new NpcInsertInfo
         {
-            TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, Status = status
+            TokenId = tokenId, Name = name, Life = life, Energy = energy, Move = move, Sheet = sheet, Image = image, Status = status, Posture = posture
         });
 
     [McpServerTool(Name = "delete_npc", Title = "Delete NPC", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

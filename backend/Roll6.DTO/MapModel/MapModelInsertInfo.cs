@@ -38,4 +38,8 @@ public class MapModelInsertInfo
     /// <summary>Background of the 3D view ({guid}.{ext}); null = none.</summary>
     [JsonPropertyName("backgroundImage")]
     public string? BackgroundImage { get; set; }
+
+    /// <summary>Texture that covers every wall of the 3D view ({guid}.{ext}); null = the walls keep the map's colors (036).</summary>
+    [JsonPropertyName("wallTextureImage")]
+    public string? WallTextureImage { get; set; }
 }

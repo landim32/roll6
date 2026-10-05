@@ -86,6 +86,41 @@ public class MapModelServiceTests
     }
 
     [Fact]
+    public async Task Update_WallTexture_IsSavedAndReturned()
+    {
+        var result = await _service.UpdateAsync(1, 20, new MapModelInsertInfo
+        {
+            Name = "Masmorra", WallTextureImage = "00112233445566778899aabbccddeeff.png"
+        });
+
+        result.WallTextureImage.Should().Be("00112233445566778899aabbccddeeff.png");
+    }
+
+    [Fact]
+    public async Task Update_WithoutTheWallTexture_RemovesIt_AndTheOtherImagesAreUntouchedByIt()
+    {
+        await _service.UpdateAsync(1, 20, new MapModelInsertInfo
+        {
+            Name = "Masmorra", MaskImage = "0123456789abcdef0123456789abcdef.png", WallTextureImage = "00112233445566778899aabbccddeeff.png"
+        });
+
+        // PUT replaces every field: an omitted texture is removed, so the walls go back to the map's colors.
+        var result = await _service.UpdateAsync(1, 20, new MapModelInsertInfo { Name = "Masmorra" });
+
+        result.WallTextureImage.Should().BeNull();
+        result.WallTextureImageUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_WithInvalidWallTexture_DoesNotSave()
+    {
+        var act = () => _service.UpdateAsync(1, 20, new MapModelInsertInfo { Name = "Masmorra", WallTextureImage = "x.gif" });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("wallTextureImage");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapModel>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Update_WithFullLayout_KeepsFixedHexSize()
     {
         var result = await _service.UpdateAsync(1, 20, new MapModelInsertInfo

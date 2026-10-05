@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatRatio, isMaskWall, sameRatio, thresholdPixels } from './maskImage';
+import { grayscalePixels, pixelHeight, sameRatio, wallHeight, formatRatio } from './maskImage';
 
 describe('sameRatio', () => {
   it('accepts the same proportion at any size', () => {
@@ -27,42 +27,74 @@ describe('formatRatio', () => {
   });
 });
 
-describe('isMaskWall', () => {
-  it('is wall when dark and opaque, empty when light', () => {
-    expect(isMaskWall(0, 0, 0)).toBe(true);
-    expect(isMaskWall(120, 120, 120)).toBe(true);
-    expect(isMaskWall(136, 136, 136)).toBe(false);
-    expect(isMaskWall(255, 255, 255)).toBe(false);
+describe('pixelHeight', () => {
+  it('asks for the whole wall when black, nothing when white, half when gray', () => {
+    expect(pixelHeight(0, 0, 0)).toBe(1);
+    expect(pixelHeight(255, 255, 255)).toBe(0);
+    expect(pixelHeight(128, 128, 128)).toBeCloseTo(0.498, 2);
   });
 
   it('weighs the channels by luminance (green counts most)', () => {
-    expect(isMaskWall(0, 230, 0)).toBe(false);
-    expect(isMaskWall(0, 0, 255)).toBe(true);
+    // The same brightness in one channel: green makes the lightest pixel, so the shortest wall.
+    expect(pixelHeight(0, 230, 0)).toBeLessThan(pixelHeight(230, 0, 0));
+    expect(pixelHeight(0, 230, 0)).toBeLessThan(pixelHeight(0, 0, 230));
+    expect(pixelHeight(0, 0, 255)).toBeGreaterThan(pixelHeight(0, 255, 0));
   });
 
   it('counts a transparent pixel as empty, even when black', () => {
-    expect(isMaskWall(0, 0, 0, 0)).toBe(false);
-    expect(isMaskWall(0, 0, 0, 127)).toBe(false);
-    expect(isMaskWall(0, 0, 0, 128)).toBe(true);
+    expect(pixelHeight(0, 0, 0, 0)).toBe(0);
+    expect(pixelHeight(0, 0, 0, 127)).toBe(0);
+    expect(pixelHeight(0, 0, 0, 128)).toBe(1);
   });
 });
 
-describe('thresholdPixels', () => {
-  it('leaves only black and white, opaque', () => {
+describe('wallHeight', () => {
+  it('is the whole wall for black and empty for white', () => {
+    expect(wallHeight(0)).toBe(1);
+    expect(wallHeight(255)).toBe(0);
+  });
+
+  it('is proportional in between (50% gray is half the wall)', () => {
+    expect(wallHeight(127.5)).toBeCloseTo(0.5);
+    expect(wallHeight(200)).toBeCloseTo(0.216, 2);
+    expect(wallHeight(55)).toBeCloseTo(0.784, 2);
+  });
+
+  it('snaps the ends of the range so a black and white mask, with or without noise, comes out as before (FR-008)', () => {
+    expect(wallHeight(10)).toBe(1);
+    expect(wallHeight(12)).toBe(1);
+    expect(wallHeight(245)).toBe(0);
+    expect(wallHeight(250)).toBe(0);
+    // just past the snap: a real gray, not a rounding of black or white
+    expect(wallHeight(13)).toBeLessThan(1);
+    expect(wallHeight(242)).toBeGreaterThan(0);
+  });
+});
+
+describe('grayscalePixels', () => {
+  it('keeps every tone as gray and leaves nothing transparent', () => {
     const pixels = new Uint8ClampedArray([
-      10, 10, 10, 255, // dark → black
-      200, 200, 200, 255, // light → white
-      0, 0, 0, 0, // transparent → white
-      90, 140, 60, 200, // mid-dark green → black (luma 107)
+      10, 10, 10, 255, // nearly black → a tall wall
+      200, 200, 200, 255, // light gray → a low wall
+      0, 0, 0, 0, // transparent → empty, shown white
+      90, 140, 60, 200, // a color tone → its luminance (116), opaque
     ]);
 
-    thresholdPixels(pixels);
+    grayscalePixels(pixels);
 
     expect([...pixels]).toEqual([
-      0, 0, 0, 255,
+      10, 10, 10, 255,
+      200, 200, 200, 255,
       255, 255, 255, 255,
-      255, 255, 255, 255,
-      0, 0, 0, 255,
+      116, 116, 116, 255,
     ]);
+  });
+
+  it('shows the middle grays it got, where the old black and white preview erased them', () => {
+    const pixels = new Uint8ClampedArray([128, 128, 128, 255]);
+
+    grayscalePixels(pixels);
+
+    expect(pixels[0]).toBe(128);
   });
 });

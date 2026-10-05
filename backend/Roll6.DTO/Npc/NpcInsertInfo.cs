@@ -27,6 +27,10 @@ public class NpcInsertInfo
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 
+    /// <summary>Posture each new map occurrence starts with: 1 standing, 2 down, 3 out of combat; null = standing (031).</summary>
+    [JsonPropertyName("posture")]
+    public int? Posture { get; set; }
+
     [JsonPropertyName("image")]
     public string? Image { get; set; }
 }

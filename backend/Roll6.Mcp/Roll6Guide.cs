@@ -88,7 +88,8 @@ public static class Roll6Guide
           character's (for all its pieces in the campaign); only the master changes an NPC's. Tools:
           `set_piece_posture`, or `posture` in `update_participation`, `update_map_npc` and `process_turn`. It is logged
           in the turn and is separate from the free-text status and from life: 0 or below does not lay the piece down.
-          Objects have none.
+          Objects have none. A library NPC (`create_npc`/`update_npc`) also has a `posture`: the one each new occurrence
+          starts with (default standing); the piece is placed with the size of that posture.
         - Tokens have a standing size (`upSpace`) and an optional down size (`downSpace`), each **1, 2, 3, 7 or 10**
           hexes; a piece takes the down size while down or out of combat. Pieces return `space` = hexes taken now.
         - Shapes, around the piece's position (`x`/`y`) and the side it faces (`look`): 1 = the position; 2 = the
@@ -101,10 +102,17 @@ public static class Roll6Guide
         - Every map can be seen in 3D in the web app (a button on the map): a Wolfenstein 3D style view — walls drawn as
           vertical columns, the map image as the floor — with a camera behind the chosen character. The viewer only
           observes; pieces still move through the 2D map. The camera is in the app: tools change data, not the camera.
-        - **`maskImage`** (from `upload_image`) is a black and white image of the **same proportion as the map `image`**
-          that covers the same area: black is wall, white is empty space. It only draws the 3D view — it never blocks
-          or hides anything on the 2D map and pieces may stand on black areas. Without it the 3D view has no walls.
+        - **`maskImage`** (from `upload_image`) is an image of the **same proportion as the map `image`** covering the same
+          area. Its tone is the wall height: **black = a wall of full height, white = empty space, a gray in between = a
+          lower wall** (50% gray = half the height, so one sees over it; very light grays count as empty). A mask that is
+          only black and white behaves exactly as before. It only affects the 3D view — never the 2D map or the pieces,
+          which may stand on wall areas. Without it the 3D view has no walls.
         - **`backgroundImage`** is a 360° panorama shown behind the walls, like a sky; a narrow image repeats.
+        - **`wallTextureImage`** is one picture (stone, brick, wood…) that covers **every wall** the mask draws, repeated
+          along them and as tall as a full wall (a low wall shows its lower part). Without it the walls take the colors of
+          the map image, as before. Only the 3D view uses it.
+        - The floor goes on past the edge of the map image with the color of its nearest edge, and the speech balloons of
+          the turn in progress appear over the figures in the 3D view (they are the turn's action texts, not new data).
         - Tokens may have four **"2.5D" images**, one per side of the standing character: **`frontImage`** (seen from the
           front), **`rightImage`** (in profile, looking to the RIGHT of the image), **`leftImage`** (in profile, looking
           to the LEFT of the image) and **`backImage`** (seen from behind). "Right" and "left" are the character's own
@@ -113,8 +121,8 @@ public static class Roll6Guide
           the piece faces (`look`): its front within ±45° of that direction, its back within ±45° of the opposite one,
           the two sides in between. Where that image is missing it mirrors the opposite side (only sides mirror), then
           uses `frontImage`, then the standing `upImage`; the back is never mirrored.
-        - `update_map_model` and `update_token` replace every field: send `maskImage`, `backgroundImage` and the four
-          "2.5D" images back unchanged or they are removed.
+        - `update_map_model` and `update_token` replace every field: send `maskImage`, `backgroundImage`,
+          `wallTextureImage` and the four "2.5D" images back unchanged or they are removed.
 
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move

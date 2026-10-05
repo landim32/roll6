@@ -531,6 +531,11 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");
 
+                    b.Property<string>("WallTextureImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("wall_texture_image");
+
                     b.HasKey("MapModelId")
                         .HasName("map_models_pkey");
 
@@ -743,6 +748,12 @@ namespace Roll6.Infra.Migrations
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
                         .HasColumnName("name");
+
+                    b.Property<int>("Posture")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("posture");
 
                     b.Property<string>("Sheet")
                         .HasMaxLength(20000)

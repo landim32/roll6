@@ -86,7 +86,7 @@ public class MapNpcService : IMapNpcService
             throw new ConflictException("O NPC não está na campanha deste mapa.");
 
         (await _occupancy.LoadAsync(map)).EnsureFits(info.X, info.Y, info.Look ?? 0,
-            await _occupancy.SpaceOfTokenAsync(npc.TokenId, Posture.Standing), null);
+            await _occupancy.SpaceOfTokenAsync(npc.TokenId, npc.Posture), null);
 
         MapNpc saved = null!;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>

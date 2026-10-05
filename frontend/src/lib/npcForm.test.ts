@@ -29,12 +29,29 @@ describe('validateNpcForm', () => {
 describe('toNpcInsert / toNpcForm', () => {
   it('builds the payload', () => {
     expect(toNpcInsert(form({ name: ' Goblin ', life: '7', energy: '', move: '6', status: ' ferido ', sheet: ' ' }), null, 5)).toEqual({
-      tokenId: 5, name: 'Goblin', life: 7, energy: 0, move: 6, sheet: null, status: 'ferido', image: null,
+      tokenId: 5, name: 'Goblin', life: 7, energy: 0, move: 6, sheet: null, status: 'ferido', posture: 1, image: null,
     });
+  });
+
+  it('sends the posture each new occurrence starts with', () => {
+    expect(toNpcInsert(form({ posture: '2' }), null, 5).posture).toBe(2);
+    expect(toNpcInsert(form({ posture: '3' }), null, 5).posture).toBe(3);
+  });
+
+  it('takes anything that is not a posture as standing', () => {
+    for (const posture of ['', '0', '4', 'abc', '1.5']) expect(toNpcInsert(form({ posture }), null, 5).posture).toBe(1);
+  });
+
+  it('starts standing', () => {
+    expect(emptyNpcForm().posture).toBe('1');
   });
 
   it('fills the form from a saved NPC', () => {
     const npc = { name: 'Goblin', life: 7, energy: 2, move: 6, sheet: null, status: null } as NpcInfo;
-    expect(toNpcForm(npc)).toEqual({ name: 'Goblin', life: '7', energy: '2', move: '6', status: '', sheet: '' });
+    expect(toNpcForm(npc)).toEqual({ name: 'Goblin', life: '7', energy: '2', move: '6', status: '', posture: '1', sheet: '' });
+  });
+
+  it('fills the posture from a saved NPC that lies down', () => {
+    expect(toNpcForm({ name: 'Goblin', life: 7, energy: 2, move: 6, sheet: null, status: null, posture: 2 } as NpcInfo).posture).toBe('2');
   });
 });

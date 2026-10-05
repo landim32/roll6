@@ -26,6 +26,9 @@ const totalOf = (dice: number[]) => dice.reduce((sum, value) => sum + value, 0);
  * The result is shown for 30 seconds and then hides by itself. Keeping the pointer over the area — the dice or
  * the button — holds it open, so once it has hidden the button is what brings the last roll back; leaving it
  * starts the 30 seconds again. Rolling again replaces the previous result and restarts the count.
+ * <p>
+ * Clicking the dice hides them at once, without waiting for the 30 seconds. The last roll is not lost: moving the
+ * pointer back onto the button (or rolling again) brings it back.
  */
 export const DiceRoller = () => {
   const { t } = useTranslation();
@@ -73,6 +76,13 @@ export const DiceRoller = () => {
     if (values) startHiding();
   };
 
+  // A click on the result puts it away now. The pointer is still inside the wrapper, so nothing re-shows it until it
+  // leaves and comes back (or the player rolls again).
+  const onDismiss = () => {
+    stopHiding();
+    setVisible(false);
+  };
+
   const onRoll = () => {
     if (spin.current !== null) {
       window.clearInterval(spin.current);
@@ -106,7 +116,7 @@ export const DiceRoller = () => {
   return (
     <div className="stm-dice" onMouseEnter={onHold} onMouseLeave={onRelease}>
       {visible && values && (
-        <div className={`stm-dice-panel${rolling ? ' is-rolling' : ''}`}>
+        <div className={`stm-dice-panel${rolling ? ' is-rolling' : ''}`} onClick={onDismiss} title={t('map.diceHide')}>
           <div className="stm-dice-row">
             {values.map((value, index) => {
               const Face = FACES[value - 1];
