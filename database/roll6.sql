@@ -1303,5 +1303,34 @@ BEGIN
     VALUES ('20261004212901_ReplaceStoryMapWithRaycast', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004234816_AddTokenDirectionImages') THEN
+    ALTER TABLE tokens ADD back_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004234816_AddTokenDirectionImages') THEN
+    ALTER TABLE tokens ADD left_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004234816_AddTokenDirectionImages') THEN
+    ALTER TABLE tokens ADD right_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261004234816_AddTokenDirectionImages') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261004234816_AddTokenDirectionImages', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

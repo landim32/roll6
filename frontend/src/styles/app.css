@@ -1481,8 +1481,7 @@ button.stm-turn-badge:hover {
   min-width: 8rem;
 }
 
-/* "2,5D frente" token image and the 3D mask / background previews (034): a checkerboard shows transparency. */
-.stm-front-preview,
+/* The 3D mask / background previews (034): a checkerboard shows transparency. */
 .stm-mask-preview {
   display: block;
   max-width: 100%;
@@ -1492,7 +1491,3 @@ button.stm-turn-badge:hover {
   background: conic-gradient(#3a3f4a 25%, #2a2e36 0 50%, #3a3f4a 0 75%, #2a2e36 0) 0 0 / 16px 16px;
 }
 
-.stm-front-preview {
-  height: 120px;
-  width: auto;
-}

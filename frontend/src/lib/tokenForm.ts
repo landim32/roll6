@@ -1,4 +1,6 @@
 import { ALLOWED_SPACES } from './hexGrid';
+import { EMPTY_VIEWS } from './spriteView';
+import type { ViewImages } from './spriteView';
 import type { TokenInfo, TokenInsertInfo } from '../types/token';
 
 /** Same limits as the backend Token.Update. */
@@ -56,7 +58,7 @@ export const toTokenInsert = (
   form: TokenForm,
   upImage: string | null,
   downImage: string | null,
-  frontImage: string | null = null,
+  sprites: ViewImages<string> = EMPTY_VIEWS,
 ): TokenInsertInfo => ({
   name: form.name.trim(),
   description: form.description.trim() || null,
@@ -64,5 +66,8 @@ export const toTokenInsert = (
   downSpace: form.downSpace.trim() === '' ? null : Number(form.downSpace),
   upImage,
   downImage,
-  frontImage,
+  frontImage: sprites.front,
+  rightImage: sprites.right,
+  leftImage: sprites.left,
+  backImage: sprites.back,
 });

@@ -26,6 +26,18 @@ public class MapTokenInfo
     [JsonPropertyName("frontImageUrl")]
     public string? FrontImageUrl { get; set; }
 
+    /// <summary>"2.5D right" image of the piece's token (035): profile looking to the right of the image.</summary>
+    [JsonPropertyName("rightImageUrl")]
+    public string? RightImageUrl { get; set; }
+
+    /// <summary>"2.5D left" image of the piece's token (035): profile looking to the left of the image.</summary>
+    [JsonPropertyName("leftImageUrl")]
+    public string? LeftImageUrl { get; set; }
+
+    /// <summary>"2.5D back" image of the piece's token (035): seen from behind.</summary>
+    [JsonPropertyName("backImageUrl")]
+    public string? BackImageUrl { get; set; }
+
     /// <summary>Participation of a Character token (its name/vitals/status/sheet are shown).</summary>
     [JsonPropertyName("campaignCharacterId")]
     public long? CampaignCharacterId { get; set; }

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import type { ImageCrop } from '../ui/ImageCropper';
 import { TokenFormFields } from '../tokens/TokenFormFields';
+import { useSpriteImages } from '../../hooks/useSpriteImages';
 import { useToken } from '../../hooks/useToken';
 import { imageService } from '../../Services/imageService';
 import { cropToFile, tokenImageSize } from '../../lib/cropImage';
@@ -30,11 +31,10 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
   const [form, setForm] = useState<TokenForm>(() => toTokenForm(token));
   const [upCrop, setUpCrop] = useState<ImageCrop | null>(null);
   const [downCrop, setDownCrop] = useState<ImageCrop | null>(null);
-  /** "2,5D frente" (034): a newly chosen file, uploaded as it is. */
-  const [frontFile, setFrontFile] = useState<File | null>(null);
-  /** The saved lying and "2,5D frente" images are kept until removed. */
+  /** The saved lying image is kept until removed. */
   const [keepDown, setKeepDown] = useState(token.downImage !== null);
-  const [keepFront, setKeepFront] = useState(token.frontImage !== null);
+  /** The four "2,5D" images of the 3D view (035): new crops and which saved ones are still kept. */
+  const sprites = useSpriteImages(token, open);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -42,9 +42,7 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
     setForm(toTokenForm(token));
     setUpCrop(null);
     setDownCrop(null);
-    setFrontFile(null);
     setKeepDown(token.downImage !== null);
-    setKeepFront(token.frontImage !== null);
   }, [open, token]);
 
   const onSubmit = async (event: FormEvent) => {
@@ -55,9 +53,8 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
     try {
       const upImage = upCrop ? await uploadTokenImage(upCrop, Number(form.upSpace)) : token.upImage;
       const downImage = downCrop ? await uploadTokenImage(downCrop, downImageSpace(form.downSpace)) : keepDown ? token.downImage : null;
-      // PUT replaces every field: the saved "2,5D frente" is sent back unless it was replaced or removed.
-      const frontImage = frontFile ? (await imageService.upload(frontFile)).fileName : keepFront ? token.frontImage : null;
-      const saved = await update(token.tokenId, toTokenInsert(form, upImage, downImage, frontImage));
+      // PUT replaces every field: each "2,5D" image is re-sent unless it was replaced or removed.
+      const saved = await update(token.tokenId, toTokenInsert(form, upImage, downImage, await sprites.resolve()));
       toast.success(t('toast.tokenUpdated', { name: saved.name }));
       onClose(true);
     } catch (err) {
@@ -87,18 +84,15 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
           onField={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))}
           onUpCrop={setUpCrop}
           onDownCrop={setDownCrop}
-          onFrontFile={setFrontFile}
+          sprites={sprites}
           current={{
             name: token.name,
             upUrl: token.upImageUrl,
             hasUp: token.upImage !== null,
             downUrl: token.downImageUrl,
             hasDown: keepDown,
-            frontUrl: token.frontImageUrl,
-            hasFront: keepFront,
           }}
           onRemoveDown={() => setKeepDown(false)}
-          onRemoveFront={() => setKeepFront(false)}
         />
       </form>
     </Modal>

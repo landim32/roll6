@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { FACE_HEIGHT_SHARE, FRONT_IMAGE_ASPECT, SILHOUETTE_SHARE } from './frontImage';
+import { HEX_SIZE } from './hexGrid';
 import {
   buildMaskGrid, castRay, columnAngle, columnVisible, EYE_HEIGHT, floorPoint, isWallAt, perpendicularDistance,
   projectionOf, projectSprite, shade, skyColumn, skyRepeats, WALL_HEIGHT, wallColumn,
@@ -126,6 +128,26 @@ describe('projection', () => {
       const hit = { distance: 300 / Math.cos(offset), x: 0, y: 0, side: 'ns' as const };
       expect(perpendicularDistance(hit, offset)).toBeCloseTo(300);
     }
+  });
+});
+
+describe('camera height', () => {
+  // A figure of 1 hex is as wide as a hex (2 × HEX_SIZE) and its "2,5D frente" image is a 3:4 portrait.
+  const imageHeight = (2 * HEX_SIZE) / FRONT_IMAGE_ASPECT;
+  const characterHeight = SILHOUETTE_SHARE * imageHeight;
+
+  it('is the eye level of the character that fits the silhouette of the front image', () => {
+    expect(EYE_HEIGHT).toBeCloseTo(FACE_HEIGHT_SHARE * imageHeight);
+    expect(EYE_HEIGHT).toBeCloseTo(59.73, 1);
+  });
+
+  it('is at the face, not above the head: a little under the height of the character, well above the waist', () => {
+    expect(EYE_HEIGHT).toBeLessThan(characterHeight);
+    expect(EYE_HEIGHT).toBeGreaterThan(characterHeight * 0.9);
+  });
+
+  it('keeps the walls taller than the eyes so the horizon cuts them', () => {
+    expect(WALL_HEIGHT).toBeGreaterThan(EYE_HEIGHT);
   });
 });
 

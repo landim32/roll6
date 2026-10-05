@@ -19,18 +19,36 @@ public class Token
     public string? DownImage { get; set; }
     /// <summary>"2.5D front" (034): the figure seen from the front, standing, used by the 3D view. Optional.</summary>
     public string? FrontImage { get; set; }
+    /// <summary>"2.5D right" (035): the figure in profile, looking to the right of the image. Optional.</summary>
+    public string? RightImage { get; set; }
+    /// <summary>"2.5D left" (035): the figure in profile, looking to the left of the image. Optional.</summary>
+    public string? LeftImage { get; set; }
+    /// <summary>"2.5D back" (035): the figure seen from behind. Optional.</summary>
+    public string? BackImage { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    public void Update(string? name, string? description, int? upSpace, int? downSpace, string? upImage, string? downImage, string? frontImage = null)
+    public void Update(string? name, string? description, int? upSpace, int? downSpace, string? upImage, string? downImage)
     {
         Name = Guard.RequiredText(name, "name", 260);
         Description = Guard.OptionalText(description, "description", 2000);
         UpSpace = Guard.TokenSpace(upSpace ?? DEFAULT_UP_SPACE, "upSpace");
         UpImage = Guard.ImageFileName(upImage, "upImage");
         DownImage = Guard.ImageFileName(downImage, "downImage");
-        FrontImage = Guard.ImageFileName(frontImage, "frontImage");
         DownSpace = ResolveDownSpace(downSpace, DownImage);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// The four "2.5D" images the 3D view draws (035), each optional and independent; separate from Update so
+    /// the group has one place. A null removes the stored file (the PUT of a token replaces every field).
+    /// </summary>
+    public void UpdateSprites(string? front, string? right, string? left, string? back)
+    {
+        FrontImage = Guard.ImageFileName(front, "frontImage");
+        RightImage = Guard.ImageFileName(right, "rightImage");
+        LeftImage = Guard.ImageFileName(left, "leftImage");
+        BackImage = Guard.ImageFileName(back, "backImage");
         UpdatedAt = DateTime.UtcNow;
     }
 

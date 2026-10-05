@@ -7,6 +7,7 @@ import type { MapTokenInfo } from '../types/mapToken';
 
 const piece = (mapTokenId: number, x: number, y: number, mapId = 30): MapTokenInfo => ({
   mapTokenId, mapId, tokenId: 5, tokenName: 'T', upImageUrl: null, downImageUrl: null, frontImageUrl: null,
+  rightImageUrl: null, leftImageUrl: null, backImageUrl: null,
   campaignCharacterId: null, characterId: null, mapNpcId: null, npcId: null, name: `P${mapTokenId}`,
   tokenType: MAP_TOKEN_TYPE.object, sheet: null, life: 0, energy: 0, totalLife: 0, totalEnergy: 0, status: null, move: 0,
   x, y, look: 0, posture: null, space: 1, createdAt: '', updatedAt: '',

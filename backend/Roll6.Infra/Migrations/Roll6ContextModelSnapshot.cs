@@ -787,6 +787,11 @@ namespace Roll6.Infra.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("TokenId"));
 
+                    b.Property<string>("BackImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("back_image");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -812,11 +817,21 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("front_image");
 
+                    b.Property<string>("LeftImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("left_image");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
                         .HasColumnName("name");
+
+                    b.Property<string>("RightImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("right_image");
 
                     b.Property<string>("UpImage")
                         .HasMaxLength(260)

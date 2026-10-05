@@ -4,6 +4,8 @@ import {
   wallColumn,
 } from './raycaster';
 import type { CameraPose, MapArea, MaskGrid } from './raycaster';
+import { chooseSprite, viewSeen } from './spriteView';
+import type { ViewImages } from './spriteView';
 
 /**
  * Draws one frame of the 3D view (034) the way Wolfenstein 3D did: column by column — sky, wall, floor — and then the
@@ -17,14 +19,20 @@ export interface PixelBuffer {
   height: number;
 }
 
-/** A figure to draw: its pixels, where its feet stand and how wide it is (map units). */
+/**
+ * A figure to draw: the four "2,5D" images of its token (035) and its standing one as the reserve, where its feet
+ * stand, how wide it is (map units) and which way it faces. The renderer picks the image every frame.
+ */
 export interface RenderSprite {
   id: number;
-  pixels: PixelBuffer;
+  /** One image per side of the character; null where the token has none. */
+  images: ViewImages<PixelBuffer>;
+  /** What to draw when the side the camera sees has no image (the token's standing image). */
+  fallback: PixelBuffer;
   center: Point;
   width: number;
-  /** Height relative to the image's natural proportion (1 standing, less lying). */
-  heightRatio: number;
+  /** Hex side the piece faces, 0–5 clockwise from the top. */
+  look: number;
 }
 
 /** Everything a frame shows besides the camera. */
@@ -154,23 +162,28 @@ export const drawRaycastFrame = (
     }
   }
 
-  // Figures, far to near, hidden column by column by the walls (the z-buffer).
+  // Figures, far to near, hidden column by column by the walls (the z-buffer). The camera moves every frame, so which
+  // side of each one it sees (and whether that side must be mirrored) is decided here, per figure and per frame (035).
+  const place = (sprite: RenderSprite) => {
+    const { image: pixels, mirrored } = chooseSprite(sprite.images, sprite.fallback, viewSeen(sprite.look, sprite.center, { x: pose.x, y: pose.z }));
+    const worldHeight = sprite.width * (pixels.height / pixels.width);
+    const where = projectSprite(pose, sprite.center, sprite.width, worldHeight, width, height, projection);
+    return where ? { pixels, mirrored, where } : null;
+  };
   const projected = scene.sprites
-    .map((sprite) => {
-      const worldHeight = sprite.width * (sprite.pixels.height / sprite.pixels.width) * sprite.heightRatio;
-      return { sprite, where: projectSprite(pose, sprite.center, sprite.width, worldHeight, width, height, projection) };
-    })
-    .filter((entry): entry is { sprite: RenderSprite; where: NonNullable<typeof entry.where> } => entry.where !== null)
+    .map(place)
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
     .sort((a, b) => b.where.depth - a.where.depth);
-  for (const { sprite, where } of projected) {
+  for (const { pixels, mirrored, where } of projected) {
     const span = where.screenX1 - where.screenX0;
     const tall = where.bottom - where.top;
     if (span <= 0 || tall <= 0) continue;
     const fade = shade(where.depth);
-    const { pixels } = sprite;
     for (let x = Math.max(0, Math.ceil(where.screenX0)); x <= Math.min(width - 1, Math.floor(where.screenX1)); x++) {
       if (!columnVisible(zBuffer, x, where.depth)) continue;
-      const texX = Math.min(pixels.width - 1, Math.floor(((x + 0.5 - where.screenX0) / span) * pixels.width));
+      const column = Math.min(pixels.width - 1, Math.floor(((x + 0.5 - where.screenX0) / span) * pixels.width));
+      // Mirrored: the opposite side's drawing, so the character's other arm is the one showing.
+      const texX = mirrored ? pixels.width - 1 - column : column;
       for (let y = Math.max(0, Math.ceil(where.top)); y <= Math.min(height - 1, Math.floor(where.bottom)); y++) {
         const texY = Math.min(pixels.height - 1, Math.floor(((y + 0.5 - where.top) / tall) * pixels.height));
         const j = (texY * pixels.width + texX) * 4;

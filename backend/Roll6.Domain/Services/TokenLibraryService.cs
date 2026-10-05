@@ -50,7 +50,8 @@ public class TokenLibraryService : ITokenLibraryService
     public async Task<TokenInfo> CreateAsync(long userId, TokenInsertInfo info)
     {
         var token = new Token { UserId = userId };
-        token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage, info.FrontImage);
+        token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
+        token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
         token.CreatedAt = token.UpdatedAt;
         return MapToDto(await _repository.InsertAsync(token));
     }
@@ -58,7 +59,8 @@ public class TokenLibraryService : ITokenLibraryService
     public async Task<TokenInfo> UpdateAsync(long userId, long tokenId, TokenInsertInfo info)
     {
         var token = await GetOwnedAsync(userId, tokenId);
-        token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage, info.FrontImage);
+        token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
+        token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
         return MapToDto(await _repository.UpdateAsync(token));
     }
 
@@ -102,6 +104,12 @@ public class TokenLibraryService : ITokenLibraryService
         DownImageUrl = _imageStorage.GetUrl(token.DownImage),
         FrontImage = token.FrontImage,
         FrontImageUrl = _imageStorage.GetUrl(token.FrontImage),
+        RightImage = token.RightImage,
+        RightImageUrl = _imageStorage.GetUrl(token.RightImage),
+        LeftImage = token.LeftImage,
+        LeftImageUrl = _imageStorage.GetUrl(token.LeftImage),
+        BackImage = token.BackImage,
+        BackImageUrl = _imageStorage.GetUrl(token.BackImage),
         CreatedAt = token.CreatedAt,
         UpdatedAt = token.UpdatedAt
     };

@@ -1,5 +1,7 @@
 import { footprintLocal, hexCenter, hexCorners } from './hexGrid';
 import type { Point } from './hexGrid';
+import { tokenSpriteUrls } from './spriteView';
+import type { ViewImages } from './spriteView';
 import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
 import type { MapTokenInfo } from '../types/mapToken';
 
@@ -86,44 +88,40 @@ export const BASE_COLORS: Record<number, string> = {
   [MAP_TOKEN_TYPE.npc]: '#dc3545',
 };
 export const OBJECT_BASE_COLOR = '#6c757d';
-export const OUT_BASE_COLOR = '#808080';
 
-/** How a piece shows in the 3D view (034). */
+/**
+ * Whether a piece is drawn in the 3D view (034): only the ones standing (objects have no posture and always stand).
+ * A piece that is down or out of combat is lying, and the 3D view only draws figures standing up, so it is left out
+ * (the 2D map still shows it lying). The camera can still follow its character.
+ */
+export const isShownIn3d = (token: Pick<MapTokenInfo, 'posture'>): boolean => !isLying(token);
+
+/** How a piece shows in the 3D view (035): a standing figure that draws the side the camera sees. */
 export interface SpriteSpec {
   mapTokenId: number;
   name: string;
-  imageUrl: string | null;
-  /** Standing: a figure that always faces the camera. Lying (down/out of combat): flat on the floor. */
-  standing: boolean;
-  /** Lying with the standing image: turned 90° on the floor (no down image). */
-  sideways: boolean;
-  grayscale: boolean;
-  /** Width of the figure / size of the lying image (px): the width of the piece's shape on the map. */
-  width: number;
-  /** Depth of the shape (px), for lying pieces. */
-  depth: number;
-  /** Middle of the piece's shape on the map (px). */
-  center: Point;
-  /** Facing, for lying pieces (0–5 clockwise from the top). */
+  /** The token's four "2,5D" images, one per side; null where the token has none. */
+  views: ViewImages<string>;
+  /** What the 3D view uses when a side has no image: the token's standing image. */
+  fallbackUrl: string | null;
+  /** Hex side the piece faces (0–5): with the camera position it says which side shows. */
   look: number;
+  /** Width of the figure (px): the width of the piece's shape on the map. */
+  width: number;
+  /** Middle of the piece's shape on the map (px), where the figure stands. */
+  center: Point;
+  /** Color of the placeholder shown when the piece has no image. */
   baseColor: string;
-  /** Radius of the disc under the figure (px). */
-  baseRadius: number;
-  /** Height of the figure relative to its image's natural proportion: 1 standing, less when lying (034). */
-  heightRatio: number;
 }
 
-/** A lying figure is drawn this fraction of its natural height in the 3D view (034). */
-export const LYING_HEIGHT_RATIO = 0.4;
-
 /**
- * The 3D figure of a piece, with the same rules as the 2D map: lying image, black and white out of combat, disc
- * color by type, size and middle of the shape turned with the piece (shape drawn in the look-3 frame, `pieceGeometry`).
+ * The 3D figure of a standing piece: its four side images and the standing one as the reserve, as wide as the shape of
+ * the piece, standing in the middle of that shape (drawn in the look-3 frame, `pieceGeometry`, and turned with the
+ * piece) and facing the piece's `look` — which side of them the camera sees is decided per frame by the renderer.
+ * Callers check `isShownIn3d` first.
  */
 export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
   const geometry = pieceGeometry(token.space, size);
-  const image = pieceImage(token);
-  const out = isOutOfCombat(token);
   // Middle of the shape in the piece's frame, turned like TokenLayer: (look − 3) × 60°.
   const local = { x: geometry.box.x + geometry.box.width / 2, y: geometry.box.y + geometry.box.height / 2 };
   const angle = ((token.look - 3) * Math.PI) / 3;
@@ -135,17 +133,11 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
   return {
     mapTokenId: token.mapTokenId,
     name: token.name,
-    // Standing pieces use the token's "2,5D frente" image when it has one; lying ones keep the 2D rules (034).
-    imageUrl: isLying(token) ? image.url : token.frontImageUrl ?? image.url,
-    standing: !isLying(token),
-    sideways: image.sideways,
-    grayscale: out,
-    width: geometry.box.width,
-    depth: geometry.box.height,
-    center,
+    views: tokenSpriteUrls(token),
+    fallbackUrl: token.upImageUrl,
     look: token.look,
-    baseColor: out ? OUT_BASE_COLOR : BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
-    baseRadius: Math.min(geometry.box.width, geometry.box.height) / 2,
-    heightRatio: isLying(token) ? LYING_HEIGHT_RATIO : 1,
+    width: geometry.box.width,
+    center,
+    baseColor: BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
   };
 };

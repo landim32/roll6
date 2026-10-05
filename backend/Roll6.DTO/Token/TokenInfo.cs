@@ -41,6 +41,27 @@ public class TokenInfo
     [JsonPropertyName("frontImageUrl")]
     public string? FrontImageUrl { get; set; }
 
+    /// <summary>"2.5D right" image (035): the figure in profile, looking to the right of the image.</summary>
+    [JsonPropertyName("rightImage")]
+    public string? RightImage { get; set; }
+
+    [JsonPropertyName("rightImageUrl")]
+    public string? RightImageUrl { get; set; }
+
+    /// <summary>"2.5D left" image (035): the figure in profile, looking to the left of the image.</summary>
+    [JsonPropertyName("leftImage")]
+    public string? LeftImage { get; set; }
+
+    [JsonPropertyName("leftImageUrl")]
+    public string? LeftImageUrl { get; set; }
+
+    /// <summary>"2.5D back" image (035): the figure seen from behind.</summary>
+    [JsonPropertyName("backImage")]
+    public string? BackImage { get; set; }
+
+    [JsonPropertyName("backImageUrl")]
+    public string? BackImageUrl { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

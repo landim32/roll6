@@ -10,7 +10,8 @@ namespace Roll6.Mcp.Tools;
 public static class MapTokenTools
 {
     private const string RETURNS = """
-        Returns: the piece { mapTokenId, mapId, tokenId, tokenName, upImageUrl, frontImageUrl (the token's "2.5D front" image, null when it has none), campaignCharacterId, characterId, mapNpcId,
+        Returns: the piece { mapTokenId, mapId, tokenId, tokenName, upImageUrl, frontImageUrl, rightImageUrl, leftImageUrl,
+        backImageUrl (the token's four "2.5D" images, each null when it has none), campaignCharacterId, characterId, mapNpcId,
         npcId, name, tokenType (1 Character, 2 Npc, 4 Object), sheet, life, energy, status, move, x, y, look, posture
         (1 standing, 2 down, 3 out of combat; null for objects), space (hexes it takes now: 1, 2, 3, 7 or 10), … }.
         Character pieces show the participation's values; their sheet is the campaign notes, not the character sheet.

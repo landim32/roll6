@@ -6,6 +6,8 @@ import { Modal } from '../ui/Modal';
 import { Tabs } from '../ui/Tabs';
 import { PagedListView } from '../ui/PagedListView';
 import { useMapEditor } from '../../hooks/useMapEditor';
+import { readFileImageSize } from '../../lib/imageSize';
+import { formatRatio, sameRatio } from '../../lib/maskImage';
 import { ThreeDImagesTab } from './ThreeDImagesTab';
 import { ACCEPTED_IMAGE_TYPES, imageService, MAX_IMAGE_BYTES } from '../../Services/imageService';
 import { mapModelService } from '../../Services/mapModelService';
@@ -25,9 +27,10 @@ const PAGE_SIZE = 10;
  */
 export const ImageModal = ({ open, onOpenChange }: ImageModalProps) => {
   const { t } = useTranslation();
-  const { setImage, canEdit } = useMapEditor();
+  const { setImage, setMaskImage, canEdit } = useMapEditor();
   const [tab, setTab] = useState('upload');
   const [file, setFile] = useState<File | null>(null);
+  const [maskFile, setMaskFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [models, setModels] = useState<PagedList<MapModelInfo> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,17 +52,42 @@ export const ImageModal = ({ open, onOpenChange }: ImageModalProps) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- search reloads only on submit
   }, [open, tab]);
 
+  /** Type and size checks of a picked file (the toast is already shown when it is not valid). */
+  const validFile = (picked: File): boolean => {
+    if (!ACCEPTED_IMAGE_TYPES.includes(picked.type)) {
+      toast.error(t('image.invalidType'));
+      return false;
+    }
+    if (picked.size > MAX_IMAGE_BYTES) {
+      toast.error(t('image.tooLarge'));
+      return false;
+    }
+    return true;
+  };
+
   const onUpload = async (event: FormEvent) => {
     event.preventDefault();
     if (!file) return toast.error(t('image.noFile'));
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) return toast.error(t('image.invalidType'));
-    if (file.size > MAX_IMAGE_BYTES) return toast.error(t('image.tooLarge'));
+    if (!validFile(file)) return;
+    // The new image and the new 3D mask (034) go together: the mask must have the proportion of the new image.
+    if (maskFile) {
+      if (!validFile(maskFile)) return;
+      const [imageSize, maskSize] = await Promise.all([readFileImageSize(file), readFileImageSize(maskFile)]);
+      if (!imageSize || !maskSize) return toast.error(t('image.invalidType'));
+      if (!sameRatio(maskSize, imageSize))
+        return toast.error(t('raycast.maskRatio', { mask: formatRatio(maskSize), map: formatRatio(imageSize) }));
+    }
     setUploading(true);
     try {
       const uploaded = await imageService.upload(file);
       await setImage(uploaded.fileName, uploaded.url);
+      if (maskFile) {
+        const mask = await imageService.upload(maskFile);
+        setMaskImage(mask.fileName, mask.url);
+      }
       toast.success(t('toast.imageUploaded'));
       setFile(null);
+      setMaskFile(null);
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
@@ -95,6 +123,14 @@ export const ImageModal = ({ open, onOpenChange }: ImageModalProps) => {
             <input id="image-file" type="file" className="form-control" accept={ACCEPTED_IMAGE_TYPES.join(',')}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </div>
+          {canEdit && (
+            <div className="mb-3">
+              <label className="form-label" htmlFor="image-mask-file">{t('image.maskFile')}</label>
+              <input id="image-mask-file" type="file" className="form-control" accept={ACCEPTED_IMAGE_TYPES.join(',')}
+                onChange={(e) => setMaskFile(e.target.files?.[0] ?? null)} />
+              <div className="form-text">{t('image.maskHint')}</div>
+            </div>
+          )}
           <button type="submit" className="btn btn-primary" disabled={uploading || !file}>
             {uploading ? t('common.loading') : t('image.upload')}
           </button>

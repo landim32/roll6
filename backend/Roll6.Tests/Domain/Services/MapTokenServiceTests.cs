@@ -25,6 +25,7 @@ public class MapTokenServiceTests
     private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly MapTokenService _service;
 
     private const long APPROVED = 70;
@@ -45,9 +46,10 @@ public class MapTokenServiceTests
         _tokenRepository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, UserId = 9, Name = "Goblin" });
         _repository.Setup(r => r.InsertAsync(It.IsAny<MapToken>())).ReturnsAsync((MapToken t) => t);
         _repository.Setup(r => r.UpdateAsync(It.IsAny<MapToken>())).ReturnsAsync((MapToken t) => t);
+        _imageStorage.Setup(s => s.GetUrl(It.IsAny<string>())).Returns((string? name) => name == null ? null : "https://x/" + name);
         _service = new MapTokenService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _tokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _turnRepository.Object, _campaignRepository.Object,
-            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _notifier.Object);
+            _unitOfWork.Object, _imageStorage.Object, _notifier.Object);
     }
 
     [Fact]
@@ -746,6 +748,44 @@ public class MapTokenServiceTests
 
         result.Single().Space.Should().Be(10);
         result.Single().Posture.Should().BeNull();
+    }
+
+    private const string UP_IMAGE = "0123456789abcdef0123456789abcdef.png";
+    private const string FRONT_IMAGE = "fedcba9876543210fedcba9876543210.png";
+    private const string RIGHT_IMAGE = "aaaa1111bbbb2222cccc3333dddd4444.png";
+    private const string LEFT_IMAGE = "aaaa5555bbbb6666cccc7777dddd8888.png";
+    private const string BACK_IMAGE = "aaaa9999bbbb0000cccc1111dddd2222.png";
+
+    [Fact]
+    public async Task ListByMap_ReturnsTheFourSpriteImagesOfTheToken()
+    {
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 41, MapId = 30, TokenId = 7, Name = "Guerreira" } });
+        _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token>
+        {
+            new() { TokenId = 7, Name = "Guerreira", UpImage = UP_IMAGE, FrontImage = FRONT_IMAGE, RightImage = RIGHT_IMAGE, LeftImage = LEFT_IMAGE, BackImage = BACK_IMAGE }
+        });
+
+        var piece = (await _service.ListByMapAsync(1, 30)).Single();
+
+        piece.UpImageUrl.Should().Be("https://x/" + UP_IMAGE);
+        piece.FrontImageUrl.Should().Be("https://x/" + FRONT_IMAGE);
+        piece.RightImageUrl.Should().Be("https://x/" + RIGHT_IMAGE);
+        piece.LeftImageUrl.Should().Be("https://x/" + LEFT_IMAGE);
+        piece.BackImageUrl.Should().Be("https://x/" + BACK_IMAGE);
+    }
+
+    [Fact]
+    public async Task ListByMap_TokenWithoutSpriteImages_HasNoSpriteUrls()
+    {
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 41, MapId = 30, TokenId = 7, Name = "Guerreira" } });
+        _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token> { new() { TokenId = 7, Name = "Guerreira" } });
+
+        var piece = (await _service.ListByMapAsync(1, 30)).Single();
+
+        piece.FrontImageUrl.Should().BeNull();
+        piece.RightImageUrl.Should().BeNull();
+        piece.LeftImageUrl.Should().BeNull();
+        piece.BackImageUrl.Should().BeNull();
     }
 
     // ---- 031 US3: the posture changes the size ----

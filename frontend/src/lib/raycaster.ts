@@ -1,3 +1,4 @@
+import { FACE_HEIGHT_SHARE, FRONT_IMAGE_ASPECT } from './frontImage';
 import { HEX_SIZE } from './hexGrid';
 import type { Point } from './hexGrid';
 import { isMaskWall } from './maskImage';
@@ -13,7 +14,12 @@ import { isMaskWall } from './maskImage';
 
 /** Height of every wall and of the camera's eyes above the floor (world units). */
 export const WALL_HEIGHT = 3 * HEX_SIZE;
-export const EYE_HEIGHT = 1.6 * HEX_SIZE;
+/**
+ * Camera height: the face of a person. A figure of 1 hex is as wide as a hex (2 × HEX_SIZE) and its "2,5D frente" image is a
+ * 3:4 portrait, so the image is `2 × HEX_SIZE / 0.75` tall, the silhouette (the character) is 60% of that and its eyes are
+ * `FACE_HEIGHT_SHARE` of it above the feet — about 59.7 units, a little under the top of the head (64).
+ */
+export const EYE_HEIGHT = FACE_HEIGHT_SHARE * ((2 * HEX_SIZE) / FRONT_IMAGE_ASPECT);
 /** Distance (world units) at which walls and floor are half as bright. */
 export const SHADE_FALLOFF = 12 * HEX_SIZE;
 /** Sprites closer than this (depth, world units) are not drawn. */

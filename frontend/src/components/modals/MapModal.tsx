@@ -5,6 +5,10 @@ import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import { Tabs } from '../ui/Tabs';
 import { PagedListView } from '../ui/PagedListView';
+import { PencilIcon } from '../ui/icons';
+import { MapEditModal } from './MapEditModal';
+import type { MapEditTarget } from './MapEditModal';
+import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { mapModelService } from '../../Services/mapModelService';
@@ -26,6 +30,8 @@ const PAGE_SIZE = 10;
 export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { session } = useAuth();
+  const userId = session?.user.userId ?? null;
   const { currentCampaign } = useCampaign();
   const { loadMapModel, newMap } = useMapEditor();
   const [tab, setTab] = useState('campaign');
@@ -33,6 +39,8 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
   const [models, setModels] = useState<PagedList<MapModelInfo> | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  /** Map whose "Editar" button was clicked (name, grid, image, 3D mask and background). */
+  const [editing, setEditing] = useState<MapEditTarget | null>(null);
 
   const load = useCallback(async (page: number) => {
     setLoading(true);
@@ -78,6 +86,13 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
     onOpenChange(false);
   };
 
+  const editButton = (target: MapEditTarget) => (
+    <button type="button" className="btn btn-sm btn-outline-secondary" title={t('mapModal.edit')} aria-label={t('mapModal.edit')}
+      onClick={() => setEditing(target)}>
+      <PencilIcon size={14} />
+    </button>
+  );
+
   const renderMap = (name: string, imageUrl: string | null, cols: number, rows: number, extra?: string) => (
     <div className="d-flex align-items-center gap-3">
       {imageUrl ? <img className="stm-thumb" src={imageUrl} alt="" /> : <div className="stm-thumb" />}
@@ -121,6 +136,7 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
             renderItem={(m) => renderMap(m.name, m.mapModelImageUrl, m.gridWidth, m.gridHeight)}
             getKey={(m) => m.mapId}
             onSelect={(m) => open_(m.mapModelId, m)}
+            renderActions={(m) => (m.userId === userId ? editButton({ mapModelId: m.mapModelId, map: m }) : null)}
             onPageChange={load}
           />
         ) : (
@@ -133,9 +149,15 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
           renderItem={(m) => renderMap(m.name, m.imageUrl, m.gridWidth, m.gridHeight, m.description ?? undefined)}
           getKey={(m) => m.mapModelId}
           onSelect={(m) => open_(m.mapModelId, null)}
+          renderActions={(m) => (m.userId === userId ? editButton({ mapModelId: m.mapModelId, map: null }) : null)}
           onPageChange={load}
         />
       )}
+      <MapEditModal
+        target={editing}
+        onClose={() => setEditing(null)}
+        onSaved={() => { void load((tab === 'campaign' ? campaignMaps?.page : models?.page) ?? 1); }}
+      />
     </Modal>
   );
 };
