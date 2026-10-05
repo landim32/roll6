@@ -88,7 +88,7 @@ No cadastro de token há uma nova imagem opcional, **"2,5D frente"**: o desenho 
 3. **Given** uma peça cujo token não tem "2,5D frente", **When** vista no 3D, **Then** aparece com a imagem atual do token.
 4. **Given** uma peça atrás de uma parede, **When** a cena é desenhada, **Then** a parede a esconde, total ou parcialmente.
 5. **Given** a vista 3D aberta, **When** alguém move, coloca ou remove uma peça, **Then** a figura muda em até 2 segundos, sem recarregar.
-6. **Given** uma peça caída ou fora de combate, **When** vista no 3D, **Then** a postura é reconhecível (deitada e/ou em preto e branco), coerente com o 2D.
+6. **Given** uma peça caída ou fora de combate, **When** o usuário olha o 3D, **Then** ela não aparece (o 3D só desenha figuras em pé); no 2D continua aparecendo deitada, e volta ao 3D quando ficar em pé de novo.
 
 ---
 
@@ -116,6 +116,7 @@ O tipo de mapa, as paredes pintadas por célula, o bloqueio das peças por pared
 - Imagem do mapa trocada depois de enviar a máscara: se a proporção mudou, o mestre é avisado de que a máscara não corresponde mais e pode trocá-la ou removê-la.
 - Peça em cima de uma área preta da máscara (permitido, a máscara não bloqueia o 2D): no 3D ela aparece normalmente, encostada ou dentro da parede; a câmera presa a ela se aproxima o necessário para não ficar dentro da parede.
 - Personagem escolhido sem peça no mapa, ou mestre como GM: a câmera começa solta no centro do mapa.
+- Personagem escolhido caído ou fora de combate: a figura dele não aparece no 3D, mas a câmera continua seguindo a posição da peça.
 - A câmera presa ao personagem e uma parede entre ela e a peça: a câmera se aproxima da peça em vez de ficar atrás da parede.
 - Celular (< 768 px): andar por um controle na tela, girar arrastando, zoom com pinça.
 - Dispositivo que não consegue desenhar a vista: mensagem clara e permanece no 2D.
@@ -157,7 +158,7 @@ O tipo de mapa, as paredes pintadas por célula, o bloqueio das peças por pared
 - **FR-019**: Na vista 3D, cada peça (PJ, NPC ou objeto) MUST aparecer como uma figura em pé que sempre encara a câmera, com a imagem "2,5D frente" do token ou, sem ela, a imagem atual do token.
 - **FR-020**: As figuras MUST ficar ocultas pelas paredes que estão entre elas e a câmera, inclusive parcialmente (uma figura pela metade atrás da quina de uma parede).
 - **FR-021**: Mudanças nas peças (colocar, mover, girar, remover, postura) MUST aparecer no 3D em tempo real.
-- **FR-022**: Peças caídas MUST aparecer deitadas e peças fora de combate em preto e branco, como no 2D.
+- **FR-022**: Peças caídas e peças fora de combate MUST NOT aparecer no 3D (o 3D só desenha figuras em pé); no 2D continuam como antes. Objetos, que não têm postura, sempre aparecem.
 
 **Retirada do que a 033 acrescentou**
 

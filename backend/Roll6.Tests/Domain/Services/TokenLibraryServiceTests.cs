@@ -15,13 +15,15 @@ public class TokenLibraryServiceTests
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly Mock<ICharacterRepository<Character>> _characterRepository = new();
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
+    private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly TokenLibraryService _service;
 
     public TokenLibraryServiceTests()
     {
         _repository.Setup(r => r.InsertAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
         _repository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, UserId = 1, Name = "Goblin" });
-        _service = new TokenLibraryService(_repository.Object, _mapTokenRepository.Object, _characterRepository.Object, _npcRepository.Object, Mock.Of<IImageStorageAppService>());
+        _imageStorage.Setup(s => s.GetUrl(It.IsAny<string>())).Returns((string? name) => name == null ? null : "https://x/" + name);
+        _service = new TokenLibraryService(_repository.Object, _mapTokenRepository.Object, _characterRepository.Object, _npcRepository.Object, _imageStorage.Object);
     }
 
     private const string DOWN_IMAGE = "0123456789abcdef0123456789abcdef.png";
@@ -82,6 +84,99 @@ public class TokenLibraryServiceTests
         var result = await _service.UpdateAsync(1, 7, new TokenInsertInfo { Name = "Goblin" });
 
         result.FrontImage.Should().BeNull();
+    }
+
+    private const string RIGHT_IMAGE = "aaaa1111bbbb2222cccc3333dddd4444.png";
+    private const string LEFT_IMAGE = "aaaa5555bbbb6666cccc7777dddd8888.png";
+    private const string BACK_IMAGE = "aaaa9999bbbb0000cccc1111dddd2222.png";
+
+    [Fact]
+    public async Task Create_WithTheFourDirectionImages_KeepsThemAll()
+    {
+        var result = await _service.CreateAsync(1, new TokenInsertInfo
+        {
+            Name = "Guerreira", FrontImage = FRONT_IMAGE, RightImage = RIGHT_IMAGE, LeftImage = LEFT_IMAGE, BackImage = BACK_IMAGE
+        });
+
+        result.FrontImage.Should().Be(FRONT_IMAGE);
+        result.RightImage.Should().Be(RIGHT_IMAGE);
+        result.LeftImage.Should().Be(LEFT_IMAGE);
+        result.BackImage.Should().Be(BACK_IMAGE);
+        result.RightImageUrl.Should().Be("https://x/" + RIGHT_IMAGE);
+        result.LeftImageUrl.Should().Be("https://x/" + LEFT_IMAGE);
+        result.BackImageUrl.Should().Be("https://x/" + BACK_IMAGE);
+    }
+
+    [Fact]
+    public async Task Create_WithoutDirectionImages_HasNoneAndNoUrls()
+    {
+        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Guerreira" });
+
+        result.RightImage.Should().BeNull();
+        result.LeftImage.Should().BeNull();
+        result.BackImage.Should().BeNull();
+        result.RightImageUrl.Should().BeNull();
+        result.LeftImageUrl.Should().BeNull();
+        result.BackImageUrl.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("rightImage")]
+    [InlineData("leftImage")]
+    [InlineData("backImage")]
+    public async Task Create_WithInvalidDirectionImage_ThrowsOnItsOwnKey(string field)
+    {
+        var info = field switch
+        {
+            "rightImage" => new TokenInsertInfo { Name = "Guerreira", RightImage = "side.gif" },
+            "leftImage" => new TokenInsertInfo { Name = "Guerreira", LeftImage = "side.gif" },
+            _ => new TokenInsertInfo { Name = "Guerreira", BackImage = "side.gif" }
+        };
+
+        var act = () => _service.CreateAsync(1, info);
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey(field);
+    }
+
+    [Fact]
+    public async Task Update_OmittingTwoDirectionImages_RemovesOnlyThose()
+    {
+        _repository.Setup(r => r.GetByIdAsync(8)).ReturnsAsync(new Token
+        {
+            TokenId = 8, UserId = 1, Name = "Guerreira",
+            FrontImage = FRONT_IMAGE, RightImage = RIGHT_IMAGE, LeftImage = LEFT_IMAGE, BackImage = BACK_IMAGE
+        });
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
+
+        // PUT replaces every field: the images that are not sent are removed, the ones sent stay.
+        var result = await _service.UpdateAsync(1, 8, new TokenInsertInfo { Name = "Guerreira", FrontImage = FRONT_IMAGE, LeftImage = LEFT_IMAGE });
+
+        result.FrontImage.Should().Be(FRONT_IMAGE);
+        result.LeftImage.Should().Be(LEFT_IMAGE);
+        result.RightImage.Should().BeNull();
+        result.BackImage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_ChangingOnlyTheRightImage_KeepsTheOtherThree()
+    {
+        const string newRight = "aaaa3333bbbb4444cccc5555dddd6666.png";
+        _repository.Setup(r => r.GetByIdAsync(9)).ReturnsAsync(new Token
+        {
+            TokenId = 9, UserId = 1, Name = "Guerreira",
+            FrontImage = FRONT_IMAGE, RightImage = RIGHT_IMAGE, LeftImage = LEFT_IMAGE, BackImage = BACK_IMAGE
+        });
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
+
+        var result = await _service.UpdateAsync(1, 9, new TokenInsertInfo
+        {
+            Name = "Guerreira", FrontImage = FRONT_IMAGE, RightImage = newRight, LeftImage = LEFT_IMAGE, BackImage = BACK_IMAGE
+        });
+
+        result.RightImage.Should().Be(newRight);
+        result.FrontImage.Should().Be(FRONT_IMAGE);
+        result.LeftImage.Should().Be(LEFT_IMAGE);
+        result.BackImage.Should().Be(BACK_IMAGE);
     }
 
     [Fact]

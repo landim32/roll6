@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import Cropper from 'react-easy-crop';
 import type { Area } from 'react-easy-crop';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +44,8 @@ interface ImageCropperProps {
   compact?: boolean;
   /** Called when the cropper opens (a file was chosen) or closes, e.g. to give it the full width. */
   onCroppingChange?: (cropping: boolean) => void;
+  /** Style of the crop frame, e.g. a background guide (the "2,5D frente" silhouette). Only a guide: never saved. */
+  cropAreaStyle?: CSSProperties;
 }
 
 /** Below 1 the image shrinks inside the frame; the uncovered part is saved transparent. */
@@ -65,7 +68,7 @@ const normalizeRotation = (degrees: number): number => {
  */
 export const ImageCropper = ({
   id, onChange, hasCurrent = false, currentUrl, currentName = '', onRemoveCurrent, shape = 'round', aspect = 1,
-  rotatable = false, hint, compact = false, onCroppingChange,
+  rotatable = false, hint, compact = false, onCroppingChange, cropAreaStyle,
 }: ImageCropperProps) => {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
@@ -149,7 +152,8 @@ export const ImageCropper = ({
               maxZoom={MAX_ZOOM}
               aspect={aspect}
               cropShape={shape === 'square' ? 'rect' : 'round'}
-              showGrid={shape === 'square'}
+              showGrid={shape === 'square' && !cropAreaStyle}
+              style={{ cropAreaStyle }}
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onRotationChange={rotatable ? setRotation : undefined}

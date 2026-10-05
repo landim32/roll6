@@ -1,7 +1,7 @@
 {
   "integration": "qwen",
   "version": "0.4.5.dev0",
-  "installed_at": "2026-09-30T20:01:01.324180+00:00",
+  "installed_at": "2026-10-04T23:39:11.494984+00:00",
   "files": {
     ".qwen/commands/speckit.analyze.md": "cc2ccad9ab1b97c44d21139dd976bea7fba7769accf799e429ef93f3869d8fee",
     ".qwen/commands/speckit.checklist.md": "f5b732abcd53392fa37117170455ce13cf4e7cf4b5f30f4b181f9d6df8d492bb",

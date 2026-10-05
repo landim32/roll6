@@ -43,21 +43,3 @@ export const initialPixels = (name: string, color: string): PixelBuffer => {
   ctx.fillText(name.trim().charAt(0).toUpperCase() || '?', 48, 51);
   return { data: ctx.getImageData(0, 0, 96, 96).data, width: 96, height: 96 };
 };
-
-/** The same pixels turned a quarter turn clockwise (a standing image used lying on its side). */
-export const rotateQuarter = (pixels: PixelBuffer): PixelBuffer => {
-  const { width, height, data } = pixels;
-  const out = new Uint8ClampedArray(data.length);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const from = (y * width + x) * 4;
-      // (x, y) → (height − 1 − y, x) in an image `height` wide and `width` tall.
-      const to = (x * height + (height - 1 - y)) * 4;
-      out[to] = data[from];
-      out[to + 1] = data[from + 1];
-      out[to + 2] = data[from + 2];
-      out[to + 3] = data[from + 3];
-    }
-  }
-  return { data: out, width: height, height: width };
-};

@@ -105,10 +105,16 @@ public static class Roll6Guide
           that covers the same area: black is wall, white is empty space. It only draws the 3D view — it never blocks
           or hides anything on the 2D map and pieces may stand on black areas. Without it the 3D view has no walls.
         - **`backgroundImage`** is a 360° panorama shown behind the walls, like a sky; a narrow image repeats.
-        - Tokens may have a **`frontImage`** ("2.5D front"): the figure seen from the front, standing, drawn in the 3D view;
-          without it the standing `upImage` is used.
-        - `update_map_model` and `update_token` replace every field: send `maskImage`, `backgroundImage` and `frontImage`
-          back unchanged or they are removed.
+        - Tokens may have four **"2.5D" images**, one per side of the standing character: **`frontImage`** (seen from the
+          front), **`rightImage`** (in profile, looking to the RIGHT of the image), **`leftImage`** (in profile, looking
+          to the LEFT of the image) and **`backImage`** (seen from behind). "Right" and "left" are the character's own
+          sides. All four are the same 3:4 portrait over the same silhouette, and each one is optional.
+        - The 3D view draws, for every standing piece, the image of the side the camera sees, compared with the direction
+          the piece faces (`look`): its front within ±45° of that direction, its back within ±45° of the opposite one,
+          the two sides in between. Where that image is missing it mirrors the opposite side (only sides mirror), then
+          uses `frontImage`, then the standing `upImage`; the back is never mirrored.
+        - `update_map_model` and `update_token` replace every field: send `maskImage`, `backgroundImage` and the four
+          "2.5D" images back unchanged or they are removed.
 
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move

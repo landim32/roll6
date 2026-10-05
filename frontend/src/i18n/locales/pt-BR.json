@@ -185,9 +185,22 @@
     "name": "Nome",
     "description": "Descrição (opcional)",
     "upImage": "Imagem em pé",
-    "frontImage": "2,5D frente",
-    "frontImageHint": "Personagem de pé, visto de frente (de preferência PNG com fundo transparente). Usada na vista 3D; sem ela vale a imagem em pé.",
-    "frontImageRemove": "Remover imagem 2,5D frente",
+    "tabToken": "Token",
+    "tabSprites": "2,5D",
+    "spritesHelp": "Os quatro lados usam a mesma silhueta. Lado sem imagem usa a oposta espelhada (laterais), a frente ou a imagem em pé.",
+    "view": {
+      "front": "Frente",
+      "right": "Direita",
+      "left": "Esquerda",
+      "back": "Costas"
+    },
+    "viewHint": {
+      "front": "Personagem de pé, visto de frente.",
+      "right": "Personagem de pé, de perfil, olhando para a direita da imagem (vemos o lado direito dele).",
+      "left": "Personagem de pé, de perfil, olhando para a esquerda da imagem (vemos o lado esquerdo dele).",
+      "back": "Personagem de pé, visto de costas."
+    },
+    "spriteCropHint": "A silhueta é só um guia e não vai para a imagem salva ({{width}}×{{height}}). Os pés ficam na borda de baixo: diminua o zoom para deixar o personagem menor na vista 3D, aumente para deixá-lo maior.",
     "downImage": "Imagem deitado (opcional)",
     "upSpace": "Espaço em pé",
     "downSpace": "Espaço deitado (opcional)",
@@ -351,7 +364,16 @@
     "noCampaign": "Escolha uma campanha para ver os mapas dela.",
     "searchPlaceholder": "Nome ou descrição",
     "newMap": "Novo mapa",
+    "edit": "Editar mapa",
     "grid": "Grid {{cols}} × {{rows}}"
+  },
+  "mapEdit": {
+    "title": "Editar mapa",
+    "image": "Imagem do cenário",
+    "imageHint": "Trocar a imagem a recoloca no tamanho original. A máscara precisa ter a mesma proporção dela.",
+    "onlyName": "Este mapa usa uma imagem de outra pessoa: você só pode mudar o nome dele na campanha.",
+    "readOnly": "Este mapa é de outra pessoa: você pode ver, mas não alterar.",
+    "saved": "Mapa \"{{name}}\" atualizado."
   },
   "image": {
     "title": "Imagem do cenário",
@@ -365,7 +387,9 @@
     "invalidType": "Formato não suportado. Use PNG, JPEG ou WebP.",
     "tooLarge": "A imagem deve ter no máximo 10 MB.",
     "noFile": "Escolha um arquivo.",
-    "noImage": "Este mapa não tem imagem."
+    "noImage": "Este mapa não tem imagem.",
+    "maskFile": "Máscara 3D (opcional)",
+    "maskHint": "Preto = parede, branco = espaço vazio. Mesma proporção da imagem. Só aparece na vista 3D."
   },
   "story": {
     "view2d": "Ver em 2D",
@@ -557,6 +581,7 @@
     "currentMap": "Atual",
     "noMaps": "Esta campanha ainda não tem mapas.",
     "openMap": "Abrir",
+    "editMap": "Editar mapa",
     "archiveMap": "Arquivar",
     "restoreMap": "Reativar",
     "deleteMap": "Excluir mapa",

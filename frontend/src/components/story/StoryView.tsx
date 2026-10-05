@@ -6,14 +6,15 @@ import { useMapToken } from '../../hooks/useMapToken';
 import { useStoryCamera } from '../../hooks/useStoryCamera';
 import type { FollowedPiece } from '../../hooks/useStoryCamera';
 import { HEX_SIZE } from '../../lib/hexGrid';
-import { loadImage, toGrayscale } from '../../lib/mapSnapshot';
-import { spriteSpec } from '../../lib/pieceDrawing';
+import { loadImage } from '../../lib/mapSnapshot';
+import { isShownIn3d, spriteSpec } from '../../lib/pieceDrawing';
+import { SPRITE_VIEWS } from '../../lib/spriteView';
 import type { SpriteSpec } from '../../lib/pieceDrawing';
 import { buildMaskGrid } from '../../lib/raycaster';
 import type { MapArea, MaskGrid } from '../../lib/raycaster';
 import { cameraBlocker } from '../../lib/storyCamera';
 import { FollowCharacterIcon } from '../ui/icons';
-import { initialPixels, rotateQuarter, toPixels } from './imagePixels';
+import { initialPixels, toPixels } from './imagePixels';
 import type { PixelBuffer } from './imagePixels';
 import { CanvasUnavailableError, createRaycastRenderer } from './raycastRenderer';
 import type { RaycastRenderer, RenderSprite } from './raycastRenderer';
@@ -160,35 +161,35 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     return () => { cancelled = true; };
   }, [ready, backgroundImageUrl]);
 
-  // The figures: each piece with the image its posture and token ask for, read once per URL.
+  // The figures: each standing piece with the four "2,5D" images of its token (035), read once per URL — pieces of the
+  // same token share the cache. A figure is handed to the renderer only after all its images finished; the ones that
+  // are missing or failed stay null and the renderer uses the reserve, so a slow or broken image never stops the 3D.
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
+    const pixelsOf = (url: string | null): Promise<PixelBuffer | null> => {
+      if (!url) return Promise.resolve(null);
+      const cached = spriteImages.current.get(url);
+      if (cached) return cached;
+      // One image that cannot be read is a hole in the figure (the reserve takes it), never a frame without figures.
+      const pending = readImage(url, SPRITE_MAX_SIDE).catch(() => null);
+      spriteImages.current.set(url, pending);
+      return pending;
+    };
     const figure = async (spec: SpriteSpec): Promise<RenderSprite> => {
-      let pixels: PixelBuffer | null = null;
-      if (spec.imageUrl) {
-        let pending = spriteImages.current.get(spec.imageUrl);
-        if (!pending) {
-          pending = readImage(spec.imageUrl, SPRITE_MAX_SIDE);
-          spriteImages.current.set(spec.imageUrl, pending);
-        }
-        const source = await pending;
-        if (source) {
-          // Each figure gets its own copy: lying on its side and black and white change the pixels.
-          pixels = { data: new Uint8ClampedArray(source.data), width: source.width, height: source.height };
-          if (spec.sideways) pixels = rotateQuarter(pixels);
-          if (spec.grayscale) toGrayscale(pixels.data);
-        }
-      }
+      const [front, right, left, back] = await Promise.all(SPRITE_VIEWS.map((view) => pixelsOf(spec.views[view])));
+      const standing = await pixelsOf(spec.fallbackUrl);
       return {
         id: spec.mapTokenId,
-        pixels: pixels ?? initialPixels(spec.name, spec.baseColor),
+        images: { front, right, left, back },
+        fallback: standing ?? initialPixels(spec.name, spec.baseColor),
         center: spec.center,
         width: spec.width,
-        heightRatio: spec.heightRatio,
+        look: spec.look,
       };
     };
-    void Promise.all(pieces.map((piece) => figure(spriteSpec(piece, HEX_SIZE)))).then((sprites) => {
+    // Only the pieces standing are drawn: the ones down or out of combat are left out of the 3D view.
+    void Promise.all(pieces.filter(isShownIn3d).map((piece) => figure(spriteSpec(piece, HEX_SIZE)))).then((sprites) => {
       if (!cancelled) rendererRef.current?.setSprites(sprites);
     });
     return () => { cancelled = true; };

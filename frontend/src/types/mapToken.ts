@@ -35,6 +35,10 @@ export interface MapTokenInfo {
   upImageUrl: string | null;
   /** "2,5D frente" image of the piece's token (034), the standing figure of the 3D view. */
   frontImageUrl: string | null;
+  /** "2,5D" side and back images of the piece's token (035); the 3D view draws the side it sees. */
+  rightImageUrl: string | null;
+  leftImageUrl: string | null;
+  backImageUrl: string | null;
   downImageUrl: string | null;
   campaignCharacterId: number | null;
   characterId: number | null;
