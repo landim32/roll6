@@ -139,7 +139,7 @@ public partial class MapTokenService : IMapTokenService
     /// <summary>
     /// Moves and turns a piece (015). The master moves any piece without limit; a player moves only the piece of
     /// his own approved character, and the cheapest cost (1 per step into the hex ahead + 1 per 60° turn,
-    /// around the other pieces) must fit the character's move.
+    /// around the other pieces) must fit the participation's Deslocamento (037, not the character's own move).
     /// </summary>
     public async Task<MapTokenInfo> MoveAsync(long userId, long mapTokenId, MapTokenPositionInfo info)
     {
@@ -196,7 +196,10 @@ public partial class MapTokenService : IMapTokenService
             (mapToken.X, mapToken.Y, mapToken.Look), (x, y, look), moved);
     }
 
-    /// <summary>A player moves only his own approved character, within its move (the whole shape around the other pieces).</summary>
+    /// <summary>
+    /// A player moves only his own approved character, within its Deslocamento in this campaign (037) — the whole
+    /// shape around the other pieces.
+    /// </summary>
     private async Task EnsurePlayerMoveAsync(long userId, MapLayout layout, MapToken mapToken, int x, int y, int look)
     {
         var participation = mapToken.CampaignCharacterId is long participationId
@@ -207,7 +210,7 @@ public partial class MapTokenService : IMapTokenService
             throw new UnauthorizedAccessException("Você só pode mover os seus personagens.");
 
         var cost = layout.MovementCost(mapToken, x, y, look);
-        if (cost == null || cost > character.Move)
+        if (cost == null || cost > participation.CurrentMove)
             throw new DomainValidationException("move", "O movimento passou do máximo.");
     }
 
@@ -344,7 +347,8 @@ public partial class MapTokenService : IMapTokenService
                 var character = characters.GetValueOrDefault(participation.CharacterId);
                 info.CharacterId = participation.CharacterId;
                 info.Name = character?.Name ?? mapToken.Name;
-                info.Move = character?.Move ?? 0;
+                // The player's limit in this campaign (037), what the Mover mode counts against.
+                info.Move = participation.CurrentMove;
                 info.Life = participation.CurrentLife;
                 info.Energy = participation.CurrentEnergy;
                 info.TotalLife = character?.Life ?? participation.CurrentLife;

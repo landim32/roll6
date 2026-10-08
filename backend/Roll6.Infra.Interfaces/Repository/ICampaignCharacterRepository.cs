@@ -27,4 +27,10 @@ public interface ICampaignCharacterRepository<TModel> where TModel : class
 
     /// <summary>Lowers current life/energy above the new totals in every campaign of the character.</summary>
     Task ClampVitalsAsync(long characterId, int totalLife, int totalEnergy);
+
+    /// <summary>
+    /// The character's move changed from <paramref name="oldMove"/> to <paramref name="newMove"/>: the participations
+    /// whose Deslocamento still equals the old move follow it; the adjusted ones keep their value (037).
+    /// </summary>
+    Task FollowMoveAsync(long characterId, int oldMove, int newMove);
 }

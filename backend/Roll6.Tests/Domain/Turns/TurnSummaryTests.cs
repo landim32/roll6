@@ -188,6 +188,15 @@ public class TurnSummaryTests
     }
 
     [Fact]
+    public void Build_DeslocamentoChange_IsANumber()
+    {
+        var line = Line(TurnType.CharacterUpdate, "Cedric (José)") with { Changes = new[] { new TurnChange("currentMove", "5", "1") } };
+
+        TurnSummary.Build(new[] { line }, Array.Empty<SummaryPosition>())
+            .Should().Contain("Cedric (José): Alterou: Deslocamento de 5 para 1");
+    }
+
+    [Fact]
     public void Build_PostureChange_UsesTheLabels()
     {
         var line = Line(TurnType.CharacterUpdate, "Cedric (José)") with { Changes = new[] { new TurnChange("posture", "1", "2") } };

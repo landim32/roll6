@@ -62,6 +62,14 @@ public class TurnDataCharacterInfo
     [JsonPropertyName("totalEnergy")]
     public int TotalEnergy { get; set; }
 
+    /// <summary>Movement points the character may spend per turn on this campaign's maps (Deslocamento, 037).</summary>
+    [JsonPropertyName("currentMove")]
+    public int CurrentMove { get; set; }
+
+    /// <summary>The character's permanent move (where the Deslocamento starts from).</summary>
+    [JsonPropertyName("move")]
+    public int Move { get; set; }
+
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 

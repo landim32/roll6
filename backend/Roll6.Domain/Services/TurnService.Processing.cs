@@ -141,6 +141,8 @@ public partial class TurnService
                         TotalLife = character.Life,
                         CurrentEnergy = p.CurrentEnergy,
                         TotalEnergy = character.Energy,
+                        CurrentMove = p.CurrentMove,
+                        Move = character.Move,
                         Status = p.CharacterStatus,
                         Posture = (int)p.Posture,
                         MapTokenId = piece?.MapTokenId,
@@ -302,6 +304,9 @@ public partial class TurnService
             var energy = item.CurrentEnergy ?? participation.CurrentEnergy;
             var status = NewStatus(prefix, item, participation.CharacterStatus);
             var posture = NewPosture(prefix, item, participation.Posture);
+            var move = item.CurrentMove ?? participation.CurrentMove;
+            if (move < 0)
+                Error($"{prefix}.currentMove", "O deslocamento não pode ser negativo.");
             CheckVitals(prefix, life, energy, character.Life, character.Energy);
             var piece = pieces.FirstOrDefault(p => p.CampaignCharacterId == participation.CampaignCharacterId);
             var target = Target(prefix, item, piece);
@@ -311,12 +316,14 @@ public partial class TurnService
             var changes = TurnChange.Diff(
                 ("currentLife", participation.CurrentLife, life),
                 ("currentEnergy", participation.CurrentEnergy, energy),
+                ("currentMove", participation.CurrentMove, move),
                 ("characterStatus", participation.CharacterStatus, status),
                 ("posture", (int)participation.Posture, (int)posture));
             if (changes.Count > 0)
             {
                 participation.UpdatePlay(life, energy, status, participation.Sheet, character.Life, character.Energy);
                 participation.ChangePosture((int)posture);
+                participation.ChangeMove(move);
                 updatedParticipations.Add(participation);
                 turns.Add(Turn.CharacterUpdate(campaignId, mapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes));
             }

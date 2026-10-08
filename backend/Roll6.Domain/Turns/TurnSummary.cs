@@ -39,7 +39,7 @@ public static class TurnSummary
     /// <summary>Flat-top hexes have no east/west side: look 0–5 clockwise from the top.</summary>
     private static readonly string[] DIRECTIONS = { "Norte", "Nordeste", "Sudeste", "Sul", "Sudoeste", "Noroeste" };
 
-    private static readonly HashSet<string> NUMBER_FIELDS = new() { "currentLife", "currentEnergy", "life", "energy", "move" };
+    private static readonly HashSet<string> NUMBER_FIELDS = new() { "currentLife", "currentEnergy", "currentMove", "life", "energy", "move" };
 
     public static string Direction(int look) => look >= 0 && look < DIRECTIONS.Length ? DIRECTIONS[look] : look.ToString();
 
@@ -138,6 +138,7 @@ public static class TurnSummary
             "life" => isNpc ? "Vida" : "Vida total",
             "energy" => isNpc ? "Energia" : "Energia total",
             "move" => "Movimento",
+            "currentMove" => "Deslocamento",
             "name" => "Nome",
             "characterStatus" or "status" => "Status",
             "posture" => "Postura",

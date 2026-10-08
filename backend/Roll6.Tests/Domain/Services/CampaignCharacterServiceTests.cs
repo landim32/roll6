@@ -675,4 +675,93 @@ public class CampaignCharacterServiceTests
             .Which.Errors.Should().ContainKey("posture");
         _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
     }
+
+    // ---- 037: Deslocamento (movement limit in the campaign) ----
+
+    private void SetupMoving(long id, int currentMove = 5) =>
+        _repository.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = id, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved,
+            CurrentLife = 10, CurrentEnergy = 6, CurrentMove = currentMove
+        });
+
+    [Theory]
+    [InlineData(MASTER_ID)]
+    [InlineData(PLAYER_ID)]
+    public async Task Update_OwnerOrMaster_ChangesTheDeslocamento_NotTheCharactersMove(long userId)
+    {
+        SetupMoving(100);
+
+        var result = await _service.UpdateAsync(userId, 100, new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6, CurrentMove = 1 });
+
+        result.CurrentMove.Should().Be(1);
+        result.CharacterMove.Should().Be(5, "the character's permanent move does not change");
+        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignCharacter>(p => p.CurrentMove == 1)), Times.Once);
+        _characterRepository.Verify(r => r.UpdateAsync(It.IsAny<Character>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_NullDeslocamento_KeepsIt()
+    {
+        SetupMoving(101, currentMove: 2);
+
+        var result = await _service.UpdateAsync(MASTER_ID, 101, new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6 });
+
+        result.CurrentMove.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Update_NegativeDeslocamento_Throws()
+    {
+        SetupMoving(102);
+
+        (await _service.Invoking(s => s.UpdateAsync(MASTER_ID, 102,
+                new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6, CurrentMove = -1 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("currentMove");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_DeslocamentoByAnotherParticipant_Throws()
+    {
+        SetupMoving(103);
+        _repository.Setup(r => r.HasApprovedCharacterAsync(CLOSED_CAMPAIGN, OUTSIDER_ID)).ReturnsAsync(true);
+
+        await _service.Invoking(s => s.UpdateAsync(OUTSIDER_ID, 103,
+                new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6, CurrentMove = 9 }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_Deslocamento_IsRecordedInTheTurn()
+    {
+        SetupMoving(104);
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        await _service.UpdateAsync(PLAYER_ID, 104, new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6, CurrentMove = 1 });
+
+        recorded!.UserId.Should().Be(PLAYER_ID);
+        recorded.Changes!.Select(c => (c.Field, c.Before, c.After)).Should().Equal(("currentMove", "5", "1"));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED && e.CampaignId == CLOSED_CAMPAIGN)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_SameDeslocamento_RecordsNothing()
+    {
+        SetupMoving(105);
+
+        await _service.UpdateAsync(MASTER_ID, 105, new CampaignCharacterUpdateInfo { CurrentLife = 10, CurrentEnergy = 6, CurrentMove = 5 });
+
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RequestAccess_StartsTheDeslocamentoAtTheCharactersMove()
+    {
+        var result = await _service.RequestAccessAsync(PLAYER_ID, Request(OPEN_CAMPAIGN));
+
+        result.CurrentMove.Should().Be(5);
+    }
 }

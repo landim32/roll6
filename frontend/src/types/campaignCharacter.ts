@@ -31,8 +31,10 @@ export interface CampaignCharacterInfo {
   /** The character's totals. */
   totalLife: number;
   totalEnergy: number;
-  /** The character's move. */
+  /** The character's permanent move (the same in every campaign; only the owner changes it). */
   characterMove: number;
+  /** Movement limit per turn on this campaign's maps ("Deslocamento", 037); starts at `characterMove`. */
+  currentMove: number;
   /** Free-text condition of the character in this campaign (not the participation `status`). */
   characterStatus: string | null;
   /** Standing, down or out of combat in this campaign (031). */
@@ -68,6 +70,8 @@ export interface CampaignCharacterDetailInfo extends CampaignCharacterInfo {
 export interface CampaignCharacterUpdateInfo {
   currentLife: number;
   currentEnergy: number;
+  /** New movement limit in this campaign (037); null/omitted keeps the current one. */
+  currentMove?: number | null;
   characterStatus: string | null;
   sheet: string | null;
   /** New token of the character (saved on the character); null keeps the current one. */

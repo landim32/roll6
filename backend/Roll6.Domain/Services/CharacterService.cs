@@ -118,6 +118,9 @@ public class CharacterService : ICharacterService
             saved = await _repository.UpdateAsync(character);
             // Lower totals also lower the current values in every campaign (FR-011).
             await _campaignCharacterRepository.ClampVitalsAsync(character.CharacterId, character.Life, character.Energy);
+            // An unadjusted Deslocamento follows the new move; one the owner or the master changed stays (037).
+            if (before.Move != character.Move)
+                await _campaignCharacterRepository.FollowMoveAsync(character.CharacterId, before.Move, character.Move);
             foreach (var turn in turns)
                 await _turnRepository.InsertAsync(turn);
         });

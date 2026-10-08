@@ -10,7 +10,8 @@ namespace Roll6.Domain.Models;
 /// request → Approved (open campaign) or RequestedAccess (closed);
 /// Invited → Approved/Denied by the character owner; RequestedAccess → Approved/Denied by the master.
 /// Holds what belongs to the character in this campaign: current life/energy (totals live in <see cref="Character"/>),
-/// the character status and the campaign notes. The owner or the master may change them.
+/// the movement limit on this campaign's maps (Deslocamento, 037), the character status and the campaign sheet.
+/// The owner or the master may change them.
 /// </summary>
 public class CampaignCharacter
 {
@@ -20,6 +21,13 @@ public class CampaignCharacter
     public CampaignCharacterStatus Status { get; set; }
     public int CurrentLife { get; set; }
     public int CurrentEnergy { get; set; }
+
+    /// <summary>
+    /// Movement points a player may spend per turn with this character on the campaign's maps ("Deslocamento", 037):
+    /// copied from <see cref="Character.Move"/> on joining, then changed by the owner or the master; it follows the
+    /// character's move only while it still equals the old one. Never limits the master.
+    /// </summary>
+    public int CurrentMove { get; set; }
 
     /// <summary>Free-text condition in this campaign ("envenenado"); not the participation <see cref="Status"/>.</summary>
     public string? CharacterStatus { get; set; }
@@ -132,6 +140,20 @@ public class CampaignCharacter
         return true;
     }
 
+    /// <summary>Changes the movement limit in this campaign (037); false when it already was that one. Only while approved.</summary>
+    public bool ChangeMove(int value)
+    {
+        if (Status != CampaignCharacterStatus.Approved)
+            throw new ConflictException("Só personagens aprovados na campanha podem ter os dados da campanha alterados.");
+        if (value < 0)
+            throw new DomainValidationException("currentMove", "O deslocamento não pode ser negativo.");
+        if (value == CurrentMove)
+            return false;
+        CurrentMove = value;
+        UpdatedAt = DateTime.UtcNow;
+        return true;
+    }
+
     /// <summary>
     /// Changes this campaign's sheet file (032): a stored name from POST /api/document replaces it, an empty string
     /// removes it and null keeps the current one — this update is partial, unlike the character's. Only while approved;
@@ -173,7 +195,7 @@ public class CampaignCharacter
     }
 
     /// <summary>
-    /// Fresh start in the campaign (032 FR-003): current values at the character's totals, the campaign sheet and
+    /// Fresh start in the campaign (032 FR-003): current values at the character's totals and move, the campaign sheet and
     /// its file copied from the character, no status and standing. Done when the participation is created or
     /// becomes approved — the only copy there is, nothing re-syncs afterwards.
     /// </summary>
@@ -181,6 +203,7 @@ public class CampaignCharacter
     {
         CurrentLife = character.Life;
         CurrentEnergy = character.Energy;
+        CurrentMove = character.Move;
         Sheet = character.Sheet;
         SheetFile = character.SheetFile;
         CharacterStatus = null;

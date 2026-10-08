@@ -56,6 +56,10 @@ public class TurnProcessCharacterInfo : TurnProcessPieceInfo
 {
     [JsonPropertyName("characterId")]
     public long CharacterId { get; set; }
+
+    /// <summary>New Deslocamento in this campaign (037): 0 or more; null keeps the current one. Characters only.</summary>
+    [JsonPropertyName("currentMove")]
+    public int? CurrentMove { get; set; }
 }
 
 public class TurnProcessNpcInfo : TurnProcessPieceInfo

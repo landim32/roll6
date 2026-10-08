@@ -11,17 +11,18 @@ public class CampaignCharacterTests
     private const int ENERGY = 6;
     private const string SHEET = "Força 3";
     private const string SHEET_FILE = "0123456789abcdef0123456789abcdef.pdf";
+    private const int MOVE = 5;
 
     /// <summary>What a participation already holds before joining: its own campaign sheet, not the character's.</summary>
     private const string CAMPAIGN_SHEET = "Ficha antiga da campanha";
     private const string CAMPAIGN_SHEET_FILE = "fedcba9876543210fedcba9876543210.png";
 
-    private static readonly Character Hero = new() { CharacterId = 2, Life = LIFE, Energy = ENERGY, Sheet = SHEET, SheetFile = SHEET_FILE };
+    private static readonly Character Hero = new() { CharacterId = 2, Life = LIFE, Energy = ENERGY, Move = MOVE, Sheet = SHEET, SheetFile = SHEET_FILE };
 
     private static CampaignCharacter With(CampaignCharacterStatus status, int currentLife = 3, int currentEnergy = 1) =>
         new()
         {
-            CampaignId = 1, CharacterId = 2, Status = status, CurrentLife = currentLife, CurrentEnergy = currentEnergy,
+            CampaignId = 1, CharacterId = 2, Status = status, CurrentLife = currentLife, CurrentEnergy = currentEnergy, CurrentMove = 1,
             CharacterStatus = "envenenado", Sheet = CAMPAIGN_SHEET, SheetFile = CAMPAIGN_SHEET_FILE
         };
 
@@ -50,6 +51,7 @@ public class CampaignCharacterTests
             participation.CharacterId.Should().Be(Hero.CharacterId);
             participation.CurrentLife.Should().Be(LIFE);
             participation.CurrentEnergy.Should().Be(ENERGY);
+            participation.CurrentMove.Should().Be(MOVE, "the Deslocamento starts at the character's move (037)");
             participation.Sheet.Should().Be(SHEET, "the campaign sheet is copied from the character (032)");
             participation.SheetFile.Should().Be(SHEET_FILE);
             participation.CharacterStatus.Should().BeNull();
@@ -142,6 +144,7 @@ public class CampaignCharacterTests
         {
             participation.CurrentLife.Should().Be(LIFE);
             participation.CurrentEnergy.Should().Be(ENERGY);
+            participation.CurrentMove.Should().Be(MOVE, "the Deslocamento starts at the character's move (037)");
             participation.Sheet.Should().Be(SHEET, "the campaign sheet is copied from the character (032)");
             participation.SheetFile.Should().Be(SHEET_FILE);
             participation.CharacterStatus.Should().BeNull();
@@ -327,6 +330,46 @@ public class CampaignCharacterTests
     public void ChangeSheetFile_NotApproved_Throws(CampaignCharacterStatus status)
     {
         var act = () => With(status).ChangeSheetFile(SHEET_FILE);
+
+        act.Should().Throw<ConflictException>();
+    }
+
+    // ---- 037: movement limit in the campaign (Deslocamento) ----
+
+    [Fact]
+    public void ChangeMove_ChangesOnlyWhenDifferent()
+    {
+        var participation = With(CampaignCharacterStatus.Approved);
+
+        participation.ChangeMove(3).Should().BeTrue();
+        participation.CurrentMove.Should().Be(3);
+        participation.ChangeMove(3).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(12)]
+    public void ChangeMove_AcceptsZeroAndMoreThanTheCharactersMove(int move)
+    {
+        var participation = With(CampaignCharacterStatus.Approved);
+
+        participation.ChangeMove(move);
+
+        participation.CurrentMove.Should().Be(move);
+    }
+
+    [Fact]
+    public void ChangeMove_Negative_Throws()
+    {
+        var act = () => With(CampaignCharacterStatus.Approved).ChangeMove(-1);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("currentMove");
+    }
+
+    [Fact]
+    public void ChangeMove_NotApproved_Throws()
+    {
+        var act = () => With(CampaignCharacterStatus.Invited).ChangeMove(3);
 
         act.Should().Throw<ConflictException>();
     }

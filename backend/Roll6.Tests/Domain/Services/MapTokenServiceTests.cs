@@ -165,12 +165,13 @@ public class MapTokenServiceTests
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
-    private void SetupParticipation(long id, long campaignId, CampaignCharacterStatus status, long characterId, long? tokenId)
+    /// <summary>The character's move is always 5; <paramref name="currentMove"/> is its Deslocamento in the campaign (037).</summary>
+    private void SetupParticipation(long id, long campaignId, CampaignCharacterStatus status, long characterId, long? tokenId, int currentMove = 5)
     {
         _campaignCharacterRepository.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(new CampaignCharacter
         {
             CampaignCharacterId = id, CampaignId = campaignId, CharacterId = characterId, Status = status,
-            CurrentLife = 8, CurrentEnergy = 3, CharacterStatus = "ferida"
+            CurrentLife = 8, CurrentEnergy = 3, CurrentMove = currentMove, CharacterStatus = "ferida"
         });
         _characterRepository.Setup(r => r.GetByIdAsync(characterId)).ReturnsAsync(() => new Character
         {
@@ -350,7 +351,7 @@ public class MapTokenServiceTests
         SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 5);
         _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter>
         {
-            new() { CampaignCharacterId = APPROVED, CampaignId = 10, CharacterId = ARIA, CurrentLife = 8, CurrentEnergy = 3, CharacterStatus = "ferida", Sheet = "Força 3" }
+            new() { CampaignCharacterId = APPROVED, CampaignId = 10, CharacterId = ARIA, CurrentLife = 8, CurrentEnergy = 3, CurrentMove = 5, CharacterStatus = "ferida", Sheet = "Força 3" }
         });
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character>
         {
@@ -414,14 +415,79 @@ public class MapTokenServiceTests
             e.Type == TableEventType.MAP_TOKEN_DELETED && e.CampaignId == 10 && e.MapId == 30)), Times.Once);
     }
 
-    private MapToken AriaPiece()
+    private MapToken AriaPiece(int currentMove = 5)
     {
         var piece = MapToken.PlaceCharacter(30, 5, APPROVED, "Aria", 2, 2);
         piece.MapTokenId = 42;
         _repository.Setup(r => r.GetByIdAsync(42)).ReturnsAsync(piece);
         _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { piece });
-        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 5);
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 5, currentMove);
         return piece;
+    }
+
+    // ---- 037: the Deslocamento of the campaign limits the player, not the character's move ----
+
+    [Fact]
+    public async Task Move_PlayerIsLimitedByTheCampaignDeslocamento()
+    {
+        AriaPiece(currentMove: 1);
+
+        // 2 steps ahead costs 2: within the character's move (5) but beyond the Deslocamento (1).
+        (await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+
+        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 });
+        (moved.X, moved.Y).Should().Be((2, 1));
+    }
+
+    [Fact]
+    public async Task Move_PlayerMayGoBeyondTheCharactersMove_WhenTheDeslocamentoAllows()
+    {
+        AriaPiece(currentMove: 6);
+
+        // Turning around (3) and walking 3 hexes down (3) costs 6 > move 5, = Deslocamento 6.
+        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 5, Look = 3 });
+
+        (moved.X, moved.Y).Should().Be((2, 5));
+    }
+
+    [Fact]
+    public async Task Move_ZeroDeslocamento_RefusesAnyStep()
+    {
+        AriaPiece(currentMove: 0);
+
+        (await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
+    }
+
+    [Fact]
+    public async Task Move_MasterIgnoresTheDeslocamento()
+    {
+        AriaPiece(currentMove: 0);
+
+        var moved = await _service.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 });
+
+        (moved.X, moved.Y).Should().Be((2, 0));
+    }
+
+    [Fact]
+    public async Task ListByMap_CharacterPiece_MoveIsTheCampaignDeslocamento()
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 5);
+        _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter>
+        {
+            new() { CampaignCharacterId = APPROVED, CampaignId = 10, CharacterId = ARIA, CurrentLife = 8, CurrentEnergy = 3, CurrentMove = 1 }
+        });
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character>
+        {
+            new() { CharacterId = ARIA, Name = "Aria", Move = 5, Life = 12, Energy = 6 }
+        });
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { MapToken.PlaceCharacter(30, 5, APPROVED, "Aria", 3, 2) });
+
+        var result = await _service.ListByMapAsync(1, 30);
+
+        result.Single().Move.Should().Be(1, "the Mover mode uses this as the player's limit (037)");
     }
 
     [Fact]

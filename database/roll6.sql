@@ -1362,5 +1362,27 @@ BEGIN
     VALUES ('20261005180820_AddNpcPosture', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261008215633_AddCampaignCharacterMove') THEN
+    ALTER TABLE campaign_characters ADD current_move integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261008215633_AddCampaignCharacterMove') THEN
+    UPDATE campaign_characters cc SET current_move = c.move FROM characters c WHERE c.character_id = cc.character_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261008215633_AddCampaignCharacterMove') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261008215633_AddCampaignCharacterMove', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 
