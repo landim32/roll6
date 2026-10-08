@@ -180,6 +180,14 @@
     "mineTab": "Meus Tokens",
     "mineEmpty": "Você ainda não cadastrou tokens. Use a aba Incluir token ou procure na biblioteca.",
     "edit": "Editar {{name}}",
+    "badge": {
+      "full": "Full",
+      "fullHint": "Token completo: imagem em pé, caído e as quatro imagens 2,5D",
+      "sprites": "2.5D",
+      "spritesHint": "Imagens 2,5D: verde com os quatro lados, amarelo quando faltam lados",
+      "down": "Caído",
+      "downHint": "Tem a imagem caído, mas falta a imagem 2,5D de frente: não aparece no 3D"
+    },
     "editTitle": "Editar token",
     "searchTab": "Buscar tokens",
     "createTab": "Incluir token",

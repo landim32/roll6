@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  characterStatus, hasEntries, hasMoved, lastActions, movementTrails, npcStatus, pieceKey, TURN_STATUS, trackTurn, trailHexes,
+  characterStatus, currentAction, hasEntries, hasMoved, lastActions, movementTrails, npcStatus, pieceKey, TURN_STATUS, trackTurn, trailHexes,
 } from './turnStatus';
 import { TURN_TYPE } from '../types/turn';
 import type { TurnInfo, TurnType } from '../types/turn';
@@ -80,6 +80,35 @@ describe('lastActions', () => {
     expect(bubbles.get('c:80')).toBe('Segundo');
     expect(bubbles.get('n:90')).toBe('Rosna');
     expect(bubbles.size).toBe(2);
+  });
+});
+
+describe('currentAction', () => {
+  const aria = { characterId: 80, mapNpcId: null };
+  const goblin1 = { characterId: null, mapNpcId: 90 };
+  const goblin2 = { characterId: null, mapNpcId: 91 };
+
+  it('is the text of the action the piece already took in the turn', () => {
+    expect(currentAction([act(ARIA, 'Ataca o goblin'), act(GOBLIN_1, 'Rosna')], aria)).toBe('Ataca o goblin');
+    expect(currentAction([act(ARIA, 'Ataca o goblin'), act(GOBLIN_1, 'Rosna')], goblin1)).toBe('Rosna');
+  });
+
+  it('is the latest one when the action was changed before', () => {
+    expect(currentAction([act(ARIA, 'Primeiro'), move(ARIA), act(ARIA, 'Segundo')], aria)).toBe('Segundo');
+  });
+
+  it('is empty when the piece has not acted (a move alone is not an action)', () => {
+    expect(currentAction([], aria)).toBe('');
+    expect(currentAction([move(ARIA)], aria)).toBe('');
+    expect(currentAction([act(GOBLIN_1, 'Rosna')], aria)).toBe('');
+  });
+
+  it('tells two occurrences of the same NPC apart', () => {
+    expect(currentAction([act(GOBLIN_1, 'Rosna'), act(GOBLIN_2, 'Foge')], goblin2)).toBe('Foge');
+  });
+
+  it('is empty for an object, which takes no part in the turn', () => {
+    expect(currentAction([act(ARIA, 'Ataca')], { characterId: null, mapNpcId: null })).toBe('');
   });
 });
 

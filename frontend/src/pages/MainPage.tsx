@@ -26,6 +26,7 @@ import { useTurn } from '../hooks/useTurn';
 import { useTableRoute } from '../hooks/useTableRoute';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import type { CharacterEditTarget } from '../components/modals/CampaignCharacterModal';
+import type { ActTarget } from '../lib/turnStatus';
 import type { CampaignNpcInfo } from '../types/npc';
 import type { TokenInfo } from '../types/token';
 
@@ -51,7 +52,7 @@ export const MainPage = () => {
   /** Piece waiting for the delete confirmation. */
   const [toDelete, setToDelete] = useState<{ mapTokenId: number; name: string } | null>(null);
   /** Piece acting ("Agir") and piece waiting for the "Resetar turno" confirmation (016). */
-  const [acting, setActing] = useState<{ mapTokenId: number; name: string } | null>(null);
+  const [acting, setActing] = useState<ActTarget | null>(null);
   const [toReset, setToReset] = useState<{ mapTokenId: number; name: string } | null>(null);
   const { reset: resetTurn } = useTurn();
   const { addToken, changeToken, placeCharacter, deleteToken } = useMapToken();

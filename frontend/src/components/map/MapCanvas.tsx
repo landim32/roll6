@@ -15,6 +15,7 @@ import { useTurn } from '../../hooks/useTurn';
 import { hexCenter, lookToward } from '../../lib/hexGrid';
 import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewHexes, previewOf } from '../../lib/movement';
 import { hasEntries, hasMoved, lastActions, movementTrails } from '../../lib/turnStatus';
+import type { ActTarget } from '../../lib/turnStatus';
 import { MAP_TOKEN_TYPE } from '../../types/mapToken';
 import type { MapTokenInfo } from '../../types/mapToken';
 import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt } from '../../lib/mapTokens';
@@ -43,7 +44,7 @@ interface MapCanvasProps {
   /** Asks to remove a piece (the page confirms first). */
   onDeleteToken: (target: { mapTokenId: number; name: string }) => void;
   /** "Agir" on a piece (the page opens the action modal, 016). */
-  onAct: (target: { mapTokenId: number; name: string }) => void;
+  onAct: (target: ActTarget) => void;
   /** "Resetar turno" on a piece (the page confirms first, 016). */
   onResetTurn: (target: { mapTokenId: number; name: string }) => void;
   /** A modal opened from the hex menu (tokens or delete confirmation) is still open: the hex stays selected. */
@@ -399,7 +400,9 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
           canManage={canPlace}
           onMove={menuToken && canMove(menuToken) ? () => movement.start(menuToken) : undefined}
           onAct={menuToken && canTakeTurn(menuToken)
-            ? () => onAct({ mapTokenId: menuToken.mapTokenId, name: menuToken.name }) : undefined}
+            ? () => onAct({
+              mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
+            }) : undefined}
           onResetTurn={menuToken && canTakeTurn(menuToken) && hasEntries(turnEntries, menuToken)
             ? () => onResetTurn({ mapTokenId: menuToken.mapTokenId, name: menuToken.name }) : undefined}
           posture={menuToken?.posture ?? null}

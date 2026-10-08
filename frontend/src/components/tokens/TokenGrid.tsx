@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { tokenBadge } from '../../lib/tokenBadge';
 import type { TokenInfo } from '../../types/token';
 import { PencilIcon } from '../ui/icons';
 
@@ -18,8 +19,9 @@ interface TokenGridProps {
 }
 
 /**
- * Tokens in a 4-column grid (image or initial + name), paginated. Clicking a card picks the token; the
- * optional pencil floats over the top-right corner of the image as a sibling button, so it never picks.
+ * Tokens in a 4-column grid (image or initial + name), paginated. Clicking a card picks the token. A badge over the
+ * top-right corner of the image says how complete the token's art is (Full / 2.5D / Caído, 036); the optional pencil
+ * floats over the top-left corner as a sibling button, so it never picks.
  */
 export const TokenGrid = ({ items, loading, busy, emptyText, onPick, onEdit, page, totalPages, onPage }: TokenGridProps) => {
   const { t } = useTranslation();
@@ -33,6 +35,14 @@ export const TokenGrid = ({ items, loading, busy, emptyText, onPick, onEdit, pag
         {items.map((token) => (
           <div className="col" key={token.tokenId}>
             <div className="stm-token-cell">
+              {(() => {
+                const badge = tokenBadge(token);
+                return badge && (
+                  <span className={`stm-token-badge badge text-bg-${badge.variant}`} title={t(`tokens.badge.${badge.kind}Hint`)}>
+                    {t(`tokens.badge.${badge.kind}`)}
+                  </span>
+                );
+              })()}
               <button type="button" className="stm-token-option" onClick={() => onPick(token)} disabled={busy} title={token.name}>
                 {token.upImageUrl
                   ? <img src={token.upImageUrl} alt="" />
