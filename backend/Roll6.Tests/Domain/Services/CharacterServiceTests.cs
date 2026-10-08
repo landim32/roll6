@@ -344,4 +344,26 @@ public class CharacterServiceTests
         // character update still does to participations is lower current values when a total drops (009).
         _campaignCharacterRepository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
     }
+
+    // ---- 037: the Deslocamento follows the move while it was not adjusted ----
+
+    [Fact]
+    public async Task Update_MoveChanged_UnadjustedCampaignsFollowIt()
+    {
+        _repository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(() => new Character { CharacterId = CHARACTER, UserId = OWNER, Name = "Aria", Life = 12, Energy = 6, Move = 5 });
+
+        await _service.UpdateAsync(OWNER, CHARACTER, new CharacterInsertInfo { Name = "Aria", Life = 12, Energy = 6, Move = 6 });
+
+        _campaignCharacterRepository.Verify(r => r.FollowMoveAsync(CHARACTER, 5, 6), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_SameMove_LeavesTheDeslocamentoAlone()
+    {
+        _repository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(() => new Character { CharacterId = CHARACTER, UserId = OWNER, Name = "Aria", Life = 12, Energy = 6, Move = 5 });
+
+        await _service.UpdateAsync(OWNER, CHARACTER, new CharacterInsertInfo { Name = "Aria", Life = 12, Energy = 6, Move = 5 });
+
+        _campaignCharacterRepository.Verify(r => r.FollowMoveAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
 }

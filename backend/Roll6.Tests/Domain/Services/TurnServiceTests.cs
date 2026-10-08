@@ -484,7 +484,7 @@ public class TurnServiceTests
         var ariaPlay = new CampaignCharacter
         {
             CampaignCharacterId = PARTICIPATION, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved,
-            CurrentLife = 10, CurrentEnergy = 8, CharacterStatus = "Agachada", Sheet = "anotação"
+            CurrentLife = 10, CurrentEnergy = 8, CurrentMove = 4, CharacterStatus = "Agachada", Sheet = "anotação"
         };
         var bramPlay = new CampaignCharacter
         {
@@ -495,7 +495,7 @@ public class TurnServiceTests
         _campaignCharacterRepository.Setup(r => r.UpdateAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
         _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character>
         {
-            new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria", Life = 10, Energy = 8 },
+            new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria", Life = 10, Energy = 8, Move = 5 },
             new() { CharacterId = BRAM, UserId = MASTER, Name = "Bram", Life = 12, Energy = 6 }
         });
         var goblin1 = new MapNpc { MapNpcId = MAP_NPC, MapId = MAP, NpcId = NPC, Name = "Goblin 1", CurrentLife = 7, CurrentEnergy = 2 };
@@ -599,6 +599,34 @@ public class TurnServiceTests
     }
 
     [Fact]
+    public async Task Data_CarriesTheDeslocamentoAndTheMove()
+    {
+        Table();
+
+        var data = await _service.GetDataAsync(MASTER, CAMPAIGN, null);
+
+        var aria = data.Characters.Single(c => c.CharacterId == ARIA);
+        (aria.CurrentMove, aria.Move).Should().Be((4, 5));
+    }
+
+    [Fact]
+    public async Task Process_Deslocamento_ChangesAndLogsIt()
+    {
+        var (_, _, ariaPlay, _, _) = Table();
+        var inserted = new List<Turn>();
+        _repository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => inserted.Add(t)).ReturnsAsync((Turn t) => t);
+
+        var result = await _service.ProcessAsync(MASTER, CAMPAIGN, new TurnProcessInfo
+        {
+            Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, CurrentMove = 2 } }
+        });
+
+        ariaPlay.CurrentMove.Should().Be(2);
+        inserted.Single().Changes!.Select(c => (c.Field, c.Before, c.After)).Should().Equal(("currentMove", "4", "2"));
+        result.Data.Characters.Single(c => c.CharacterId == ARIA).CurrentMove.Should().Be(2);
+    }
+
+    [Fact]
     public async Task Process_PiecesMaySwapHexes()
     {
         var (bram, _, _, _, _) = Table();
@@ -627,7 +655,8 @@ public class TurnServiceTests
         new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 20, Y = 1 } } }, "characters[0].x" },
         new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 3 } } }, "characters[0].x" },
         new object[] { new TurnProcessInfo { Narration = new string('a', Turn.MAX_NARRATION + 1) }, "narration" },
-        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, Posture = 5 } } }, "characters[0].posture" }
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, Posture = 5 } } }, "characters[0].posture" },
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, CurrentMove = -1 } } }, "characters[0].currentMove" }
     };
 
     [Theory]

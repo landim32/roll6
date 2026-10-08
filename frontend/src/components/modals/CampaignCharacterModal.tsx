@@ -37,7 +37,7 @@ interface CampaignCharacterModalProps {
 
 /**
  * What one campaign holds about a character (032), opened from a party card: tabs "Dados" (the character's name,
- * picture and totals read-only, plus "Nesta campanha" = current life/energy, status, posture and token),
+ * picture and totals read-only, plus "Nesta campanha" = current life/energy, Deslocamento (037), status, posture and token),
  * "Ficha da Campanha" (this campaign's copy of the sheet) and "Ficha em arquivo" (this campaign's copy of the file).
  * The owner changes everything here and the master the campaign values, the campaign sheet and its file — the token
  * is the only character field reachable from here (011/012), so nothing of the character can be changed by mistake.
@@ -50,6 +50,8 @@ export const CampaignCharacterModal = ({ open, onOpenChange, editing }: Campaign
   const [detail, setDetail] = useState<CampaignCharacterDetailInfo | null>(null);
   const [currentLife, setCurrentLife] = useState('');
   const [currentEnergy, setCurrentEnergy] = useState('');
+  /** Movement limit on this campaign's maps (037): owner and master change it, as the other campaign values. */
+  const [currentMove, setCurrentMove] = useState('');
   const [characterStatus, setCharacterStatus] = useState('');
   const [posture, setPosture] = useState<Posture>(POSTURE.standing);
   const [campaignSheet, setCampaignSheet] = useState('');
@@ -78,6 +80,7 @@ export const CampaignCharacterModal = ({ open, onOpenChange, editing }: Campaign
         setDetail(participation);
         setCurrentLife(String(participation.currentLife));
         setCurrentEnergy(String(participation.currentEnergy));
+        setCurrentMove(String(participation.currentMove));
         setCharacterStatus(participation.characterStatus ?? '');
         setPosture(participation.posture);
         setCampaignSheet(participation.sheet ?? '');
@@ -125,7 +128,7 @@ export const CampaignCharacterModal = ({ open, onOpenChange, editing }: Campaign
       setTab('data');
       return toast.error(t(`characterForm.errors.${vitalsError}`));
     }
-    const areaError = validateCampaignArea({ characterStatus, sheet: campaignSheet });
+    const areaError = validateCampaignArea({ currentMove, characterStatus, sheet: campaignSheet });
     if (areaError) {
       setTab(areaError === 'campaignSheetTooLong' ? 'campaignSheet' : 'data');
       return toast.error(t(`characterForm.errors.${areaError}`));
@@ -136,7 +139,7 @@ export const CampaignCharacterModal = ({ open, onOpenChange, editing }: Campaign
       // The only call this modal makes: the character's own data is not reachable from here (032 FR-010).
       // An empty string removes this campaign's sheet file; the stored name keeps or replaces it.
       await updateParticipation(before.campaignCharacterId, toCampaignUpdate({
-        currentLife: vitals.life, currentEnergy: vitals.energy, characterStatus, sheet: campaignSheet, posture,
+        currentLife: vitals.life, currentEnergy: vitals.energy, currentMove, characterStatus, sheet: campaignSheet, posture,
         tokenId: token?.tokenId ?? null, sheetFile: campaignSheetFile?.fileName ?? '',
       }));
       toast.success(t('toast.campaignCharacterUpdated', { name: before.characterName }));
@@ -199,16 +202,23 @@ export const CampaignCharacterModal = ({ open, onOpenChange, editing }: Campaign
               <fieldset className="col-12" disabled={isViewer}>
                 <legend className="fs-6 fw-semibold mb-2">{t('characterForm.campaignSection')}</legend>
                 <div className="row g-3">
-                  <div className="col-6">
+                  <div className="col-6 col-md-4">
                     <label className="form-label" htmlFor="campaign-character-current-life">{t('characterForm.currentLife')}</label>
                     <input id="campaign-character-current-life" type="number" step={1} className="form-control"
                       value={currentLife} onChange={(e) => setCurrentLife(e.target.value)} />
                   </div>
-                  <div className="col-6">
+                  <div className="col-6 col-md-4">
                     <label className="form-label" htmlFor="campaign-character-current-energy">{t('characterForm.currentEnergy')}</label>
                     <input id="campaign-character-current-energy" type="number" step={1} className="form-control"
                       value={currentEnergy} onChange={(e) => setCurrentEnergy(e.target.value)} />
                   </div>
+                  <div className="col-12 col-md-4">
+                    <label className="form-label" htmlFor="campaign-character-current-move">{t('characterForm.currentMove')}</label>
+                    <input id="campaign-character-current-move" type="number" min={0} step={1} className="form-control"
+                      aria-describedby="campaign-character-current-move-hint"
+                      value={currentMove} onChange={(e) => setCurrentMove(e.target.value)} />
+                  </div>
+                  <div id="campaign-character-current-move-hint" className="col-12 form-text mt-1">{t('characterForm.currentMoveHint')}</div>
                   <div className="col-sm-8">
                     <label className="form-label" htmlFor="campaign-character-status">{t('characterForm.characterStatus')}</label>
                     <input id="campaign-character-status" className="form-control" maxLength={MAX_CHARACTER_STATUS}

@@ -65,6 +65,18 @@ export const pieceKey = (piece: TurnPiece): string | null => {
   return null;
 };
 
+/** The piece that opens "Agir": who it is in the turn, its map piece and its name. */
+export interface ActTarget extends TurnPiece {
+  mapTokenId: number;
+  name: string;
+}
+
+/** Text of the action the piece already took in the turn in progress, or '' when it has not acted (the "Agir" field starts with it). */
+export const currentAction = (entries: TurnInfo[], piece: TurnPiece): string => {
+  const key = pieceKey(piece);
+  return (key && lastActions(entries).get(key)) || '';
+};
+
 /** Latest action text of each actor (speech balloons), keyed like `pieceKey`. */
 export const lastActions = (entries: TurnInfo[]): Map<string, string> => {
   const result = new Map<string, string>();

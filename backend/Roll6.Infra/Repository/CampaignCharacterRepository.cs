@@ -111,4 +111,11 @@ public class CampaignCharacterRepository : ICampaignCharacterRepository<Campaign
                 .SetProperty(e => e.CurrentLife, e => e.CurrentLife > totalLife ? totalLife : e.CurrentLife)
                 .SetProperty(e => e.CurrentEnergy, e => e.CurrentEnergy > totalEnergy ? totalEnergy : e.CurrentEnergy));
     }
+
+    public async Task FollowMoveAsync(long characterId, int oldMove, int newMove)
+    {
+        await _context.CampaignCharacters
+            .Where(e => e.CharacterId == characterId && e.CurrentMove == oldMove)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.CurrentMove, newMove));
+    }
 }

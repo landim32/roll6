@@ -23,10 +23,21 @@ export const participationMode = (isMaster: boolean, isOwner: boolean): Particip
 export const MAX_CHARACTER_STATUS = 260;
 export const MAX_CAMPAIGN_SHEET = 20000;
 
-export type CampaignAreaError = 'characterStatusTooLong' | 'campaignSheetTooLong';
+export type CampaignAreaError = 'currentMoveInvalid' | 'characterStatusTooLong' | 'campaignSheetTooLong';
 
-/** Status and campaign sheet as typed; the current values are checked by `validateVitals`. */
-export const validateCampaignArea = ({ characterStatus, sheet }: { characterStatus: string; sheet: string }): CampaignAreaError | null => {
+/** The Deslocamento (037): a whole number, 0 or more, with no upper limit (it may exceed the character's move). */
+const isValidMove = (value: string) => /^\d+$/.test(value.trim());
+
+/**
+ * Deslocamento, status and campaign sheet as typed; the current values are checked by `validateVitals`.
+ * Without `currentMove` (callers that don't edit it) the Deslocamento is not checked.
+ */
+export const validateCampaignArea = ({ currentMove, characterStatus, sheet }: {
+  currentMove?: string;
+  characterStatus: string;
+  sheet: string;
+}): CampaignAreaError | null => {
+  if (currentMove !== undefined && !isValidMove(currentMove)) return 'currentMoveInvalid';
   if (characterStatus.trim().length > MAX_CHARACTER_STATUS) return 'characterStatusTooLong';
   if (sheet.length > MAX_CAMPAIGN_SHEET) return 'campaignSheetTooLong';
   return null;
@@ -34,11 +45,12 @@ export const validateCampaignArea = ({ characterStatus, sheet }: { characterStat
 
 /**
  * API payload from valid values: numbers, trimmed status and blank texts as null; no token keeps the current one,
- * and so does no posture (031) and no sheet file (032 — an empty string removes it).
+ * and so does no posture (031), no sheet file (032 — an empty string removes it) and no Deslocamento (037).
  */
-export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, sheet, tokenId = null, posture = null, sheetFile = null }: {
+export const toCampaignUpdate = ({ currentLife, currentEnergy, currentMove, characterStatus, sheet, tokenId = null, posture = null, sheetFile = null }: {
   currentLife: string;
   currentEnergy: string;
+  currentMove?: string;
   characterStatus: string;
   sheet: string;
   tokenId?: number | null;
@@ -47,6 +59,7 @@ export const toCampaignUpdate = ({ currentLife, currentEnergy, characterStatus, 
 }): CampaignCharacterUpdateInfo => ({
   currentLife: Number(currentLife),
   currentEnergy: Number(currentEnergy),
+  currentMove: currentMove === undefined || currentMove.trim() === '' ? null : Number(currentMove),
   characterStatus: characterStatus.trim() || null,
   sheet: sheet.trim() ? sheet : null,
   tokenId,

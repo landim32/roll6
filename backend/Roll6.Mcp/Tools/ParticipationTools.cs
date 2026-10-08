@@ -123,7 +123,8 @@ public static class ParticipationTools
         What it does: lists the participations of the current user's characters in one campaign (any status) — e.g. to see
         whether a request was approved.
         Who can use it: any authenticated user.
-        Returns: [participation].
+        Returns: [participation], each with currentMove (how far the character may move per turn in this campaign) and
+        characterMove (the character's permanent move).
         Common errors: 404 campaign not found.
         Related tools: request_campaign_access.
         """)]
@@ -140,8 +141,9 @@ public static class ParticipationTools
         from then on changes only here; `characterSheet` is the character's original sheet, read-only.
         Who can use it: the master, the character's owner and approved participants of the campaign.
         Returns: the participation plus sheet (this campaign's sheet), sheetFile/sheetFileUrl/sheetFileType (this
-        campaign's sheet file), characterSheet (the character's own sheet, read-only here) and
-        characterTokenName/characterTokenImageUrl.
+        campaign's sheet file), characterSheet (the character's own sheet, read-only here),
+        characterTokenName/characterTokenImageUrl, currentMove (the Deslocamento: movement points per turn on this
+        campaign's maps, the player's limit) and characterMove (the character's permanent move, where currentMove starts).
         Common errors: 403 not allowed, 404 not found.
         Related tools: update_participation.
         """)]
@@ -154,7 +156,9 @@ public static class ParticipationTools
     [ApiOperation("PUT", "/api/campaigncharacter/{id}")]
     [Description("""
         What it does: changes the campaign values of an approved character: current life and energy (up to the totals;
-        0 or less is allowed and does not change posture), free-text status (e.g. "poisoned"), optionally the posture
+        0 or less is allowed and does not change posture), optionally the Deslocamento (`currentMove`, how many movement
+        points the player may spend per turn with this character on this campaign's maps — e.g. lower it for a wounded
+        character; the character's own move never changes), free-text status (e.g. "poisoned"), optionally the posture
         (standing, down or out of combat), the campaign sheet (`sheet`) and its sheet file (`sheetFile`). The campaign
         sheet is this campaign's own copy of the character's sheet, made when the character joined: write the
         character's full sheet as it stands here, not only the differences. Neither the character's sheet nor its sheet
@@ -163,8 +167,8 @@ public static class ParticipationTools
         values at once for everyone.
         Who can use it: the character's owner or the master.
         Returns: the updated participation plus sheet, sheetFile/sheetFileUrl/sheetFileType.
-        Common errors: 403 not allowed, 404 participation or token not found, 400 above the totals, too long or an
-        invalid sheetFile, 409 not approved.
+        Common errors: 403 not allowed, 404 participation or token not found, 400 above the totals, a negative
+        currentMove, too long or an invalid sheetFile, 409 not approved.
         Related tools: get_participation (read current values first), upload_document, list_tokens.
         """)]
     public static Task<CallToolResult> UpdateParticipation(
@@ -176,11 +180,12 @@ public static class ParticipationTools
         [Description(McpDocs.CAMPAIGN_SHEET)] string? sheet = null,
         [Description("Optional new token for the character (tokenId from list_tokens); null keeps the current token.")] long? tokenId = null,
         [Description(McpDocs.POSTURE_OPTIONAL)] int? posture = null,
-        [Description(McpDocs.CAMPAIGN_SHEET_FILE_OPTIONAL)] string? sheetFile = null) =>
+        [Description(McpDocs.CAMPAIGN_SHEET_FILE_OPTIONAL)] string? sheetFile = null,
+        [Description("Optional Deslocamento: movement points this character may spend per turn on this campaign's maps; 0 or more, may exceed the character's move. Null keeps the current value. Example: 1.")] int? currentMove = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaigncharacter/{campaignCharacterId}", new CampaignCharacterUpdateInfo
         {
             CurrentLife = currentLife, CurrentEnergy = currentEnergy, CharacterStatus = characterStatus, Sheet = sheet, TokenId = tokenId,
-            Posture = posture, SheetFile = sheetFile
+            Posture = posture, SheetFile = sheetFile, CurrentMove = currentMove
         });
 
     [McpServerTool(Name = "remove_participation", Title = "Remove character from campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

@@ -56,7 +56,9 @@ public static class TurnTools
     [ApiOperation("GET", "/api/campaign/{id}/turn/data")]
     [Description("""
         What it does: returns the whole table in ONE call, to decide what happened in a turn: every approved character
-        (characterId, name, playerName, currentLife/totalLife, currentEnergy/totalEnergy — energy is the fatigue —, status and,
+        (characterId, name, playerName, currentLife/totalLife, currentEnergy/totalEnergy — energy is the fatigue —,
+        currentMove — the Deslocamento, how far the player may move it per turn in this campaign — and move — the
+        character's permanent move —, status and,
         when it has a piece on the current map, x/y/look/lookName), every NPC occurrence on the current map (mapNpcId, name,
         current/total life and energy, status, x/y/look/lookName) and "actions": the "## Ações" markdown of the turn (moves,
         actions, results, changes, narration, with who made them).
@@ -77,7 +79,8 @@ public static class TurnTools
     [Description($$"""
         What it does: saves the result of the turn in ONE call and FINISHES it (the campaign moves to the next turn). For each
         character (characterId) and NPC occurrence (mapNpcId) send only what changed: currentLife, currentEnergy (fatigue),
-        status (or clearStatus: true), posture (1 standing, 2 down, 3 out of combat), x/y (together) and look. Also send "narration": what happened in the turn (up to 10000
+        status (or clearStatus: true), posture (1 standing, 2 down, 3 out of combat), x/y (together) and look; characters
+        also take currentMove (the Deslocamento, 0 or more). Also send "narration": what happened in the turn (up to 10000
         characters). Everything is validated first — current values never above the totals, the whole shape of each moved
         piece inside the grid and on free hexes (checked after all moves, so two pieces may swap) — and saved together: if any item is invalid nothing
         changes and the turn does not advance. Every change is logged in the turn by the master (moves without the one-move
@@ -91,7 +94,7 @@ public static class TurnTools
     public static Task<CallToolResult> ProcessTurn(
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
-        [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, status?, clearStatus?, posture?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessCharacterInfo>? characters = null,
+        [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, posture?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessCharacterInfo>? characters = null,
         [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, status?, clearStatus?, posture?, x?, y?, look? }].")] List<TurnProcessNpcInfo>? npcs = null,
         [Description("What happened in the turn, in plain text or markdown (up to 10000 characters); stays in the turn log.")] string? narration = null) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/process", new TurnProcessInfo

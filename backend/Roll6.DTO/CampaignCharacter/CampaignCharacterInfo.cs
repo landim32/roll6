@@ -48,8 +48,16 @@ public class CampaignCharacterInfo
     [JsonPropertyName("totalEnergy")]
     public int TotalEnergy { get; set; }
 
+    /// <summary>The character's permanent move (same in every campaign; only the owner changes it).</summary>
     [JsonPropertyName("characterMove")]
     public int CharacterMove { get; set; }
+
+    /// <summary>
+    /// Movement limit per turn on this campaign's maps ("Deslocamento", 037): starts at the character's move and is
+    /// changed by the owner or the master. This is what limits a player's moves, not <see cref="CharacterMove"/>.
+    /// </summary>
+    [JsonPropertyName("currentMove")]
+    public int CurrentMove { get; set; }
 
     /// <summary>Free-text condition of the character in this campaign (not the participation status).</summary>
     [JsonPropertyName("characterStatus")]

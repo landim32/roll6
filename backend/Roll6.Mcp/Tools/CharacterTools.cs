@@ -89,7 +89,9 @@ public static class CharacterTools
     [ApiOperation("PUT", "/api/character/{id}")]
     [Description($$"""
         What it does: replaces all fields of a character (read it with get_character and send unchanged values back).
-        Lowering life/energy totals also lowers the current values above them in every campaign.
+        Lowering life/energy totals also lowers the current values above them in every campaign. Changing move also
+        changes the campaign Deslocamento (currentMove) where it still equalled the old move; where the owner or a master
+        adjusted it, it stays.
         Who can use it: only the owner.
         {{FIELDS}}
         Returns: the updated character.

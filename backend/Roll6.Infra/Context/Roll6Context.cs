@@ -209,6 +209,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>();
             entity.Property(e => e.CurrentLife).HasColumnName("current_life").IsRequired();
             entity.Property(e => e.CurrentEnergy).HasColumnName("current_energy").IsRequired();
+            entity.Property(e => e.CurrentMove).HasColumnName("current_move").IsRequired();
             entity.Property(e => e.CharacterStatus).HasColumnName("character_status").HasMaxLength(260);
             entity.Property(e => e.Sheet).HasColumnName("sheet").HasMaxLength(20000);
             entity.Property(e => e.SheetFile).HasColumnName("sheet_file").HasMaxLength(260);

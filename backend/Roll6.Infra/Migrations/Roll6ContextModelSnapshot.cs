@@ -185,6 +185,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("current_life");
 
+                    b.Property<int>("CurrentMove")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_move");
+
                     b.Property<int>("Posture")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")

@@ -79,7 +79,8 @@ public static class MapTokenTools
         occurrences the move is recorded in the current turn (each moves once per turn) and everyone at the table sees it
         in real time.
         Who can use it: the master (any piece, any distance); a player only the piece of his own approved character, once
-        per turn, within the character's move points.
+        per turn, within the character's Deslocamento in this campaign (currentMove of get_participation — not the
+        character's own move, which only sets where the Deslocamento starts).
         Coordinates: x = column, y = row of the rectangular flat-top hex grid (odd columns shifted half a hex down),
         0-based, inside gridWidth × gridHeight of the map. look = side the piece faces, 0-5 clockwise from the top side
         (0 up, 1 up-right, 2 down-right, 3 down, 4 down-left, 5 up-left).

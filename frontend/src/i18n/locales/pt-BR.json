@@ -136,6 +136,7 @@
       "notInteger": "Vida, energia e movimento devem ser números inteiros.",
       "negative": "Vida, energia e movimento não podem ser negativos.",
       "characterStatusTooLong": "O status pode ter no máximo 260 caracteres.",
+      "currentMoveInvalid": "Informe um deslocamento inteiro igual ou maior que zero.",
       "campaignSheetTooLong": "A ficha da campanha pode ter no máximo 20.000 caracteres.",
       "sheetTooLong": "A ficha deve ter no máximo 20.000 caracteres.",
       "aboveTotal": "O valor atual não pode passar do total.",
@@ -165,11 +166,13 @@
     "campaignSection": "Nesta campanha",
     "currentLife": "Vida atual",
     "currentEnergy": "Energia atual",
+    "currentMove": "Deslocamento",
+    "currentMoveHint": "Quanto o personagem anda no mapa por turno nesta campanha. Começa igual ao Movimento.",
     "changeImage": "Trocar imagem",
     "chooseImage": "Escolher imagem",
     "permanentSection": "Ficha permanente",
     "permanentHint": "Valores totais do personagem, os mesmos em todas as campanhas.",
-    "vitalsHint": "Podem ficar em zero ou negativos, mas não passar do total."
+    "vitalsHint": "Vida e energia podem ficar em zero ou negativas, mas não passar do total."
   },
   "tokens": {
     "modalTitle": "Tokens",
@@ -177,6 +180,14 @@
     "mineTab": "Meus Tokens",
     "mineEmpty": "Você ainda não cadastrou tokens. Use a aba Incluir token ou procure na biblioteca.",
     "edit": "Editar {{name}}",
+    "badge": {
+      "full": "Full",
+      "fullHint": "Token completo: imagem em pé, caído e as quatro imagens 2,5D",
+      "sprites": "2.5D",
+      "spritesHint": "Imagens 2,5D: verde com os quatro lados, amarelo quando faltam lados",
+      "down": "Caído",
+      "downHint": "Tem a imagem caído, mas falta a imagem 2,5D de frente: não aparece no 3D"
+    },
     "editTitle": "Editar token",
     "searchTab": "Buscar tokens",
     "createTab": "Incluir token",

@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import { useTurn } from '../../hooks/useTurn';
+import { currentAction } from '../../lib/turnStatus';
+import type { ActTarget } from '../../lib/turnStatus';
 
 /** Longest action text (backend Turn.MAX_DESCRIPTION). */
 const MAX_ACTION = 2000;
@@ -11,20 +13,32 @@ const MAX_ACTION = 2000;
 interface ActModalProps {
   open: boolean;
   /** Piece acting (its character or NPC occurrence). */
-  piece: { mapTokenId: number; name: string } | null;
+  piece: ActTarget | null;
   onClose: () => void;
 }
 
-/** "Agir": the action's text, recorded in the current turn and shown in a balloon over the piece. */
+/**
+ * "Agir": the action's text, recorded in the current turn and shown in a balloon over the piece. When the piece already
+ * acted in this turn the field opens with that text, so the player changes it instead of writing it again.
+ */
 export const ActModal = ({ open, piece, onClose }: ActModalProps) => {
   const { t } = useTranslation();
-  const { act } = useTurn();
+  const { act, entries } = useTurn();
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
+  // The turn is refreshed while the modal is open (polling, real time): the field is filled when it opens and never
+  // rewritten under the player's hands, so the latest entries are read through a ref.
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+  const pieceRef = useRef(piece);
+  pieceRef.current = piece;
+  const pieceId = piece?.mapTokenId ?? null;
 
   useEffect(() => {
-    if (open) setText('');
-  }, [open]);
+    if (!open) return;
+    const target = pieceRef.current;
+    setText(target ? currentAction(entriesRef.current, target) : '');
+  }, [open, pieceId]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

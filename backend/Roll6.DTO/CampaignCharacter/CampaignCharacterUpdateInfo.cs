@@ -11,6 +11,13 @@ public class CampaignCharacterUpdateInfo
     [JsonPropertyName("currentEnergy")]
     public int CurrentEnergy { get; set; }
 
+    /// <summary>
+    /// Movement limit per turn on this campaign's maps ("Deslocamento", 037): 0 or more, may exceed the character's
+    /// move. Null (or omitted) keeps the current value.
+    /// </summary>
+    [JsonPropertyName("currentMove")]
+    public int? CurrentMove { get; set; }
+
     [JsonPropertyName("characterStatus")]
     public string? CharacterStatus { get; set; }
 

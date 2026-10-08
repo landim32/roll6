@@ -1308,7 +1308,7 @@ body,
   font-size: 0.875rem;
 }
 
-/* Own tokens: pencil floating over the top-right corner of the image (012) */
+/* Own tokens: pencil floating over the top-left corner of the image (012; the badge has the top-right one) */
 .stm-token-cell {
   position: relative;
 }
@@ -1316,7 +1316,7 @@ body,
 .stm-token-edit {
   position: absolute;
   top: 10px;
-  right: 10px;
+  left: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1330,6 +1330,20 @@ body,
   backdrop-filter: blur(8px);
   color: #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* How complete the token's art is (036): Full / 2.5D / Caído, over the top-right corner of the image. Never takes a click. */
+.stm-token-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  pointer-events: none;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.3em 0.5em;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
 .stm-token-edit:hover:not(:disabled),

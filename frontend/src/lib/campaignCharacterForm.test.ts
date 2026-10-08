@@ -29,13 +29,30 @@ describe('validateCampaignArea', () => {
   ])('rejects %#', (values, error) => {
     expect(validateCampaignArea(values)).toBe(error);
   });
+
+  it.each(['0', '1', '7', ' 12 '])('accepts the Deslocamento %j (037)', (currentMove) => {
+    expect(validateCampaignArea({ currentMove, characterStatus: '', sheet: '' })).toBeNull();
+  });
+
+  it.each(['', '-1', '1.5', 'abc', '1e2'])('rejects the Deslocamento %j (037)', (currentMove) => {
+    expect(validateCampaignArea({ currentMove, characterStatus: '', sheet: '' })).toBe('currentMoveInvalid');
+  });
+
+  it('does not check the Deslocamento when it is not edited', () => {
+    expect(validateCampaignArea({ characterStatus: '', sheet: '' })).toBeNull();
+  });
 });
 
 describe('toCampaignUpdate', () => {
   it('converts numbers, trims the status and turns blank texts into null', () => {
     expect(toCampaignUpdate({ currentLife: '-2', currentEnergy: '6', characterStatus: '   ', sheet: ' \n ' })).toEqual({
-      currentLife: -2, currentEnergy: 6, characterStatus: null, sheet: null, tokenId: null, posture: null, sheetFile: null,
+      currentLife: -2, currentEnergy: 6, currentMove: null, characterStatus: null, sheet: null, tokenId: null, posture: null, sheetFile: null,
     });
+  });
+
+  it('sends the Deslocamento as a number (037)', () => {
+    expect(toCampaignUpdate({ currentLife: '1', currentEnergy: '1', currentMove: ' 1 ', characterStatus: '', sheet: '' }).currentMove).toBe(1);
+    expect(toCampaignUpdate({ currentLife: '1', currentEnergy: '1', currentMove: '0', characterStatus: '', sheet: '' }).currentMove).toBe(0);
   });
 
   it('sends the chosen posture (031)', () => {

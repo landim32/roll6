@@ -151,7 +151,7 @@ public class CampaignCharacterService : ICampaignCharacterService
     }
 
     /// <summary>
-    /// Current life/energy, status, the campaign sheet and its file (032) and the character's token; the character
+    /// Current life/energy, the Deslocamento (037), status, posture, the campaign sheet and its file (032) and the character's token; the character
     /// owner or the campaign master (010 FR-007). The token is saved on the character (the master's only change to
     /// someone else's character); nothing else of the character is reachable through here (032 FR-010).
     /// </summary>
@@ -163,15 +163,18 @@ public class CampaignCharacterService : ICampaignCharacterService
         if (character.UserId != userId && campaign.UserId != userId)
             throw new UnauthorizedAccessException("Apenas o dono do personagem ou o mestre da campanha podem alterar os dados na campanha.");
 
-        var before = (participation.CurrentLife, participation.CurrentEnergy, participation.CharacterStatus, participation.Sheet, participation.SheetFile, participation.Posture);
+        var before = (participation.CurrentLife, participation.CurrentEnergy, participation.CurrentMove, participation.CharacterStatus, participation.Sheet, participation.SheetFile, participation.Posture);
         participation.UpdatePlay(info.CurrentLife, info.CurrentEnergy, info.CharacterStatus, info.Sheet, character.Life, character.Energy);
         participation.ChangeSheetFile(info.SheetFile);
         if (info.Posture is int posture)
             participation.ChangePosture(posture);
+        if (info.CurrentMove is int move)
+            participation.ChangeMove(move);
         // Every change during the turn is recorded with who made it (024).
         var changes = TurnChange.Diff(
             ("currentLife", before.CurrentLife, participation.CurrentLife),
             ("currentEnergy", before.CurrentEnergy, participation.CurrentEnergy),
+            ("currentMove", before.CurrentMove, participation.CurrentMove),
             ("characterStatus", before.CharacterStatus, participation.CharacterStatus),
             ("notes", before.Sheet, participation.Sheet),
             ("sheetFile", before.SheetFile, participation.SheetFile),
@@ -270,6 +273,7 @@ public class CampaignCharacterService : ICampaignCharacterService
             TotalLife = info.TotalLife,
             TotalEnergy = info.TotalEnergy,
             CharacterMove = info.CharacterMove,
+            CurrentMove = info.CurrentMove,
             CharacterStatus = info.CharacterStatus,
             Posture = info.Posture,
             CharacterTokenId = info.CharacterTokenId,
@@ -349,6 +353,7 @@ public class CampaignCharacterService : ICampaignCharacterService
                 TotalLife = character?.Life ?? 0,
                 TotalEnergy = character?.Energy ?? 0,
                 CharacterMove = character?.Move ?? 0,
+                CurrentMove = p.CurrentMove,
                 CharacterStatus = p.CharacterStatus,
                 Posture = (int)p.Posture,
                 CharacterTokenId = character?.TokenId,

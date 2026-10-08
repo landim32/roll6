@@ -57,6 +57,11 @@ public static class Roll6Guide
           participation's `sheet` and `sheetFile`, copied from the character when they join and from then on editable
           only here, by the owner or the master (`update_participation`). The character's own sheet and sheet file are
           never changed by campaign play, and the master cannot change them at all.
+        - **Deslocamento** (`currentMove`, per participation): how many movement points a player may spend per turn with
+          the character on this campaign's maps — the limit of `move_map_token` for players. It starts at the
+          character's `move` when the character joins (or is approved again), the owner or the master change it with
+          `update_participation` (e.g. lower it for a wounded character; it may also go above `move`), and while nobody
+          has adjusted it it follows the character's `move`. It never limits the master, and NPCs keep their own move.
         - The campaign's **current map** (`set_current_map`, master) is the map all players follow in the app.
         - Every campaign and every campaign map has an immutable **slug** (built from the name, unique on the whole
           site; renaming does not change it). `get_campaign_by_slug` and `get_map_by_slug` open them.
@@ -71,7 +76,8 @@ public static class Roll6Guide
         - **`look`** = the side a piece faces, **0–5 clockwise starting at the top**: 0 up, 1 up-right, 2 down-right,
           3 down, 4 down-left, 5 up-left.
         - Movement cost (enforced for players): 1 for each step into the hex ahead, 1 for each 60° turn; the shortest
-          path goes around other pieces; the total must fit the character's `move`. The master moves anything freely.
+          path goes around other pieces; the total must fit the character's **Deslocamento** in the campaign
+          (`currentMove` of the participation). The master moves anything freely.
           A big piece needs its whole shape free and inside the grid at every step and turn.
 
         ## Pieces (map tokens)

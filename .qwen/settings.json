@@ -1,0 +1,10 @@
+{
+  // Permissões deste repositório apenas. Sobrepõe ~/.qwen/settings.json.
+  // auto-edit: edições de arquivo (edit, write_file, notebook_edit) entram sem perguntar;
+  // comandos de shell (dotnet test, git, gh, docker) continuam pedindo confirmação.
+  // Exige reiniciar o Qwen Code (/exit e reabrir).
+  "tools": {
+    "approvalMode": "auto-edit"
+  },
+  "$version": 4
+}
