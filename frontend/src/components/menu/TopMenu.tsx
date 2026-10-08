@@ -22,6 +22,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { GearIcon } from '../ui/icons';
+import { BrandLogo } from '../ui/BrandLogo';
 
 interface TopMenuProps {
   onOpenCampaign: () => void;
@@ -70,7 +71,11 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
 
   return (
     <header className="stm-menu">
-      <span className="stm-brand me-2">{t('common.appName')}</span>
+      {/* Horizontal logo on md+, only the symbol on phones, where the first row is tight (038). */}
+      <span className="stm-menu-brand me-2">
+        <BrandLogo variant="horizontal" height={32} className="d-none d-md-inline-flex" />
+        <BrandLogo variant="symbol" height={32} className="d-md-none" />
+      </span>
       {/* Phones: the three selects wrap to a second row below this break (CSS order). */}
       <span className="stm-menu-break" aria-hidden="true" />
       <TableSelect onOpenCampaign={onOpenCampaign} onOpenMap={onOpenMap} />
