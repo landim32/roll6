@@ -116,3 +116,17 @@ export const nameColor = (name: string): string => {
 
 /** Sum of a roll's faces. */
 export const rollTotal = (dice: readonly number[] | null | undefined): number => (dice ?? []).reduce((sum, d) => sum + d, 0);
+
+const firstWord = (name: string): string => name.trim().split(/\s+/)[0] ?? name;
+
+/**
+ * The chat shows only the users' first names: "Aria (Bruno Carneiro)" → "Aria (Bruno)", "Mestre (GM) — Rodrigo Landim"
+ * → "Mestre (GM) — Rodrigo", "GM (Ana Paula)" → "GM (Ana)". A character's or NPC's own name is never cut.
+ */
+export const chatLabel = (label: string): string =>
+  label
+    .replace(/\(([^)]*)\)/g, (_, inner: string) => `(${firstWord(inner)})`)
+    .replace(/ — (.+)$/, (_, user: string) => ` — ${firstWord(user)}`);
+
+/** Who recorded a turn entry for someone else: "GM (Ana Paula)" → "GM (Ana)", a plain user name → its first word. */
+export const authorLabel = (label: string): string => (label.includes('(') ? chatLabel(label) : firstWord(label));
