@@ -8,7 +8,7 @@ import { useCharacter } from '../hooks/useCharacter';
 import { useMapToken } from '../hooks/useMapToken';
 import { useRealtime, useTableEvents } from '../hooks/useRealtime';
 import { TABLE_EVENT } from '../types/realtime';
-import { trackTurn } from '../lib/turnStatus';
+import { markAllTurnsRead, markTurnRead, trackTurn } from '../lib/turnStatus';
 import type { TurnSeen } from '../lib/turnStatus';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo } from '../types/turn';
@@ -16,10 +16,13 @@ import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo } from '../typ
 /** The turn is polled this often while the tab is visible (same rhythm as the party panel). */
 const TURN_POLL_MS = 15_000;
 
-/** A finished turn whose summary the user hasn't opened yet. */
+/** A finished turn's notice in the bell (local to this device and campaign). */
 export interface TurnNotification {
   campaignId: number;
   turnNo: number;
+  /** When this device noticed the turn finished (ISO); null for notices recorded before 046. */
+  at: string | null;
+  read: boolean;
 }
 
 interface TurnContextType {
@@ -28,14 +31,17 @@ interface TurnContextType {
   turnNo: number | null;
   /** Entries of the turn in progress (chronological). */
   entries: TurnInfo[];
-  /** Finished turns of the current campaign not read yet, most recent first. */
+  /** Finished turns of the current campaign, unread then read, most recent first. */
   notifications: TurnNotification[];
   loading: boolean;
   error: string | null;
   // State management
   refresh: () => Promise<void>;
-  /** Marks a finished turn's notification as read. */
+  /** Marks a finished turn's notification as read (it stays listed). */
   dismiss: (turnNo: number) => void;
+  markRead: (turnNo: number) => void;
+  /** "Marcar tudo como lido" for this campaign's turn notices (046). */
+  markAllRead: () => void;
   clearError: () => void;
   // API
   /** Records the piece's action (044: replacing its previous one of the turn), optionally answering a chat entry. */
@@ -77,7 +83,7 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
   const { live } = useRealtime();
   const [turnNo, setTurnNo] = useState<number | null>(null);
   const [entries, setEntries] = useState<TurnInfo[]>([]);
-  const [unread, setUnread] = useState<number[]>([]);
+  const [seen, setSeen] = useState<TurnSeen | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Campaign whose turn is wanted; late responses for another campaign are dropped. */
@@ -92,7 +98,7 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
     const records = readSeen();
     const next = trackTurn(records[id], current);
     if (next !== records[id]) writeSeen({ ...records, [id]: next });
-    setUnread(next.unread);
+    setSeen(next);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -100,7 +106,7 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
     if (!canRead || campaignId === null) {
       setTurnNo(null);
       setEntries([]);
-      setUnread([]);
+      setSeen(null);
       return;
     }
     try {
@@ -178,22 +184,30 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
 
   const listTurn = useCallback((no: number) => run(() => turnService.list(requireCampaign(), no)), [run, requireCampaign]);
 
-  const dismiss = useCallback((no: number) => {
+  const update = useCallback((change: (record: TurnSeen) => TurnSeen) => {
     if (campaignId === null) return;
     const records = readSeen();
-    const seen = records[campaignId];
-    if (!seen) return;
-    const next = { ...seen, unread: seen.unread.filter((n) => n !== no) };
+    const record = records[campaignId];
+    if (!record) return;
+    const next = change(record);
+    if (next === record) return;
     writeSeen({ ...records, [campaignId]: next });
-    setUnread(next.unread);
+    setSeen(next);
   }, [campaignId]);
+
+  const markRead = useCallback((no: number) => update((record) => markTurnRead(record, no)), [update]);
+  const markAllRead = useCallback(() => update(markAllTurnsRead), [update]);
 
   const clearError = useCallback(() => setError(null), []);
 
-  const notifications: TurnNotification[] = campaignId === null ? [] : unread.map((no) => ({ campaignId, turnNo: no }));
+  const notifications: TurnNotification[] = campaignId === null || seen === null ? [] : [
+    ...seen.unread.map((no) => ({ campaignId, turnNo: no, at: seen.at?.[no] ?? null, read: false })),
+    ...(seen.read ?? []).map((no) => ({ campaignId, turnNo: no, at: seen.at?.[no] ?? null, read: true })),
+  ];
 
   const value: TurnContextType = {
-    turnNo, entries, notifications, loading, error, refresh, dismiss, clearError, act, reset, finish, listTurn,
+    turnNo, entries, notifications, loading, error, refresh, dismiss: markRead, markRead, markAllRead, clearError, act, reset,
+    finish, listTurn,
   };
   return <TurnContext.Provider value={value}>{children}</TurnContext.Provider>;
 };

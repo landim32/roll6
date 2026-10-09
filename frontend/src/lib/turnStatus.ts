@@ -124,15 +124,43 @@ export interface TurnSeen {
   known: number;
   /** Finished turns with an unread notification, most recent first. */
   unread: number[];
+  /** Finished turns already read, still listed in the bell (046), most recent first, at most {@link MAX_READ_TURNS}. */
+  read?: number[];
+  /** When this device noticed each finished turn (046): turn number → ISO time. Older records have none. */
+  at?: Record<string, string>;
 }
+
+/** Read turn notices kept in the bell. */
+export const MAX_READ_TURNS = 20;
 
 /**
  * Updates the record with the turn in progress: the first sight of a campaign only records it; a higher turn
- * means the previous one was finished, which becomes an unread notification.
+ * means the previous one was finished, which becomes an unread notification stamped with the moment it was noticed.
  */
-export const trackTurn = (seen: TurnSeen | undefined, turnNo: number): TurnSeen => {
+export const trackTurn = (seen: TurnSeen | undefined, turnNo: number, now: string = new Date().toISOString()): TurnSeen => {
   if (!seen) return { known: turnNo, unread: [] };
   if (turnNo <= seen.known) return seen;
   const finished = turnNo - 1;
-  return { known: turnNo, unread: [finished, ...seen.unread.filter((n) => n !== finished)] };
+  return {
+    ...seen,
+    known: turnNo,
+    unread: [finished, ...seen.unread.filter((n) => n !== finished)],
+    read: (seen.read ?? []).filter((n) => n !== finished),
+    at: { ...seen.at, [finished]: seen.at?.[finished] ?? now },
+  };
 };
+
+const withRead = (seen: TurnSeen, turns: readonly number[]): TurnSeen => {
+  const read = [...turns, ...(seen.read ?? []).filter((n) => !turns.includes(n))]
+    .sort((a, b) => b - a).slice(0, MAX_READ_TURNS);
+  const kept = new Set([...seen.unread.filter((n) => !turns.includes(n)), ...read].map(String));
+  const at = Object.fromEntries(Object.entries(seen.at ?? {}).filter(([no]) => kept.has(no)));
+  return { ...seen, unread: seen.unread.filter((n) => !turns.includes(n)), read, at };
+};
+
+/** The turn's notice was opened (046): it stays in the bell, read. Unknown turns leave the record as it is. */
+export const markTurnRead = (seen: TurnSeen, turnNo: number): TurnSeen =>
+  seen.unread.includes(turnNo) ? withRead(seen, [turnNo]) : seen;
+
+/** "Marcar tudo como lido" (046) for this campaign's turn notices. */
+export const markAllTurnsRead = (seen: TurnSeen): TurnSeen => (seen.unread.length === 0 ? seen : withRead(seen, seen.unread));

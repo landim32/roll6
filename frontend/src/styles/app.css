@@ -1696,8 +1696,27 @@ button.stm-chat-quote { cursor: pointer; }
   white-space: normal;
 }
 
-.stm-inbox-notification.is-unread {
+.stm-inbox-notification.is-unread,
+.stm-turn-notification.is-unread {
   background: rgba(var(--stm-accent-rgb, 31, 214, 122), 0.08);
+}
+
+/* "Marcar tudo como lido" (046): the first line of the bell, the list stays open. */
+.stm-feed-markall {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--stm-accent);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.stm-feed-markall[data-disabled] {
+  color: var(--bs-secondary-color);
+  opacity: 0.6;
 }
 
 .stm-inbox-icon {

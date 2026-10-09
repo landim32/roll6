@@ -327,8 +327,9 @@
     "decline": "Recusar",
     "turnFinished": "Turno {{no}} finalizado",
     "turnFinishedHint": "Clique para ver o resumo",
-    "markAllRead": "Marcar todas como lidas",
-    "unread": "Não lida"
+    "markAllRead": "Marcar tudo como lido",
+    "unread": "Não lida",
+    "markAllFailed": "Não foi possível marcar como lidas."
   },
   "party": {
     "title": "Personagens ({{count}})",
