@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  authorLabel, chatLabel, compareCursors, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
+  authorLabel, chatLabel, compareCursors, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
+import { CHAT_KIND } from '../types/chat';
 
 const item = (id: number, over: Partial<ChatItemInfo> = {}): ChatItemInfo => ({
   key: `t${id}`, cursor: `${1000 + id}_${id}`, kind: 'text', turnId: id, campaignId: 1, turnNo: 1,
@@ -150,5 +151,23 @@ describe('044: permissions and reactions', () => {
     expect(summary).toEqual({ like: 1, love: 2, total: 3, mine: 'like' });
     expect(nextReaction('like', 'like')).toBeNull();
     expect(nextReaction('like', 'love')).toBe('love');
+  });
+});
+
+describe('copyableText', () => {
+  it('copies the message, the action text and the narration', () => {
+    expect(copyableText(item(1, { kind: CHAT_KIND.text, text: '  Olá mesa  ' }))).toBe('Olá mesa');
+    expect(copyableText(item(2, { kind: CHAT_KIND.action, description: 'Ataco o orc', text: 'Ana: Ataco o orc' }))).toBe('Ataco o orc');
+    expect(copyableText(item(3, { kind: CHAT_KIND.narration, text: '## Cena\nA porta range.' }))).toBe('## Cena\nA porta range.');
+  });
+
+  it('copies a roll as its sum and reason', () => {
+    expect(copyableText(item(4, { kind: CHAT_KIND.roll, dice: [5, 3, 6], text: 'Furtividade' }))).toBe('5 + 3 + 6 = 14 — Furtividade');
+    expect(copyableText(item(5, { kind: CHAT_KIND.roll, dice: [1, 2, 3], text: null }))).toBe('1 + 2 + 3 = 6');
+  });
+
+  it('has nothing to copy for a photo without caption or a deleted entry', () => {
+    expect(copyableText(item(6, { kind: CHAT_KIND.image, text: null }))).toBeNull();
+    expect(copyableText(item(7, { kind: CHAT_KIND.text, text: 'x', deleted: true }))).toBeNull();
   });
 });

@@ -2,9 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ChatLeftTextIcon, HeartFillIcon, HeartIcon, LightningIcon, ReplyIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
+  ChatLeftTextIcon, CopyIcon, HeartFillIcon, HeartIcon, LightningIcon, ReplyIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
 } from '../ui/icons';
-import { reactionSummary } from '../../lib/chatItems';
+import { copyableText, reactionSummary } from '../../lib/chatItems';
 import { REACTION } from '../../types/chat';
 import type { ChatItemInfo, ReactionKind } from '../../types/chat';
 
@@ -17,21 +17,24 @@ export interface ChatItemActionsProps {
   onReply: () => void;
   onConvert: (to: 'action' | 'message') => void;
   onDelete: () => void;
+  /** Puts the text on the clipboard (only offered when the entry has text). */
+  onCopy: (text: string) => void;
   onClose: () => void;
 }
 
 const BAR_HEIGHT = 56;
 
 /**
- * The bar that opens on holding a bubble (044): up to five big buttons — Curtir, Amei, Responder, Ação/Mensagem and
- * Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
+ * The bar that opens on holding a bubble (044): up to six big buttons — Curtir, Amei, Responder, Copiar, Ação/Mensagem
+ * and Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
  * closes on a tap outside, a scroll or Esc.
  */
-export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onClose }: ChatItemActionsProps) => {
+export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onCopy, onClose }: ChatItemActionsProps) => {
   const { t } = useTranslation();
   const bar = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const mine = reactionSummary(item.reactions, userId).mine;
+  const text = copyableText(item);
 
   useLayoutEffect(() => {
     const rect = anchor.getBoundingClientRect();
@@ -83,6 +86,11 @@ export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConv
       {item.canReply && (
         <button type="button" className="stm-chat-action" onClick={act(onReply)} title={t('chat.reply')} aria-label={t('chat.reply')}>
           <ReplyIcon size={24} />
+        </button>
+      )}
+      {text !== null && (
+        <button type="button" className="stm-chat-action" onClick={act(() => onCopy(text))} title={t('chat.copy')} aria-label={t('chat.copy')}>
+          <CopyIcon size={24} />
         </button>
       )}
       {item.canConvert === 'action' && (
