@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { ChatComposer } from './ChatComposer';
 import { ChatMessageList } from './ChatMessageList';
+import { PendingPlayers } from './PendingPlayers';
 
 /**
  * The campaign chat (041): the whole timeline — conversation and turn records — over the composer. On phones the
@@ -28,6 +29,7 @@ export const ChatPanel = () => {
 
   return (
     <section className="stm-chat">
+      <PendingPlayers />
       <ChatMessageList />
       <ChatComposer />
     </section>

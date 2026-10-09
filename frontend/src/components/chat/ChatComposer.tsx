@@ -4,7 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AudioRecorder } from './AudioRecorder';
-import { CameraIcon, Dice5Icon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon, SpeechIcon } from '../ui/icons';
+import { CameraIcon, Dice5Icon, EyeIcon, EyeSlashIcon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon, SpeechIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -27,7 +27,7 @@ type ComposerMode = 'talk' | 'act';
  */
 export const ChatComposer = () => {
   const { t } = useTranslation();
-  const { speaker, send, roll } = useChat();
+  const { speaker, send, roll, filters, setFilters } = useChat();
   const { mapTokens } = useMapToken();
   const { act } = useTurn();
   const [text, setText] = useState('');
@@ -182,6 +182,23 @@ export const ChatComposer = () => {
                     </>
                   )}
                   {participation && !acting && !piece && <p className="stm-chat-attach-note">{t('chat.placeToAct')}</p>}
+                  {/* What this user sees in the chat: the item stays open so both can be switched in one go. */}
+                  <DropdownMenu.Item className={`stm-chat-attach-item${filters.showMovement ? ' is-on' : ''}`}
+                    onSelect={(event) => { event.preventDefault(); setFilters({ ...filters, showMovement: !filters.showMovement }); }}
+                    aria-checked={filters.showMovement} role="menuitemcheckbox">
+                    <span className="stm-chat-attach-icon is-view">
+                      {filters.showMovement ? <EyeIcon size={24} /> : <EyeSlashIcon size={24} />}
+                    </span>
+                    <span>{t('chat.showMovement')}</span>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item className={`stm-chat-attach-item${filters.showChanges ? ' is-on' : ''}`}
+                    onSelect={(event) => { event.preventDefault(); setFilters({ ...filters, showChanges: !filters.showChanges }); }}
+                    aria-checked={filters.showChanges} role="menuitemcheckbox">
+                    <span className="stm-chat-attach-icon is-view">
+                      {filters.showChanges ? <EyeIcon size={24} /> : <EyeSlashIcon size={24} />}
+                    </span>
+                    <span>{t('chat.showChanges')}</span>
+                  </DropdownMenu.Item>
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>

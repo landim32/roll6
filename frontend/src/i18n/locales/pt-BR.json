@@ -692,7 +692,13 @@
     "rollOption": "Rolar 3d6",
     "photoOption": "Foto",
     "rollTotal": "Total",
-    "rollLabel": "Rolou {{dice}}, total {{total}}"
+    "rollLabel": "Rolou {{dice}}, total {{total}}",
+    "showMovement": "Ver deslocamento",
+    "showChanges": "Ver mudanças de status",
+    "pendingLabel": "Personagens que ainda não jogaram neste turno",
+    "pendingNone": "{{name}}: ainda não moveu nem agiu — ver no mapa",
+    "pendingMoved": "{{name}}: já moveu, falta agir — ver no mapa",
+    "pendingNotOnMap": "{{name}} não está no mapa aberto."
   },
   "layout": {
     "label": "Mapa e chat",

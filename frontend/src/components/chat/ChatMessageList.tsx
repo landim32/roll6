@@ -1,11 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatItem } from './ChatItem';
 import { ImageLightbox } from './ImageLightbox';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
-import { continuesPrevious } from '../../lib/chatItems';
+import { compareCursors, continuesPrevious } from '../../lib/chatItems';
+import { filterChatItems } from '../../lib/chatFilters';
 import type { ChatItemInfo } from '../../types/chat';
 import { toast } from 'sonner';
 
@@ -16,7 +17,12 @@ const STICK_PX = 48;
 export const ChatMessageList = () => {
   const { t } = useTranslation();
   const { session } = useAuth();
-  const { items, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove } = useChat();
+  const { items: allItems, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters } = useChat();
+  // Moves and character changes show only when the user turned them on in the paperclip.
+  const items = useMemo(() => filterChatItems(allItems, filters), [allItems, filters]);
+  /** "Novas mensagens" goes before the first unread item still shown (the first unread may be a hidden one). */
+  const unreadKey = useMemo(() => (firstUnreadCursor === null ? null
+    : items.find((item) => compareCursors(item.cursor, firstUnreadCursor) >= 0)?.key ?? null), [items, firstUnreadCursor]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const unreadRef = useRef<HTMLDivElement>(null);
@@ -89,12 +95,12 @@ export const ChatMessageList = () => {
       )}
       {items.map((item, index) => (
         <div key={item.key}>
-          {item.cursor === firstUnreadCursor && (
+          {item.key === unreadKey && (
             <div ref={unreadRef} className="stm-chat-unread" role="separator"><span>{t('chat.newMessages')}</span></div>
           )}
           <ChatItem
             item={item}
-            continued={index > 0 && item.cursor !== firstUnreadCursor && continuesPrevious(items[index - 1], item)}
+            continued={index > 0 && item.key !== unreadKey && continuesPrevious(items[index - 1], item)}
             own={item.userId === userId}
             onDelete={setToDelete}
             onOpenImage={(url, caption) => setImage({ url, caption })}

@@ -12,6 +12,8 @@ import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
 import { CONVERSATION_KINDS, compareCursors, markDeleted, mergeItems, reconcileRange } from '../lib/chatItems';
 import { isChatVisible, readLayoutMode, writeLayoutMode } from '../lib/layoutMode';
+import { isShown, readChatFilters, writeChatFilters } from '../lib/chatFilters';
+import type { ChatFilters } from '../lib/chatFilters';
 import type { LayoutMode } from '../lib/layoutMode';
 
 /** Without the real-time channel the chat is reloaded this often while the tab is visible. */
@@ -50,6 +52,9 @@ interface ChatContextType {
   canRead: boolean;
   speaker: ChatSpeaker | null;
   layoutMode: LayoutMode;
+  /** Moves and character changes the user chose to see (hidden by default, per user). */
+  filters: ChatFilters;
+  setFilters: (filters: ChatFilters) => void;
   setLayoutMode: (mode: LayoutMode) => void;
   loadOlder: () => Promise<void>;
   send: (info: Omit<ChatSendInfo, 'characterId'>, preview: string) => Promise<boolean>;
@@ -76,6 +81,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [pending, setPending] = useState<ChatPending[]>([]);
   const [loading, setLoading] = useState(false);
   const [layoutMode, setLayoutModeState] = useState<LayoutMode>(readLayoutMode);
+  const [filters, setFiltersState] = useState<ChatFilters>(() => readChatFilters(session?.user.userId ?? null));
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
   const [tabVisible, setTabVisible] = useState(() => document.visibilityState === 'visible');
   /** Campaign whose chat is wanted; late responses for another campaign are dropped. */
   const campaignRef = useRef<number | null>(null);
@@ -117,7 +125,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const countNew = useCallback((before: ChatItemInfo[], after: ChatItemInfo[]) => {
     if (visibleRef.current) return;
     const known = new Set(before.map((i) => i.key));
-    const added = after.filter((i) => !known.has(i.key) && i.userId !== userId && !i.deleted).length;
+    // What the user chose not to see doesn't count as unread either.
+    const added = after.filter((i) => !known.has(i.key) && i.userId !== userId && !i.deleted && isShown(i, filtersRef.current)).length;
     if (added > 0) setUnreadCount((n) => n + added);
   }, [userId]);
 
@@ -232,6 +241,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     return () => window.clearTimeout(timer);
   }, [visible, campaignId, lastCursor]);
 
+  // Each user has their own choice: reload it when someone else logs in.
+  useEffect(() => {
+    setFiltersState(readChatFilters(userId));
+  }, [userId]);
+
+  const setFilters = useCallback((next: ChatFilters) => {
+    setFiltersState(next);
+    writeChatFilters(userId, next);
+  }, [userId]);
+
   const setLayoutMode = useCallback((mode: LayoutMode) => {
     setLayoutModeState(mode);
     writeLayoutMode(mode);
@@ -290,8 +309,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo<ChatContextType>(() => ({
     items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
-    loadOlder, send, retry, discard, remove, roll,
+    filters, setFilters, loadOlder, send, retry, discard, remove, roll,
   }), [items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
+    filters, setFilters,
     loadOlder, send, retry, discard, remove, roll]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
