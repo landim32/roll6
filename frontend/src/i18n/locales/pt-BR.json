@@ -668,7 +668,6 @@
     "messageLabel": "Mensagem",
     "actPlaceholder": "O que o personagem faz neste turno?",
     "modeAct": "Ação",
-    "modeActHint": "Registra a ação do turno do seu personagem",
     "placeToAct": "Coloque o personagem no mapa aberto para agir",
     "send": "Enviar",
     "sendAction": "Registrar ação",
@@ -686,9 +685,6 @@
     "micDenied": "O microfone não foi liberado.",
     "micDeniedHint": "Permita o uso do microfone para este site nas configurações do navegador e tente de novo.",
     "attach": "Anexar",
-    "actOption": "Ação do turno",
-    "backToTalk": "Voltar à conversa",
-    "cancelAct": "Cancelar a ação",
     "rollOption": "Rolar 3d6",
     "photoOption": "Foto",
     "rollTotal": "Total",
@@ -698,7 +694,10 @@
     "pendingLabel": "Personagens que ainda não jogaram neste turno",
     "pendingNone": "{{name}}: ainda não moveu nem agiu — ver no mapa",
     "pendingMoved": "{{name}}: já moveu, falta agir — ver no mapa",
-    "pendingNotOnMap": "{{name}} não está no mapa aberto."
+    "pendingNotOnMap": "{{name}} não está no mapa aberto.",
+    "actSwitch": "Ação do turno",
+    "actOn": "Ligar a ação do turno: o que você enviar vira a ação do personagem",
+    "actOff": "Desligar a ação: voltar à conversa"
   },
   "layout": {
     "label": "Mapa e chat",
