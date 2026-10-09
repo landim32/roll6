@@ -23,6 +23,8 @@ import { readViewMode, writeViewMode } from '../lib/viewMode';
 import type { ViewMode } from '../lib/viewMode';
 import { MAP_STATUS_DELETED } from '../types/map';
 import type { MapInfo } from '../types/map';
+import type { CampaignInfo } from '../types/campaign';
+import { isMasterOf, viewerMapDecision } from '../lib/viewerMap';
 
 /** Zoom limits and step (research R3). */
 export const MIN_ZOOM = 0.1;
@@ -109,8 +111,11 @@ interface MapEditorContextType {
   newMap: () => void;
   /** `keepView` keeps zoom/pan (the same map reloaded because someone saved it, 017). */
   loadMapModel: (mapModelId: number, map?: MapInfo | null, options?: { keepView?: boolean }) => Promise<MapDraft>;
-  /** Opens a campaign map by its URL slug and returns it. */
-  openCampaignMapBySlug: (slug: string) => Promise<MapInfo>;
+  /**
+   * Opens a campaign map by its URL slug — or, for a player, the campaign's current map instead (039): the choice is
+   * made before loading, so a map the master hasn't revealed never shows. Returns what was opened and its campaign.
+   */
+  openCampaignMapBySlug: (slug: string) => Promise<OpenBySlugResult>;
   discardChanges: () => void;
   saveMap: (info?: SaveMapInfo) => Promise<SaveMapResult>;
   clearError: () => void;
@@ -154,6 +159,13 @@ const writeStoredMap = (map: StoredMap | null) => {
     // Storage unavailable: the map just isn't reopened after a reload.
   }
 };
+
+/** What `openCampaignMapBySlug` did (039): the asked map, the current one instead, or nothing (no current map). */
+export interface OpenBySlugResult {
+  map: MapInfo | null;
+  campaign: CampaignInfo;
+  outcome: 'opened' | 'redirected' | 'noCurrentMap';
+}
 
 export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
@@ -364,6 +376,22 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     setRestored(value);
   };
 
+  /** The campaign of a map (the open one when it is the same) and what this user may see of it (039). */
+  const campaignOfMap = useCallback(async (map: MapInfo): Promise<CampaignInfo> =>
+    (currentCampaign?.campaignId === map.campaignId ? currentCampaign : campaignService.getById(map.campaignId)),
+  [currentCampaign]);
+
+  const viewerDecisionFor = async (map: MapInfo, campaign?: CampaignInfo) => {
+    const owner = campaign ?? await campaignOfMap(map);
+    return viewerMapDecision({
+      isMaster: isMasterOf(owner, session?.user.userId),
+      mapId: map.mapId,
+      mapCampaignId: map.campaignId,
+      campaignId: owner.campaignId,
+      currentMapId: owner.currentMapId,
+    });
+  };
+
   // Once logged in, reopen the remembered map (a campaign map through its map, else the model alone).
   useEffect(() => {
     markRestored(false);
@@ -381,9 +409,20 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     let cancelled = false;
     (async () => {
       try {
-        const map = stored.mapId !== null ? await mapService.getById(stored.mapId) : null;
+        let map = stored.mapId !== null ? await mapService.getById(stored.mapId) : null;
         if (cancelled) return;
         if (map && map.status === MAP_STATUS_DELETED) throw new Error('map deleted');
+        if (map) {
+          // A player reopens only the campaign's current map, silently (039 FR-003).
+          const decision = await viewerDecisionFor(map);
+          if (cancelled) return;
+          if (decision.kind === 'none') {
+            writeStoredMap(null);
+            return;
+          }
+          if (decision.kind === 'redirect') map = await mapService.getById(decision.mapId!);
+          if (cancelled) return;
+        }
         await loadMapModel(map?.mapModelId ?? stored.mapModelId, map);
       } catch {
         // Deleted, no longer accessible or offline: start with an empty map.
@@ -424,31 +463,43 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     return loadMapModel(map.mapModelId, map, options);
   }, [loadMapModel]);
 
-  const openCampaignMapBySlug = useCallback(async (slug: string): Promise<MapInfo> => {
+  const openCampaignMapBySlug = useCallback(async (slug: string): Promise<OpenBySlugResult> => {
     const map = await mapService.getBySlug(slug);
     if (map.status === MAP_STATUS_DELETED) throw new Error('map deleted');
-    await loadMapModel(map.mapModelId, map);
-    return map;
-  }, [loadMapModel]);
+    const campaign = await campaignOfMap(map);
+    const decision = await viewerDecisionFor(map, campaign);
+    if (decision.kind === 'none') {
+      // No current map: a player sees none, so whatever map of this campaign was open goes away (039 FR-004).
+      if (draft.campaignId === campaign.campaignId) newMap();
+      return { map: null, campaign, outcome: 'noCurrentMap' };
+    }
+    const opened = decision.kind === 'redirect' ? await mapService.getById(decision.mapId!) : map;
+    await loadMapModel(opened.mapModelId, opened);
+    return { map: opened, campaign, outcome: decision.kind === 'redirect' ? 'redirected' : 'opened' };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- viewerDecisionFor only reads campaignOfMap and the session
+  }, [loadMapModel, campaignOfMap, draft.campaignId, newMap, session?.user.userId]);
 
   /**
-   * Players follow the master's map: on entering the campaign (after the restore, so it wins over the
-   * remembered map) and whenever the master switches. Opening another map on their own is fine until the
-   * next switch. Unsaved changes are never discarded.
+   * Players see only the campaign's current map (039): on entering the campaign (after the restore, so it wins over
+   * the remembered map), whenever the master switches, and whenever another map of the campaign ends up open. With no
+   * current map the open map of the campaign is closed. Unsaved changes are never discarded (players can't edit
+   * campaign maps, so for them this never blocks).
    */
   const followedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!restored) return;
+    // Two triggers: the campaign or its current map changed (follow), or another map of this campaign is open.
+    // A library model (no mapId) or a map of another campaign is left alone.
     const key = `${campaignId}:${currentMapId}`;
-    if (followedRef.current === key) return;
-    const previous = followedRef.current;
+    const switched = followedRef.current !== key;
     followedRef.current = key;
-    if (isMaster || campaignId === null || currentMapId === null || draft.mapId === currentMapId) return;
-    // A /map/<slug> deep link stays until the master switches, the same as opening another map yourself.
-    const route = parseTablePath(window.location.pathname);
-    const explicitMap = route.kind === 'map' && draft.mapSlug === route.slug && draft.campaignId === campaignId;
-    const enteredCampaign = previous === null || !previous.startsWith(`${campaignId}:`);
-    if (explicitMap && enteredCampaign) return;
+    const otherMapOfCampaign = draft.mapId !== null && draft.campaignId === campaignId && draft.mapId !== currentMapId;
+    if (!switched && !otherMapOfCampaign) return;
+    if (isMaster || campaignId === null || draft.mapId === currentMapId) return;
+    if (currentMapId === null) {
+      if (draft.mapId !== null && draft.campaignId === campaignId && !isDirty) newMap();
+      return;
+    }
     if (isDirty) {
       toast.warning(t('realtime.mapChangedDirty'));
       return;
@@ -459,7 +510,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
         if (opened && hadMap) toast.info(t('realtime.followedMap', { name: opened.name }));
       })
       .catch(() => { /* not accessible (yet): stay on the current map */ });
-  }, [restored, campaignId, currentMapId, isMaster, isDirty, draft.mapId, draft.mapSlug, draft.campaignId, openCampaignMap, t]);
+  }, [restored, campaignId, currentMapId, isMaster, isDirty, draft.mapId, draft.campaignId, openCampaignMap, newMap, t]);
 
   useTableEvents((event) => {
     if (event.type === TABLE_EVENT.mapSaved) {

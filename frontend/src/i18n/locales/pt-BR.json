@@ -40,7 +40,8 @@
   },
   "route": {
     "notFound": "Campanha ou mapa não encontrado.",
-    "forbidden": "Você não tem acesso a este mapa."
+    "forbidden": "Você não tem acesso a este mapa.",
+    "notCurrentMap": "Apenas o mapa atual da campanha pode ser aberto."
   },
   "userMenu": {
     "label": "Menu do usuário",
@@ -338,6 +339,7 @@
     }
   },
   "map": {
+    "noCurrentMap": "O mestre ainda não escolheu um mapa.",
     "zoomIn": "Aproximar",
     "zoomOut": "Afastar",
     "image": "Imagem",
