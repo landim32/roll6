@@ -100,6 +100,10 @@ public class ChatItemInfo
     [JsonPropertyName("audioType")]
     public string? AudioType { get; set; }
 
+    /// <summary>The faces of a roll (kind "roll"), drawn by the server: three values 1–6.</summary>
+    [JsonPropertyName("dice")]
+    public List<int>? Dice { get; set; }
+
     /// <summary>Deleted from the chat: no text and no media.</summary>
     [JsonPropertyName("deleted")]
     public bool Deleted { get; set; }

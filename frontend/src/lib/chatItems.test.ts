@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  compareCursors, continuesPrevious, nameColor, NAME_COLORS, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
+  compareCursors, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
 
@@ -99,5 +99,17 @@ describe('nameColor', () => {
   it('gives each name one color from the palette', () => {
     expect(nameColor('Aria')).toBe(nameColor('Aria'));
     expect(NAME_COLORS).toContain(nameColor('Mestre (GM) — Ana'));
+  });
+});
+
+describe('rolls and turn bubbles', () => {
+  it('sums the faces of a roll', () => {
+    expect(rollTotal([5, 3, 6])).toBe(14);
+    expect(rollTotal(null)).toBe(0);
+  });
+
+  it('runs moves, actions and character changes of the same actor together', () => {
+    expect(continuesPrevious(item(1, { kind: 'movement' }), item(2, { kind: 'characterUpdate' }))).toBe(true);
+    expect(continuesPrevious(item(1, { kind: 'roll' }), item(2, { kind: 'text' }))).toBe(true);
   });
 });

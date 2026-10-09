@@ -1483,5 +1483,20 @@ BEGIN
     VALUES ('20261009031324_AddCampaignChat', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009044306_AddChatDiceRoll') THEN
+    ALTER TABLE turns ADD dice character varying(100);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009044306_AddChatDiceRoll') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261009044306_AddChatDiceRoll', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

@@ -45,6 +45,18 @@ public class ChatSendInfo
     public int? AudioSeconds { get; set; }
 }
 
+/// <summary>A dice roll in the chat: 3d6 drawn by the server, as a character or as the master.</summary>
+public class ChatRollInfo
+{
+    /// <summary>One of the roller's characters approved in the campaign; null = roll as the master.</summary>
+    [JsonPropertyName("characterId")]
+    public long? CharacterId { get; set; }
+
+    /// <summary>Optional reason (≤ 260): "Ataque com espada".</summary>
+    [JsonPropertyName("text")]
+    public string? Text { get; set; }
+}
+
 /// <summary>Moves the reader's mark forward up to an entry (041).</summary>
 public class ChatReadInfo
 {

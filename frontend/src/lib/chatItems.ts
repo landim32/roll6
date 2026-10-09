@@ -17,10 +17,10 @@ export const DISCREET_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([
   CHAT_KIND.movement, CHAT_KIND.action, CHAT_KIND.characterUpdate,
 ]);
 
-/** Moves (gray, small) and actions (red), drawn as chat bubbles of the actor. */
-export const TURN_BUBBLE_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.movement, CHAT_KIND.action]);
+/** Moves and character changes (gray, small) and actions (red), drawn as chat bubbles of the actor. */
+export const TURN_BUBBLE_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.movement, CHAT_KIND.action, CHAT_KIND.characterUpdate]);
 
-export const CONVERSATION_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio]);
+export const CONVERSATION_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio, CHAT_KIND.roll]);
 
 /** "{ticks}_{id}" → comparable pair (ticks don't fit in a Number). */
 const cursorParts = (cursor: string): [bigint, bigint] => {
@@ -113,3 +113,6 @@ export const nameColor = (name: string): string => {
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return NAME_COLORS[hash % NAME_COLORS.length];
 };
+
+/** Sum of a roll's faces. */
+export const rollTotal = (dice: readonly number[] | null | undefined): number => (dice ?? []).reduce((sum, d) => sum + d, 0);

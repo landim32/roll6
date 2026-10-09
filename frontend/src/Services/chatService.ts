@@ -1,4 +1,4 @@
-import type { ChatAudioUploadInfo, ChatItemInfo, ChatPageInfo, ChatSendInfo } from '../types/chat';
+import type { ChatAudioUploadInfo, ChatItemInfo, ChatPageInfo, ChatRollInfo, ChatSendInfo } from '../types/chat';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface ChatServiceConfig {
@@ -36,6 +36,16 @@ class ChatService {
 
   async send(campaignId: number, info: ChatSendInfo): Promise<ChatItemInfo> {
     const response = await fetch(`${API_URL}/api/campaign/${campaignId}/chat`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(info),
+    });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
+  /** Rolls 3d6: the server draws the dice and everyone sees the same result. */
+  async roll(campaignId: number, info: ChatRollInfo): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/chat/roll`, {
       method: 'POST',
       headers: getHeaders(true),
       body: JSON.stringify(info),

@@ -56,6 +56,8 @@ interface ChatContextType {
   retry: (id: string) => Promise<void>;
   discard: (id: string) => void;
   remove: (item: ChatItemInfo) => Promise<void>;
+  /** Rolls 3d6 as the speaker, with an optional reason. */
+  roll: (text: string | null) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -102,7 +104,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   /** Items from events were mapped for their author: whether this user may delete them is decided here. */
   const forViewer = useCallback((item: ChatItemInfo): ChatItemInfo => {
     if (item.deleted) return { ...item, canDelete: false };
-    const canDelete = CONVERSATION_KINDS.has(item.kind)
+    // A roll can't be taken back by whoever made it: only the master removes one.
+    const canDelete = item.kind === CHAT_KIND.roll
+      ? isMaster
+      : CONVERSATION_KINDS.has(item.kind)
       ? item.userId === userId || isMaster
       : item.kind === CHAT_KIND.narration && isMaster;
     return { ...item, canDelete };
@@ -276,11 +281,18 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setItems((current) => markDeleted(current, item.key));
   }, []);
 
+  const roll = useCallback(async (text: string | null) => {
+    if (!speaker || campaignId === null) return;
+    const item = await chatService.roll(campaignId, { characterId: speaker.characterId, text });
+    if (campaignRef.current === campaignId) setItems((current) => mergeItems(current, [forViewer(item)]));
+    setFirstUnreadCursor(null);
+  }, [speaker, campaignId, forViewer]);
+
   const value = useMemo<ChatContextType>(() => ({
     items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
-    loadOlder, send, retry, discard, remove,
+    loadOlder, send, retry, discard, remove, roll,
   }), [items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
-    loadOlder, send, retry, discard, remove]);
+    loadOlder, send, retry, discard, remove, roll]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };

@@ -4,7 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AudioRecorder } from './AudioRecorder';
-import { CameraIcon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon, SpeechIcon } from '../ui/icons';
+import { CameraIcon, Dice5Icon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon, SpeechIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -27,7 +27,7 @@ type ComposerMode = 'talk' | 'act';
  */
 export const ChatComposer = () => {
   const { t } = useTranslation();
-  const { speaker, send } = useChat();
+  const { speaker, send, roll } = useChat();
   const { mapTokens } = useMapToken();
   const { act } = useTurn();
   const [text, setText] = useState('');
@@ -117,6 +117,20 @@ export const ChatComposer = () => {
   }
 
   const pickImage = () => fileRef.current?.click();
+
+  /** 3d6 drawn by the server; whatever is typed becomes the roll's reason ("Ataque com espada"). */
+  const onRoll = async () => {
+    const reason = text.trim() || null;
+    try {
+      setBusy(true);
+      await roll(reason);
+      setText('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    } finally {
+      setBusy(false);
+    }
+  };
   // Like WhatsApp: an empty field offers the microphone, anything typed (or an action) offers "send".
   const showRecorder = recordable && !acting && (recording || !text.trim());
 
@@ -138,35 +152,43 @@ export const ChatComposer = () => {
               onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} disabled={busy} />
             <DropdownMenu.Root modal={false}>
               <DropdownMenu.Trigger className="stm-chat-field-btn" disabled={busy} title={t('chat.attach')} aria-label={t('chat.attach')}>
-                <PaperclipIcon size={18} />
+                <PaperclipIcon size={22} />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content className="dropdown-menu show stm-user-menu stm-chat-attach" side="top" align="end" sideOffset={8}>
-                  {participation && (
-                    acting ? (
-                      <DropdownMenu.Item className="dropdown-item" onSelect={() => setMode('talk')}>
-                        <SpeechIcon size={16} /> {t('chat.backToTalk')}
-                      </DropdownMenu.Item>
-                    ) : (
-                      <DropdownMenu.Item className="dropdown-item" disabled={!piece} onSelect={() => setMode('act')}
-                        title={piece ? t('chat.modeActHint') : t('chat.placeToAct')}>
-                        <LightningIcon size={16} /> {t('chat.actOption')}
-                        {!piece && <small className="d-block text-body-secondary">{t('chat.placeToAct')}</small>}
-                      </DropdownMenu.Item>
-                    )
-                  )}
-                  {!acting && (
-                    <DropdownMenu.Item className="dropdown-item" onSelect={pickImage}>
-                      <ImageIcon size={16} /> {t('chat.sendImage')}
+                {/* WhatsApp-like attach sheet: two columns of big round icons, sized for a finger. */}
+                <DropdownMenu.Content className="stm-chat-attach" side="top" align="end" sideOffset={10}>
+                  {participation && (acting ? (
+                    <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => setMode('talk')}>
+                      <span className="stm-chat-attach-icon is-talk"><SpeechIcon size={24} /></span>
+                      <span>{t('chat.backToTalk')}</span>
                     </DropdownMenu.Item>
+                  ) : (
+                    <DropdownMenu.Item className="stm-chat-attach-item" disabled={!piece} onSelect={() => setMode('act')}
+                      title={piece ? t('chat.modeActHint') : t('chat.placeToAct')}>
+                      <span className="stm-chat-attach-icon is-act"><LightningIcon size={24} /></span>
+                      <span>{t('chat.actOption')}</span>
+                    </DropdownMenu.Item>
+                  ))}
+                  {!acting && (
+                    <>
+                      <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => { void onRoll(); }}>
+                        <span className="stm-chat-attach-icon is-roll"><Dice5Icon size={24} /></span>
+                        <span>{t('chat.rollOption')}</span>
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item className="stm-chat-attach-item" onSelect={pickImage}>
+                        <span className="stm-chat-attach-icon is-photo"><ImageIcon size={24} /></span>
+                        <span>{t('chat.photoOption')}</span>
+                      </DropdownMenu.Item>
+                    </>
                   )}
+                  {participation && !acting && !piece && <p className="stm-chat-attach-note">{t('chat.placeToAct')}</p>}
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
             {!acting && !text.trim() && (
               <button type="button" className="stm-chat-field-btn" onClick={pickImage} disabled={busy}
                 title={t('chat.sendImage')} aria-label={t('chat.sendImage')}>
-                <CameraIcon size={18} />
+                <CameraIcon size={22} />
               </button>
             )}
           </div>
@@ -177,7 +199,7 @@ export const ChatComposer = () => {
           <button type="button" className={`btn ${acting ? 'btn-danger' : 'btn-primary'} stm-chat-send`} onClick={() => { void submit(); }}
             disabled={busy || !text.trim() || (acting && !piece)}
             title={acting ? t('chat.sendAction') : t('chat.send')} aria-label={acting ? t('chat.sendAction') : t('chat.send')}>
-            {acting ? <LightningIcon size={18} /> : <SendIcon size={18} />}
+            {acting ? <LightningIcon size={22} /> : <SendIcon size={22} />}
           </button>
         )}
       </div>

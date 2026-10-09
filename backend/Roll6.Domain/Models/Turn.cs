@@ -72,6 +72,16 @@ public class Turn
     /// <summary>Deleted from the chat (041): kept as "Mensagem apagada", ignored by every turn read.</summary>
     public DateTime? DeletedAt { get; set; }
 
+    /// <summary>Chat: the faces of a <see cref="TurnType.Roll"/>, in order, comma separated ("5,3,6").</summary>
+    public string? Dice { get; set; }
+
+    /// <summary>The roll of the chat: three dice of six faces (GURPS 3d6).</summary>
+    public const int ROLL_DICE = 3;
+    public const int ROLL_SIDES = 6;
+
+    /// <summary>Longest reason of a roll ("Ataque com espada").</summary>
+    public const int MAX_ROLL_REASON = 260;
+
     // --- Chat (041) ---
 
     /// <summary>What someone says in text. <paramref name="characterId"/> null = the master speaking.</summary>
@@ -109,6 +119,22 @@ public class Turn
     }
 
     /// <summary>The divider written where a turn ends (finish, process, moving the current turn forward).</summary>
+    /// <summary>A dice roll in the chat, as a character or as the master; the faces come drawn by the server.</summary>
+    public static Turn DiceRoll(long campaignId, long? mapId, int turnNo, long userId, long? characterId, string displayName,
+        string? displayImage, IReadOnlyList<int> dice, string? reason)
+    {
+        if (dice.Count != ROLL_DICE || dice.Any(d => d is < 1 or > ROLL_SIDES))
+            throw new DomainValidationException("dice", $"A jogada deve ter {ROLL_DICE} dados de 1 a {ROLL_SIDES}.");
+        var turn = Speech(campaignId, mapId, turnNo, userId, characterId, displayName, displayImage, TurnType.Roll);
+        turn.Dice = string.Join(',', dice);
+        turn.Description = Guard.OptionalText(reason, "text", MAX_ROLL_REASON);
+        return turn;
+    }
+
+    /// <summary>The faces of a roll; empty for anything else.</summary>
+    public IReadOnlyList<int> DiceValues() =>
+        string.IsNullOrEmpty(Dice) ? Array.Empty<int>() : Dice.Split(',').Select(int.Parse).ToArray();
+
     public static Turn TurnFinished(long campaignId, long? mapId, int turnNo, long userId)
     {
         if (turnNo < 1)
@@ -132,7 +158,8 @@ public class Turn
 
     /// <summary>Who may delete it from the chat: the author their own message; the master any message and narrations.</summary>
     public bool CanBeDeletedBy(long userId, bool isMaster) =>
-        (IsConversation && (UserId == userId || isMaster)) || (TurnType == TurnType.Narration && isMaster);
+        // A roll can't be taken back by whoever made it: only the master removes one.
+        (IsConversation && ((UserId == userId && TurnType != TurnType.Roll) || isMaster)) || (TurnType == TurnType.Narration && isMaster);
 
     /// <summary>
     /// Deletes it from the chat (041): text, photo, audio (author or master) and narrations (master). Moves, actions,

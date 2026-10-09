@@ -2,10 +2,12 @@ import { lazy, Suspense, useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
-import { DotsIcon, LightningIcon, MoveIcon, PencilIcon } from '../ui/icons';
+import {
+  Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, DotsIcon, LightningIcon, MoveIcon, PencilIcon,
+} from '../ui/icons';
 import { CHAT_KIND } from '../../types/chat';
 import type { ChatItemInfo } from '../../types/chat';
-import { formatChanges, formatMovement, nameColor, shortName } from '../../lib/chatItems';
+import { formatChanges, formatMovement, nameColor, rollTotal, shortName } from '../../lib/chatItems';
 import { formatSeconds } from '../../lib/audioFormat';
 
 const MarkdownView = lazy(() => import('../ui/MarkdownView'));
@@ -45,13 +47,35 @@ const AudioPlayer = ({ item }: { item: ChatItemInfo }) => {
   );
 };
 
+/** The faces of the dice: `FACES[value - 1]` draws that die. */
+const FACES = [Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon];
+
+/** A 3d6 roll of the chat: the three faces and the total. */
+const RollResult = ({ dice }: { dice: number[] }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="stm-chat-roll" aria-label={t('chat.rollLabel', { dice: dice.join(', '), total: rollTotal(dice) })}>
+      <span className="stm-chat-roll-dice" aria-hidden="true">
+        {dice.map((value, index) => {
+          const Face = FACES[value - 1] ?? Dice1Icon;
+          return <Face key={index} size={30} />;
+        })}
+      </span>
+      <span className="stm-chat-roll-total">
+        <small>{t('chat.rollTotal')}</small>
+        <strong>{rollTotal(dice)}</strong>
+      </span>
+    </div>
+  );
+};
+
 const ItemMenu = ({ item, onDelete }: { item: ChatItemInfo; onDelete: (item: ChatItemInfo) => void }) => {
   const { t } = useTranslation();
   if (!item.canDelete) return null;
   return (
     <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger className="btn btn-sm stm-chat-menu" title={t('chat.menu')} aria-label={t('chat.menu')}>
-        <DotsIcon size={14} />
+        <DotsIcon size={20} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="dropdown-menu show stm-user-menu" align="end" sideOffset={4}>
@@ -78,10 +102,12 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
       );
 
     case CHAT_KIND.movement:
-    case CHAT_KIND.action: {
-      // Like a chat bubble: actions in red, moves smaller and gray. The actor's name always shows on the first bubble
-      // of a run, because the master moves and acts for many pieces.
+    case CHAT_KIND.action:
+    case CHAT_KIND.characterUpdate: {
+      // Like a chat bubble: actions in red, moves and character changes smaller and gray. The actor's name always
+      // shows on the first bubble of a run, because the master moves and acts for many pieces.
       const isAction = item.kind === CHAT_KIND.action;
+      const isChange = item.kind === CHAT_KIND.characterUpdate;
       const meta = <time className="stm-chat-meta">{timeOf(item.createdAt)}</time>;
       return (
         <div className={`stm-chat-message ${isAction ? 'is-action' : 'is-movement'}${own ? ' is-own' : ''}${continued ? ' is-continued' : ''}`}
@@ -97,27 +123,18 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
               </div>
             )}
             <div className="stm-chat-captioned">
-              <span className="stm-chat-kind-icon">{isAction ? <LightningIcon size={12} /> : <MoveIcon size={12} />}</span>
-              <span className="stm-chat-plain stm-chat-text">{isAction ? (item.description ?? '') : formatMovement(item)}</span>
+              <span className="stm-chat-kind-icon">
+                {isAction ? <LightningIcon size={12} /> : isChange ? <PencilIcon size={12} /> : <MoveIcon size={12} />}
+              </span>
+              <span className="stm-chat-plain stm-chat-text">
+                {isAction ? (item.description ?? '') : isChange ? formatChanges(item.changes) : formatMovement(item)}
+              </span>
               {meta}
             </div>
           </div>
         </div>
       );
     }
-
-    case CHAT_KIND.characterUpdate:
-      return (
-        <div className={`stm-chat-discreet${continued ? ' is-continued' : ''}`} title={item.text ?? undefined}>
-          <span className="stm-chat-discreet-icon"><PencilIcon size={12} /></span>
-          <span className="stm-chat-discreet-text">
-            <strong>{shortName(item.displayName)}</strong>
-            {item.authorLabel && <span className="text-body-secondary"> · {item.authorLabel}</span>}
-            {' '}{formatChanges(item.changes)}
-          </span>
-          <time className="stm-chat-time">{timeOf(item.createdAt)}</time>
-        </div>
-      );
 
     case CHAT_KIND.actionResult:
       return (
@@ -172,6 +189,7 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
                     </button>
                   ))}
                 {item.kind === CHAT_KIND.audio && <AudioPlayer item={item} />}
+                {item.kind === CHAT_KIND.roll && <RollResult dice={item.dice ?? []} />}
                 {caption ? <div className="stm-chat-captioned"><Text value={caption} />{meta}</div> : <div className="stm-chat-meta-row">{meta}</div>}
               </>
             )}

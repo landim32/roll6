@@ -356,6 +356,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Image).HasColumnName("image").HasMaxLength(260);
             entity.Property(e => e.Audio).HasColumnName("audio").HasMaxLength(260);
             entity.Property(e => e.AudioSeconds).HasColumnName("audio_seconds");
+            entity.Property(e => e.Dice).HasColumnName("dice").HasMaxLength(100);
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at").HasColumnType(TIMESTAMP);
             entity.HasIndex(e => new { e.CampaignId, e.TurnNo }).HasDatabaseName("ix_turns_campaign_turn");
             entity.HasIndex(e => new { e.CampaignId, e.CreatedAt, e.TurnId }).HasDatabaseName("ix_turns_campaign_created");

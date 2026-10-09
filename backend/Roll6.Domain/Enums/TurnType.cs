@@ -22,7 +22,9 @@ public enum TurnType
     /// <summary>A chat message with a recorded audio (041), optional caption in the description.</summary>
     Audio = 8,
     /// <summary>"Turno N finalizado" (041): written where the turn advances; <c>TurnNo</c> is the finished turn.</summary>
-    TurnFinished = 9
+    TurnFinished = 9,
+    /// <summary>A dice roll made in the chat: 3d6 drawn by the server, values in <c>dice</c>, optional reason.</summary>
+    Roll = 10
 }
 
 /// <summary>Groups of <see cref="TurnType"/> (041).</summary>
@@ -32,10 +34,10 @@ public static class TurnTypes
     public static readonly TurnType[] LOG =
         { TurnType.Movement, TurnType.Action, TurnType.ActionResult, TurnType.CharacterUpdate, TurnType.Narration };
 
-    /// <summary>What people say in the chat.</summary>
-    public static readonly TurnType[] CONVERSATION = { TurnType.Text, TurnType.Image, TurnType.Audio };
+    /// <summary>What people say in the chat, dice rolls included.</summary>
+    public static readonly TurnType[] CONVERSATION = { TurnType.Text, TurnType.Image, TurnType.Audio, TurnType.Roll };
 
     public static bool IsLog(TurnType type) => type is >= TurnType.Movement and <= TurnType.Narration;
 
-    public static bool IsConversation(TurnType type) => type is TurnType.Text or TurnType.Image or TurnType.Audio;
+    public static bool IsConversation(TurnType type) => type is TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll;
 }

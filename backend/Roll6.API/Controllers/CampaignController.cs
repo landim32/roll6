@@ -203,6 +203,22 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Rolls 3d6 in the chat: the server draws the dice and everyone sees the same result.</summary>
+    [HttpPost("{id:long}/chat/roll")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status201Created)]
+    public async Task<IActionResult> RollChat(long id, [FromBody] ChatRollInfo info)
+    {
+        try
+        {
+            var item = await _chatService.RollAsync(CurrentUserId, id, info);
+            return StatusCode(StatusCodes.Status201Created, item);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Moves the caller's read mark forward (041); everything after it counts as unread.</summary>
     [HttpPut("{id:long}/chat/read")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

@@ -101,4 +101,25 @@ public class TurnChatTests
         ((Action)(() => action.Delete(1, isMaster: true))).Should().Throw<DomainValidationException>();
         ((Action)(() => Turn.TurnFinished(10, null, 3, 1).Delete(1, isMaster: true))).Should().Throw<DomainValidationException>();
     }
+
+    [Fact]
+    public void DiceRoll_KeepsTheFaces_AndValidatesThem()
+    {
+        var roll = Turn.DiceRoll(1, null, 2, 5, 80, "Aria", null, new[] { 5, 3, 6 }, " Ataque ");
+        (roll.TurnType, roll.Dice, roll.Description, roll.IsConversation).Should().Be((TurnType.Roll, "5,3,6", "Ataque", true));
+        roll.DiceValues().Should().Equal(5, 3, 6);
+
+        FluentActions.Invoking(() => Turn.DiceRoll(1, null, 2, 5, 80, "Aria", null, new[] { 5, 7, 1 }, null))
+            .Should().Throw<DomainValidationException>();
+        FluentActions.Invoking(() => Turn.DiceRoll(1, null, 2, 5, 80, "Aria", null, new[] { 5, 3 }, null))
+            .Should().Throw<DomainValidationException>();
+    }
+
+    [Fact]
+    public void DiceRoll_OnlyTheMasterDeletesIt()
+    {
+        var roll = Turn.DiceRoll(1, null, 2, 5, 80, "Aria", null, new[] { 1, 2, 3 }, null);
+        roll.CanBeDeletedBy(5, isMaster: false).Should().BeFalse();
+        roll.CanBeDeletedBy(9, isMaster: true).Should().BeTrue();
+    }
 }
