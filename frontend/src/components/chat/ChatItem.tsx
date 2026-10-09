@@ -78,25 +78,46 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
       );
 
     case CHAT_KIND.movement:
-    case CHAT_KIND.action:
-    case CHAT_KIND.characterUpdate: {
-      const icon = item.kind === CHAT_KIND.movement ? <MoveIcon size={12} />
-        : item.kind === CHAT_KIND.action ? <LightningIcon size={12} /> : <PencilIcon size={12} />;
-      const detail = item.kind === CHAT_KIND.movement ? formatMovement(item)
-        : item.kind === CHAT_KIND.action ? (item.description ?? '') : formatChanges(item.changes);
+    case CHAT_KIND.action: {
+      // Like a chat bubble: actions in red, moves smaller and gray. The actor's name always shows on the first bubble
+      // of a run, because the master moves and acts for many pieces.
+      const isAction = item.kind === CHAT_KIND.action;
+      const meta = <time className="stm-chat-meta">{timeOf(item.createdAt)}</time>;
+      return (
+        <div className={`stm-chat-message ${isAction ? 'is-action' : 'is-movement'}${own ? ' is-own' : ''}${continued ? ' is-continued' : ''}`}
+          title={item.text ?? undefined}>
+          <div className="stm-chat-avatar">
+            {!continued && <CharacterAvatar name={item.displayName} imageUrl={item.displayImageUrl} size={isAction ? 32 : 24} />}
+          </div>
+          <div className="stm-chat-bubble">
+            {!continued && (
+              <div className="stm-chat-name" style={isAction ? { color: nameColor(item.displayName) } : undefined}>
+                {item.displayName}
+                {item.authorLabel && <span className="stm-chat-author"> · {item.authorLabel}</span>}
+              </div>
+            )}
+            <div className="stm-chat-captioned">
+              <span className="stm-chat-kind-icon">{isAction ? <LightningIcon size={12} /> : <MoveIcon size={12} />}</span>
+              <span className="stm-chat-plain stm-chat-text">{isAction ? (item.description ?? '') : formatMovement(item)}</span>
+              {meta}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    case CHAT_KIND.characterUpdate:
       return (
         <div className={`stm-chat-discreet${continued ? ' is-continued' : ''}`} title={item.text ?? undefined}>
-          <span className="stm-chat-discreet-icon">{icon}</span>
+          <span className="stm-chat-discreet-icon"><PencilIcon size={12} /></span>
           <span className="stm-chat-discreet-text">
             <strong>{shortName(item.displayName)}</strong>
             {item.authorLabel && <span className="text-body-secondary"> · {item.authorLabel}</span>}
-            {item.kind === CHAT_KIND.action ? ': ' : ' '}
-            {detail}
+            {' '}{formatChanges(item.changes)}
           </span>
           <time className="stm-chat-time">{timeOf(item.createdAt)}</time>
         </div>
       );
-    }
 
     case CHAT_KIND.actionResult:
       return (
