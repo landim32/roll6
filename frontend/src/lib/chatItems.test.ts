@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  compareCursors, continuesPrevious, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
+  compareCursors, continuesPrevious, nameColor, NAME_COLORS, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
 
@@ -92,5 +92,12 @@ describe('countUnread', () => {
     const items = [item(1, { userId: 9 }), item(2), item(3, { userId: 9 }), item(4, { userId: 9, deleted: true })];
     expect(countUnread(items, 2, null)).toBe(2);
     expect(countUnread(items, 2, items[0].cursor)).toBe(1);
+  });
+});
+
+describe('nameColor', () => {
+  it('gives each name one color from the palette', () => {
+    expect(nameColor('Aria')).toBe(nameColor('Aria'));
+    expect(NAME_COLORS).toContain(nameColor('Mestre (GM) — Ana'));
   });
 });

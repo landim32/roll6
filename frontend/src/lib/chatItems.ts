@@ -99,3 +99,12 @@ export const formatChanges = (changes: ChatChangeInfo[] | null): string =>
 /** Unread entries by others among `items`, after the cursor `since` (all when null). */
 export const countUnread = (items: ChatItemInfo[], userId: number, since: string | null): number =>
   items.filter((item) => item.userId !== userId && !item.deleted && (since === null || compareCursors(item.cursor, since) > 0)).length;
+
+/** Author colors of the chat (WhatsApp-like): readable on the dark bubble, picked by the name so each speaker keeps one. */
+export const NAME_COLORS = ['#f5a3c7', '#7ad7f0', '#f7c873', '#9be38f', '#c5a3ff', '#ff9e7a', '#6fd3b5', '#f28b82'] as const;
+
+export const nameColor = (name: string): string => {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return NAME_COLORS[hash % NAME_COLORS.length];
+};

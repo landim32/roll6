@@ -5,7 +5,7 @@ import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { DotsIcon, LightningIcon, MoveIcon, PencilIcon } from '../ui/icons';
 import { CHAT_KIND } from '../../types/chat';
 import type { ChatItemInfo } from '../../types/chat';
-import { formatChanges, formatMovement, shortName } from '../../lib/chatItems';
+import { formatChanges, formatMovement, nameColor, shortName } from '../../lib/chatItems';
 import { formatSeconds } from '../../lib/audioFormat';
 
 const MarkdownView = lazy(() => import('../ui/MarkdownView'));
@@ -126,20 +126,20 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
     default: {
       // Conversation: text, photo or recording.
       const caption = item.text?.trim() ? item.text : null;
+      const meta = <time className="stm-chat-meta">{timeOf(item.createdAt)}</time>;
       return (
         <div className={`stm-chat-message${own ? ' is-own' : ''}${continued ? ' is-continued' : ''}`}>
-          <div className="stm-chat-avatar">
-            {!continued && <CharacterAvatar name={item.displayName} imageUrl={item.displayImageUrl} size={32} />}
-          </div>
+          {!own && (
+            <div className="stm-chat-avatar">
+              {!continued && <CharacterAvatar name={item.displayName} imageUrl={item.displayImageUrl} size={32} />}
+            </div>
+          )}
           <div className="stm-chat-bubble">
-            {!continued && (
-              <div className="stm-chat-head">
-                <span className="stm-chat-name">{item.displayName}</span>
-                <time className="stm-chat-time">{timeOf(item.createdAt)}</time>
-              </div>
+            {!own && !continued && (
+              <div className="stm-chat-name" style={{ color: nameColor(item.displayName) }}>{item.displayName}</div>
             )}
             {item.deleted ? (
-              <em className="text-body-secondary">{t('chat.deleted')}</em>
+              <div className="stm-chat-text"><em className="text-body-secondary">{t('chat.deleted')}</em>{meta}</div>
             ) : (
               <>
                 {item.kind === CHAT_KIND.image && item.imageUrl && (imageFailed
@@ -151,7 +151,7 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
                     </button>
                   ))}
                 {item.kind === CHAT_KIND.audio && <AudioPlayer item={item} />}
-                {caption && <Text value={caption} />}
+                {caption ? <div className="stm-chat-captioned"><Text value={caption} />{meta}</div> : <div className="stm-chat-meta-row">{meta}</div>}
               </>
             )}
           </div>
