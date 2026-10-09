@@ -1,3 +1,5 @@
+using Roll6.Domain.Notifications;
+using Roll6.Domain.Interfaces;
 using FluentAssertions;
 using Moq;
 using Roll6.Domain.Enums;
@@ -30,6 +32,7 @@ public class CampaignCharacterServiceTests
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<INotificationQueue> _queue = new();
     private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly CampaignCharacterService _service;
@@ -61,7 +64,7 @@ public class CampaignCharacterServiceTests
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
             _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _tokenRepository.Object, _unitOfWork.Object,
-            _imageStorage.Object, _turnRepository.Object, _notifier.Object);
+            _imageStorage.Object, _turnRepository.Object, _queue.Object, _notifier.Object);
     }
 
     private static CampaignCharacterRequestInfo Request(long campaignId) => new() { CampaignId = campaignId, CharacterId = CHARACTER };
@@ -348,6 +351,29 @@ public class CampaignCharacterServiceTests
         result.CharacterMove.Should().Be(5);
         _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Once);
         _characterRepository.Verify(r => r.UpdateAsync(It.IsAny<Character>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_ByTheMaster_TellsTheOwnerHisPvAndFadiga()
+    {
+        SetupParticipation(81, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+
+        await _service.UpdateAsync(MASTER_ID, 81, Play());
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Life && n.Body.StartsWith("Você está com -2/")
+            && n.Body.EndsWith(" PV") && n.TargetUserIds!.SequenceEqual(new[] { PLAYER_ID }))), Times.Once);
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Fatigue && n.Body.StartsWith("Você está com 6/")
+            && n.Body.EndsWith(" de Fadiga"))), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_ByTheOwner_NotifiesNobody()
+    {
+        SetupParticipation(81, CLOSED_CAMPAIGN, CampaignCharacterStatus.Approved);
+
+        await _service.UpdateAsync(PLAYER_ID, 81, Play());
+
+        _queue.Verify(q => q.Enqueue(It.IsAny<TableNotice>()), Times.Never);
     }
 
     [Fact]

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Roll6.Application.Notifications;
 using Roll6.Domain.Models;
+using Roll6.DTO.Push;
 using Roll6.Domain.Realtime;
 using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
@@ -13,7 +15,7 @@ namespace Roll6.Application.Realtime;
 /// Sends table events to the campaign group through the SignalR hub (017); failures are only logged. Piece events of a
 /// map that isn't the campaign's current one go only to the master's connections (039, <see cref="TableEventAudience"/>).
 /// </summary>
-public class SignalRRealtimeNotifier : IRealtimeNotifier
+public class SignalRRealtimeNotifier : IRealtimeNotifier, INoticeChannel
 {
     private readonly IHubContext<TableHub> _hub;
     private readonly TableConnections _connections;
@@ -58,6 +60,20 @@ public class SignalRRealtimeNotifier : IRealtimeNotifier
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not publish {Type} to campaign {CampaignId}", tableEvent.Type, tableEvent.CampaignId);
+        }
+    }
+
+    public async Task SendNoticeAsync(long userId, long campaignId, NoticeInfo notice)
+    {
+        try
+        {
+            var connections = _connections.ConnectionsOf(userId, campaignId);
+            if (connections.Count > 0)
+                await _hub.Clients.Clients(connections).SendAsync(TableHub.NOTICE_METHOD, notice);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not send a {Kind} notice to user {UserId}", notice.Kind, userId);
         }
     }
 

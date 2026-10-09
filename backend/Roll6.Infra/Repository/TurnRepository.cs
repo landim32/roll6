@@ -179,6 +179,15 @@ public class TurnRepository : ITurnRepository<Turn>
         return await query.Take(cap).CountAsync();
     }
 
+    public async Task<DateTime?> LastPokeAtAsync(long campaignId, long userId)
+    {
+        return await _context.Turns.AsNoTracking()
+            .Where(e => e.CampaignId == campaignId && e.UserId == userId && e.TurnType == TurnType.Poke)
+            .OrderByDescending(e => e.CreatedAt)
+            .Select(e => (DateTime?)e.CreatedAt)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<Turn?> FirstUnreadAsync(long campaignId, long userId, DateTime? since)
     {
         var query = _context.Turns.AsNoTracking()

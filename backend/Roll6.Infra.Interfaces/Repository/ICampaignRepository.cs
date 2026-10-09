@@ -16,5 +16,11 @@ public interface ICampaignRepository<TModel> where TModel : class
     Task<List<CampaignTableRow>> ListTableAsync(long userId);
     Task<TModel> InsertAsync(TModel entity);
     Task<TModel> UpdateAsync(TModel entity);
+
+    /// <summary>
+    /// Marks "Falta apenas você…" as sent for the turn (043) only if it wasn't and the campaign is still in it; false
+    /// when another request got there first.
+    /// </summary>
+    Task<bool> TrySetMajorityNotifiedAsync(long campaignId, int turnNo);
     Task DeleteAsync(long id);
 }

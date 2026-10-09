@@ -18,6 +18,9 @@ public class TableHub : Hub
     /// <summary>Client method that receives the events.</summary>
     public const string EVENT_METHOD = "tableEvent";
 
+    /// <summary>Personal notice shown as a toast (043).</summary>
+    public const string NOTICE_METHOD = "notice";
+
     private readonly ICampaignService _campaignService;
     private readonly TableConnections _connections;
 
@@ -70,6 +73,16 @@ public class TableHub : Hub
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, TableConnections.GroupName(old));
         await Groups.AddToGroupAsync(Context.ConnectionId, TableConnections.GroupName(campaignId));
         return true;
+    }
+
+    /// <summary>
+    /// The client reports whether its window is on screen and the chat visible (043): people looking at the chat get no
+    /// push for its messages, and personal notices of the campaign on screen become toasts.
+    /// </summary>
+    public Task SetPresence(bool visible, bool chatVisible)
+    {
+        _connections.SetPresence(Context.ConnectionId, visible, chatVisible);
+        return Task.CompletedTask;
     }
 
     /// <summary>Stops following any campaign.</summary>

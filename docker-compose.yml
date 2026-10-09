@@ -25,6 +25,9 @@ services:
       S3__Folder: ${S3_FOLDER:-roll6}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      Push__PublicKey: ${VAPID_PUBLIC_KEY:-}
+      Push__PrivateKey: ${VAPID_PRIVATE_KEY:-}
+      Push__Subject: ${VAPID_SUBJECT:-}
     depends_on:
       db:
         condition: service_healthy

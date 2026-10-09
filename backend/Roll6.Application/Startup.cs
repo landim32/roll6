@@ -1,3 +1,4 @@
+using Roll6.Application.Notifications;
 using System.Text;
 using Amazon.S3;
 using Microsoft.AspNetCore.Authentication;
@@ -34,6 +35,7 @@ public static class Startup
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
         services.Configure<S3Settings>(configuration.GetSection("S3"));
         services.Configure<SiteSettings>(configuration.GetSection("Site"));
+        services.Configure<PushSettings>(configuration.GetSection("Push"));
 
         // DbContext
         services.AddDbContext<Roll6Context>(options =>
@@ -53,6 +55,8 @@ public static class Startup
         services.AddScoped<IMapNpcRepository<MapNpc>, MapNpcRepository>();
         services.AddScoped<ITurnRepository<Turn>, TurnRepository>();
         services.AddScoped<IChatReadRepository<ChatRead>, ChatReadRepository>();
+        services.AddScoped<IPushSubscriptionRepository<PushSubscription>, PushSubscriptionRepository>();
+        services.AddScoped<ICampaignNotificationPrefRepository<CampaignNotificationPref>, CampaignNotificationPrefRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // AppServices
@@ -91,7 +95,18 @@ public static class Startup
         // Real-time table events (017): the hub only pushes; changes keep going through the REST API.
         services.AddSignalR();
         services.AddSingleton<TableConnections>();
-        services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
+        services.AddSingleton<IPresence>(sp => sp.GetRequiredService<TableConnections>());
+        services.AddSingleton<SignalRRealtimeNotifier>();
+        services.AddSingleton<IRealtimeNotifier>(sp => sp.GetRequiredService<SignalRRealtimeNotifier>());
+        services.AddSingleton<INoticeChannel>(sp => sp.GetRequiredService<SignalRRealtimeNotifier>());
+
+        // Web Push (043): notices are queued by the domain services and delivered in the background.
+        services.AddSingleton<IPushSender, WebPushSender>();
+        services.AddSingleton<NotificationQueue>();
+        services.AddSingleton<INotificationQueue>(sp => sp.GetRequiredService<NotificationQueue>());
+        services.AddScoped<NoticeDispatcher>();
+        services.AddScoped<IPushService, PushService>();
+        services.AddHostedService<NotificationWorker>();
 
         // Authentication
         // Authentication: the default scheme picks the API key (X-Api-Key header, 019) or the JWT per request, so

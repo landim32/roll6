@@ -17,6 +17,7 @@ import { TransferCharacterModal } from '../modals/TransferCharacterModal';
 import { TurnSummaryModal } from '../modals/TurnSummaryModal';
 import { CampaignSettingsModal } from '../modals/CampaignSettingsModal';
 import { ApiKeysModal } from '../modals/ApiKeysModal';
+import { NotificationsModal } from '../notifications/NotificationsModal';
 import type { MapInfo } from '../../types/map';
 import type { CharacterInfo } from '../../types/character';
 import { useAuth } from '../../hooks/useAuth';
@@ -56,6 +57,7 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
   const [summaryTurn, setSummaryTurn] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   /** "Abrir" in the settings' Mapas tab: same as opening from the maps window (the table follows it, 017). */
   const openMapFromSettings = (map: MapInfo) => {
@@ -100,12 +102,13 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
       )}
       <div className="ms-auto d-flex align-items-center gap-2">
         <UserMenu onEdit={() => setEditOpen(true)} onChangePassword={() => setPasswordOpen(true)}
-          onApiKeys={() => setApiKeysOpen(true)} onLogout={onLogout} />
+          onApiKeys={() => setApiKeysOpen(true)} onNotifications={() => setNotificationsOpen(true)} onLogout={onLogout} />
         <NotificationBell onOpenTurn={setSummaryTurn} />
       </div>
       <EditUserModal open={editOpen} onOpenChange={setEditOpen} />
       <ChangePasswordModal open={passwordOpen} onOpenChange={setPasswordOpen} />
       <ApiKeysModal open={apiKeysOpen} onOpenChange={setApiKeysOpen} />
+      <NotificationsModal open={notificationsOpen} onOpenChange={setNotificationsOpen} />
       {isMaster && <ManageCharactersModal open={manageOpen} onOpenChange={setManageOpen} />}
       <SelectCharacterModal open={selectOpen} onOpenChange={setSelectOpen} onInclude={() => setIncludeOpen(true)} onEdit={setEditingCharacter} onTransfer={setTransferring} />
       <TransferCharacterModal

@@ -135,6 +135,27 @@ public class Turn
     public IReadOnlyList<int> DiceValues() =>
         string.IsNullOrEmpty(Dice) ? Array.Empty<int>() : Dice.Split(',').Select(int.Parse).ToArray();
 
+    /// <summary>
+    /// A poke in the chat (043): <c>DisplayName</c> = first name of who poked, <c>Description</c> = the poked first names
+    /// ("Ana e Bruno"). Not a turn record and not deletable.
+    /// </summary>
+    public static Turn Poke(long campaignId, long? mapId, int turnNo, long userId, string displayName, string pokedNames)
+    {
+        if (turnNo < 1)
+            throw new DomainValidationException("turnNo", "O turno deve ser maior que zero.");
+        return new Turn
+        {
+            CampaignId = campaignId,
+            MapId = mapId,
+            TurnNo = turnNo,
+            TurnType = TurnType.Poke,
+            UserId = userId,
+            DisplayName = Guard.RequiredText(displayName, "displayName", 260),
+            Description = Guard.RequiredText(pokedNames, "description", MAX_DESCRIPTION),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
     public static Turn TurnFinished(long campaignId, long? mapId, int turnNo, long userId)
     {
         if (turnNo < 1)

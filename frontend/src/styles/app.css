@@ -1178,6 +1178,18 @@ body,
 
 .stm-chat-attach-icon.is-roll { background: #1fa463; }
 .stm-chat-attach-icon.is-photo { background: #8e5cd9; }
+.stm-chat-attach-icon.is-poke { background: #e0902a; }
+
+/* "Rodrigo cutucou Ana e Bruno" (043): a small gray line in the middle of the chat. */
+.stm-chat-poke {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+}
 /* The two view switches: gray with a closed eye while off, the brand green with an open eye while on. */
 .stm-chat-attach-icon.is-view { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
 .stm-chat-attach-item.is-on .stm-chat-attach-icon.is-view { background: #1fa463; color: #fff; }

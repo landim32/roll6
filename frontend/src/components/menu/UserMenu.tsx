@@ -9,6 +9,8 @@ interface UserMenuProps {
   onChangePassword: () => void;
   /** "Chaves de API" (019). */
   onApiKeys: () => void;
+  /** "Notificações" (043). */
+  onNotifications: () => void;
   onLogout: () => void;
 }
 
@@ -17,7 +19,7 @@ interface UserMenuProps {
  * click and keyboard navigation (research R1); `modal={false}` keeps it from competing with the
  * Radix Dialog opened by the items, which run after the menu closes (onSelect).
  */
-export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onLogout }: UserMenuProps) => {
+export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications, onLogout }: UserMenuProps) => {
   const { t } = useTranslation();
   const { session } = useAuth();
   const { canInstall, install } = useInstall();
@@ -35,6 +37,7 @@ export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onLogout }: User
           <DropdownMenu.Item className="dropdown-item" onSelect={onEdit}>{t('userMenu.edit')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onChangePassword}>{t('userMenu.changePassword')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onApiKeys}>{t('userMenu.apiKeys')}</DropdownMenu.Item>
+          <DropdownMenu.Item className="dropdown-item" onSelect={onNotifications}>{t('notifications.menu')}</DropdownMenu.Item>
           {canInstall && (
             <DropdownMenu.Item className="dropdown-item d-flex align-items-center gap-2" onSelect={() => { void install(); }}>
               <DownloadIcon size={14} /> {t('install.menu')}

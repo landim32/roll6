@@ -108,6 +108,14 @@ public class CampaignRepository : ICampaignRepository<Campaign>
         }
     }
 
+    public async Task<bool> TrySetMajorityNotifiedAsync(long campaignId, int turnNo)
+    {
+        return await _context.Campaigns
+            .Where(c => c.CampaignId == campaignId && c.CurrentTurn == turnNo
+                && (c.MajorityNotifiedTurn == null || c.MajorityNotifiedTurn != turnNo))
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.MajorityNotifiedTurn, turnNo)) > 0;
+    }
+
     public async Task<Campaign> UpdateAsync(Campaign entity)
     {
         var existing = await _context.Campaigns.FindAsync(entity.CampaignId)

@@ -1,3 +1,5 @@
+using Roll6.Domain.Notifications;
+using Roll6.Domain.Interfaces;
 using FluentAssertions;
 using Moq;
 using Roll6.Domain.Enums;
@@ -31,6 +33,7 @@ public class TurnServiceChatTests
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<INotificationQueue> _queue = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IChatReadRepository<ChatRead>> _chatReadRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
@@ -68,7 +71,7 @@ public class TurnServiceChatTests
             new Mock<IMapTokenRepository<MapToken>>().Object, _campaignCharacterRepository.Object, _characterRepository.Object,
             _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object,
             new Mock<IMapModelRepository<MapModel>>().Object, new Mock<ICampaignNpcRepository<CampaignNpc>>().Object,
-            new Mock<ITokenRepository<Token>>().Object, _chatReadRepository.Object, _imageStorage.Object, _notifier.Object);
+            new Mock<ITokenRepository<Token>>().Object, _chatReadRepository.Object, _imageStorage.Object, _queue.Object, _notifier.Object);
     }
 
     private static Turn At(Turn t, long id, int second)
@@ -349,5 +352,97 @@ public class TurnServiceChatTests
         await _service.Invoking(s => s.UpdateAsync(MASTER, 60, new TurnUpdateInfo { Description = "y" })).Should().ThrowAsync<KeyNotFoundException>();
         (await _service.Invoking(s => s.CreateAsync(MASTER, new TurnInsertInfo { CampaignId = CAMPAIGN, TurnType = 6, Description = "x" }))
             .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("turnType");
+    }
+
+    // --- Notices (043) ---
+
+    [Fact]
+    public async Task Send_EnqueuesTheMessageForTheOthers()
+    {
+        await _service.SendAsync(PLAYER, CAMPAIGN, new ChatSendInfo { CharacterId = ARIA, Text = "Vamos pela **ponte**" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Message && n.Speaker == "Aria"
+            && n.Body == "Vamos pela ponte" && n.ActorUserId == PLAYER && n.TargetUserIds == null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Send_AsTheMaster_UsesTheFirstName()
+    {
+        _userRepository.Setup(r => r.GetByIdAsync(MASTER)).ReturnsAsync(new User { UserId = MASTER, Name = "Ana Paula" });
+
+        await _service.SendAsync(MASTER, CAMPAIGN, new ChatSendInfo { Text = "Rolem iniciativa" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Speaker == "Mestre (GM) — Ana")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Roll_EnqueuesTheTotal()
+    {
+        var item = await _service.RollAsync(PLAYER, CAMPAIGN, new ChatRollInfo { CharacterId = ARIA });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Body == $"rolou 3d6: total {item.Dice!.Sum()}")), Times.Once);
+    }
+
+    private void PokeTable()
+    {
+        // Aria (PLAYER) acted; Bram (user 5) and Cael (user 6) did not.
+        _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(new List<CampaignCharacter>
+        {
+            new() { CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved },
+            new() { CampaignId = CAMPAIGN, CharacterId = 81, Status = CampaignCharacterStatus.Approved },
+            new() { CampaignId = CAMPAIGN, CharacterId = 82, Status = CampaignCharacterStatus.Approved }
+        });
+        var owners = new Dictionary<long, long> { [ARIA] = PLAYER, [81] = 5, [82] = 6 };
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            ids.Select(id => new Character { CharacterId = id, UserId = owners[id], Name = $"C{id}" }).ToList());
+        _userRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            ids.Select(id => new User { UserId = id, Name = id == 5 ? "Bruno Lima" : id == 6 ? "Caio Reis" : "Rodrigo Landim" }).ToList());
+        _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3)).ReturnsAsync(new List<Turn>
+        {
+            new() { CampaignId = CAMPAIGN, TurnNo = 3, TurnType = TurnType.Action, CharacterId = ARIA }
+        });
+    }
+
+    [Fact]
+    public async Task Poke_TellsWhoHasNotActed_AndLeavesALineInTheChat()
+    {
+        PokeTable();
+
+        var result = await _service.PokeAsync(PLAYER, CAMPAIGN);
+
+        (result.Poked, string.Join(",", result.Names)).Should().Be((2, "Bruno,Caio"));
+        result.Item!.Kind.Should().Be("poke");
+        result.Item.Text.Should().Be("Rodrigo cutucou Bruno e Caio");
+        result.Item.CanDelete.Should().BeFalse();
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Poke && n.Body == "Rodrigo está cutucando você"
+            && n.TargetUserIds!.OrderBy(u => u).SequenceEqual(new[] { 5L, 6L }))), Times.Once);
+    }
+
+    [Fact]
+    public async Task Poke_WhenEveryoneActed_SendsNothing()
+    {
+        PokeTable();
+        _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3)).ReturnsAsync(new[] { ARIA, 81L, 82L }
+            .Select(c => new Turn { CampaignId = CAMPAIGN, TurnNo = 3, TurnType = TurnType.Action, CharacterId = c }).ToList());
+
+        var result = await _service.PokeAsync(PLAYER, CAMPAIGN);
+
+        result.Poked.Should().Be(0);
+        _repository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Poke_TwiceInAMinute_Is409()
+    {
+        PokeTable();
+        _repository.Setup(r => r.LastPokeAtAsync(CAMPAIGN, PLAYER)).ReturnsAsync(DateTime.UtcNow.AddSeconds(-20));
+
+        await _service.Invoking(s => s.PokeAsync(PLAYER, CAMPAIGN)).Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task Poke_Stranger_Is403()
+    {
+        await _service.Invoking(s => s.PokeAsync(STRANGER, CAMPAIGN)).Should().ThrowAsync<UnauthorizedAccessException>();
     }
 }

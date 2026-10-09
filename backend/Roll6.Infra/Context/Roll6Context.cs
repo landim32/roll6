@@ -30,6 +30,8 @@ public class Roll6Context : DbContext
     public DbSet<MapNpc> MapNpcs { get; set; }
     public DbSet<Turn> Turns { get; set; }
     public DbSet<ChatRead> ChatReads { get; set; }
+    public DbSet<PushSubscription> PushSubscriptions { get; set; }
+    public DbSet<CampaignNotificationPref> CampaignNotificationPrefs { get; set; }
     public DbSet<CampaignPlan> CampaignPlans { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
 
@@ -86,6 +88,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Open).HasColumnName("open");
             entity.Property(e => e.CurrentTurn).HasColumnName("current_turn").HasDefaultValue(1).HasSentinel(0);
             entity.Property(e => e.CurrentMapId).HasColumnName("current_map_id");
+            entity.Property(e => e.MajorityNotifiedTurn).HasColumnName("majority_notified_turn");
             // Map the table follows (017); a map belongs to its campaign, so no navigation both ways.
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.CurrentMapId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_campaign_current");
@@ -388,6 +391,39 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_chat_read");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_chat_read");
+        });
+
+        modelBuilder.Entity<PushSubscription>(entity =>
+        {
+            entity.ToTable("push_subscriptions");
+            entity.HasKey(e => e.PushSubscriptionId).HasName("push_subscriptions_pkey");
+            entity.Property(e => e.PushSubscriptionId).HasColumnName("push_subscription_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Endpoint).HasColumnName("endpoint").HasMaxLength(PushSubscription.MAX_ENDPOINT).IsRequired();
+            entity.Property(e => e.P256dh).HasColumnName("p256dh").HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Auth).HasColumnName("auth").HasMaxLength(100).IsRequired();
+            entity.Property(e => e.UserAgent).HasColumnName("user_agent").HasMaxLength(500);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.LastUsedAt).HasColumnName("last_used_at").HasColumnType(TIMESTAMP);
+            entity.HasIndex(e => e.Endpoint).IsUnique().HasDatabaseName("ix_push_subscriptions_endpoint");
+            entity.HasIndex(e => e.UserId).HasDatabaseName("ix_push_subscriptions_user");
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_push_subscription");
+        });
+
+        modelBuilder.Entity<CampaignNotificationPref>(entity =>
+        {
+            entity.ToTable("campaign_notification_prefs");
+            entity.HasKey(e => e.CampaignNotificationPrefId).HasName("campaign_notification_prefs_pkey");
+            entity.Property(e => e.CampaignNotificationPrefId).HasColumnName("campaign_notification_pref_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.CampaignId).HasColumnName("campaign_id");
+            entity.Property(e => e.Muted).HasColumnName("muted");
+            entity.HasIndex(e => new { e.UserId, e.CampaignId }).IsUnique().HasDatabaseName("ix_campaign_notification_prefs_user_campaign");
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_notification_pref");
+            entity.HasOne<Campaign>().WithMany().HasForeignKey(e => e.CampaignId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_notification_pref");
         });
     }
 

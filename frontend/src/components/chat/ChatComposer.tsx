@@ -4,7 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AudioRecorder } from './AudioRecorder';
-import { Dice5Icon, EyeIcon, EyeSlashIcon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
+import { Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -27,7 +27,7 @@ type ComposerMode = 'talk' | 'act';
  */
 export const ChatComposer = () => {
   const { t } = useTranslation();
-  const { speaker, send, roll, filters, setFilters } = useChat();
+  const { speaker, send, roll, poke, filters, setFilters } = useChat();
   const { mapTokens } = useMapToken();
   const { act } = useTurn();
   const [text, setText] = useState('');
@@ -118,6 +118,17 @@ export const ChatComposer = () => {
 
   const pickImage = () => fileRef.current?.click();
 
+  /** Pokes everyone who hasn't acted in the turn (043): they get a notification, the chat a gray line. */
+  const onPoke = async () => {
+    try {
+      const result = await poke();
+      if (result.poked === 0) toast.info(t('chat.pokeNobody'));
+      else toast.success(t('chat.pokeDone', { count: result.poked }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    }
+  };
+
   /** 3d6 drawn by the server; whatever is typed becomes the roll's reason ("Ataque com espada"). */
   const onRoll = async () => {
     const reason = text.trim() || null;
@@ -156,6 +167,10 @@ export const ChatComposer = () => {
                       <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => { void onRoll(); }}>
                         <span className="stm-chat-attach-icon is-roll"><Dice5Icon size={24} /></span>
                         <span>{t('chat.rollOption')}</span>
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => { void onPoke(); }}>
+                        <span className="stm-chat-attach-icon is-poke"><HandIndexIcon size={24} /></span>
+                        <span>{t('chat.pokeOption')}</span>
                       </DropdownMenu.Item>
                       <DropdownMenu.Item className="stm-chat-attach-item" onSelect={pickImage}>
                         <span className="stm-chat-attach-icon is-photo"><ImageIcon size={24} /></span>

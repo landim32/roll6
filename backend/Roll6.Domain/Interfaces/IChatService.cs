@@ -17,6 +17,9 @@ public interface IChatService
     /// <summary>Deletes a message (author or master) or a narration (master) from the chat.</summary>
     Task DeleteMessageAsync(long userId, long turnId);
 
+    /// <summary>Pokes the players who haven't acted in the turn (043): a chat line and a notice to each of them.</summary>
+    Task<Roll6.DTO.Push.PokeResultInfo> PokeAsync(long userId, long campaignId);
+
     /// <summary>Rolls 3d6 in the chat (server-side draw) and publishes it like a message.</summary>
     Task<ChatItemInfo> RollAsync(long userId, long campaignId, ChatRollInfo info);
 

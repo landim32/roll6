@@ -109,6 +109,10 @@ namespace Roll6.Infra.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("current_turn");
 
+                    b.Property<int?>("MajorityNotifiedTurn")
+                        .HasColumnType("integer")
+                        .HasColumnName("majority_notified_turn");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)
@@ -225,6 +229,39 @@ namespace Roll6.Infra.Migrations
                         .HasDatabaseName("ix_campaign_characters_campaign_character");
 
                     b.ToTable("campaign_characters", (string)null);
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.CampaignNotificationPref", b =>
+                {
+                    b.Property<long>("CampaignNotificationPrefId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_notification_pref_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("CampaignNotificationPrefId"));
+
+                    b.Property<long>("CampaignId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_id");
+
+                    b.Property<bool>("Muted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("muted");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("CampaignNotificationPrefId")
+                        .HasName("campaign_notification_prefs_pkey");
+
+                    b.HasIndex("CampaignId");
+
+                    b.HasIndex("UserId", "CampaignId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_campaign_notification_prefs_user_campaign");
+
+                    b.ToTable("campaign_notification_prefs", (string)null);
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.CampaignNpc", b =>
@@ -826,6 +863,63 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("npcs", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.PushSubscription", b =>
+                {
+                    b.Property<long>("PushSubscriptionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("push_subscription_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("PushSubscriptionId"));
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("auth");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("endpoint");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("p256dh");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("PushSubscriptionId")
+                        .HasName("push_subscriptions_pkey");
+
+                    b.HasIndex("Endpoint")
+                        .IsUnique()
+                        .HasDatabaseName("ix_push_subscriptions_endpoint");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_push_subscriptions_user");
+
+                    b.ToTable("push_subscriptions", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.Token", b =>
                 {
                     b.Property<long>("TokenId")
@@ -1137,6 +1231,21 @@ namespace Roll6.Infra.Migrations
                         .HasConstraintName("fk_character_campaign_character");
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.CampaignNotificationPref", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("CampaignId")
+                        .IsRequired()
+                        .HasConstraintName("fk_campaign_notification_pref");
+
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_notification_pref");
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.CampaignNpc", b =>
                 {
                     b.HasOne("Roll6.Domain.Models.Campaign", null)
@@ -1273,6 +1382,15 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("fk_user_npc");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.PushSubscription", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_push_subscription");
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.Token", b =>

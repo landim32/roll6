@@ -300,13 +300,26 @@
     "deleteMessage": "Excluir {{name}} do mapa? A peça sai deste mapa; o token continua na biblioteca."
   },
   "notifications": {
-    "label": "Notificações",
-    "empty": "Nenhuma notificação",
-    "invite": "{{campaign}} (mestre {{owner}}) convidou {{character}}",
-    "accept": "Aceitar",
-    "decline": "Recusar",
-    "turnFinished": "Turno {{no}} finalizado",
-    "turnFinishedHint": "Clique para ver o resumo"
+    "menu": "Notificações",
+    "title": "Notificações",
+    "device": "Este aparelho",
+    "on": "Ativadas",
+    "off": "Desativadas",
+    "enable": "Ativar neste aparelho",
+    "disable": "Desativar neste aparelho",
+    "enabled": "Notificações ativadas neste aparelho.",
+    "disabled": "Notificações desativadas neste aparelho.",
+    "blocked": "Bloqueadas pelo navegador",
+    "denied": "O navegador bloqueou as notificações do Roll6.",
+    "deniedHint": "Para liberar, toque no cadeado ao lado do endereço (ou abra as configurações do navegador → Configurações do site → Notificações), permita o roll6.site e tente de novo.",
+    "unsupported": "Este navegador não recebe notificações.",
+    "unavailable": "As notificações não estão disponíveis no momento.",
+    "needsInstall": "No iPhone e no iPad, as notificações só funcionam com o Roll6 instalado na tela de início (iOS 16.4 ou mais novo).",
+    "howToInstall": "Como instalar",
+    "whatArrives": "Você recebe as mensagens do chat, os avisos do seu turno, as mudanças de PV e Fadiga do seu personagem e os cutucões. O mestre recebe também as ações dos personagens.",
+    "campaigns": "Campanhas",
+    "noCampaigns": "Você ainda não está em nenhuma campanha.",
+    "muted": "silenciada"
   },
   "party": {
     "title": "Personagens ({{count}})",
@@ -697,7 +710,11 @@
     "pendingNotOnMap": "{{name}} não está no mapa aberto.",
     "actSwitch": "Ação do turno",
     "actOn": "Ligar a ação do turno: o que você enviar vira a ação do personagem",
-    "actOff": "Desligar a ação: voltar à conversa"
+    "actOff": "Desligar a ação: voltar à conversa",
+    "pokeOption": "Cutucar",
+    "pokeNobody": "Todos já agiram neste turno.",
+    "pokeDone_one": "Cutucou {{count}} jogador.",
+    "pokeDone_other": "Cutucou {{count}} jogadores."
   },
   "layout": {
     "label": "Mapa e chat",

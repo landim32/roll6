@@ -33,6 +33,11 @@ class RealtimeService {
   async leaveCampaign(connection: HubConnection): Promise<void> {
     await connection.invoke('LeaveCampaign');
   }
+
+  /** Whether this window is on screen and the chat visible (043): decides push vs nothing vs toast on the server. */
+  async setPresence(connection: HubConnection, visible: boolean, chatVisible: boolean): Promise<void> {
+    await connection.invoke('SetPresence', visible, chatVisible);
+  }
 }
 
 export const realtimeService = new RealtimeService();

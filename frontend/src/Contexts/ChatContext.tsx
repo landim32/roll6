@@ -1,6 +1,8 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { chatService } from '../Services/chatService';
+import { pushService } from '../Services/pushService';
+import type { PokeResultInfo } from '../types/push';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { useCharacter } from '../hooks/useCharacter';
@@ -63,6 +65,8 @@ interface ChatContextType {
   remove: (item: ChatItemInfo) => Promise<void>;
   /** Rolls 3d6 as the speaker, with an optional reason. */
   roll: (text: string | null) => Promise<void>;
+  /** Pokes who hasn't acted in the turn (043); the chat line comes back merged. */
+  poke: () => Promise<PokeResultInfo>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -73,7 +77,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
   const { currentCampaign, isMaster } = useCampaign();
   const { myParticipations, currentSelection } = useCharacter();
-  const { live } = useRealtime();
+  const { live, setPresence } = useRealtime();
   const [items, setItems] = useState<ChatItemInfo[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -224,6 +228,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     return () => window.clearInterval(timer);
   }, [canRead, live, refreshRecent]);
 
+  // The server must know whether the chat is on screen (043): no push for what one is looking at.
+  useEffect(() => {
+    setPresence(tabVisible, visible);
+  }, [tabVisible, visible, setPresence]);
+
   useEffect(() => {
     const onVisibility = () => setTabVisible(document.visibilityState === 'visible');
     document.addEventListener('visibilitychange', onVisibility);
@@ -307,12 +316,19 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setFirstUnreadCursor(null);
   }, [speaker, campaignId, forViewer]);
 
+  const poke = useCallback(async () => {
+    if (campaignId === null) return { poked: 0, names: [] };
+    const result = await pushService.poke(campaignId);
+    if (result.item && campaignRef.current === campaignId) setItems((current) => mergeItems(current, [forViewer(result.item!)]));
+    return { poked: result.poked, names: result.names };
+  }, [campaignId, forViewer]);
+
   const value = useMemo<ChatContextType>(() => ({
     items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
-    filters, setFilters, loadOlder, send, retry, discard, remove, roll,
+    filters, setFilters, loadOlder, send, retry, discard, remove, roll, poke,
   }), [items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters,
-    loadOlder, send, retry, discard, remove, roll]);
+    loadOlder, send, retry, discard, remove, roll, poke]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
