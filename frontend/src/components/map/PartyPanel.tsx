@@ -11,6 +11,8 @@ import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 
 interface PartyPanelProps {
   onOpen: (member: CampaignCharacterInfo, mode: ParticipationMode) => void;
+  /** A fixed column beside the chat instead of a panel over the map. */
+  docked?: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ interface PartyPanelProps {
  * current campaign. Every card opens the character form: to edit for the owner or the master, read-only
  * for the other participants.
  */
-export const PartyPanel = ({ onOpen }: PartyPanelProps) => {
+export const PartyPanel = ({ onOpen, docked = false }: PartyPanelProps) => {
   const { t } = useTranslation();
   const { session } = useAuth();
   const { isMaster } = useCampaign();
@@ -29,6 +31,7 @@ export const PartyPanel = ({ onOpen }: PartyPanelProps) => {
 
   return (
     <SidePanel
+      docked={docked}
       side="left"
       title={t('party.title', { count: party.length })}
       storageKey="roll6:party-collapsed"

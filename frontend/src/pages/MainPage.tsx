@@ -23,6 +23,7 @@ import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { useChat } from '../hooks/useChat';
 import { useMapEditor } from '../hooks/useMapEditor';
+import { DESKTOP_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 import { useCampaign } from '../hooks/useCampaign';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { LAYOUT_MODE, isChatVisible, isMapVisible } from '../lib/layoutMode';
@@ -80,6 +81,7 @@ export const MainPage = () => {
   const layout = chatReadable ? layoutMode : LAYOUT_MODE.map;
   const showMap = isMapVisible(layout);
   const showChat = isChatVisible(layout);
+  const desktop = useMediaQuery(DESKTOP_QUERY);
 
   // Closing or reloading the tab with unsaved changes asks the browser to confirm.
   useEffect(() => {
@@ -170,7 +172,12 @@ export const MainPage = () => {
       )}
       {showChat && (
         <div className="stm-chat-region">
-          <ChatPanel />
+          {/* Chat only: the cards come along — fixed columns on the desktop, the map's collapsible panels on phones. */}
+          <div className="stm-chat-body">
+            {!showMap && <PartyPanel docked={desktop} onOpen={(participation, mode) => setEditing({ participation, mode })} />}
+            <ChatPanel />
+            {!showMap && <NpcPanel docked={desktop} onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} />}
+          </div>
         </div>
       )}
       {noCurrentMap && <div className="stm-no-map-notice" role="status">{t('map.noCurrentMap')}</div>}
