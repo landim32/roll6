@@ -15,6 +15,10 @@ export const TABLE_EVENT = {
   mapCurrent: 'map.current',
   campaignChanged: 'campaign.changed',
   campaignDeleted: 'campaign.deleted',
+  /** A chat message or end-of-turn divider was saved (041); data = ChatItemInfo. */
+  chatMessage: 'chat.message',
+  /** A chat message or narration was deleted (041); data = { itemKey }. */
+  chatDeleted: 'chat.deleted',
   resync: 'resync',
 } as const;
 

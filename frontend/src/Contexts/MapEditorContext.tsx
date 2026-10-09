@@ -1,3 +1,4 @@
+import { mapRegionCenter } from '../lib/mapRegion';
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { mapModelService } from '../Services/mapModelService';
@@ -202,7 +203,8 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   }, []);
   const centerOn = useCallback((mapX: number, mapY: number, zoom: number) => {
     const scale = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
-    setView({ zoom: scale, panX: window.innerWidth / 2 - mapX * scale, panY: window.innerHeight / 2 - mapY * scale });
+    const [cx, cy] = mapRegionCenter();
+    setView({ zoom: scale, panX: cx - mapX * scale, panY: cy - mapY * scale });
   }, []);
 
   // ---------- draft editing ----------

@@ -91,6 +91,11 @@ public class S3ImageStorageAppService : IImageStorageAppService
         }
     }
 
+    public async Task DeleteAsync(string fileName)
+    {
+        await _client.DeleteObjectAsync(_settings.BucketName, GetKey(fileName));
+    }
+
     /// <summary>Only the file name is stored in the database; the configured folder is applied here.</summary>
     private string GetKey(string fileName)
     {

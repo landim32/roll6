@@ -78,6 +78,9 @@ public static class TurnSummary
     public static string BuildNarration(string? author, string? description)
         => Narration(author == null ? null : Escape(author), description).TrimEnd('\n');
 
+    /// <summary>One entry as the summary writes it (041: the chat shows each turn record with this same text).</summary>
+    public static string Line(SummaryLine line) => Write(line);
+
     private static string Write(SummaryLine line)
     {
         var actor = Escape(line.Actor);
@@ -131,21 +134,29 @@ public static class TurnSummary
             return "Ficha da campanha alterada";
         if (change.Field == "sheetFile")
             return "Ficha em arquivo alterada";
-        var label = change.Field switch
-        {
-            "currentLife" => "Vida",
-            "currentEnergy" => "Energia",
-            "life" => isNpc ? "Vida" : "Vida total",
-            "energy" => isNpc ? "Energia" : "Energia total",
-            "move" => "Movimento",
-            "currentMove" => "Deslocamento",
-            "name" => "Nome",
-            "characterStatus" or "status" => "Status",
-            "posture" => "Postura",
-            _ => change.Field
-        };
-        return $"{label} de {Value(change.Field, change.Before)} para {Value(change.Field, change.After)}";
+        return $"{FieldLabel(change.Field, isNpc)} de {Value(change.Field, change.Before)} para {Value(change.Field, change.After)}";
     }
+
+    /// <summary>Readable name of a changed field ("Vida", "Postura"…; 041: also used by the chat).</summary>
+    public static string FieldLabel(string field, bool isNpc) => field switch
+    {
+        "notes" => "Ficha da campanha",
+        "sheetFile" => "Ficha em arquivo",
+        "currentLife" => "Vida",
+        "currentEnergy" => "Energia",
+        "life" => isNpc ? "Vida" : "Vida total",
+        "energy" => isNpc ? "Energia" : "Energia total",
+        "move" => "Movimento",
+        "currentMove" => "Deslocamento",
+        "name" => "Nome",
+        "characterStatus" or "status" => "Status",
+        "posture" => "Postura",
+        _ => field
+    };
+
+    /// <summary>A changed value as a reader sees it (posture by name), without markdown escaping (041, chat).</summary>
+    public static string? FieldValue(string field, string? value) =>
+        field == "posture" && value != null ? PostureName(value) : value;
 
     private static string Value(string field, string? value)
     {

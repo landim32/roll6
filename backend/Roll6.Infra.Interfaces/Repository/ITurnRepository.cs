@@ -30,5 +30,27 @@ public interface ITurnRepository<TModel> where TModel : class
     Task DeleteByCampaignAsync(long campaignId);
     Task DeleteByCharacterAsync(long characterId);
     Task DeleteByNpcAsync(long npcId);
+
+    // --- Chat (041): the same timeline read as the campaign chat ---
+
+    /// <summary>
+    /// A page ordered by (created_at, id), every type, deleted ones included, returned ascending: the newest without
+    /// cursor, older with <paramref name="before"/>, newer with <paramref name="after"/>.
+    /// </summary>
+    Task<List<TModel>> ListChatPageAsync(long campaignId, (DateTime At, long Id)? before, (DateTime At, long Id)? after, int limit);
+
+    /// <summary>The turn records (types 1–5, not deleted) of the given turns, in order.</summary>
+    Task<List<TModel>> ListLogByTurnsAsync(long campaignId, IEnumerable<int> turnNos);
+
+    /// <summary>Entries by others, not deleted, after <paramref name="since"/> (all when null), at most <paramref name="cap"/>.</summary>
+    Task<int> CountUnreadAsync(long campaignId, long userId, DateTime? since, int cap);
+
+    Task<TModel?> FirstUnreadAsync(long campaignId, long userId, DateTime? since);
+
+    /// <summary>Stored photo and audio names of the campaign's chat (deleted with the campaign).</summary>
+    Task<List<string>> ListChatMediaAsync(long campaignId);
+
+    /// <summary>Removes the end-of-turn dividers from <paramref name="turnNo"/> on (moving the current turn back).</summary>
+    Task<int> DeleteFinishedFromAsync(long campaignId, int turnNo);
     Task DeleteByMapNpcIdsAsync(IEnumerable<long> mapNpcIds);
 }

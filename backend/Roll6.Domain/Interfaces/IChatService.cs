@@ -1,0 +1,25 @@
+using Roll6.DTO.Chat;
+
+namespace Roll6.Domain.Interfaces;
+
+/// <summary>
+/// The campaign chat (041). It is the campaign's whole timeline — what people say plus every turn record and the
+/// end-of-turn dividers — read and written by the master and the approved participants.
+/// </summary>
+public interface IChatService
+{
+    /// <summary>A page: newest without cursor, older with <paramref name="before"/>, newer with <paramref name="after"/>.</summary>
+    Task<ChatPageInfo> ListAsync(long userId, long campaignId, string? before, string? after, int? limit);
+
+    /// <summary>Says something as one of the sender's approved characters, or as the master when no character.</summary>
+    Task<ChatItemInfo> SendAsync(long userId, long campaignId, ChatSendInfo info);
+
+    /// <summary>Deletes a message (author or master) or a narration (master) from the chat.</summary>
+    Task DeleteMessageAsync(long userId, long turnId);
+
+    /// <summary>Moves the reader's mark forward up to <paramref name="until"/>.</summary>
+    Task MarkReadAsync(long userId, long campaignId, string until);
+
+    /// <summary>Stores a recorded audio as it came (WebM, MP4/M4A or Ogg, at most 5 MB).</summary>
+    Task<ChatAudioUploadInfo> UploadAudioAsync(Stream content, long length);
+}

@@ -1384,5 +1384,104 @@ BEGIN
     VALUES ('20261008215633_AddCampaignCharacterMove', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    ALTER TABLE turns ADD audio character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    ALTER TABLE turns ADD audio_seconds integer;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    ALTER TABLE turns ADD deleted_at timestamp without time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    ALTER TABLE turns ADD display_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    ALTER TABLE turns ADD display_name character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    ALTER TABLE turns ADD image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    CREATE TABLE chat_reads (
+        chat_read_id bigint GENERATED ALWAYS AS IDENTITY,
+        campaign_id bigint NOT NULL,
+        user_id bigint NOT NULL,
+        last_read_at timestamp without time zone NOT NULL,
+        CONSTRAINT chat_reads_pkey PRIMARY KEY (chat_read_id),
+        CONSTRAINT fk_campaign_chat_read FOREIGN KEY (campaign_id) REFERENCES campaigns (campaign_id),
+        CONSTRAINT fk_user_chat_read FOREIGN KEY (user_id) REFERENCES users (user_id)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    CREATE INDEX ix_turns_campaign_created ON turns (campaign_id, created_at, turn_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    CREATE UNIQUE INDEX ix_chat_reads_campaign_user ON chat_reads (campaign_id, user_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    CREATE INDEX "IX_chat_reads_user_id" ON chat_reads (user_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+
+    INSERT INTO turns (campaign_id, map_id, turn_no, turn_type, user_id, created_at)
+    SELECT t.campaign_id, NULL, t.turn_no, 9, c.user_id, MAX(t.created_at) + INTERVAL '1 millisecond'
+    FROM turns t
+    JOIN campaigns c ON c.campaign_id = t.campaign_id
+    WHERE t.turn_no < c.current_turn AND t.turn_type <> 9
+    GROUP BY t.campaign_id, t.turn_no, c.user_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261009031324_AddCampaignChat') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261009031324_AddCampaignChat', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

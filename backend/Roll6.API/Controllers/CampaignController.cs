@@ -5,6 +5,7 @@ using Roll6.DTO.Campaign;
 using Roll6.DTO.CampaignCharacter;
 using Roll6.DTO.CampaignNpc;
 using Roll6.DTO.CampaignPlan;
+using Roll6.DTO.Chat;
 using Roll6.DTO.Common;
 using Roll6.DTO.Map;
 using Roll6.DTO.Turn;
@@ -20,6 +21,7 @@ public class CampaignController : ApiControllerBase
     private readonly ICampaignNpcService _campaignNpcService;
     private readonly ITurnService _turnService;
     private readonly ICampaignPlanService _campaignPlanService;
+    private readonly IChatService _chatService;
 
     public CampaignController(
         ICampaignService campaignService,
@@ -27,8 +29,10 @@ public class CampaignController : ApiControllerBase
         ICampaignCharacterService campaignCharacterService,
         ICampaignNpcService campaignNpcService,
         ITurnService turnService,
-        ICampaignPlanService campaignPlanService)
+        ICampaignPlanService campaignPlanService,
+        IChatService chatService)
     {
+        _chatService = chatService;
         _campaignPlanService = campaignPlanService;
         _turnService = turnService;
         _campaignService = campaignService;
@@ -158,6 +162,56 @@ public class CampaignController : ApiControllerBase
         try
         {
             return Ok(await _mapService.ListByCampaignAsync(CurrentUserId, id, query));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>
+    /// The campaign chat (041): what people say plus every turn record and end-of-turn divider, oldest first within
+    /// the page. No cursor = the newest page; "before" = older; "after" = newer. Master or approved participants.
+    /// </summary>
+    [HttpGet("{id:long}/chat")]
+    [ProducesResponseType(typeof(ChatPageInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListChat(long id, [FromQuery] string? before, [FromQuery] string? after, [FromQuery] int? limit)
+    {
+        try
+        {
+            return Ok(await _chatService.ListAsync(CurrentUserId, id, before, after, limit));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Says something in the chat (041): text, a photo or an audio, as an approved character or as the master.</summary>
+    [HttpPost("{id:long}/chat")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status201Created)]
+    public async Task<IActionResult> SendChat(long id, [FromBody] ChatSendInfo info)
+    {
+        try
+        {
+            var item = await _chatService.SendAsync(CurrentUserId, id, info);
+            return StatusCode(StatusCodes.Status201Created, item);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Moves the caller's read mark forward (041); everything after it counts as unread.</summary>
+    [HttpPut("{id:long}/chat/read")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> MarkChatRead(long id, [FromBody] ChatReadInfo info)
+    {
+        try
+        {
+            await _chatService.MarkReadAsync(CurrentUserId, id, info.Until);
+            return NoContent();
         }
         catch (Exception ex)
         {

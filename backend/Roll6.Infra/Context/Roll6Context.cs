@@ -29,6 +29,7 @@ public class Roll6Context : DbContext
     public DbSet<CampaignNpc> CampaignNpcs { get; set; }
     public DbSet<MapNpc> MapNpcs { get; set; }
     public DbSet<Turn> Turns { get; set; }
+    public DbSet<ChatRead> ChatReads { get; set; }
     public DbSet<CampaignPlan> CampaignPlans { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
 
@@ -349,7 +350,15 @@ public class Roll6Context : DbContext
                         v => JsonSerializer.Serialize(v, TURN_CHANGE_JSON).GetHashCode(),
                         v => v == null ? null : v.Select(c => new TurnChange(c.Field, c.Before, c.After)).ToList()));
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            // Chat (041): the same timeline holds what people say and the end-of-turn dividers.
+            entity.Property(e => e.DisplayName).HasColumnName("display_name").HasMaxLength(260);
+            entity.Property(e => e.DisplayImage).HasColumnName("display_image").HasMaxLength(260);
+            entity.Property(e => e.Image).HasColumnName("image").HasMaxLength(260);
+            entity.Property(e => e.Audio).HasColumnName("audio").HasMaxLength(260);
+            entity.Property(e => e.AudioSeconds).HasColumnName("audio_seconds");
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at").HasColumnType(TIMESTAMP);
             entity.HasIndex(e => new { e.CampaignId, e.TurnNo }).HasDatabaseName("ix_turns_campaign_turn");
+            entity.HasIndex(e => new { e.CampaignId, e.CreatedAt, e.TurnId }).HasDatabaseName("ix_turns_campaign_created");
             entity.HasIndex(e => e.UserId).HasDatabaseName("ix_turns_user");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_turn");
@@ -363,6 +372,21 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_npc_turn");
             entity.HasOne<MapNpc>().WithMany().HasForeignKey(e => e.MapNpcId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_npc_turn");
+        });
+
+        modelBuilder.Entity<ChatRead>(entity =>
+        {
+            entity.ToTable("chat_reads");
+            entity.HasKey(e => e.ChatReadId).HasName("chat_reads_pkey");
+            entity.Property(e => e.ChatReadId).HasColumnName("chat_read_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.CampaignId).HasColumnName("campaign_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.LastReadAt).HasColumnName("last_read_at").HasColumnType(TIMESTAMP);
+            entity.HasIndex(e => new { e.CampaignId, e.UserId }).IsUnique().HasDatabaseName("ix_chat_reads_campaign_user");
+            entity.HasOne<Campaign>().WithMany().HasForeignKey(e => e.CampaignId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_chat_read");
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_chat_read");
         });
     }
 

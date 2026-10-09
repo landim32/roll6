@@ -1,3 +1,4 @@
+import { mapRegionCenter } from '../../lib/mapRegion';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { MAX_ZOOM, MIN_ZOOM } from '../../Contexts/MapEditorContext';
@@ -25,7 +26,7 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
 
   const in3d = viewMode === '3d';
 
-  const center = (): [number, number] => [window.innerWidth / 2, window.innerHeight / 2];
+  const center = mapRegionCenter;
 
   const onToggleResize = () => {
     if (!draft.imageUrl) {

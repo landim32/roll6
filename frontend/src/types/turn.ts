@@ -72,25 +72,6 @@ export interface TurnResetResultInfo {
   reverted: boolean;
 }
 
-/** Readable markdown of a turn (024): "## Ações" and "## Posições". */
-export interface TurnSummaryInfo {
-  campaignId: number;
-  turnNo: number;
-  markdown: string;
-}
-
-/** One narration for the turn console (028). A turn can hold several, so the entry id is the identity. */
-export interface TurnHistoryItemInfo {
-  /** Id of the narration entry — unique. `turnNo` repeats when a turn has more than one narration. */
-  turnId: number;
-  /** Turn the narration was written in; used for ordering only, the console does not show it. */
-  turnNo: number;
-  /** The narration as the summary renders it: "GM (name):" and the text, without the "## Ações" heading. */
-  actions: string;
-  /** UTC time the narration was written, without zone. */
-  finishedAt: string | null;
-}
-
 /** Narration of one turn (029). `finishedAt` is null when that turn is still in progress. */
 export interface TurnNarrationInfo {
   turnNo: number;
@@ -98,10 +79,3 @@ export interface TurnNarrationInfo {
   finishedAt: string | null;
 }
 
-/** A page of finished turns, newest first; `nextBefore` loads older ones (null = turn 1 reached). */
-export interface TurnHistoryPageInfo {
-  campaignId: number;
-  currentTurn: number;
-  items: TurnHistoryItemInfo[];
-  nextBefore: number | null;
-}

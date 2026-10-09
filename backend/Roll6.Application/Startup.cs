@@ -51,6 +51,7 @@ public static class Startup
         services.AddScoped<ICampaignNpcRepository<CampaignNpc>, CampaignNpcRepository>();
         services.AddScoped<IMapNpcRepository<MapNpc>, MapNpcRepository>();
         services.AddScoped<ITurnRepository<Turn>, TurnRepository>();
+        services.AddScoped<IChatReadRepository<ChatRead>, ChatReadRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // AppServices
@@ -72,7 +73,10 @@ public static class Startup
         services.AddScoped<INpcService, NpcService>();
         services.AddScoped<ICampaignNpcService, CampaignNpcService>();
         services.AddScoped<IMapNpcService, MapNpcService>();
-        services.AddScoped<ITurnService, TurnService>();
+        // The turn log and the chat are one timeline (041): the same service answers both.
+        services.AddScoped<TurnService>();
+        services.AddScoped<ITurnService>(sp => sp.GetRequiredService<TurnService>());
+        services.AddScoped<IChatService>(sp => sp.GetRequiredService<TurnService>());
         services.AddScoped<ICampaignPlanRepository<CampaignPlan>, CampaignPlanRepository>();
         services.AddScoped<ICampaignPlanService, CampaignPlanService>();
         services.AddScoped<IApiKeyRepository<ApiKey>, ApiKeyRepository>();

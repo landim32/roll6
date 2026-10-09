@@ -415,6 +415,8 @@ public partial class TurnService
 
         var finished = campaign.CurrentTurn;
         campaign.AdvanceTurn();
+        // The chat shows where the turn ended, after its narration (041).
+        turns.Add(Turn.TurnFinished(campaignId, mapId, finished, userId));
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             foreach (var participation in updatedParticipations)

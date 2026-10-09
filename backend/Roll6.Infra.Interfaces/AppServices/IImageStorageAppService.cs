@@ -12,4 +12,10 @@ public interface IImageStorageAppService
 
     /// <summary>Opens the stored file for reading, or null when it does not exist.</summary>
     Task<StoredImageInfo?> OpenAsync(string fileName);
+
+    /// <summary>
+    /// Removes a stored file. Only for files nothing else can point to — the campaign chat's photos and audios (041);
+    /// character and sheet files are write-once and shared, so they are never deleted.
+    /// </summary>
+    Task DeleteAsync(string fileName);
 }

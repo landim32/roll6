@@ -518,81 +518,163 @@ body,
   text-decoration: none;
 }
 
-/* ---------- turn console (028) ---------- */
-.stm-console-toggle {
+/* ---------- map and chat regions (041) ----------
+   The map region keeps the old geometry (it starts under the translucent menu), so every map layer offset by
+   --stm-menu-height still works; in "split" it ends halfway down the space under the menu and the chat takes the rest.
+   In "chat" the map region isn't mounted. */
+.stm-map-region {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  padding: 0.1rem 0.75rem;
-  line-height: 1;
-  color: var(--bs-body-color);
-  border: 1px solid var(--stm-border);
-  background: rgba(255, 255, 255, 0.04);
+  inset: 0;
+  overflow: hidden;
 }
 
-.stm-console-toggle:hover {
-  background: rgba(255, 255, 255, 0.1);
+.stm-layout-split .stm-map-region {
+  bottom: calc((100% - var(--stm-menu-height)) / 2);
 }
 
-.stm-turn-console {
+.stm-chat-region {
   position: absolute;
-  left: 50%;
-  bottom: calc(var(--stm-footer-height) + 0.25rem);
-  transform: translateX(-50%);
-  width: min(720px, calc(100% - 2rem));
-  max-height: 35vh;
+  inset: var(--stm-menu-height) 0 0 0;
+  /* Phones: the on-screen keyboard covers the bottom; ChatPanel measures it so the composer stays above it. */
+  bottom: var(--stm-keyboard-offset, 0px);
   display: flex;
   flex-direction: column;
-  padding: 0.35rem 0.6rem;
-  font-size: 0.72rem;
-  background: rgba(20, 22, 27, 0.6);
-  backdrop-filter: blur(4px);
-  border: 1px solid var(--stm-border);
-  border-radius: var(--bs-border-radius);
+  background: var(--bs-body-bg);
 }
 
-.stm-turn-console-header {
-  display: flex;
-  align-items: center;
-  font-weight: 600;
-  opacity: 0.8;
-  margin-bottom: 0.2rem;
-}
-
-.stm-turn-history {
-  position: relative;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.stm-turn-history-scroll {
-  overflow-y: auto;
-  min-height: 0;
-  max-height: 70vh;
-  flex: 1;
-}
-
-.stm-turn-history.is-compact .stm-turn-history-scroll {
-  max-height: calc(35vh - 2rem);
-  opacity: 0.9;
-}
-
-.stm-turn-history-item + .stm-turn-history-item {
-  margin-top: 0.5rem;
-  padding-top: 0.4rem;
+.stm-layout-split .stm-chat-region {
+  top: calc(var(--stm-menu-height) + (100% - var(--stm-menu-height)) / 2);
   border-top: 1px solid var(--stm-border);
 }
 
-.stm-turn-history-raw {
+.stm-rotate-90 {
+  transform: rotate(90deg);
+}
+
+.stm-layout-toggle .btn {
+  position: relative;
+  line-height: 1;
+}
+
+.stm-layout-badge {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.5rem;
+  font-size: 0.6rem;
+  z-index: 1;
+}
+
+/* ---------- chat (041) ---------- */
+.stm-chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.stm-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  overscroll-behavior: contain;
+}
+
+.stm-chat-sentinel {
+  height: 1px;
+}
+
+.stm-chat-empty {
+  text-align: center;
+  margin: 2rem 0;
+}
+
+.stm-chat-time {
+  font-size: 0.7rem;
+  color: var(--bs-secondary-color);
+  white-space: nowrap;
+}
+
+.stm-chat-plain {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-/* The summary is markdown ("## Ações", …). Keep it readable inside the small translucent strip and the full window. */
-.stm-turn-history .wmde-markdown {
+/* Conversation bubbles */
+.stm-chat-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.stm-chat-message.is-continued {
+  margin-top: 0.15rem;
+}
+
+.stm-chat-message.is-own {
+  flex-direction: row-reverse;
+}
+
+.stm-chat-avatar {
+  width: 32px;
+  flex: 0 0 32px;
+}
+
+.stm-chat-bubble {
+  max-width: min(75%, 560px);
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.6rem;
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+}
+
+.stm-chat-message.is-own .stm-chat-bubble {
+  background: rgba(var(--bs-primary-rgb), 0.18);
+  border-color: rgba(var(--bs-primary-rgb), 0.4);
+}
+
+.stm-chat-message.is-pending {
+  opacity: 0.75;
+}
+
+.stm-chat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.1rem;
+}
+
+.stm-chat-name {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.stm-chat-menu {
+  padding: 0 0.25rem;
+  color: var(--bs-secondary-color);
+  opacity: 0;
+  border: none;
+}
+
+.stm-chat-message:hover .stm-chat-menu,
+.stm-chat-narration:hover .stm-chat-menu,
+.stm-chat-menu:focus-visible,
+.stm-chat-menu[data-state='open'] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .stm-chat-menu {
+    opacity: 0.7;
+  }
+}
+
+.stm-chat-text .wmde-markdown {
   font-family: inherit;
   font-size: inherit;
   line-height: 1.4;
@@ -601,80 +683,190 @@ body,
   overflow-wrap: anywhere;
 }
 
-.stm-turn-history .wmde-markdown h1,
-.stm-turn-history .wmde-markdown h2,
-.stm-turn-history .wmde-markdown h3,
-.stm-turn-history .wmde-markdown h4,
-.stm-turn-history .wmde-markdown h5,
-.stm-turn-history .wmde-markdown h6 {
-  margin: 0.15rem 0;
-  padding-bottom: 0;
-  border-bottom: none;
-  font-size: 1em;
-  line-height: 1.3;
-}
-
-.stm-turn-history .wmde-markdown p,
-.stm-turn-history .wmde-markdown ul,
-.stm-turn-history .wmde-markdown ol,
-.stm-turn-history .wmde-markdown pre,
-.stm-turn-history .wmde-markdown blockquote {
-  margin-top: 0;
-  margin-bottom: 0.2rem;
-}
-
-.stm-turn-history .wmde-markdown > :last-child {
+.stm-chat-text .wmde-markdown > :last-child {
   margin-bottom: 0;
 }
 
-.stm-turn-history .wmde-markdown ul,
-.stm-turn-history .wmde-markdown ol {
-  padding-left: 1.2em;
+.stm-chat-text .wmde-markdown p {
+  margin-bottom: 0.25rem;
 }
 
-.stm-turn-history .wmde-markdown pre,
-.stm-turn-history .wmde-markdown code {
-  font-size: inherit;
-  white-space: pre-wrap;
+.stm-chat-image {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  margin-bottom: 0.25rem;
+}
+
+.stm-chat-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 0.4rem;
+}
+
+.stm-chat-lightbox {
+  display: block;
+  max-width: 100%;
+  max-height: 75vh;
+  margin: 0 auto;
+}
+
+.stm-chat-audio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stm-chat-audio audio {
+  max-width: 260px;
+  height: 36px;
+}
+
+/* Turn records: moves, actions and changes as one muted line */
+.stm-chat-discreet {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  padding-left: 2.5rem;
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+}
+
+.stm-chat-discreet.is-continued {
+  margin-top: 0.05rem;
+}
+
+.stm-chat-discreet-icon {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+
+.stm-chat-discreet-text {
+  flex: 1;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.stm-turn-history .wmde-markdown a {
-  color: var(--bs-link-color);
+.stm-chat-result {
+  margin: 0.6rem 0 0 2.5rem;
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid rgba(var(--bs-info-rgb), 0.7);
+  background: rgba(var(--bs-info-rgb), 0.08);
+  border-radius: 0 0.4rem 0.4rem 0;
 }
 
-.stm-turn-history .wmde-markdown hr {
-  height: 0;
-  margin: 0.45rem 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--stm-border);
+.stm-chat-result-head,
+.stm-chat-narration-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 0.15rem;
 }
 
-.stm-turn-history .wmde-markdown li > p {
-  margin: 0;
+.stm-chat-result-head .stm-chat-time,
+.stm-chat-narration-head .stm-chat-time {
+  margin-left: auto;
+  font-weight: normal;
 }
 
-.stm-turn-history .wmde-markdown li + li {
-  margin-top: 0.15em;
+.stm-chat-narration {
+  margin-top: 0.8rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 193, 7, 0.45);
+  background: rgba(255, 193, 7, 0.07);
+  border-radius: 0.5rem;
 }
 
-.stm-turn-history-sentinel {
-  height: 1px;
+.stm-chat-narration-head {
+  color: var(--bs-warning);
 }
 
-.stm-turn-history-news {
-  position: absolute;
-  top: 0.25rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1;
+.stm-chat-divider,
+.stm-chat-unread {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0 0.5rem;
+  font-size: 0.72rem;
+  color: var(--bs-secondary-color);
 }
 
-@media (max-width: 576px) {
-  .stm-turn-console {
-    width: calc(100% - 1rem);
-    max-height: 30vh;
+.stm-chat-divider::before,
+.stm-chat-divider::after,
+.stm-chat-unread::before,
+.stm-chat-unread::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--stm-border);
+}
+
+.stm-chat-unread {
+  color: var(--bs-danger);
+}
+
+.stm-chat-unread::before,
+.stm-chat-unread::after {
+  border-color: rgba(var(--bs-danger-rgb), 0.5);
+}
+
+/* Composer */
+.stm-chat-composer {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--stm-border);
+  background: var(--bs-body-bg);
+}
+
+.stm-chat-mode {
+  margin-bottom: 0.4rem;
+}
+
+.stm-chat-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.stm-chat-input textarea {
+  flex: 1;
+  resize: none;
+  field-sizing: content;
+  min-height: 34px;
+  max-height: 8rem;
+}
+
+.stm-chat-input .btn {
+  height: 34px;
+}
+
+.stm-chat-recorder {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.stm-chat-recorder audio {
+  height: 34px;
+  max-width: 100%;
+}
+
+.stm-chat-rec-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--bs-danger);
+  animation: stm-chat-rec 1s ease-in-out infinite alternate;
+}
+
+@keyframes stm-chat-rec {
+  to {
+    opacity: 0.3;
   }
 }
 
@@ -1446,26 +1638,6 @@ body,
   color: var(--bs-warning);
   border: 1px solid rgba(255, 193, 7, 0.5);
   font-weight: 600;
-}
-
-button.stm-turn-badge {
-  cursor: pointer;
-}
-
-button.stm-turn-badge:hover {
-  background: rgba(255, 193, 7, 0.3);
-}
-
-/* Turn summary (024): the markdown as plain text, ready to copy. */
-.stm-turn-log {
-  max-height: 60vh;
-  overflow: auto;
-  white-space: pre-wrap;
-  padding: 0.75rem;
-  border: 1px solid var(--bs-border-color);
-  border-radius: var(--bs-border-radius);
-  background: var(--bs-tertiary-bg);
-  font-size: 0.875rem;
 }
 
 .stm-map .stm-turn-trails {
