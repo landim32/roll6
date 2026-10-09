@@ -4,7 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AudioRecorder } from './AudioRecorder';
-import { CameraIcon, Dice5Icon, EyeIcon, EyeSlashIcon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon, SpeechIcon } from '../ui/icons';
+import { Dice5Icon, EyeIcon, EyeSlashIcon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -140,12 +140,6 @@ export const ChatComposer = () => {
       <div className="stm-chat-input">
         {!recording && (
           <div className={`stm-chat-field${acting ? ' is-acting' : ''}`}>
-            {acting && (
-              <button type="button" className="badge rounded-pill text-bg-danger stm-chat-act-chip" onClick={() => setMode('talk')}
-                title={t('chat.cancelAct')} aria-label={t('chat.cancelAct')}>
-                {t('chat.modeAct')} ×
-              </button>
-            )}
             <textarea rows={1} maxLength={max} value={text}
               placeholder={acting ? t('chat.actPlaceholder') : t('chat.placeholder', { name: participation?.characterName ?? t('chat.master') })}
               aria-label={acting ? t('chat.actPlaceholder') : t('chat.messageLabel')}
@@ -157,18 +151,6 @@ export const ChatComposer = () => {
               <DropdownMenu.Portal>
                 {/* WhatsApp-like attach sheet: two columns of big round icons, sized for a finger. */}
                 <DropdownMenu.Content className="stm-chat-attach" side="top" align="end" sideOffset={10}>
-                  {participation && (acting ? (
-                    <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => setMode('talk')}>
-                      <span className="stm-chat-attach-icon is-talk"><SpeechIcon size={24} /></span>
-                      <span>{t('chat.backToTalk')}</span>
-                    </DropdownMenu.Item>
-                  ) : (
-                    <DropdownMenu.Item className="stm-chat-attach-item" disabled={!piece} onSelect={() => setMode('act')}
-                      title={piece ? t('chat.modeActHint') : t('chat.placeToAct')}>
-                      <span className="stm-chat-attach-icon is-act"><LightningIcon size={24} /></span>
-                      <span>{t('chat.actOption')}</span>
-                    </DropdownMenu.Item>
-                  ))}
                   {!acting && (
                     <>
                       <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => { void onRoll(); }}>
@@ -181,7 +163,6 @@ export const ChatComposer = () => {
                       </DropdownMenu.Item>
                     </>
                   )}
-                  {participation && !acting && !piece && <p className="stm-chat-attach-note">{t('chat.placeToAct')}</p>}
                   {/* What this user sees in the chat: the item stays open so both can be switched in one go. */}
                   <DropdownMenu.Item className={`stm-chat-attach-item${filters.showMovement ? ' is-on' : ''}`}
                     onSelect={(event) => { event.preventDefault(); setFilters({ ...filters, showMovement: !filters.showMovement }); }}
@@ -202,10 +183,14 @@ export const ChatComposer = () => {
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
-            {!acting && !text.trim() && (
-              <button type="button" className="stm-chat-field-btn" onClick={pickImage} disabled={busy}
-                title={t('chat.sendImage')} aria-label={t('chat.sendImage')}>
-                <CameraIcon size={22} />
+            {participation && (
+              // The action switch: on, the field turns red and sending records the turn's action; off, a message.
+              <button type="button" className={`stm-chat-field-btn stm-chat-act-switch${acting ? ' is-on' : ''}`}
+                role="switch" aria-checked={acting} disabled={busy || (!acting && !piece)}
+                onClick={() => setMode(acting ? 'talk' : 'act')}
+                title={!piece && !acting ? t('chat.placeToAct') : t(acting ? 'chat.actOff' : 'chat.actOn')}
+                aria-label={t('chat.actSwitch')}>
+                <LightningIcon size={22} />
               </button>
             )}
           </div>

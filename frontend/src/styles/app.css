@@ -1013,11 +1013,10 @@ body,
   background: rgba(255, 255, 255, 0.06);
 }
 
-.stm-chat-act-chip {
-  align-self: center;
-  margin-right: 0.35rem;
-  border: 0;
-  cursor: pointer;
+.stm-chat-act-switch.is-on,
+.stm-chat-act-switch.is-on:hover:not(:disabled) {
+  color: #fff;
+  background: var(--bs-danger);
 }
 
 .stm-chat-send {
@@ -1128,21 +1127,12 @@ body,
   background: var(--bs-secondary);
 }
 
-.stm-chat-attach-icon.is-act { background: var(--bs-danger); }
 .stm-chat-attach-icon.is-roll { background: #1fa463; }
 .stm-chat-attach-icon.is-photo { background: #8e5cd9; }
-.stm-chat-attach-icon.is-talk { background: #2f80ed; }
 /* The two view switches: gray with a closed eye while off, the brand green with an open eye while on. */
 .stm-chat-attach-icon.is-view { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
 .stm-chat-attach-item.is-on .stm-chat-attach-icon.is-view { background: #1fa463; color: #fff; }
 
-.stm-chat-attach-note {
-  grid-column: 1 / -1;
-  margin: 0;
-  font-size: 0.75rem;
-  text-align: center;
-  color: var(--bs-secondary-color);
-}
 
 /* A 3d6 roll in a bubble: the three faces and the total. */
 .stm-chat-roll {
@@ -1778,10 +1768,6 @@ body,
     animation: none;
     opacity: 1;
     transform: none;
-  }
-
-  .stm-dice-panel.is-rolling .stm-die {
-    animation: none;
   }
 }
 
