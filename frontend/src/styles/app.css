@@ -572,8 +572,19 @@ body,
   transform: rotate(90deg);
 }
 
+.stm-layout-toggle {
+  align-self: center;
+}
+
+/* Same size as the other menu icon buttons (the gear: 32 × 32). */
 .stm-layout-toggle .btn {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 0.55rem;
   line-height: 1;
 }
 
@@ -587,6 +598,7 @@ body,
 
 /* ---------- chat (041) ---------- */
 .stm-chat {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1019,6 +1031,53 @@ body,
   border-radius: 50%;
 }
 
+/* Floating over the top of the chat: who still owes their play this turn, blinking slowly. */
+.stm-chat-pending {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  max-width: calc(100% - 1rem);
+  padding: 0.3rem 0.5rem;
+  border-radius: 2rem;
+  background: rgba(var(--stm-bg-rgb, 11, 18, 32), 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.stm-chat-pending-item {
+  padding: 0;
+  border: 3px solid var(--bs-danger);
+  border-radius: 50%;
+  background: transparent;
+  line-height: 0;
+  cursor: pointer;
+  animation: stm-chat-pending-blink 2.4s ease-in-out infinite;
+}
+
+.stm-chat-pending-item.is-moved {
+  border-color: var(--bs-warning);
+}
+
+.stm-chat-pending-item .stm-avatar {
+  display: block;
+}
+
+@keyframes stm-chat-pending-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stm-chat-pending-item {
+    animation: none;
+  }
+}
+
 /* The clip's sheet: two columns of big round icons with the label under them, sized for a finger. */
 .stm-chat-attach {
   z-index: 1060;
@@ -1073,6 +1132,9 @@ body,
 .stm-chat-attach-icon.is-roll { background: #1fa463; }
 .stm-chat-attach-icon.is-photo { background: #8e5cd9; }
 .stm-chat-attach-icon.is-talk { background: #2f80ed; }
+/* The two view switches: gray with a closed eye while off, the brand green with an open eye while on. */
+.stm-chat-attach-icon.is-view { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+.stm-chat-attach-item.is-on .stm-chat-attach-icon.is-view { background: #1fa463; color: #fff; }
 
 .stm-chat-attach-note {
   grid-column: 1 / -1;
@@ -1906,6 +1968,18 @@ body,
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* Phones: the lightning-only "Finalizar turno" is a 32 × 32 icon button like the gear. */
+@media (max-width: 767.98px) {
+  .stm-turn-controls > .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
 }
 
 .stm-turn-badge {

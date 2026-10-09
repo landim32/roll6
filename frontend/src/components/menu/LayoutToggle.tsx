@@ -18,13 +18,13 @@ export const LayoutToggle = () => {
   const badge = layoutMode === LAYOUT_MODE.map && unreadCount > 0;
 
   return (
-    <div className="btn-group btn-group-sm stm-layout-toggle" role="group" aria-label={t('layout.label')}>
+    <div className="btn-group stm-layout-toggle" role="group" aria-label={t('layout.label')}>
       {OPTIONS.map(({ mode, key }) => (
         <button key={mode} type="button" aria-pressed={layoutMode === mode} title={t(key)} aria-label={t(key)}
           className={`btn ${layoutMode === mode ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setLayoutMode(mode)}>
-          {mode === LAYOUT_MODE.map && <MapIcon size={14} />}
-          {mode === LAYOUT_MODE.split && <LayoutSplitIcon size={14} className="stm-rotate-90" />}
-          {mode === LAYOUT_MODE.chat && <ChatDotsIcon size={14} />}
+          {mode === LAYOUT_MODE.map && <MapIcon size={16} />}
+          {mode === LAYOUT_MODE.split && <LayoutSplitIcon size={16} className="stm-rotate-90" />}
+          {mode === LAYOUT_MODE.chat && <ChatDotsIcon size={16} />}
           {mode === LAYOUT_MODE.chat && badge && (
             <span className="badge rounded-pill text-bg-danger stm-layout-badge" aria-label={t('layout.unread', { count: unreadCount })}>
               {unreadCount > 99 ? '99+' : unreadCount}

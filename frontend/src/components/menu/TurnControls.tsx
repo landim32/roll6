@@ -38,7 +38,7 @@ export const TurnControls = () => {
       {/* Phones: only the lightning icon, so the button doesn't push the menu onto another line. */}
       <button type="button" className="btn btn-sm btn-outline-warning" onClick={() => { void run(false); }} disabled={busy}
         title={t('turn.finish')} aria-label={t('turn.finish')}>
-        <LightningIcon size={14} className="d-md-none" />
+        <LightningIcon size={16} className="d-md-none" />
         <span className="d-none d-md-inline">{t('turn.finish')}</span>
       </button>
       <FinishTurnModal pending={pending} onBack={() => setPending([])} onForce={() => run(true)} />
