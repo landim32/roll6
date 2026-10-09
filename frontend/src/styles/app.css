@@ -3,8 +3,12 @@
   /* Column of map controls (4 × 48 px buttons) in the bottom-right corner, kept clear by the NPC panel. */
   --stm-controls-space: 240px;
   --stm-grid-line: rgba(230, 230, 240, 0.35);
-  --stm-menu-height: 56px;
-  --stm-footer-height: 32px;
+  /* Installed app on a phone with a notch (042, viewport-fit=cover): the menu goes under the status bar and the bottom
+     bars above the home indicator. In a normal browser tab both insets are 0, so nothing changes. */
+  --stm-safe-top: env(safe-area-inset-top, 0px);
+  --stm-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --stm-menu-height: calc(56px + var(--stm-safe-top));
+  --stm-footer-height: calc(32px + var(--stm-safe-bottom));
 }
 
 html,
@@ -139,7 +143,7 @@ body,
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0 1rem;
+  padding: var(--stm-safe-top) 1rem 0;
   background: rgba(var(--stm-surface-rgb), 0.92);
   border-bottom: 1px solid var(--stm-border);
   backdrop-filter: blur(4px);
@@ -157,7 +161,7 @@ body,
 /* Phones: two-row menu — actions on top, the table combo and the character select sharing the second row. */
 @media (max-width: 767.98px) {
   :root {
-    --stm-menu-height: 100px;
+    --stm-menu-height: calc(100px + var(--stm-safe-top));
   }
 
   .stm-menu {
@@ -520,7 +524,7 @@ body,
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0 1rem;
+  padding: 0 1rem var(--stm-safe-bottom);
   font-size: 0.85rem;
   background: rgba(var(--stm-surface-rgb), 0.92);
   border-top: 1px solid var(--stm-border);
@@ -944,7 +948,7 @@ body,
 /* Composer */
 .stm-chat-composer {
   flex: 0 0 auto;
-  padding: 0.45rem 0.6rem 0.55rem;
+  padding: 0.45rem 0.6rem calc(0.55rem + var(--stm-safe-bottom));
   background: rgba(0, 0, 0, 0.18);
 }
 
@@ -1191,6 +1195,85 @@ body,
   to {
     opacity: 0.3;
   }
+}
+
+/* ---------- installable app (042) ---------- */
+/* The one-time notice on phones: a small card at the bottom, above the map footer / chat composer, below the windows. */
+.stm-install-hint {
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(var(--stm-footer-height) + 4.5rem);
+  z-index: 1040;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.75rem 2.25rem 0.75rem 0.85rem;
+  border-radius: 1rem;
+  background: var(--stm-surface, var(--bs-tertiary-bg));
+  border: 1px solid var(--stm-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.stm-install-hint-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--stm-on-accent, #071322);
+  background: var(--stm-accent, var(--bs-success));
+}
+
+.stm-install-hint-text {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.stm-install-hint-actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.stm-install-hint-close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+}
+
+.stm-install-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.stm-install-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.stm-install-step-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.6rem;
+  color: #2f80ed;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.stm-install-step-icon img {
+  border-radius: 0.4rem;
 }
 
 /* ---------- modal (Radix Dialog styled as Bootstrap) ---------- */

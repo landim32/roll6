@@ -705,5 +705,20 @@
     "split": "Mapa e chat",
     "chat": "Só o chat",
     "unread": "{{count}} não lidas"
+  },
+  "install": {
+    "menu": "Instalar o Roll6",
+    "hintTitle": "Instale o Roll6",
+    "hintText": "Abra a mesa direto da tela de início, em tela cheia.",
+    "hintInstall": "Instalar",
+    "hintLater": "Agora não",
+    "hintClose": "Fechar o aviso",
+    "installed": "Roll6 instalado. Abra pelo ícone na tela de início.",
+    "guideTitle": "Instalar o Roll6 no iPhone ou iPad",
+    "guideStep1": "No Safari, toque em \"Compartilhar\" (o quadrado com a seta para cima).",
+    "guideStep2": "Role as opções e toque em \"Adicionar à Tela de Início\" e depois em \"Adicionar\".",
+    "guideStep3": "Abra o Roll6 pelo novo ícone na tela de início: ele abre em tela cheia, como um aplicativo.",
+    "guideOtherBrowser": "Neste navegador, use o botão de compartilhar do próprio navegador; se \"Adicionar à Tela de Início\" não aparecer, abra o roll6.site no Safari.",
+    "guideClose": "Entendi"
   }
 }

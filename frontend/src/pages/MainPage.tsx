@@ -21,6 +21,8 @@ import { TokenModal } from '../components/modals/TokenModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { ChatPanel } from '../components/chat/ChatPanel';
+import { InstallHint } from '../components/install/InstallHint';
+import { IosInstallGuide } from '../components/install/IosInstallGuide';
 import { useChat } from '../hooks/useChat';
 import { useMapEditor } from '../hooks/useMapEditor';
 import { useCampaign } from '../hooks/useCampaign';
@@ -174,6 +176,9 @@ export const MainPage = () => {
         </div>
       )}
       {noCurrentMap && <div className="stm-no-map-notice" role="status">{t('map.noCurrentMap')}</div>}
+      {/* Installable app (042): the one-time phone notice and the iOS guide. */}
+      <InstallHint />
+      <IosInstallGuide />
       <TopMenu
         onOpenCampaign={() => setCampaignOpen(true)}
         onOpenMap={() => setMapOpen(true)}
