@@ -49,13 +49,13 @@ export const PollCard = ({ item }: { item: ChatItemInfo }) => {
               aria-label={t('chat.poll.vote', { option: option.text })}
               onClick={(event) => { event.stopPropagation(); void tap(option.optionId); }}>
               <span className="stm-poll-row">
-                <span className="stm-poll-radio" aria-hidden="true">{checked && <CheckIcon size={14} />}</span>
+                <span className="stm-poll-radio" aria-hidden="true">{checked && <CheckIcon size={12} />}</span>
                 <span className="stm-poll-text">{option.text}</span>
                 {option.voters.length > 0 && (
                   <span className="stm-poll-voters" aria-hidden="true">
                     {option.voters.slice(0, MAX_AVATARS).map((voter) => (
                       <CharacterAvatar key={voter.characterId ?? 'master'}
-                        name={voter.characterId === null ? t('chat.poll.master') : voter.name} imageUrl={voter.imageUrl} size={20} />
+                        name={voter.characterId === null ? t('chat.poll.master') : voter.name} imageUrl={voter.imageUrl} size={18} />
                     ))}
                   </span>
                 )}
