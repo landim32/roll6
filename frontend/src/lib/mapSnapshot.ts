@@ -38,7 +38,8 @@ export interface SnapshotToken {
   space: number;
 }
 
-const BACKGROUND = '#1a1d21';
+// Same as --stm-bg in styles/theme.css (038): a canvas can't read CSS variables, so the shared JPEG keeps it here.
+const BACKGROUND = '#0b1220';
 /** A bit stronger than on screen: the shared picture is shrunk and then recompressed by WhatsApp. */
 const GRID_STROKE = 'rgba(235, 235, 245, 0.55)';
 /** Line widths in output pixels, whatever the scale (the screen uses non-scaling strokes too). */

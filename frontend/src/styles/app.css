@@ -1,12 +1,7 @@
-/* Roll6 — dark theme only (Bootstrap 5.3 data-bs-theme="dark" on <html>). */
+/* Roll6 — dark theme only (Bootstrap 5.3 data-bs-theme="dark" on <html>). Brand colors: styles/theme.css (038). */
 :root {
   /* Column of map controls (4 × 48 px buttons) in the bottom-right corner, kept clear by the NPC panel. */
   --stm-controls-space: 240px;
-  --stm-bg: #111317;
-  --stm-surface: #1b1e24;
-  --stm-surface-2: #242830;
-  --stm-border: #343a46;
-  --stm-accent: #d4a24c;
   --stm-grid-line: rgba(230, 230, 240, 0.35);
   --stm-menu-height: 56px;
   --stm-footer-height: 32px;
@@ -20,28 +15,93 @@ body,
   background: var(--stm-bg);
 }
 
-/* ---------- login ---------- */
+/* ---------- login (038: brand background, vertical logo, new card) ---------- */
 .stm-login {
   min-height: 100%;
+  min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  gap: 1.5rem;
+  padding: 2rem 1rem;
+  /* A soft green glow behind the logo over a flat-top honeycomb in the slate of the logo (one 24 px hexagon plus
+     the edge to its neighbour per tile, 72 × 41.57 px), all in CSS: nothing to download. */
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 28%, rgba(var(--stm-accent-rgb), 0.12), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='41.569'%3E%3Cpath d='M0 20.785L12 0h24l12 20.785L36 41.569H12zM48 20.785h24' fill='none' stroke='%232b3d52' stroke-opacity='.45' stroke-width='1'/%3E%3C/svg%3E"),
+    var(--stm-bg);
+}
+
+.stm-login-logo img {
+  display: block;
+  height: 160px;
+  width: auto;
+  max-width: 70vw;
+  object-fit: contain;
 }
 
 .stm-login-card {
+  position: relative;
   width: 100%;
   max-width: 400px;
   background: var(--stm-surface);
   border: 1px solid var(--stm-border);
-  border-radius: 0.75rem;
+  border-radius: var(--stm-radius);
+  box-shadow: var(--stm-shadow);
   padding: 2rem;
+  overflow: hidden;
 }
 
-.stm-brand {
+/* The gradient of the logo's "6" as a thin strip on top of the card. */
+.stm-login-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--stm-accent), var(--stm-accent-2));
+}
+
+@media (max-width: 767.98px) {
+  .stm-login {
+    justify-content: flex-start;
+    gap: 1rem;
+    padding-top: 1.5rem;
+  }
+
+  .stm-login-logo img {
+    height: 120px;
+  }
+
+  .stm-login-card {
+    padding: 1.5rem;
+  }
+}
+
+/* ---------- brand (038) ---------- */
+.stm-brand-logo {
+  display: inline-flex;
+  align-items: center;
+}
+
+.stm-brand-logo img {
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* What shows when a logo file fails to load. */
+.stm-brand-text {
   color: var(--stm-accent);
   font-weight: 700;
+  font-size: 1.25rem;
   letter-spacing: 0.02em;
+}
+
+.stm-menu-brand {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 /* ---------- main layout ---------- */
@@ -63,7 +123,7 @@ body,
   align-items: center;
   gap: 0.75rem;
   padding: 0 1rem;
-  background: rgba(27, 30, 36, 0.92);
+  background: rgba(var(--stm-surface-rgb), 0.92);
   border-bottom: 1px solid var(--stm-border);
   backdrop-filter: blur(4px);
 }
@@ -228,7 +288,7 @@ body,
 .stm-story {
   position: absolute;
   inset: 0;
-  background: #1a1d21;
+  background: var(--stm-bg);
 }
 
 .stm-story-canvas {
@@ -354,7 +414,7 @@ body,
   width: 112px;
   height: 112px;
   border-radius: 50%;
-  background: rgba(27, 30, 36, 0.55);
+  background: rgba(var(--stm-surface-rgb), 0.55);
   border: 1px solid var(--stm-border);
   touch-action: none;
   align-items: center;
@@ -501,7 +561,7 @@ body,
   gap: 1rem;
   padding: 0 1rem;
   font-size: 0.85rem;
-  background: rgba(27, 30, 36, 0.92);
+  background: rgba(var(--stm-surface-rgb), 0.92);
   border-top: 1px solid var(--stm-border);
 }
 
@@ -875,7 +935,7 @@ body,
   position: fixed;
   inset: 0;
   z-index: 1050;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(5, 9, 16, 0.7);
 }
 
 .stm-modal-content {
@@ -893,8 +953,8 @@ body,
   --bs-modal-bg: var(--stm-surface);
   --bs-modal-border-color: var(--stm-border);
   --bs-modal-border-width: 1px;
-  --bs-modal-border-radius: 0.5rem;
-  --bs-modal-inner-border-radius: calc(0.5rem - 1px);
+  --bs-modal-border-radius: var(--stm-radius);
+  --bs-modal-inner-border-radius: calc(var(--stm-radius) - 1px);
   --bs-modal-padding: 1rem;
   --bs-modal-header-padding: 1rem 1rem;
   --bs-modal-header-border-color: var(--stm-border);
@@ -904,6 +964,10 @@ body,
   --bs-modal-footer-border-width: 1px;
   --bs-modal-box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
   box-shadow: var(--bs-modal-box-shadow);
+}
+
+.stm-modal-content .modal-title {
+  font-weight: 600;
 }
 
 .stm-modal-content.stm-modal-lg {
@@ -1347,9 +1411,9 @@ body,
   max-width: 280px;
   padding: 0;
   overflow: hidden;
-  border: 0.5px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  background: rgba(44, 44, 48, 0.72);
+  border: 1px solid var(--stm-border);
+  border-radius: var(--stm-radius);
+  background: rgba(var(--stm-surface-rgb), 0.72);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   backdrop-filter: blur(24px) saturate(180%);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -1571,10 +1635,10 @@ body,
   vector-effect: non-scaling-stroke;
 }
 
-.stm-map .stm-move-trail.is-ok { stroke: rgba(25, 135, 84, 0.85); }
+.stm-map .stm-move-trail.is-ok { stroke: rgba(var(--stm-accent-rgb), 0.85); }
 .stm-map .stm-move-trail.is-over { stroke: rgba(220, 53, 69, 0.85); }
 .stm-map .stm-move-trail.is-free { stroke: rgba(173, 181, 189, 0.85); }
-.stm-map .stm-move-target.is-ok { fill: rgba(25, 135, 84, 0.3); stroke: rgba(25, 135, 84, 0.9); }
+.stm-map .stm-move-target.is-ok { fill: rgba(var(--stm-accent-rgb), 0.3); stroke: rgba(var(--stm-accent-rgb), 0.9); }
 .stm-map .stm-move-target.is-over { fill: rgba(220, 53, 69, 0.3); stroke: rgba(220, 53, 69, 0.9); }
 .stm-map .stm-move-target.is-free { fill: rgba(173, 181, 189, 0.3); stroke: rgba(173, 181, 189, 0.9); }
 
@@ -1588,9 +1652,9 @@ body,
   flex-direction: column;
   align-items: flex-end;
   padding: 8px 14px;
-  border: 0.5px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  background: rgba(44, 44, 48, 0.8);
+  border: 1px solid var(--stm-border);
+  border-radius: var(--stm-radius);
+  background: rgba(var(--stm-surface-rgb), 0.8);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   color: #fff;
@@ -1603,7 +1667,7 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
-.stm-move-counter.is-ok strong { color: #75b798; }
+.stm-move-counter.is-ok strong { color: var(--stm-accent); }
 .stm-move-counter.is-over strong { color: #ea868f; }
 
 .stm-move-counter small {
