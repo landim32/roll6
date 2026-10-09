@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FinishTurnModal } from '../modals/FinishTurnModal';
+import { LightningIcon } from '../ui/icons';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useTurn } from '../../hooks/useTurn';
 
@@ -34,8 +35,11 @@ export const TurnControls = () => {
 
   return (
     <div className="stm-turn-controls">
-      <button type="button" className="btn btn-sm btn-outline-warning" onClick={() => { void run(false); }} disabled={busy}>
-        {t('turn.finish')}
+      {/* Phones: only the lightning icon, so the button doesn't push the menu onto another line. */}
+      <button type="button" className="btn btn-sm btn-outline-warning" onClick={() => { void run(false); }} disabled={busy}
+        title={t('turn.finish')} aria-label={t('turn.finish')}>
+        <LightningIcon size={14} className="d-md-none" />
+        <span className="d-none d-md-inline">{t('turn.finish')}</span>
       </button>
       <FinishTurnModal pending={pending} onBack={() => setPending([])} onForce={() => run(true)} />
     </div>
