@@ -73,6 +73,21 @@ public partial class TurnService : IChatService
         return item;
     }
 
+    public async Task<ChatItemInfo> RollAsync(long userId, long campaignId, ChatRollInfo info)
+    {
+        var campaign = await GetReadableCampaignAsync(userId, campaignId);
+        var (characterId, displayName, displayImage) = await SpeakerAsync(userId, campaign, info.CharacterId);
+        // Drawn here, never by the client, so everyone sees the same fair roll.
+        var dice = Enumerable.Range(0, Turn.ROLL_DICE)
+            .Select(_ => System.Security.Cryptography.RandomNumberGenerator.GetInt32(1, Turn.ROLL_SIDES + 1)).ToArray();
+        var roll = Turn.DiceRoll(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
+            displayName, displayImage, dice, info.Text);
+        var saved = await _repository.InsertAsync(roll);
+        var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
+        return item;
+    }
+
     public async Task DeleteMessageAsync(long userId, long turnId)
     {
         var turn = await _repository.GetByIdAsync(turnId)
@@ -197,6 +212,8 @@ public partial class TurnService : IChatService
                     item.AudioUrl = _imageStorage.GetUrl(t.Audio);
                     item.AudioSeconds = t.AudioSeconds;
                     item.AudioType = AudioTypeOf(t.Audio);
+                    if (t.TurnType == TurnType.Roll)
+                        item.Dice = t.DiceValues().ToList();
                 }
             }
             else if (t.TurnType == TurnType.TurnFinished)
@@ -269,6 +286,7 @@ public partial class TurnService : IChatService
         TurnType.Image => "image",
         TurnType.Audio => "audio",
         TurnType.TurnFinished => "turnFinished",
+        TurnType.Roll => "roll",
         _ => type.ToString()
     };
 

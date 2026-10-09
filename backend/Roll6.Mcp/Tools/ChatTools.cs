@@ -13,7 +13,8 @@ public static class ChatTools
         Item: { key, cursor, kind, turnId, campaignId, turnNo, createdAt, userId, mapId, characterId, npcId, mapNpcId,
         displayName, displayImageUrl, authorLabel, text, description, before/after {x, y, look, lookName}, moved,
         movedTotal, changes [{field, label, before, after}], imageUrl, audioUrl, audioSeconds, audioType, deleted,
-        canDelete }. kind is text | image | audio (what people said), movement | action | actionResult |
+        canDelete, dice }. kind is text | image | audio | roll (what people said or rolled; a roll has dice = the three
+        faces and text = the optional reason), movement | action | actionResult |
         characterUpdate | narration (the turn records — text is the same line as get_turn_summary) or turnFinished
         (the divider "Turno N finalizado").
         """;
@@ -64,10 +65,32 @@ public static class ChatTools
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat",
             new ChatSendInfo { CharacterId = characterId, Text = text, Image = image });
 
+    [McpServerTool(Name = "roll_dice", Title = "Roll dice", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
+    [ApiOperation("POST", "/api/campaign/{id}/chat/roll")]
+    [Description($$"""
+        What it does: rolls 3d6 in the campaign chat. The server draws the three dice, records the roll in the chat
+        history and shows it at once to everyone at the table, so nobody can pick the result. Roll as one of your
+        characters approved in the campaign (characterId) or, omitting characterId, as the master; text is an optional
+        reason ("Ataque com espada"). Only the master can delete a roll.
+        Who can use it: the campaign master (with or without a character) or a player as his own approved character.
+        Returns: the new item, kind "roll", with dice = [d1, d2, d3].
+        {{ITEM}}
+        Common errors: 400 reason longer than 260 characters, 403 not your approved character / not the master
+        without a character, 404 campaign not found.
+        Related tools: list_chat_messages, send_chat_message.
+        """)]
+    public static Task<CallToolResult> RollDice(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("Optional: what the roll is for (≤ 260 characters). Example: \"Ataque com espada\".")] string? text = null,
+        [Description("Optional: one of your characters approved in the campaign. Omit to roll as the master (only the master can).")] long? characterId = null) =>
+        api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat/roll",
+            new ChatRollInfo { CharacterId = characterId, Text = text });
+
     [McpServerTool(Name = "delete_chat_message", Title = "Delete chat message", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/chat/{id}")]
     [Description($$"""
-        What it does: deletes a chat message (text, photo or audio) or a narration; everyone then sees "Mensagem
+        What it does: deletes a chat message (text, photo, audio or a dice roll — rolls only by the master) or a narration; everyone then sees "Mensagem
         apagada" and a deleted narration also leaves the turn summary and narration. Moves, actions, results and
         changes can't be deleted here (use reset_turn or delete_turn_entry). {{McpDocs.DESTRUCTIVE}}
         Who can use it: the author of the message, or the campaign master (any message and narrations).

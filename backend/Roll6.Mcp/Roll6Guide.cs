@@ -139,6 +139,8 @@ public static class Roll6Guide
           of your approved characters or, without `characterId`, as the master; `delete_chat_message` removes a message
           (its author or the master) or a narration (the master). Conversation is not a turn record: it never shows in
           the turn summary, the turn data or the pending actions.
+        - `roll_dice` rolls **3d6** in the chat: the server draws the dice, the roll stays in the chat history for
+          everyone (kind `roll`, `dice` = the three faces, `text` = the optional reason) and only the master can delete it.
 
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move

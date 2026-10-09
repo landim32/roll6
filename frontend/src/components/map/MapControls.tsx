@@ -7,7 +7,6 @@ import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapShare } from '../../hooks/useMapShare';
 import { FOV_MAX, FOV_MIN, FOV_STEP } from '../../lib/storyCamera';
 import { ImageIcon, MapIcon, MinusIcon, PlusIcon, ResizeIcon, ShareIcon, View3dIcon } from '../ui/icons';
-import { DiceRoller } from './DiceRoller';
 
 interface MapControlsProps {
   onOpenImage: () => void;
@@ -46,7 +45,6 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
         disabled={in3d ? fov >= FOV_MAX : view.zoom <= MIN_ZOOM}
         onClick={() => (in3d ? setFov(fov + FOV_STEP) : zoomOut(...center()))}><MinusIcon size={20} /></button>
       {/* 3d6 on this screen only: it reads no campaign and stores nothing. */}
-      <DiceRoller />
       {canShare && (
         <button type="button" className="btn btn-secondary" title={t('map.share')} aria-label={t('map.share')}
           aria-busy={sharing} disabled={sharing} onClick={() => { void share(); }}>

@@ -17,6 +17,9 @@ public interface IChatService
     /// <summary>Deletes a message (author or master) or a narration (master) from the chat.</summary>
     Task DeleteMessageAsync(long userId, long turnId);
 
+    /// <summary>Rolls 3d6 in the chat (server-side draw) and publishes it like a message.</summary>
+    Task<ChatItemInfo> RollAsync(long userId, long campaignId, ChatRollInfo info);
+
     /// <summary>Moves the reader's mark forward up to <paramref name="until"/>.</summary>
     Task MarkReadAsync(long userId, long campaignId, string until);
 

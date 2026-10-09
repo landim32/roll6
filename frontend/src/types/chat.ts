@@ -13,6 +13,8 @@ export const CHAT_KIND = {
   characterUpdate: 'characterUpdate',
   narration: 'narration',
   turnFinished: 'turnFinished',
+  /** 3d6 rolled in the chat, drawn by the server. */
+  roll: 'roll',
 } as const;
 
 export type ChatKind = (typeof CHAT_KIND)[keyof typeof CHAT_KIND];
@@ -63,6 +65,8 @@ export interface ChatItemInfo {
   audioUrl: string | null;
   audioSeconds: number | null;
   audioType: string | null;
+  /** The three faces of a roll (kind `roll`). */
+  dice?: number[] | null;
   deleted: boolean;
   canDelete: boolean;
 }
@@ -81,6 +85,12 @@ export interface ChatSendInfo {
   image?: string | null;
   audio?: string | null;
   audioSeconds?: number | null;
+}
+
+/** A 3d6 roll in the chat; `text` is the optional reason. */
+export interface ChatRollInfo {
+  characterId: number | null;
+  text?: string | null;
 }
 
 export interface ChatAudioUploadInfo {

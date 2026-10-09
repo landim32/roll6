@@ -108,6 +108,25 @@ public class TurnServiceChatTests
     }
 
     [Fact]
+    public async Task Roll_DrawsThreeD6_AsTheCharacter_AndOnlyTheMasterDeletesIt()
+    {
+        var item = await _service.RollAsync(PLAYER, CAMPAIGN, new ChatRollInfo { CharacterId = ARIA, Text = "Ataque" });
+
+        item.Kind.Should().Be("roll");
+        item.Dice.Should().HaveCount(3).And.OnlyContain(d => d >= 1 && d <= 6);
+        (item.DisplayName, item.Text, item.CanDelete).Should().Be(("Aria", "Ataque", false));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_MESSAGE)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Roll_StrangerOrSomeoneElsesCharacter_Is403()
+    {
+        await _service.Invoking(s => s.RollAsync(STRANGER, CAMPAIGN, new ChatRollInfo())).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.RollAsync(PLAYER, CAMPAIGN, new ChatRollInfo { CharacterId = BRAM }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    [Fact]
     public async Task Master_SpeaksAsTheMaster()
     {
         var item = await _service.SendAsync(MASTER, CAMPAIGN, new ChatSendInfo { Text = "Rolem iniciativa" });

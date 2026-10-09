@@ -216,8 +216,8 @@ export const ChevronDownIcon = (props: IconProps) => (
 );
 
 /**
- * Dice faces, one component per value so a die shows exactly what it rolled: index = value - 1 in
- * components/map/DiceRoller. bi-dice-1-fill … bi-dice-6-fill.
+ * Dice faces, one component per value so a die shows exactly what it rolled: index = value - 1 in the chat's
+ * roll (components/chat/ChatItem). bi-dice-1-fill … bi-dice-6-fill.
  */
 
 /** bi-dice-1-fill */

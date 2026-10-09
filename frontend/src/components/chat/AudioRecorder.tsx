@@ -105,9 +105,9 @@ export const AudioRecorder = ({ disabled, onSend, onActiveChange }: AudioRecorde
       <div className="stm-chat-recorder">
         <span className="stm-chat-rec-dot" aria-hidden="true" />
         <span className="small">{formatSeconds(elapsed)} / {formatSeconds(MAX_RECORDING_SECONDS)}</span>
-        <button type="button" className="btn btn-sm btn-danger ms-auto" onClick={stop}
+        <button type="button" className="btn btn-danger ms-auto stm-chat-send" onClick={stop}
           title={t('chat.stopRecording')} aria-label={t('chat.stopRecording')}>
-          <StopIcon size={14} />
+          <StopIcon size={20} />
         </button>
       </div>
     );
@@ -117,13 +117,13 @@ export const AudioRecorder = ({ disabled, onSend, onActiveChange }: AudioRecorde
     return (
       <div className="stm-chat-recorder">
         <audio controls src={recorded.url} preload="metadata" />
-        <button type="button" className="btn btn-sm btn-outline-secondary ms-auto" onClick={() => setRecorded(null)} disabled={sending}
+        <button type="button" className="btn btn-outline-secondary ms-auto stm-chat-send" onClick={() => setRecorded(null)} disabled={sending}
           title={t('chat.discardRecording')} aria-label={t('chat.discardRecording')}>
-          <TrashIcon size={14} />
+          <TrashIcon size={20} />
         </button>
-        <button type="button" className="btn btn-sm btn-primary" onClick={() => { void send(); }} disabled={sending}
+        <button type="button" className="btn btn-primary stm-chat-send" onClick={() => { void send(); }} disabled={sending}
           title={t('chat.send')} aria-label={t('chat.send')}>
-          <SendIcon size={14} />
+          <SendIcon size={20} />
         </button>
       </div>
     );
@@ -132,7 +132,7 @@ export const AudioRecorder = ({ disabled, onSend, onActiveChange }: AudioRecorde
   return (
     <button type="button" className="btn btn-primary stm-chat-send" onClick={() => { void start(); }} disabled={disabled}
       title={t('chat.record')} aria-label={t('chat.record')}>
-      <MicIcon size={18} />
+      <MicIcon size={22} />
     </button>
   );
 };

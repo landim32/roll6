@@ -346,9 +346,6 @@
     "resize": "Ajustar imagem",
     "zoom": "Zoom {{value}}%",
     "unsaved": "Não salvo",
-    "dice": "Rolar 3d6 (só na sua tela)",
-    "diceTotal": "Total",
-    "diceHide": "Clique para esconder os dados",
     "share": "Compartilhar"
   },
   "share": {
@@ -691,7 +688,11 @@
     "attach": "Anexar",
     "actOption": "Ação do turno",
     "backToTalk": "Voltar à conversa",
-    "cancelAct": "Cancelar a ação"
+    "cancelAct": "Cancelar a ação",
+    "rollOption": "Rolar 3d6",
+    "photoOption": "Foto",
+    "rollTotal": "Total",
+    "rollLabel": "Rolou {{dice}}, total {{total}}"
   },
   "layout": {
     "label": "Mapa e chat",
