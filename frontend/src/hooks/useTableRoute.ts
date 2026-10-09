@@ -6,6 +6,8 @@ import { useCampaign } from './useCampaign';
 import { useMapEditor } from './useMapEditor';
 import { ApiError } from '../Services/apiHelpers';
 import { parseTablePath, tablePathFor } from '../lib/tableRoute';
+import { useChat } from './useChat';
+import { LAYOUT_MODE } from '../lib/layoutMode';
 
 /**
  * Keeps the address and the open table in step.
@@ -18,6 +20,16 @@ export const useTableRoute = (guard: () => Promise<boolean>) => {
   const { t } = useTranslation();
   const campaign = useCampaign();
   const editor = useMapEditor();
+
+  const { layoutMode, setLayoutMode } = useChat();
+
+  // A notification opens the campaign with "?chat=1" (043): show the chat (split when only the map was on screen)
+  // and drop the flag from the address.
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has('chat')) return;
+    if (layoutMode === LAYOUT_MODE.map) setLayoutMode(LAYOUT_MODE.split);
+    navigate(location.pathname, { replace: true });
+  }, [location.search, location.pathname, layoutMode, setLayoutMode, navigate]);
 
   const pendingRef = useRef(false);
   const guardRef = useRef(guard);

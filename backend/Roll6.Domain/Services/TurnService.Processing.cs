@@ -2,6 +2,7 @@ using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Grid;
 using Roll6.Domain.Models;
+using Roll6.Domain.Notifications;
 using Roll6.Domain.Realtime;
 using Roll6.Domain.Turns;
 using Roll6.DTO.Realtime;
@@ -434,6 +435,12 @@ public partial class TurnService
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
             data: new { finishedTurn = finished, turnNo = campaign.CurrentTurn }));
+        // 043: the narration to everyone, each owner's PV/Fadiga, and the end of the turn to the players.
+        if (narration != null)
+            _queue.Enqueue(TableNotices.Narration(campaignId, userId, narration));
+        foreach (var update in turns.Where(t => t.TurnType == TurnType.CharacterUpdate && t.CharacterId.HasValue && t.Changes != null))
+            await NotifyVitalsAsync(campaignId, userId, update.CharacterId!.Value, update.Changes!);
+        await NotifyTurnFinishedAsync(campaign, userId, finished);
 
         return new TurnProcessResultInfo
         {

@@ -1,5 +1,6 @@
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Notifications;
 using Roll6.Domain.Realtime;
 using Roll6.DTO.CampaignCharacter;
 using Roll6.DTO.Realtime;
@@ -24,6 +25,7 @@ public class CampaignCharacterService : ICampaignCharacterService
     private readonly IImageStorageAppService _imageStorage;
     private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IRealtimeNotifier _notifier;
+    private readonly INotificationQueue _queue;
 
     public CampaignCharacterService(
         ICampaignCharacterRepository<CampaignCharacter> repository,
@@ -35,8 +37,10 @@ public class CampaignCharacterService : ICampaignCharacterService
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
         ITurnRepository<Turn> turnRepository,
+        INotificationQueue queue,
         IRealtimeNotifier notifier)
     {
+        _queue = queue;
         _notifier = notifier;
         _turnRepository = turnRepository;
         _mapTokenRepository = mapTokenRepository;
@@ -197,6 +201,10 @@ public class CampaignCharacterService : ICampaignCharacterService
         await PublishPartyAsync(campaign.CampaignId, userId, piecesToo: true);
         if (turn != null)
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, campaign.CampaignId, userId));
+        // 043: the owner learns his character's new PV / Fadiga (not when he changed them himself).
+        foreach (var notice in TableNotices.Vitals(campaign.CampaignId, userId, character.UserId, character.Name, changes,
+                     character.Life, character.Energy))
+            _queue.Enqueue(notice);
         return result;
     }
 

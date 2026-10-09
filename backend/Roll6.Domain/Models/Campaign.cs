@@ -22,6 +22,9 @@ public class Campaign
 
     /// <summary>Campaign map the master opened last (017): players follow it. Null when there is none.</summary>
     public long? CurrentMapId { get; set; }
+
+    /// <summary>The turn in which "Falta apenas você…" was already sent (043), so it goes once per turn.</summary>
+    public int? MajorityNotifiedTurn { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

@@ -10,6 +10,7 @@ import { AuthProvider } from './Contexts/AuthContext';
 import { CampaignProvider } from './Contexts/CampaignContext';
 import { ChatProvider } from './Contexts/ChatContext';
 import { InstallProvider } from './Contexts/InstallContext';
+import { PushProvider } from './Contexts/PushContext';
 import { registerServiceWorker } from './lib/serviceWorker';
 import { CharacterProvider } from './Contexts/CharacterContext';
 import { MapEditorProvider } from './Contexts/MapEditorContext';
@@ -19,7 +20,7 @@ import { RealtimeProvider } from './Contexts/RealtimeContext';
 import { TokenProvider } from './Contexts/TokenContext';
 import { TurnProvider } from './Contexts/TurnContext';
 
-// Provider chain: Auth → Install (the installable app, 042) → Campaign (needs the session) → Realtime (table events
+// Provider chain: Auth → Install (the installable app, 042) → Push (Web Push on this device, 043) → Campaign (needs the session) → Realtime (table events
 // of the current campaign; every provider below reacts to them) → Character (needs the campaign) → MapEditor →
 // Token (library) → MapToken (pieces of the open map: needs the editor, the campaign and the characters) →
 // Npc (library and campaign NPCs; places pieces, so it needs MapToken) → Turn (turn of the current campaign;
@@ -29,25 +30,27 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <InstallProvider>
-          <CampaignProvider>
-            <RealtimeProvider>
-              <CharacterProvider>
-                <MapEditorProvider>
-                  <TokenProvider>
-                    <MapTokenProvider>
-                      <NpcProvider>
-                        <TurnProvider>
-                          <ChatProvider>
-                            <App />
-                          </ChatProvider>
-                        </TurnProvider>
-                      </NpcProvider>
-                    </MapTokenProvider>
-                  </TokenProvider>
-                </MapEditorProvider>
-              </CharacterProvider>
-            </RealtimeProvider>
-          </CampaignProvider>
+          <PushProvider>
+            <CampaignProvider>
+              <RealtimeProvider>
+                <CharacterProvider>
+                  <MapEditorProvider>
+                    <TokenProvider>
+                      <MapTokenProvider>
+                        <NpcProvider>
+                          <TurnProvider>
+                            <ChatProvider>
+                              <App />
+                            </ChatProvider>
+                          </TurnProvider>
+                        </NpcProvider>
+                      </MapTokenProvider>
+                    </TokenProvider>
+                  </MapEditorProvider>
+                </CharacterProvider>
+              </RealtimeProvider>
+            </CampaignProvider>
+          </PushProvider>
         </InstallProvider>
       </AuthProvider>
     </BrowserRouter>

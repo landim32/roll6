@@ -3,7 +3,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import {
-  Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, DotsIcon, LightningIcon, MoveIcon, PencilIcon,
+  Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, DotsIcon, HandIndexIcon, LightningIcon, MoveIcon, PencilIcon,
 } from '../ui/icons';
 import { CHAT_KIND } from '../../types/chat';
 import type { ChatItemInfo } from '../../types/chat';
@@ -94,6 +94,13 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
   const [imageFailed, setImageFailed] = useState(false);
 
   switch (item.kind) {
+    case CHAT_KIND.poke:
+      return (
+        <div className="stm-chat-poke" role="note">
+          <HandIndexIcon size={12} /> <span>{item.text}</span> <time className="stm-chat-time">{timeOf(item.createdAt)}</time>
+        </div>
+      );
+
     case CHAT_KIND.turnFinished:
       return (
         <div className="stm-chat-divider" role="separator">

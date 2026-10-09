@@ -30,6 +30,8 @@ services:
       S3__Folder: roll6
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      Push__PublicKey: ${ROLL6_VAPID_PUBLIC_KEY:-}
+      Push__PrivateKey: ${ROLL6_VAPID_PRIVATE_KEY:-}
     networks:
       - roll6-network
       # Shared network: the server's nginx reaches roll6-api:8080 (/api, /hubs) and the API reaches an external

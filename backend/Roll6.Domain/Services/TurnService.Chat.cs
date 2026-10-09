@@ -2,6 +2,7 @@ using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Notifications;
 using Roll6.Domain.Realtime;
 using Roll6.Domain.Turns;
 using Roll6.DTO.Chat;
@@ -70,6 +71,7 @@ public partial class TurnService : IChatService
         var saved = await _repository.InsertAsync(message);
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
+        _queue.Enqueue(TableNotices.Message(campaign.CampaignId, userId, item));
         return item;
     }
 
@@ -85,6 +87,7 @@ public partial class TurnService : IChatService
         var saved = await _repository.InsertAsync(roll);
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
+        _queue.Enqueue(TableNotices.Message(campaign.CampaignId, userId, item));
         return item;
     }
 
@@ -220,6 +223,12 @@ public partial class TurnService : IChatService
             {
                 item.Text = $"Turno {t.TurnNo} finalizado";
             }
+            else if (t.TurnType == TurnType.Poke)
+            {
+                // "Rodrigo cutucou Ana e Bruno" (043): a discreet line, never deleted from the chat.
+                item.DisplayName = t.DisplayName ?? string.Empty;
+                item.Text = NoticeTexts.PokeLine(item.DisplayName, t.Description ?? string.Empty);
+            }
             else
             {
                 FillLogItem(item, t, lines.GetValueOrDefault(t.TurnId), names, npcImages);
@@ -287,6 +296,7 @@ public partial class TurnService : IChatService
         TurnType.Audio => "audio",
         TurnType.TurnFinished => "turnFinished",
         TurnType.Roll => "roll",
+        TurnType.Poke => "poke",
         _ => type.ToString()
     };
 

@@ -15,6 +15,8 @@ export const CHAT_KIND = {
   turnFinished: 'turnFinished',
   /** 3d6 rolled in the chat, drawn by the server. */
   roll: 'roll',
+  /** "Rodrigo cutucou Ana e Bruno" (043): a gray line, never deleted. */
+  poke: 'poke',
 } as const;
 
 export type ChatKind = (typeof CHAT_KIND)[keyof typeof CHAT_KIND];

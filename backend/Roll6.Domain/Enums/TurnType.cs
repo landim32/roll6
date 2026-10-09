@@ -24,7 +24,9 @@ public enum TurnType
     /// <summary>"Turno N finalizado" (041): written where the turn advances; <c>TurnNo</c> is the finished turn.</summary>
     TurnFinished = 9,
     /// <summary>A dice roll made in the chat: 3d6 drawn by the server, values in <c>dice</c>, optional reason.</summary>
-    Roll = 10
+    Roll = 10,
+    /// <summary>"Rodrigo cutucou Ana e Bruno" (043): a chat line, neither a turn record nor conversation.</summary>
+    Poke = 11
 }
 
 /// <summary>Groups of <see cref="TurnType"/> (041).</summary>

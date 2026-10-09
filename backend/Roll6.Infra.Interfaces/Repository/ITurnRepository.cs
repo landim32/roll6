@@ -47,6 +47,9 @@ public interface ITurnRepository<TModel> where TModel : class
 
     Task<TModel?> FirstUnreadAsync(long campaignId, long userId, DateTime? since);
 
+    /// <summary>When the user last poked in the campaign (043), for the one-minute interval.</summary>
+    Task<DateTime?> LastPokeAtAsync(long campaignId, long userId);
+
     /// <summary>Stored photo and audio names of the campaign's chat (deleted with the campaign).</summary>
     Task<List<string>> ListChatMediaAsync(long campaignId);
 

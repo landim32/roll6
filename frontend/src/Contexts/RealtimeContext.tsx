@@ -1,3 +1,4 @@
+import type { NoticeInfo } from '../types/push';
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { HubConnectionState } from '@microsoft/signalr';
@@ -26,7 +27,12 @@ interface RealtimeContextType {
   live: boolean;
   /** Receives the current campaign's events (and the local `resync`); returns the unsubscribe function. */
   subscribe: (handler: TableEventHandler) => () => void;
+  /** Reports whether this window is on screen and the chat visible (043); re-sent after every join. */
+  setPresence: (visible: boolean, chatVisible: boolean) => void;
 }
+
+/** Hub method of the personal notices (043). */
+const NOTICE_METHOD = 'notice';
 
 const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined);
 
@@ -56,6 +62,15 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
   refreshRef.current = refreshTableCampaigns;
   const tRef = useRef(t);
   tRef.current = t;
+  /** What this window shows (043), sent to the hub after each join and whenever it changes. */
+  const presenceRef = useRef({ visible: true, chatVisible: false });
+
+  const sendPresence = useCallback(() => {
+    const connection = connectionRef.current;
+    if (!connection || connection.state !== HubConnectionState.Connected || joinedRef.current === null) return;
+    const { visible, chatVisible } = presenceRef.current;
+    void realtimeService.setPresence(connection, visible, chatVisible).catch(() => undefined);
+  }, []);
 
   /**
    * The campaign itself lives above this provider: its events are applied here. Renamed/opened → new data;
@@ -105,12 +120,13 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
       await realtimeService.joinCampaign(connection, wanted);
       if (wantedRef.current !== wanted) return;
       setJoined(wanted);
+      sendPresence();
       dispatch({ type: TABLE_EVENT.resync, campaignId: wanted, mapId: null, actorUserId: 0, data: null });
     } catch {
       // Refused (not master nor approved) or dropped: stay on polling; retried below.
       setJoined(null);
     }
-  }, [dispatch]);
+  }, [dispatch, sendPresence]);
 
   // One connection per session.
   useEffect(() => {
@@ -122,6 +138,10 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
 
     connection.on(TABLE_EVENT_METHOD, (event: TableEvent) => {
       if (event.campaignId === joinedRef.current && event.campaignId === wantedRef.current) dispatch(event);
+    });
+    // Personal notices of the campaign on screen (043): "Falta apenas você", turn finished, PV, Fadiga, pokes.
+    connection.on(NOTICE_METHOD, (notice: NoticeInfo) => {
+      if (notice.campaignId === joinedRef.current) toast.info(notice.title, { description: notice.body });
     });
     connection.onreconnecting(() => {
       setStatus(REALTIME_STATUS.reconnecting);
@@ -182,7 +202,14 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
 
   const live = status === REALTIME_STATUS.connected && campaignId !== null && joinedId === campaignId;
 
-  const value = useMemo<RealtimeContextType>(() => ({ status, live, subscribe }), [status, live, subscribe]);
+  const setPresence = useCallback((visible: boolean, chatVisible: boolean) => {
+    const current = presenceRef.current;
+    if (current.visible === visible && current.chatVisible === chatVisible) return;
+    presenceRef.current = { visible, chatVisible };
+    sendPresence();
+  }, [sendPresence]);
+
+  const value = useMemo<RealtimeContextType>(() => ({ status, live, subscribe, setPresence }), [status, live, subscribe, setPresence]);
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
 };
 

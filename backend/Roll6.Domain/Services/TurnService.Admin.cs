@@ -65,6 +65,7 @@ public partial class TurnService
             });
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
                 data: new { finishedTurn = info.TurnNo - 1, turnNo = info.TurnNo }));
+            await NotifyTurnFinishedAsync(campaign, userId, info.TurnNo - 1);
             return result;
         }
 

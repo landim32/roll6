@@ -8,6 +8,7 @@ using Roll6.DTO.CampaignPlan;
 using Roll6.DTO.Chat;
 using Roll6.DTO.Common;
 using Roll6.DTO.Map;
+using Roll6.DTO.Push;
 using Roll6.DTO.Turn;
 
 namespace Roll6.API.Controllers;
@@ -22,6 +23,7 @@ public class CampaignController : ApiControllerBase
     private readonly ITurnService _turnService;
     private readonly ICampaignPlanService _campaignPlanService;
     private readonly IChatService _chatService;
+    private readonly IPushService _pushService;
 
     public CampaignController(
         ICampaignService campaignService,
@@ -30,8 +32,10 @@ public class CampaignController : ApiControllerBase
         ICampaignNpcService campaignNpcService,
         ITurnService turnService,
         ICampaignPlanService campaignPlanService,
-        IChatService chatService)
+        IChatService chatService,
+        IPushService pushService)
     {
+        _pushService = pushService;
         _chatService = chatService;
         _campaignPlanService = campaignPlanService;
         _turnService = turnService;
@@ -212,6 +216,39 @@ public class CampaignController : ApiControllerBase
         {
             var item = await _chatService.RollAsync(CurrentUserId, id, info);
             return StatusCode(StatusCodes.Status201Created, item);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>
+    /// Pokes the players whose characters haven't acted in the turn (043): a line in the chat and a notification to each.
+    /// Master or approved participant; once a minute per person (409 otherwise).
+    /// </summary>
+    [HttpPost("{id:long}/poke")]
+    [ProducesResponseType(typeof(PokeResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Poke(long id)
+    {
+        try
+        {
+            return Ok(await _chatService.PokeAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Mutes or unmutes the campaign's notifications for the caller (043).</summary>
+    [HttpPut("{id:long}/notifications")]
+    [ProducesResponseType(typeof(CampaignNotificationInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetNotifications(long id, [FromBody] CampaignNotificationUpdateInfo info)
+    {
+        try
+        {
+            return Ok(await _pushService.SetMutedAsync(CurrentUserId, id, info));
         }
         catch (Exception ex)
         {

@@ -3,6 +3,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Grid;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Notifications;
 using Roll6.Domain.Realtime;
 using Roll6.Domain.Turns;
 using Roll6.DTO.Realtime;
@@ -34,6 +35,7 @@ public partial class TurnService : ITurnService
     private readonly IChatReadRepository<ChatRead> _chatReadRepository;
     private readonly IImageStorageAppService _imageStorage;
     private readonly IRealtimeNotifier _notifier;
+    private readonly INotificationQueue _queue;
 
     /// <summary>Hexes taken on a map (031): resets and processed moves need the whole shape free.</summary>
     private readonly MapOccupancyLoader _occupancy;
@@ -54,8 +56,10 @@ public partial class TurnService : ITurnService
         ITokenRepository<Token> tokenRepository,
         IChatReadRepository<ChatRead> chatReadRepository,
         IImageStorageAppService imageStorage,
+        INotificationQueue queue,
         IRealtimeNotifier notifier)
     {
+        _queue = queue;
         _chatReadRepository = chatReadRepository;
         _imageStorage = imageStorage;
         _occupancy = new MapOccupancyLoader(mapModelRepository, mapTokenRepository, tokenRepository, campaignCharacterRepository, mapNpcRepository);
@@ -161,6 +165,7 @@ public partial class TurnService : ITurnService
             campaign.CurrentTurn, userId, info.Description);
         var result = (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
+        await NotifyActionAsync(campaign, userId, actor.CharacterId, info.Description);
         return result;
     }
 
@@ -237,6 +242,7 @@ public partial class TurnService : ITurnService
         });
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
             data: new { finishedTurn = finished, turnNo = campaign.CurrentTurn }));
+        await NotifyTurnFinishedAsync(campaign, userId, finished);
         return new TurnFinishResultInfo { Finished = true, FinishedTurn = finished, TurnNo = campaign.CurrentTurn };
     }
 
@@ -275,6 +281,8 @@ public partial class TurnService : ITurnService
         };
         var result = (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
+        if (type == TurnType.Narration)
+            _queue.Enqueue(TableNotices.Narration(campaign.CampaignId, userId, info.Description));
         return result;
     }
 

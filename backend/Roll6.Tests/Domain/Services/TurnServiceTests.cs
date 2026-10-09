@@ -1,3 +1,5 @@
+using Roll6.Domain.Notifications;
+using Roll6.Domain.Interfaces;
 using FluentAssertions;
 using Moq;
 using Roll6.Domain.Enums;
@@ -37,6 +39,7 @@ public class TurnServiceTests
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<INotificationQueue> _queue = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
@@ -91,7 +94,7 @@ public class TurnServiceTests
 
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object,
-            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _notifier.Object);
+            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _queue.Object, _notifier.Object);
     }
 
     // --- State (US1) ---
@@ -1054,5 +1057,83 @@ public class TurnServiceTests
             .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("turnNo");
         await _service.Invoking(s => s.SetCurrentAsync(PLAYER, CAMPAIGN, new TurnSetCurrentInfo { TurnNo = 5 })).Should().ThrowAsync<UnauthorizedAccessException>();
         await _service.Invoking(s => s.SetCurrentAsync(MASTER, 999, new TurnSetCurrentInfo { TurnNo = 5 })).Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    // --- Notices (043) ---
+
+    private void ThreePlayers(params long[] actedCharacterIds)
+    {
+        // Aria (PLAYER), Bram (user 5) and Cael (user 6) approved; the given characters already acted this turn.
+        _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(new List<CampaignCharacter>
+        {
+            new() { CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved },
+            new() { CampaignId = CAMPAIGN, CharacterId = BRAM, Status = CampaignCharacterStatus.Approved },
+            new() { CampaignId = CAMPAIGN, CharacterId = 82, Status = CampaignCharacterStatus.Approved }
+        });
+        var owners = new Dictionary<long, long> { [ARIA] = PLAYER, [BRAM] = 5, [82] = 6 };
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            ids.Select(id => new Character { CharacterId = id, UserId = owners[id], Name = $"C{id}" }).ToList());
+        _userRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            ids.Select(id => new User { UserId = id, Name = id == 5 ? "Bruno Lima" : id == 6 ? "Caio Reis" : "Ana" }).ToList());
+        _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3)).ReturnsAsync(actedCharacterIds
+            .Select(c => new Turn { CampaignId = CAMPAIGN, TurnNo = 3, TurnType = TurnType.Action, CharacterId = c }).ToList());
+        _campaignRepository.Setup(r => r.TrySetMajorityNotifiedAsync(CAMPAIGN, 3)).ReturnsAsync(true);
+    }
+
+    [Fact]
+    public async Task Act_NotifiesTheMasterOnly_WithTheActionText()
+    {
+        ThreePlayers(ARIA);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Ataco o **orc**" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action && n.Body == "Ataco o orc"
+            && n.Speaker == "Aria" && n.TargetUserIds!.SequenceEqual(new[] { MASTER }) && n.ActorUserId == PLAYER)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_ThatMakesTheMajority_TellsWhoIsMissing()
+    {
+        // 3 characters → majority 2: Bram already acted, now Aria acts.
+        ThreePlayers(BRAM, ARIA);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Majority
+            && n.TargetUserIds!.SequenceEqual(new[] { 6L }) && n.BodyFor(6) == "Falta apenas você")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_AfterTheMajorityWasSent_DoesNotRepeat()
+    {
+        ThreePlayers(BRAM, ARIA);
+        _campaign.MajorityNotifiedTurn = 3;
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Majority)), Times.Never);
+        _campaign.MajorityNotifiedTurn = null;
+    }
+
+    [Fact]
+    public async Task Act_BelowTheMajority_TellsNobodyButTheMaster()
+    {
+        ThreePlayers(ARIA);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Ando" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Majority)), Times.Never);
+    }
+
+    [Fact]
+    public async Task Finish_TellsThePlayersTheTurnEnded()
+    {
+        ThreePlayers(ARIA, BRAM, 82);
+
+        await _service.FinishAsync(MASTER, CAMPAIGN, new TurnFinishInfo { Force = true });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.TurnFinished
+            && n.Body == "Turno 3 terminado. Pode agir novamente" && n.TargetUserIds!.OrderBy(u => u).SequenceEqual(new[] { PLAYER, 5L, 6L }))), Times.Once);
+        _campaign.CurrentTurn = 3;
     }
 }

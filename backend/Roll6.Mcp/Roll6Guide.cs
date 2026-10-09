@@ -142,6 +142,15 @@ public static class Roll6Guide
         - `roll_dice` rolls **3d6** in the chat: the server draws the dice, the roll stays in the chat history for
           everyone (kind `roll`, `dice` = the three faces, `text` = the optional reason) and only the master can delete it.
 
+        ## Notifications
+        - Players and masters can turn on **notifications** on their phones/computers (Web Push, in the app only — there
+          is no tool for that). They get: chat messages of others (when not looking at the chat); the master also every
+          character's **action** with its text; each player "Falta apenas você…" when most characters already acted
+          (once per turn), "Turno N terminado. Pode agir novamente", their character's PV/Fadiga changes made by someone
+          else, and pokes. So `act_in_turn`, `finish_turn`, `process_turn` and changing PV/energy notify people.
+        - `poke_players` pokes everyone whose character hasn't acted in the turn (a gray chat line + a notification; once
+          a minute per person); `list_notification_settings` / `set_campaign_notifications` read and mute campaigns.
+
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move
           once** per turn (moving records a Movement entry) and **act** any number of times (`act_in_turn`, text).

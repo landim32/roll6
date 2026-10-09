@@ -30,6 +30,10 @@ public static class McpToolCatalog
         // 041: the reader's mark (UI state) and the browser's audio recording upload.
         "PUT /api/campaign/{id}/chat/read",
         "POST /api/chat/audio",
+        // 043: browser-only Web Push subscription (login session, not for assistants).
+        "GET /api/push/key",
+        "POST /api/push/subscription",
+        "DELETE /api/push/subscription",
         // 040: link previews for crawlers (anonymous HTML fragment and picture), not for assistants.
         "GET /api/meta/head/{**path}",
         "GET /api/meta/image/map/{slug}.jpg"
