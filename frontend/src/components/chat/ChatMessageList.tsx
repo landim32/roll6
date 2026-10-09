@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
 import { compareCursors, continuesPrevious } from '../../lib/chatItems';
 import { filterChatItems } from '../../lib/chatFilters';
+import { copyToClipboard } from '../../lib/clipboard';
 import type { ChatItemInfo } from '../../types/chat';
 import { toast } from 'sonner';
 
@@ -184,6 +185,7 @@ export const ChatMessageList = () => {
           onReply={() => startReply(actions.item)}
           onConvert={(to) => run(() => convert(actions.item, to))}
           onDelete={() => setToDelete(actions.item)}
+          onCopy={(text) => { void copyToClipboard(text).then((ok) => (ok ? toast.success(t('chat.copied')) : toast.error(t('chat.copyFailed')))); }}
         />
       )}
     </div>

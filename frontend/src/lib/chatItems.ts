@@ -118,6 +118,24 @@ export const nameColor = (name: string): string => {
 /** Sum of a roll's faces. */
 export const rollTotal = (dice: readonly number[] | null | undefined): number => (dice ?? []).reduce((sum, d) => sum + d, 0);
 
+/**
+ * What "Copiar" puts on the clipboard for a chat entry: the message or caption, the action's text, the narration's
+ * markdown, a roll as "5 + 3 + 6 = 14" plus its reason. Null when there is nothing to copy (a photo or a recording
+ * without caption, a deleted entry), so the bar shows no Copiar button.
+ */
+export const copyableText = (item: ChatItemInfo): string | null => {
+  if (item.deleted) return null;
+  if (item.kind === CHAT_KIND.roll && item.dice && item.dice.length > 0) {
+    const roll = `${item.dice.join(' + ')} = ${rollTotal(item.dice)}`;
+    const reason = item.text?.trim();
+    return reason ? `${roll} — ${reason}` : roll;
+  }
+  const value = item.kind === CHAT_KIND.action || item.kind === CHAT_KIND.actionResult
+    ? item.description ?? item.text
+    : item.text ?? item.description;
+  return value?.trim() ? value.trim() : null;
+};
+
 const firstWord = (name: string): string => name.trim().split(/\s+/)[0] ?? name;
 
 /**
