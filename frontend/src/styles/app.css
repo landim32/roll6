@@ -554,7 +554,8 @@ body,
 }
 
 .stm-layout-split .stm-map-region {
-  bottom: calc((100% - var(--stm-menu-height)) / 2);
+  /* Map 60%, chat 40% of the space under the menu. */
+  bottom: calc((100% - var(--stm-menu-height)) * 0.4);
 }
 
 .stm-chat-region {
@@ -568,7 +569,7 @@ body,
 }
 
 .stm-layout-split .stm-chat-region {
-  top: calc(var(--stm-menu-height) + (100% - var(--stm-menu-height)) / 2);
+  top: calc(var(--stm-menu-height) + (100% - var(--stm-menu-height)) * 0.6);
   border-top: 1px solid var(--stm-border);
 }
 
@@ -600,6 +601,50 @@ body,
   z-index: 1;
 }
 
+/* Chat only: the chat between the character and NPC cards. */
+.stm-chat-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* Desktop: the cards are fixed columns beside the chat. */
+.stm-party.stm-party-docked {
+  position: static;
+  flex: 0 0 260px;
+  width: 260px;
+  max-height: none;
+  border-width: 0 1px 0 0;
+  border-radius: 0;
+  background: var(--bs-body-bg);
+}
+
+.stm-party.stm-party-docked.stm-side-right {
+  max-height: none;
+  border-width: 0 0 0 1px;
+}
+
+/* Phones: the same collapsible panels as on the map, over the chat and above the composer. */
+.stm-chat-body > .stm-party:not(.stm-party-docked) {
+  top: 8px;
+  max-height: calc(100% - 16px - 72px);
+}
+
+/* Split: the map is short, so its buttons line up horizontally and the NPC panel needs little room under it. */
+.stm-layout-split {
+  --stm-controls-space: 72px;
+}
+
+.stm-layout-split .stm-controls {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: flex-end;
+  max-height: none;
+  max-width: calc(100% - 2rem);
+}
+
 /* ---------- chat (041) ---------- */
 .stm-chat {
   position: relative;
@@ -607,9 +652,9 @@ body,
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  /* The whole width of its region (no reading column), in every layout. */
   width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
 }
 
 .stm-chat-scroll {

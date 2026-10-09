@@ -13,6 +13,8 @@ interface SidePanelProps {
   children: ReactNode;
   /** Below the list (e.g. an add button). */
   footer?: ReactNode;
+  /** A fixed column beside the chat (desktop, chat only): always open, no collapse button. */
+  docked?: boolean;
 }
 
 const readCollapsed = (key: string): boolean => {
@@ -34,7 +36,7 @@ const EXPANDED_EVENT = 'roll6:side-panel-expanded';
  * vertical tab; the choice is remembered in this browser. On phones only one panel is open at a time and the
  * right one starts collapsed.
  */
-export const SidePanel = ({ side, title, storageKey, collapseLabel, expandLabel, children, footer }: SidePanelProps) => {
+export const SidePanel = ({ side, title, storageKey, collapseLabel, expandLabel, children, footer, docked = false }: SidePanelProps) => {
   const [collapsed, setCollapsed] = useState(() => readCollapsed(storageKey) || (side === 'right' && isPhone()));
   const sideClass = side === 'right' ? ' stm-side-right' : '';
 
@@ -58,7 +60,7 @@ export const SidePanel = ({ side, title, storageKey, collapseLabel, expandLabel,
     if (!next) window.dispatchEvent(new CustomEvent(EXPANDED_EVENT, { detail: side }));
   };
 
-  if (collapsed) {
+  if (collapsed && !docked) {
     return (
       <button type="button" className={`stm-party stm-party-collapsed${sideClass}`} onClick={toggle} aria-label={expandLabel} title={expandLabel}>
         <span>{title}</span>
@@ -67,12 +69,12 @@ export const SidePanel = ({ side, title, storageKey, collapseLabel, expandLabel,
   }
 
   return (
-    <section className={`stm-party${sideClass}`} aria-label={title}>
+    <section className={`stm-party${sideClass}${docked ? ' stm-party-docked' : ''}`} aria-label={title}>
       <header>
         <span>{title}</span>
-        <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={toggle} aria-label={collapseLabel} title={collapseLabel}>
+        {!docked && <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={toggle} aria-label={collapseLabel} title={collapseLabel}>
           {side === 'right' ? '›' : '‹'}
-        </button>
+        </button>}
       </header>
       <ul>{children}</ul>
       {footer && <footer className="stm-party-footer">{footer}</footer>}
