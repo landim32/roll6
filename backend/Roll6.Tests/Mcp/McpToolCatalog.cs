@@ -26,7 +26,10 @@ public static class McpToolCatalog
         "POST /api/apikey/{id}/revoke",
         "DELETE /api/apikey/{id}",
         // 029: image bytes for the browser's map snapshot; assistants already get the presigned URLs.
-        "GET /api/image/file/{fileName}"
+        "GET /api/image/file/{fileName}",
+        // 040: link previews for crawlers (anonymous HTML fragment and picture), not for assistants.
+        "GET /api/meta/head/{**path}",
+        "GET /api/meta/image/map/{slug}.jpg"
     };
 
     public record Tool(MethodInfo Method, McpServerToolAttribute Attribute, string Name, string Description, ApiOperationAttribute? Operation);

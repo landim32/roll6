@@ -21,6 +21,8 @@ import { TokenModal } from '../components/modals/TokenModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { useMapEditor } from '../hooks/useMapEditor';
+import { useCampaign } from '../hooks/useCampaign';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useMapToken } from '../hooks/useMapToken';
 import { useTurn } from '../hooks/useTurn';
 import { useTableRoute } from '../hooks/useTableRoute';
@@ -36,6 +38,13 @@ const StoryView = lazy(() => import('../components/story/StoryView'));
 /** Main screen: always the map with the grid; every other window opens as a modal over it. */
 export const MainPage = () => {
   const { isDirty, draft, viewMode, setViewMode } = useMapEditor();
+  const { currentCampaign } = useCampaign();
+  // The tab says what is open (040): "{map} — {campaign} | Roll6", "{model} | Roll6", "{campaign} | Roll6" or "Roll6".
+  useDocumentTitle({
+    mapName: draft.mapModelId !== null ? draft.name : null,
+    campaignName: currentCampaign?.name ?? null,
+    isCampaignMap: draft.mapId !== null && draft.campaignId === (currentCampaign?.campaignId ?? null),
+  });
   const { guard, requestSave, saveModalProps, unsavedModalProps } = useUnsavedGuard();
   useTableRoute(guard);
   const [campaignOpen, setCampaignOpen] = useState(false);
