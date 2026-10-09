@@ -12,10 +12,13 @@ export const LOG_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([
   CHAT_KIND.turnFinished,
 ]);
 
-/** Shown as one small muted line (moves, actions, character changes). */
+/** Turn records of a character's own doing (moves, actions, character changes): never mixed with conversation. */
 export const DISCREET_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([
   CHAT_KIND.movement, CHAT_KIND.action, CHAT_KIND.characterUpdate,
 ]);
+
+/** Moves (gray, small) and actions (red), drawn as chat bubbles of the actor. */
+export const TURN_BUBBLE_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.movement, CHAT_KIND.action]);
 
 export const CONVERSATION_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio]);
 
@@ -68,6 +71,8 @@ const GROUP_MS = 5 * 60 * 1000;
 /** Whether an item continues the previous one (no repeated avatar and name). */
 export const continuesPrevious = (previous: ChatItemInfo | undefined, item: ChatItemInfo): boolean => {
   if (!previous || item.deleted || previous.deleted) return false;
+  // Moves and actions of the same actor form one run of bubbles; character changes one run of lines.
+  if (TURN_BUBBLE_KINDS.has(item.kind)) return TURN_BUBBLE_KINDS.has(previous.kind) && previous.displayName === item.displayName;
   if (DISCREET_KINDS.has(item.kind)) return DISCREET_KINDS.has(previous.kind) && previous.displayName === item.displayName;
   if (!CONVERSATION_KINDS.has(item.kind) || !CONVERSATION_KINDS.has(previous.kind)) return false;
   return previous.userId === item.userId && previous.displayName === item.displayName
