@@ -5,7 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Tabs } from '../components/ui/Tabs';
 import { useAuth } from '../hooks/useAuth';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { isTablePath } from '../lib/tableRoute';
+import { BrandLogo } from '../components/ui/BrandLogo';
 
 /** Address to open after login: the campaign or map the user asked for, otherwise the table root. */
 const destinationFrom = (state: unknown): string => {
@@ -21,6 +23,8 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, login, register, loading } = useAuth();
+  // Nothing of the table shows on the login page, nor in its tab (040).
+  useDocumentTitle({ mapName: null, campaignName: null, isCampaignMap: false });
   const [tab, setTab] = useState('signIn');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -52,8 +56,10 @@ export const LoginPage = () => {
 
   return (
     <div className="stm-login">
+      {/* The vertical logo over the card (038); the heading stays for screen readers. */}
+      <BrandLogo variant="vertical" className="stm-login-logo" />
       <div className="stm-login-card">
-        <h1 className="h3 text-center mb-4 stm-brand">{t('common.appName')}</h1>
+        <h1 className="visually-hidden">{t('common.appName')}</h1>
         <Tabs
           tabs={[{ key: 'signIn', label: t('login.signInTab') }, { key: 'signUp', label: t('login.signUpTab') }]}
           active={tab}

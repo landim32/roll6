@@ -1,0 +1,203 @@
+/*
+ * Roll6 visual identity (038): the palette sampled from the dark logos in docs/logomarca (research D1) and handed to
+ * Bootstrap 5.3 through its CSS variables — no Sass. Imported between bootstrap.min.css and app.css (main.tsx).
+ * Every brand color lives here; the only copy outside is lib/mapSnapshot.BACKGROUND (a canvas can't read CSS vars).
+ * One single green: --stm-accent is the primary, the success color and the Mover "ok" path. Text on it is
+ * --stm-on-accent (white on this green is 1.9:1, the dark navy is 9.7:1).
+ */
+:root {
+  --stm-bg: #0b1220;
+  --stm-bg-rgb: 11, 18, 32;
+  --stm-surface: #121b2b;
+  --stm-surface-rgb: 18, 27, 43;
+  --stm-surface-2: #1a2638;
+  --stm-border: #2b3d52;
+  /* Form field borders need 3:1 against the surfaces (WCAG 1.4.11). */
+  --stm-border-strong: #5b7694;
+  --stm-accent: #1fd67a;
+  --stm-accent-rgb: 31, 214, 122;
+  --stm-accent-hover: #3fe08e;
+  /* End of the logo's "6" gradient: decoration only. */
+  --stm-accent-2: #00b890;
+  --stm-on-accent: #071322;
+  --stm-text: #e6edf3;
+  --stm-text-muted: #9fb0c3;
+  --stm-radius: 0.75rem;
+  --stm-radius-sm: 0.5rem;
+  --stm-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+[data-bs-theme="dark"] {
+  --bs-body-bg: var(--stm-bg);
+  --bs-body-bg-rgb: var(--stm-bg-rgb);
+  --bs-body-color: var(--stm-text);
+  --bs-body-color-rgb: 230, 237, 243;
+  --bs-emphasis-color: #ffffff;
+  --bs-emphasis-color-rgb: 255, 255, 255;
+  --bs-secondary-color: var(--stm-text-muted);
+  --bs-secondary-color-rgb: 159, 176, 195;
+  --bs-secondary-bg: var(--stm-surface-2);
+  --bs-secondary-bg-rgb: 26, 38, 56;
+  --bs-tertiary-bg: var(--stm-surface);
+  --bs-tertiary-bg-rgb: var(--stm-surface-rgb);
+  --bs-border-color: var(--stm-border);
+  --bs-border-color-translucent: rgba(91, 118, 148, 0.35);
+  --bs-heading-color: var(--stm-text);
+}
+
+/* ---------- Bootstrap: one single green for primary, success and links ---------- */
+[data-bs-theme="dark"] {
+  --bs-primary: var(--stm-accent);
+  --bs-primary-rgb: var(--stm-accent-rgb);
+  --bs-success: var(--stm-accent);
+  --bs-success-rgb: var(--stm-accent-rgb);
+  --bs-primary-text-emphasis: var(--stm-accent);
+  --bs-primary-bg-subtle: rgba(var(--stm-accent-rgb), 0.12);
+  --bs-primary-border-subtle: rgba(var(--stm-accent-rgb), 0.45);
+  --bs-success-text-emphasis: var(--stm-accent);
+  --bs-success-bg-subtle: rgba(var(--stm-accent-rgb), 0.12);
+  --bs-success-border-subtle: rgba(var(--stm-accent-rgb), 0.45);
+  --bs-link-color: var(--stm-accent);
+  --bs-link-color-rgb: var(--stm-accent-rgb);
+  --bs-link-hover-color: var(--stm-accent-hover);
+  --bs-link-hover-color-rgb: 63, 224, 142;
+  --bs-focus-ring-color: rgba(var(--stm-accent-rgb), 0.35);
+}
+
+/* The compiled CSS fixes these components to #0d6efd; the text on the green is the logo's navy (9.7:1). */
+.btn-primary,
+.btn-success {
+  --bs-btn-color: var(--stm-on-accent);
+  --bs-btn-bg: var(--stm-accent);
+  --bs-btn-border-color: var(--stm-accent);
+  --bs-btn-hover-color: var(--stm-on-accent);
+  --bs-btn-hover-bg: var(--stm-accent-hover);
+  --bs-btn-hover-border-color: var(--stm-accent-hover);
+  --bs-btn-focus-shadow-rgb: var(--stm-accent-rgb);
+  --bs-btn-active-color: var(--stm-on-accent);
+  --bs-btn-active-bg: var(--stm-accent-hover);
+  --bs-btn-active-border-color: var(--stm-accent-hover);
+  --bs-btn-disabled-color: var(--stm-on-accent);
+  --bs-btn-disabled-bg: var(--stm-accent);
+  --bs-btn-disabled-border-color: var(--stm-accent);
+  font-weight: 600;
+}
+
+.btn-outline-primary,
+.btn-outline-success {
+  --bs-btn-color: var(--stm-accent);
+  --bs-btn-border-color: var(--stm-accent);
+  --bs-btn-hover-color: var(--stm-on-accent);
+  --bs-btn-hover-bg: var(--stm-accent);
+  --bs-btn-hover-border-color: var(--stm-accent);
+  --bs-btn-focus-shadow-rgb: var(--stm-accent-rgb);
+  --bs-btn-active-color: var(--stm-on-accent);
+  --bs-btn-active-bg: var(--stm-accent);
+  --bs-btn-active-border-color: var(--stm-accent);
+  --bs-btn-disabled-color: var(--stm-accent);
+  --bs-btn-disabled-border-color: var(--stm-accent);
+}
+
+.btn-link {
+  --bs-btn-color: var(--stm-accent);
+  --bs-btn-hover-color: var(--stm-accent-hover);
+  --bs-btn-active-color: var(--stm-accent-hover);
+}
+
+.text-bg-primary,
+.text-bg-success {
+  color: var(--stm-on-accent) !important;
+}
+
+/* Form fields: a border that reaches 3:1 on the surfaces, the green focus ring. */
+.form-control,
+.form-select {
+  border-color: var(--stm-border-strong);
+}
+
+.form-check-input {
+  border-color: var(--stm-border-strong);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--stm-accent);
+  box-shadow: 0 0 0 0.25rem rgba(var(--stm-accent-rgb), 0.25);
+}
+
+.form-check-input:checked {
+  background-color: var(--stm-accent);
+  border-color: var(--stm-accent);
+}
+
+.form-range::-webkit-slider-thumb {
+  background-color: var(--stm-accent);
+}
+
+.form-range::-moz-range-thumb {
+  background-color: var(--stm-accent);
+}
+
+.form-range:focus::-webkit-slider-thumb,
+.form-range:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 1px var(--stm-bg), 0 0 0 0.25rem rgba(var(--stm-accent-rgb), 0.25);
+}
+
+.nav-pills {
+  --bs-nav-pills-link-active-color: var(--stm-on-accent);
+  --bs-nav-pills-link-active-bg: var(--stm-accent);
+}
+
+.nav {
+  --bs-nav-link-color: var(--stm-text-muted);
+  --bs-nav-link-hover-color: var(--stm-text);
+}
+
+.dropdown-menu {
+  --bs-dropdown-link-active-color: var(--stm-on-accent);
+  --bs-dropdown-link-active-bg: var(--stm-accent);
+}
+
+.pagination {
+  --bs-pagination-color: var(--stm-accent);
+  --bs-pagination-hover-color: var(--stm-accent-hover);
+  --bs-pagination-focus-color: var(--stm-accent-hover);
+  --bs-pagination-focus-box-shadow: 0 0 0 0.25rem rgba(var(--stm-accent-rgb), 0.25);
+  --bs-pagination-active-color: var(--stm-on-accent);
+  --bs-pagination-active-bg: var(--stm-accent);
+  --bs-pagination-active-border-color: var(--stm-accent);
+}
+
+.progress,
+.progress-stacked {
+  --bs-progress-bar-bg: var(--stm-accent);
+}
+
+/* ---------- sonner toasts: the same green for success, the brand surface for the rest ---------- */
+html [data-sonner-toaster][data-sonner-theme='dark'] {
+  --normal-bg: var(--stm-surface);
+  --normal-border: var(--stm-border);
+  --normal-text: var(--stm-text);
+  --success-bg: #0d2a22;
+  --success-border: rgba(var(--stm-accent-rgb), 0.55);
+  --success-text: var(--stm-accent);
+}
+
+/* ---------- shapes (US3): one set of corners for controls, cards and windows ---------- */
+[data-bs-theme="dark"] {
+  --bs-border-radius: var(--stm-radius-sm);
+  --bs-border-radius-sm: 0.375rem;
+  --bs-border-radius-lg: var(--stm-radius);
+}
+
+/* Tabs live on surfaces (windows, the login card): the active tab joins its surface and carries a green top line. */
+.nav-tabs {
+  --bs-nav-tabs-link-active-bg: var(--stm-surface);
+  --bs-nav-tabs-link-active-color: var(--stm-text);
+  --bs-nav-tabs-link-active-border-color: var(--stm-border) var(--stm-border) var(--stm-surface);
+}
+
+.nav-tabs .nav-link.active {
+  box-shadow: inset 0 2px 0 var(--stm-accent);
+}

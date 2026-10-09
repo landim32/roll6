@@ -23,6 +23,8 @@ import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { useChat } from '../hooks/useChat';
 import { useMapEditor } from '../hooks/useMapEditor';
+import { useCampaign } from '../hooks/useCampaign';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { LAYOUT_MODE, isChatVisible, isMapVisible } from '../lib/layoutMode';
 import { setMapRegion } from '../lib/mapRegion';
 import { useMapToken } from '../hooks/useMapToken';
@@ -43,6 +45,15 @@ const StoryView = lazy(() => import('../components/story/StoryView'));
  */
 export const MainPage = () => {
   const { isDirty, draft, viewMode, setViewMode } = useMapEditor();
+  const { currentCampaign, isMaster } = useCampaign();
+  /** A player in a campaign whose master hasn't picked a map yet sees no map, and says so (039). */
+  const noCurrentMap = !!currentCampaign && !isMaster && currentCampaign.currentMapId === null && draft.mapId === null;
+  // The tab says what is open (040): "{map} — {campaign} | Roll6", "{model} | Roll6", "{campaign} | Roll6" or "Roll6".
+  useDocumentTitle({
+    mapName: draft.mapModelId !== null ? draft.name : null,
+    campaignName: currentCampaign?.name ?? null,
+    isCampaignMap: draft.mapId !== null && draft.campaignId === (currentCampaign?.campaignId ?? null),
+  });
   const { guard, requestSave, saveModalProps, unsavedModalProps } = useUnsavedGuard();
   useTableRoute(guard);
   const [campaignOpen, setCampaignOpen] = useState(false);
@@ -162,6 +173,7 @@ export const MainPage = () => {
           <ChatPanel />
         </div>
       )}
+      {noCurrentMap && <div className="stm-no-map-notice" role="status">{t('map.noCurrentMap')}</div>}
       <TopMenu
         onOpenCampaign={() => setCampaignOpen(true)}
         onOpenMap={() => setMapOpen(true)}

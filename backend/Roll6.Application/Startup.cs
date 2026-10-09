@@ -33,6 +33,7 @@ public static class Startup
         var s3Settings = configuration.GetSection("S3").Get<S3Settings>() ?? new S3Settings();
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
         services.Configure<S3Settings>(configuration.GetSection("S3"));
+        services.Configure<SiteSettings>(configuration.GetSection("Site"));
 
         // DbContext
         services.AddDbContext<Roll6Context>(options =>
@@ -57,6 +58,9 @@ public static class Startup
         // AppServices
         services.AddSingleton<IAmazonS3>(_ => S3ImageStorageAppService.CreateClient(s3Settings));
         services.AddScoped<IImageStorageAppService, S3ImageStorageAppService>();
+        // Link-preview pictures (040): rendered once per stored image and kept in memory (bounded by bytes).
+        services.AddMemoryCache(options => options.SizeLimit = 32 * 1024 * 1024);
+        services.AddScoped<IPreviewImageRenderer, SkiaPreviewImageRenderer>();
         services.AddSingleton<IPasswordHasherService, PasswordHasherService>();
         services.AddSingleton<ITokenService, JwtTokenService>();
 
@@ -66,6 +70,7 @@ public static class Startup
         services.AddScoped<IMapModelService, MapModelService>();
         services.AddScoped<ICampaignService, CampaignService>();
         services.AddScoped<IMapService, MapService>();
+        services.AddScoped<IPageMetaService, PageMetaService>();
         services.AddScoped<ITokenLibraryService, TokenLibraryService>();
         services.AddScoped<IMapTokenService, MapTokenService>();
         services.AddScoped<ICharacterService, CharacterService>();
