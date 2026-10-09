@@ -25,6 +25,7 @@ public class NoticeDispatcherTests
     private readonly Mock<ICampaignNotificationPrefRepository<CampaignNotificationPref>> _prefs = new();
     private readonly Mock<IPushSubscriptionRepository<PushSubscription>> _subscriptions = new();
     private readonly Mock<IPushSender> _sender = new();
+    private readonly Mock<IUserNotificationRepository<UserNotification>> _inbox = new();
     private readonly Mock<IPresence> _presence = new();
     private readonly Mock<INoticeChannel> _channel = new();
     private readonly List<(long UserId, string Payload)> _sent = new();
@@ -58,7 +59,7 @@ public class NoticeDispatcherTests
             .Callback((PushTarget t, string payload, string _, bool _, TimeSpan _) => _sent.Add((long.Parse(t.Endpoint.Split('/').Last()), payload)))
             .ReturnsAsync(PushSendResult.Sent);
         _dispatcher = new NoticeDispatcher(_campaigns.Object, _participations.Object, _characters.Object, _prefs.Object,
-            _subscriptions.Object, _sender.Object, _presence.Object, _channel.Object, NullLogger<NoticeDispatcher>.Instance);
+            _subscriptions.Object, _inbox.Object, _sender.Object, _presence.Object, _channel.Object, NullLogger<NoticeDispatcher>.Instance);
     }
 
     private static TableNotice Message(long actor) => new()
@@ -156,5 +157,30 @@ public class NoticeDispatcherTests
         await _dispatcher.DispatchAsync(Message(ANA));
 
         _subscriptions.Verify(r => r.ListByUsersAsync(It.IsAny<IReadOnlyCollection<long>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Inbox_GetsExactlyWhatWasSent_ToastsIncluded_ButNotWhatWasSkipped()
+    {
+        _presence.Setup(p => p.IsChatVisible(BRUNO, CAMPAIGN)).Returns(true);
+        var stored = new List<UserNotification>();
+        _inbox.Setup(r => r.InsertRangeAsync(It.IsAny<IEnumerable<UserNotification>>()))
+            .Callback((IEnumerable<UserNotification> rows) => stored.AddRange(rows)).Returns(Task.CompletedTask);
+
+        await _dispatcher.DispatchAsync(Message(ANA));
+
+        stored.Should().ContainSingle();
+        (stored[0].UserId, stored[0].Title, stored[0].Body, stored[0].Url, stored[0].Kind)
+            .Should().Be((MASTER, "Aria · Tormento Vil", "Vamos pela ponte", "/campaign/tormento-vil?chat=1", "message"));
+        _channel.Verify(c => c.InboxChangedAsync(MASTER), Times.Once);
+
+        stored.Clear();
+        _presence.Setup(p => p.IsCampaignVisible(ANA, CAMPAIGN)).Returns(true);
+        await _dispatcher.DispatchAsync(new TableNotice
+        {
+            Kind = NoticeKind.Poke, CampaignId = CAMPAIGN, ActorUserId = MASTER, Body = "Rodrigo está cutucando você",
+            TargetUserIds = new[] { ANA }
+        });
+        stored.Select(n => (n.UserId, n.Kind, n.Body)).Should().Equal((ANA, "poke", "Rodrigo está cutucando você"));
     }
 }

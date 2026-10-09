@@ -32,6 +32,7 @@ public class Roll6Context : DbContext
     public DbSet<ChatRead> ChatReads { get; set; }
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
     public DbSet<ChatReaction> ChatReactions { get; set; }
+    public DbSet<UserNotification> UserNotifications { get; set; }
     public DbSet<CampaignNotificationPref> CampaignNotificationPrefs { get; set; }
     public DbSet<CampaignPlan> CampaignPlans { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
@@ -397,6 +398,26 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_chat_read");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_chat_read");
+        });
+
+        modelBuilder.Entity<UserNotification>(entity =>
+        {
+            entity.ToTable("user_notifications");
+            entity.HasKey(e => e.UserNotificationId).HasName("user_notifications_pkey");
+            entity.Property(e => e.UserNotificationId).HasColumnName("user_notification_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.CampaignId).HasColumnName("campaign_id");
+            entity.Property(e => e.Kind).HasColumnName("kind").HasMaxLength(30).IsRequired();
+            entity.Property(e => e.Title).HasColumnName("title").HasMaxLength(UserNotification.MAX_TITLE).IsRequired();
+            entity.Property(e => e.Body).HasColumnName("body").HasMaxLength(UserNotification.MAX_BODY).IsRequired();
+            entity.Property(e => e.Url).HasColumnName("url").HasMaxLength(UserNotification.MAX_URL);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.ReadAt).HasColumnName("read_at").HasColumnType(TIMESTAMP);
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt }).HasDatabaseName("ix_user_notifications_user_created");
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_user_notification");
+            entity.HasOne<Campaign>().WithMany().HasForeignKey(e => e.CampaignId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_user_notification");
         });
 
         modelBuilder.Entity<ChatReaction>(entity =>

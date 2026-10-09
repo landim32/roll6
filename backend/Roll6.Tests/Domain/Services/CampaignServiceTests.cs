@@ -26,6 +26,8 @@ public class CampaignServiceTests
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<IChatReadRepository<ChatRead>> _chatReadRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
+    private readonly Mock<ICampaignNotificationPrefRepository<CampaignNotificationPref>> _notificationPrefs = new();
+    private readonly Mock<IUserNotificationRepository<UserNotification>> _inbox = new();
     private readonly Mock<ICampaignPlanRepository<CampaignPlan>> _campaignPlanRepository = new();
     private readonly CampaignService _service;
 
@@ -44,7 +46,7 @@ public class CampaignServiceTests
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
             _unitOfWork.Object, _turnRepository.Object, _notifier.Object, _campaignPlanRepository.Object,
-            _chatReadRepository.Object, _imageStorage.Object);
+            _chatReadRepository.Object, _imageStorage.Object, _notificationPrefs.Object, _inbox.Object);
     }
 
     [Fact]
@@ -86,6 +88,8 @@ public class CampaignServiceTests
         await _service.DeleteAsync(1, 10);
 
         _chatReadRepository.Verify(r => r.DeleteByCampaignAsync(10));
+        _notificationPrefs.Verify(r => r.DeleteByCampaignAsync(10));
+        _inbox.Verify(r => r.DeleteByCampaignAsync(10));
         _turnRepository.Verify(r => r.DeleteByCampaignAsync(10));
         _imageStorage.Verify(s => s.DeleteAsync("a.png"));
         _imageStorage.Verify(s => s.DeleteAsync("b.webm"), "a failing file doesn't stop the others");

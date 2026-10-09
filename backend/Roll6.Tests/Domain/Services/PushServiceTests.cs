@@ -20,13 +20,14 @@ public class PushServiceTests
     private readonly Mock<ICampaignRepository<Campaign>> _campaigns = new();
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _participations = new();
     private readonly Mock<IPushSender> _sender = new();
+    private readonly Mock<IUserNotificationRepository<UserNotification>> _inbox = new();
     private readonly PushService _service;
 
     public PushServiceTests()
     {
         _campaigns.Setup(r => r.GetByIdAsync(CAMPAIGN)).ReturnsAsync(new Campaign { CampaignId = CAMPAIGN, UserId = 1, Name = "C", Slug = "c" });
         _participations.Setup(r => r.HasApprovedCharacterAsync(CAMPAIGN, ANA)).ReturnsAsync(true);
-        _service = new PushService(_subscriptions.Object, _prefs.Object, _campaigns.Object, _participations.Object, _sender.Object);
+        _service = new PushService(_subscriptions.Object, _prefs.Object, _campaigns.Object, _participations.Object, _sender.Object, _inbox.Object);
     }
 
     private static PushSubscriptionInfo Device(string endpoint = "https://fcm.googleapis.com/fcm/send/abc") =>
@@ -107,5 +108,19 @@ public class PushServiceTests
         var list = await _service.ListCampaignsAsync(ANA);
 
         list.Select(c => (c.CampaignId, c.Muted)).Should().Equal((CAMPAIGN, false), (11L, true));
+    }
+
+    [Fact]
+    public async Task Inbox_ListsAndMarksRead()
+    {
+        var notice = UserNotification.Create(ANA, CAMPAIGN, "poke", "C", "Bruno está cutucando você", "/campaign/c?chat=1");
+        _inbox.Setup(r => r.ListByUserAsync(ANA, PushService.INBOX_SIZE)).ReturnsAsync(new List<UserNotification> { notice });
+        _inbox.Setup(r => r.CountUnreadAsync(ANA)).ReturnsAsync(1);
+
+        var page = await _service.ListInboxAsync(ANA);
+        (page.UnreadCount, page.Items.Single().Body, page.Items.Single().Read).Should().Be((1, "Bruno está cutucando você", false));
+
+        await _service.MarkInboxReadAsync(ANA, new UserNotificationReadInfo());
+        _inbox.Verify(r => r.MarkReadAsync(ANA, null, It.IsAny<DateTime>()), Times.Once);
     }
 }

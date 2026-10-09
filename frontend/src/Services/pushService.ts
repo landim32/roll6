@@ -1,4 +1,6 @@
-import type { CampaignNotificationInfo, PokeResultInfo, PushKeyInfo, PushSubscriptionInfo } from '../types/push';
+import type {
+  CampaignNotificationInfo, PokeResultInfo, PushKeyInfo, PushSubscriptionInfo, UserNotificationPageInfo,
+} from '../types/push';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface PushServiceConfig {
@@ -47,6 +49,20 @@ class PushService {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ muted }),
     });
     return this.handleResponse<CampaignNotificationInfo>(response);
+  }
+
+  /** The bell's inbox: the latest notices received and how many are unread. */
+  async inbox(): Promise<UserNotificationPageInfo> {
+    const response = await fetch(`${API_URL}/api/push/inbox`, { headers: getHeaders(true) });
+    return this.handleResponse<UserNotificationPageInfo>(response);
+  }
+
+  /** Marks one notice (id) or all of them (null) as read. */
+  async markInboxRead(userNotificationId: number | null): Promise<void> {
+    const response = await fetch(`${API_URL}/api/push/inbox/read`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ userNotificationId }),
+    });
+    return this.handleResponse<void>(response);
   }
 
   async poke(campaignId: number): Promise<PokeResultInfo> {

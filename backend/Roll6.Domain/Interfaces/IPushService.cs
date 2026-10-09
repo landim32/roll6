@@ -18,4 +18,10 @@ public interface IPushService
     Task<List<CampaignNotificationInfo>> ListCampaignsAsync(long userId);
 
     Task<CampaignNotificationInfo> SetMutedAsync(long userId, long campaignId, CampaignNotificationUpdateInfo info);
+
+    /// <summary>The bell's inbox: the latest notices the user received and how many are unread.</summary>
+    Task<UserNotificationPageInfo> ListInboxAsync(long userId);
+
+    /// <summary>Marks one notice (id) or all (null) as read.</summary>
+    Task MarkInboxReadAsync(long userId, UserNotificationReadInfo info);
 }

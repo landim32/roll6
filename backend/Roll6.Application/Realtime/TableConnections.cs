@@ -56,6 +56,13 @@ public class TableConnections : IPresence
                 .Select(c => c.Key).ToList();
     }
 
+    /// <summary>Every connection of the user, whatever campaign it follows.</summary>
+    public List<string> ConnectionsOfUser(long userId)
+    {
+        lock (_lock)
+            return _connections.Where(c => c.Value.UserId == userId).Select(c => c.Key).ToList();
+    }
+
     public bool IsChatVisible(long userId, long campaignId)
     {
         lock (_lock)

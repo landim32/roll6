@@ -24,6 +24,8 @@ public class CampaignService : ICampaignService
     private readonly IRealtimeNotifier _notifier;
     private readonly ICampaignPlanRepository<CampaignPlan> _campaignPlanRepository;
     private readonly IChatReadRepository<ChatRead> _chatReadRepository;
+    private readonly ICampaignNotificationPrefRepository<CampaignNotificationPref> _notificationPrefRepository;
+    private readonly IUserNotificationRepository<UserNotification> _inboxRepository;
     private readonly IImageStorageAppService _imageStorage;
 
     public CampaignService(
@@ -39,8 +41,12 @@ public class CampaignService : ICampaignService
         IRealtimeNotifier notifier,
         ICampaignPlanRepository<CampaignPlan> campaignPlanRepository,
         IChatReadRepository<ChatRead> chatReadRepository,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        ICampaignNotificationPrefRepository<CampaignNotificationPref> notificationPrefRepository,
+        IUserNotificationRepository<UserNotification> inboxRepository)
     {
+        _notificationPrefRepository = notificationPrefRepository;
+        _inboxRepository = inboxRepository;
         _chatReadRepository = chatReadRepository;
         _imageStorage = imageStorage;
         _campaignPlanRepository = campaignPlanRepository;
@@ -134,6 +140,8 @@ public class CampaignService : ICampaignService
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _chatReadRepository.DeleteByCampaignAsync(campaignId);
+            await _notificationPrefRepository.DeleteByCampaignAsync(campaignId);
+            await _inboxRepository.DeleteByCampaignAsync(campaignId);
             await _turnRepository.DeleteByCampaignAsync(campaignId);
             var deletedMapIds = await _mapRepository.ListDeletedIdsByCampaignAsync(campaignId);
             if (deletedMapIds.Count > 0)
