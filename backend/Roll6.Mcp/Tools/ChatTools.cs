@@ -13,7 +13,9 @@ public static class ChatTools
         Item: { key, cursor, kind, turnId, campaignId, turnNo, createdAt, userId, mapId, characterId, npcId, mapNpcId,
         displayName, displayImageUrl, authorLabel, text, description, before/after {x, y, look, lookName}, moved,
         movedTotal, changes [{field, label, before, after}], imageUrl, audioUrl, audioSeconds, audioType, deleted,
-        canDelete, dice }. kind is text | image | audio | roll (what people said or rolled; a roll has dice = the three
+        canDelete, dice, cancelled, replyTo {key, turnId, displayName, kind, excerpt, deleted, cancelled},
+        reactions [{userId, name, kind like|love}], canReply, canReact, canConvert (action|message|null) }. An action with
+        cancelled = true was replaced, reset or deleted ("Ação cancelada") and no longer counts in the turn. kind is text | image | audio | roll (what people said or rolled; a roll has dice = the three
         faces and text = the optional reason), movement | action | actionResult |
         characterUpdate | narration (the turn records — text is the same line as get_turn_summary) or turnFinished
         (the divider "Turno N finalizado").
@@ -61,9 +63,10 @@ public static class ChatTools
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("What to say (1–4000 characters, markdown), or the caption of a photo. Example: \"Vamos descansar antes de entrar na cripta?\".")] string? text = null,
         [Description("Optional: one of your characters approved in the campaign. Omit to speak as the master (only the master can).")] long? characterId = null,
-        [Description("Optional: fileName returned by upload_image, to send a photo.")] string? image = null) =>
+        [Description("Optional: fileName returned by upload_image, to send a photo.")] string? image = null,
+        [Description("Optional: turnId of the chat entry this message answers (message, action, roll or narration; shown as a quote).")] long? replyToTurnId = null) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat",
-            new ChatSendInfo { CharacterId = characterId, Text = text, Image = image });
+            new ChatSendInfo { CharacterId = characterId, Text = text, Image = image, ReplyToTurnId = replyToTurnId });
 
     [McpServerTool(Name = "roll_dice", Title = "Roll dice", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaign/{id}/chat/roll")]
@@ -87,10 +90,47 @@ public static class ChatTools
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat/roll",
             new ChatRollInfo { CharacterId = characterId, Text = text });
 
+    [McpServerTool(Name = "react_to_chat_message", Title = "React to a chat entry", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/chat/{id}/reaction")]
+    [Description($$"""
+        What it does: sets your reaction to a chat entry — "like" (Curtir, thumbs up) or "love" (Amei, heart) — switching
+        the one you had, or removes it (kind omitted, or the same kind again). One reaction per person and entry. Works on
+        messages, photos, audios, rolls, actions and narrations. Reactions notify nobody.
+        Who can use it: the campaign master or a player with an approved character.
+        Returns: the updated item. {{ITEM}}
+        Common errors: 400 not reactable (moves, changes, dividers, pokes, deleted) or unknown kind, 403 no access, 404 not found.
+        Related tools: list_chat_messages.
+        """)]
+    public static Task<CallToolResult> ReactToChatMessage(
+        Roll6ApiClient api,
+        [Description("Id of the item (turnId from list_chat_messages).")] long turnId,
+        [Description("\"like\" or \"love\"; omit to remove your reaction.")] string? kind = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/chat/{turnId}/reaction", new ChatReactInfo { Kind = kind });
+
+    [McpServerTool(Name = "convert_chat_entry", Title = "Convert a message into an action or back", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
+    [ApiOperation("POST", "/api/chat/{id}/convert")]
+    [Description($$"""
+        What it does: to = "action" turns a text message a character said in the current turn into that character's
+        action of the turn (its previous action becomes "Ação cancelada"; the master is notified like act_in_turn); to =
+        "message" turns the character's valid action of the current turn back into a text message (the character no
+        longer has an action). The entry keeps its time, quote and reactions. A character has one valid action per turn.
+        Who can use it: the character's owner or the campaign master.
+        Returns: the updated item. {{ITEM}}
+        Common errors: 400 not a text/action of a character, another turn, text over 2000 characters, the character has no
+        piece on the campaign's current map; 403 not the owner nor the master; 404 not found.
+        Related tools: act_in_turn, list_chat_messages, get_turn_data.
+        """)]
+    public static Task<CallToolResult> ConvertChatEntry(
+        Roll6ApiClient api,
+        [Description("Id of the item (turnId from list_chat_messages).")] long turnId,
+        [Description("\"action\" (text → the character's action) or \"message\" (action → text).")] string to) =>
+        api.SendAsync(HttpMethod.Post, $"/api/chat/{turnId}/convert", new ChatConvertInfo { To = to });
+
     [McpServerTool(Name = "delete_chat_message", Title = "Delete chat message", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/chat/{id}")]
     [Description($$"""
-        What it does: deletes a chat message (text, photo, audio or a dice roll — rolls only by the master) or a narration; everyone then sees "Mensagem
+        What it does: deletes a chat message (text, photo, audio or a dice roll — rolls only by the master) or a narration
+        (an action is cancelled instead: it stays as "Ação cancelada" — its owner or the master); everyone then sees "Mensagem
         apagada" and a deleted narration also leaves the turn summary and narration. Moves, actions, results and
         changes can't be deleted here (use reset_turn or delete_turn_entry). {{McpDocs.DESTRUCTIVE}}
         Who can use it: the author of the message, or the campaign master (any message and narrations).

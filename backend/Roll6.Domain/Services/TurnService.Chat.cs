@@ -67,6 +67,7 @@ public partial class TurnService : IChatService
         else
             message = Turn.Text(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
                 displayName, displayImage, info.Text);
+        await ApplyReplyAsync(message, info.ReplyToTurnId);
 
         var saved = await _repository.InsertAsync(message);
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
@@ -84,6 +85,7 @@ public partial class TurnService : IChatService
             .Select(_ => System.Security.Cryptography.RandomNumberGenerator.GetInt32(1, Turn.ROLL_SIDES + 1)).ToArray();
         var roll = Turn.DiceRoll(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
             displayName, displayImage, dice, info.Text);
+        await ApplyReplyAsync(roll, info.ReplyToTurnId);
         var saved = await _repository.InsertAsync(roll);
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
@@ -96,6 +98,19 @@ public partial class TurnService : IChatService
         var turn = await _repository.GetByIdAsync(turnId)
             ?? throw new KeyNotFoundException("Mensagem não encontrada.");
         var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
+        if (turn.TurnType == TurnType.Action)
+        {
+            // 044: deleting an action cancels it — the character's owner or the master.
+            var owner = turn.CharacterId is long c ? (await _characterRepository.GetByIdAsync(c))?.UserId : null;
+            if (campaign.UserId != userId && owner != userId)
+                throw new UnauthorizedAccessException("Só o dono do personagem ou o mestre podem cancelar esta ação.");
+            if (!turn.Delete(userId, campaign.UserId == userId))
+                return;
+            await _repository.UpdateAsync(turn);
+            await PublishUpdatedAsync(campaign, userId, turn);
+            await PublishTurnChangedAsync(campaign.CampaignId, userId);
+            return;
+        }
         if (!turn.Delete(userId, campaign.UserId == userId))
             return;
         await _repository.UpdateAsync(turn);
@@ -184,6 +199,19 @@ public partial class TurnService : IChatService
         var npcImages = npcIds.Count == 0 ? new Dictionary<long, string?>()
             : (await _npcRepository.ListByIdsAsync(npcIds)).ToDictionary(n => n.NpcId, n => n.Image);
         var isMaster = campaign.UserId == userId;
+        // 044: what each reply quotes and who reacted with what.
+        var replyIds = page.Where(t => t.ReplyToTurnId.HasValue).Select(t => t.ReplyToTurnId!.Value).Distinct().ToList();
+        var targets = replyIds.Count == 0 ? new Dictionary<long, Turn>()
+            : (await _repository.ListByIdsAsync(replyIds)).ToDictionary(t => t.TurnId);
+        var targetCharacterIds = targets.Values.Where(t => t.CharacterId.HasValue && !names.Characters.ContainsKey(t.CharacterId!.Value))
+            .Select(t => t.CharacterId!.Value).Distinct().ToList();
+        if (targetCharacterIds.Count > 0)
+            foreach (var character in await _characterRepository.ListByIdsAsync(targetCharacterIds))
+                names.Characters[character.CharacterId] = character;
+        var reactions = await _chatReactionRepository.ListByTurnsAsync(page.Select(t => t.TurnId));
+        var reactionNames = reactions.Count == 0 ? new Dictionary<long, string>()
+            : (await _userRepository.ListByIdsAsync(reactions.Select(r => r.UserId).Distinct()))
+                .ToDictionary(u => u.UserId, u => NoticeTexts.FirstName(u.Name));
 
         return page.Select(t =>
         {
@@ -233,6 +261,7 @@ public partial class TurnService : IChatService
             {
                 FillLogItem(item, t, lines.GetValueOrDefault(t.TurnId), names, npcImages);
             }
+            FillInteractions(item, t, campaign, userId, isMaster, names, targets, reactions, reactionNames);
             return item;
         }).ToList();
     }
@@ -266,6 +295,64 @@ public partial class TurnService : IChatService
             Before = TurnSummary.FieldValue(c.Field, c.Before),
             After = TurnSummary.FieldValue(c.Field, c.After)
         }).ToList();
+    }
+
+    /// <summary>
+    /// 044: the reply quote, the reactions and what this viewer may do with the entry (reply, react, convert, delete —
+    /// for actions: the character's owner or the master, valid actions only).
+    /// </summary>
+    private void FillInteractions(ChatItemInfo item, Turn t, Campaign campaign, long userId, bool isMaster, TurnNames names,
+        Dictionary<long, Turn> targets, List<ChatReaction> reactions, Dictionary<long, string> reactionNames)
+    {
+        item.Cancelled = t.IsCancelled;
+        item.CanReply = t.CanReply;
+        item.CanReact = t.CanReply;
+        var ownerId = t.CharacterId is long c && names.Characters.TryGetValue(c, out var character) ? character.UserId : (long?)null;
+        var mayChange = isMaster || (ownerId.HasValue && ownerId == userId);
+        var currentTurn = t.TurnNo == campaign.CurrentTurn;
+        if (t.TurnType == TurnType.Action)
+            item.CanDelete = t.IsValidAction && (isMaster || (ownerId.HasValue && ownerId == userId));
+        item.CanConvert = !currentTurn || !mayChange || t.CharacterId == null ? null
+            : t.TurnType == TurnType.Text && !t.IsDeleted ? "action"
+            : t.IsValidAction ? "message"
+            : null;
+        if (!t.IsDeleted)
+            item.Reactions = reactions.Where(r => r.TurnId == t.TurnId).Select(r => new ChatReactionInfo
+            {
+                UserId = r.UserId,
+                Name = reactionNames.GetValueOrDefault(r.UserId, string.Empty),
+                Kind = ChatReaction.Name(r.Kind)
+            }).ToList();
+        if (t.ReplyToTurnId is long replyId)
+            item.ReplyTo = targets.TryGetValue(replyId, out var target)
+                ? ReplyOf(target, names)
+                : new ChatReplyInfo { Key = $"t{replyId}", TurnId = replyId, Deleted = true };
+    }
+
+    private static ChatReplyInfo ReplyOf(Turn target, TurnNames names)
+    {
+        var name = target.TurnType == TurnType.Narration ? "Narração"
+            : target.IsConversation ? TableNotices.Speaker(target.DisplayName ?? string.Empty)
+            : target.CharacterId is long c && names.Characters.TryGetValue(c, out var character) ? character.Name
+            : target.DisplayName ?? string.Empty;
+        var excerpt = target.IsDeleted ? string.Empty : target.TurnType switch
+        {
+            TurnType.Image => string.IsNullOrWhiteSpace(target.Description) ? "Foto" : "Foto: " + NoticeTexts.Excerpt(target.Description),
+            TurnType.Audio => "Áudio",
+            TurnType.Roll => $"Rolou 3d6: total {target.DiceValues().Sum()}",
+            TurnType.Action => "Ação: " + NoticeTexts.Excerpt(target.Description),
+            _ => NoticeTexts.Excerpt(target.Description)
+        };
+        return new ChatReplyInfo
+        {
+            Key = KeyOf(target),
+            TurnId = target.TurnId,
+            DisplayName = name,
+            Kind = KindOf(target.TurnType),
+            Excerpt = excerpt,
+            Deleted = target.IsDeleted,
+            Cancelled = target.IsCancelled
+        };
     }
 
     private static string KeyOf(Turn t) => $"t{t.TurnId}";

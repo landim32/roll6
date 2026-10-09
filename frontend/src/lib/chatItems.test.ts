@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  authorLabel, chatLabel, compareCursors, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
+  authorLabel, chatLabel, compareCursors, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
 
@@ -122,5 +122,33 @@ describe('first names', () => {
     expect(chatLabel('Comam Obabaroy')).toBe('Comam Obabaroy');
     expect(authorLabel('GM (Ana Paula)')).toBe('GM (Ana)');
     expect(authorLabel('Henrique Souza')).toBe('Henrique');
+  });
+});
+
+describe('044: permissions and reactions', () => {
+  const viewer = { userId: 2, isMaster: false, currentTurn: 1, ownerOf: (id: number) => (id === 80 ? 2 : 9) };
+
+  it('mirrors the server rules for the viewer', () => {
+    const own = permissionsFor(item(1, { kind: 'text', characterId: 80 }), viewer);
+    expect([own.canDelete, own.canReply, own.canConvert]).toEqual([true, true, 'action']);
+    const action = permissionsFor(item(2, { kind: 'action', characterId: 80, userId: 9 }), viewer);
+    expect([action.canDelete, action.canConvert]).toEqual([true, 'message']);
+    const cancelled = permissionsFor(item(3, { kind: 'action', characterId: 80, cancelled: true }), viewer);
+    expect([cancelled.canDelete, cancelled.canConvert, cancelled.canReply]).toEqual([false, null, true]);
+    const others = permissionsFor(item(4, { kind: 'text', characterId: 81, userId: 9 }), viewer);
+    expect([others.canDelete, others.canConvert]).toEqual([false, null]);
+    const move = permissionsFor(item(5, { kind: 'movement' }), viewer);
+    expect([move.canReply, move.canReact]).toEqual([false, false]);
+    const oldTurn = permissionsFor(item(6, { kind: 'text', characterId: 80, turnNo: 0 }), viewer);
+    expect(oldTurn.canConvert).toBeNull();
+  });
+
+  it('summarizes reactions and toggles the own one', () => {
+    const summary = reactionSummary([
+      { userId: 2, name: 'Ana', kind: 'like' }, { userId: 3, name: 'Bruno', kind: 'love' }, { userId: 4, name: 'Caio', kind: 'love' },
+    ], 2);
+    expect(summary).toEqual({ like: 1, love: 2, total: 3, mine: 'like' });
+    expect(nextReaction('like', 'like')).toBeNull();
+    expect(nextReaction('like', 'love')).toBe('love');
   });
 });

@@ -31,6 +31,7 @@ public class Roll6Context : DbContext
     public DbSet<Turn> Turns { get; set; }
     public DbSet<ChatRead> ChatReads { get; set; }
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
+    public DbSet<ChatReaction> ChatReactions { get; set; }
     public DbSet<CampaignNotificationPref> CampaignNotificationPrefs { get; set; }
     public DbSet<CampaignPlan> CampaignPlans { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
@@ -360,6 +361,11 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Audio).HasColumnName("audio").HasMaxLength(260);
             entity.Property(e => e.AudioSeconds).HasColumnName("audio_seconds");
             entity.Property(e => e.Dice).HasColumnName("dice").HasMaxLength(100);
+            entity.Property(e => e.CancelledAt).HasColumnName("cancelled_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.ReplyToTurnId).HasColumnName("reply_to_turn_id");
+            entity.HasIndex(e => e.ReplyToTurnId).HasDatabaseName("ix_turns_reply_to");
+            entity.HasOne<Turn>().WithMany().HasForeignKey(e => e.ReplyToTurnId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_reply");
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at").HasColumnType(TIMESTAMP);
             entity.HasIndex(e => new { e.CampaignId, e.TurnNo }).HasDatabaseName("ix_turns_campaign_turn");
             entity.HasIndex(e => new { e.CampaignId, e.CreatedAt, e.TurnId }).HasDatabaseName("ix_turns_campaign_created");
@@ -391,6 +397,22 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_chat_read");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_chat_read");
+        });
+
+        modelBuilder.Entity<ChatReaction>(entity =>
+        {
+            entity.ToTable("chat_reactions");
+            entity.HasKey(e => e.ChatReactionId).HasName("chat_reactions_pkey");
+            entity.Property(e => e.ChatReactionId).HasColumnName("chat_reaction_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.TurnId).HasColumnName("turn_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Kind).HasColumnName("kind").HasConversion<short>();
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP);
+            entity.HasIndex(e => new { e.TurnId, e.UserId }).IsUnique().HasDatabaseName("ix_chat_reactions_turn_user");
+            entity.HasOne<Turn>().WithMany().HasForeignKey(e => e.TurnId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_chat_reaction");
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_chat_reaction");
         });
 
         modelBuilder.Entity<PushSubscription>(entity =>

@@ -416,6 +416,43 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("characters", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.ChatReaction", b =>
+                {
+                    b.Property<long>("ChatReactionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("chat_reaction_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ChatReactionId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("TurnId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("turn_id");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("ChatReactionId")
+                        .HasName("chat_reactions_pkey");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TurnId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_chat_reactions_turn_user");
+
+                    b.ToTable("chat_reactions", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.ChatRead", b =>
                 {
                     b.Property<long>("ChatReadId")
@@ -1038,6 +1075,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("campaign_id");
 
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("cancelled_at");
+
                     b.Property<string>("Changes")
                         .HasColumnType("jsonb")
                         .HasColumnName("changes");
@@ -1101,6 +1142,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("npc_id");
 
+                    b.Property<long?>("ReplyToTurnId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reply_to_turn_id");
+
                     b.Property<int>("TurnNo")
                         .HasColumnType("integer")
                         .HasColumnName("turn_no");
@@ -1131,6 +1176,9 @@ namespace Roll6.Infra.Migrations
                     b.HasIndex("MapNpcId");
 
                     b.HasIndex("NpcId");
+
+                    b.HasIndex("ReplyToTurnId")
+                        .HasDatabaseName("ix_turns_reply_to");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_turns_user");
@@ -1284,6 +1332,21 @@ namespace Roll6.Infra.Migrations
                         .HasConstraintName("fk_user_character");
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.ChatReaction", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Turn", null)
+                        .WithMany()
+                        .HasForeignKey("TurnId")
+                        .IsRequired()
+                        .HasConstraintName("fk_turn_chat_reaction");
+
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_chat_reaction");
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.ChatRead", b =>
                 {
                     b.HasOne("Roll6.Domain.Models.Campaign", null)
@@ -1429,6 +1492,11 @@ namespace Roll6.Infra.Migrations
                         .WithMany()
                         .HasForeignKey("NpcId")
                         .HasConstraintName("fk_npc_turn");
+
+                    b.HasOne("Roll6.Domain.Models.Turn", null)
+                        .WithMany()
+                        .HasForeignKey("ReplyToTurnId")
+                        .HasConstraintName("fk_turn_reply");
 
                     b.HasOne("Roll6.Domain.Models.User", null)
                         .WithMany()

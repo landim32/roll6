@@ -72,6 +72,12 @@ public class Turn
     /// <summary>Deleted from the chat (041): kept as "Mensagem apagada", ignored by every turn read.</summary>
     public DateTime? DeletedAt { get; set; }
 
+    /// <summary>An action replaced by another one, reset or deleted (044): shown as "Ação cancelada", out of every turn rule.</summary>
+    public DateTime? CancelledAt { get; set; }
+
+    /// <summary>The entry this one answers (044); null when it isn't a reply.</summary>
+    public long? ReplyToTurnId { get; set; }
+
     /// <summary>Chat: the faces of a <see cref="TurnType.Roll"/>, in order, comma separated ("5,3,6").</summary>
     public string? Dice { get; set; }
 
@@ -177,6 +183,54 @@ public class Turn
 
     public bool IsDeleted => DeletedAt.HasValue;
 
+    public bool IsCancelled => CancelledAt.HasValue;
+
+    /// <summary>The action of the turn that counts (044): an Action neither deleted nor cancelled.</summary>
+    public bool IsValidAction => TurnType == TurnType.Action && !IsDeleted && !IsCancelled;
+
+    /// <summary>What can be answered and reacted to (044): what people say, actions and narrations.</summary>
+    public bool CanReply => !IsDeleted && (IsConversation || TurnType is TurnType.Action or TurnType.Narration);
+
+    /// <summary>Cancels a valid action (044). False when it was not one.</summary>
+    public bool Cancel(DateTime now)
+    {
+        if (!IsValidAction)
+            return false;
+        CancelledAt = now;
+        return true;
+    }
+
+    /// <summary>Makes this entry an answer to <paramref name="target"/> (044): same campaign and something one can answer.</summary>
+    public void SetReply(Turn target)
+    {
+        if (target.CampaignId != CampaignId || !target.CanReply)
+            throw new DomainValidationException("replyToTurnId", "Só é possível responder a mensagens, ações e narrações desta campanha.");
+        ReplyToTurnId = target.TurnId;
+    }
+
+    /// <summary>A text message of a character becomes its action of the turn (044), keeping id, time, reply and reactions.</summary>
+    public void ToAction(long? mapId)
+    {
+        if (TurnType != TurnType.Text || IsDeleted || CharacterId == null)
+            throw new DomainValidationException("to", "Só mensagens de texto de um personagem podem virar ação.");
+        var text = Description?.Trim() ?? string.Empty;
+        if (text.Length == 0 || text.Length > MAX_DESCRIPTION)
+            throw new DomainValidationException("to", $"A ação deve ter de 1 a {MAX_DESCRIPTION} caracteres.");
+        TurnType = TurnType.Action;
+        MapId = mapId ?? MapId;
+        Description = text;
+    }
+
+    /// <summary>A valid action becomes a text message of its character (044), shown with the given name and picture.</summary>
+    public void ToMessage(string displayName, string? displayImage)
+    {
+        if (!IsValidAction || CharacterId == null)
+            throw new DomainValidationException("to", "Só a ação vigente de um personagem pode virar mensagem.");
+        TurnType = TurnType.Text;
+        DisplayName = Guard.RequiredText(displayName, "displayName", 260);
+        DisplayImage = displayImage;
+    }
+
     /// <summary>Who may delete it from the chat: the author their own message; the master any message and narrations.</summary>
     public bool CanBeDeletedBy(long userId, bool isMaster) =>
         // A roll can't be taken back by whoever made it: only the master removes one.
@@ -188,6 +242,13 @@ public class Turn
     /// </summary>
     public bool Delete(long userId, bool isMaster)
     {
+        // 044: deleting an action from the chat cancels it (the author/owner check is the service's).
+        if (TurnType == TurnType.Action)
+        {
+            if (IsCancelled || IsDeleted)
+                throw new DomainValidationException("type", "Esta ação já foi cancelada.");
+            return Cancel(DateTime.UtcNow);
+        }
         if (!IsConversation && TurnType != TurnType.Narration)
             throw new DomainValidationException("type", "Este registro do turno não pode ser apagado pelo chat.");
         if (!CanBeDeletedBy(userId, isMaster))

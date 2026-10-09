@@ -97,7 +97,10 @@ public class TurnChatTests
         ((Action)(() => narration.Delete(1, isMaster: false))).Should().Throw<UnauthorizedAccessException>();
         narration.Delete(1, isMaster: true).Should().BeTrue();
 
+        // 044: deleting an action cancels it, once.
         var action = Turn.Action(10, 30, 80, null, null, 3, 2, "Ataco");
+        action.Delete(1, isMaster: true).Should().BeTrue();
+        (action.IsCancelled, action.IsValidAction).Should().Be((true, false));
         ((Action)(() => action.Delete(1, isMaster: true))).Should().Throw<DomainValidationException>();
         ((Action)(() => Turn.TurnFinished(10, null, 3, 1).Delete(1, isMaster: true))).Should().Throw<DomainValidationException>();
     }
@@ -121,5 +124,38 @@ public class TurnChatTests
         var roll = Turn.DiceRoll(1, null, 2, 5, 80, "Aria", null, new[] { 1, 2, 3 }, null);
         roll.CanBeDeletedBy(5, isMaster: false).Should().BeFalse();
         roll.CanBeDeletedBy(9, isMaster: true).Should().BeTrue();
+    }
+
+    // --- 044 ---
+
+    [Fact]
+    public void Reply_SameCampaignAndSomethingToAnswer()
+    {
+        var target = Turn.Text(1, null, 3, 5, 80, "Aria", null, "Oi");
+        target.TurnId = 50;
+        var reply = Turn.Text(1, null, 3, 6, 81, "Bram", null, "Oi!");
+        reply.SetReply(target);
+        reply.ReplyToTurnId.Should().Be(50);
+
+        var other = Turn.Text(2, null, 3, 5, 80, "Aria", null, "Oi");
+        FluentActions.Invoking(() => reply.SetReply(other)).Should().Throw<DomainValidationException>();
+        var move = Turn.Movement(1, 30, 80, null, null, 3, 5, (1, 1, 0), (1, 2, 0));
+        FluentActions.Invoking(() => reply.SetReply(move)).Should().Throw<DomainValidationException>();
+    }
+
+    [Fact]
+    public void Convert_TextToActionAndBack()
+    {
+        var text = Turn.Text(1, null, 3, 5, 80, "Aria", null, "Abro a porta");
+        text.ToAction(30);
+        (text.TurnType, text.IsValidAction, text.MapId).Should().Be((TurnType.Action, true, (long?)30));
+
+        text.ToMessage("Aria", "a.png");
+        (text.TurnType, text.DisplayName).Should().Be((TurnType.Text, "Aria"));
+
+        var master = Turn.Text(1, null, 3, 1, null, "Mestre (GM) — Ana", null, "Rolem");
+        FluentActions.Invoking(() => master.ToAction(30)).Should().Throw<DomainValidationException>();
+        var longText = Turn.Text(1, null, 3, 5, 80, "Aria", null, new string('a', 2500));
+        FluentActions.Invoking(() => longText.ToAction(30)).Should().Throw<DomainValidationException>();
     }
 }

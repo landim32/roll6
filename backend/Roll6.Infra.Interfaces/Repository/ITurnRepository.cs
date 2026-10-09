@@ -50,6 +50,12 @@ public interface ITurnRepository<TModel> where TModel : class
     /// <summary>When the user last poked in the campaign (043), for the one-minute interval.</summary>
     Task<DateTime?> LastPokeAtAsync(long campaignId, long userId);
 
+    /// <summary>Entries by id, whatever their type (044: reply targets of a chat page).</summary>
+    Task<List<TModel>> ListByIdsAsync(IEnumerable<long> ids);
+
+    /// <summary>The actor's valid (neither deleted nor cancelled) actions of a turn (044).</summary>
+    Task<List<TModel>> ListValidActionsAsync(long campaignId, int turnNo, long? characterId, long? mapNpcId);
+
     /// <summary>Stored photo and audio names of the campaign's chat (deleted with the campaign).</summary>
     Task<List<string>> ListChatMediaAsync(long campaignId);
 

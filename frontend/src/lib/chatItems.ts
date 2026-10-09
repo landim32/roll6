@@ -1,5 +1,6 @@
 import { CHAT_KIND } from '../types/chat';
-import type { ChatChangeInfo, ChatItemInfo, ChatKind } from '../types/chat';
+import { REACTION } from '../types/chat';
+import type { ChatChangeInfo, ChatItemInfo, ChatKind, ChatReactionInfo, ReactionKind } from '../types/chat';
 
 /**
  * Pure rules of the campaign chat (041): keeping the list ordered without duplicates, refreshing the turn records of
@@ -130,3 +131,72 @@ export const chatLabel = (label: string): string =>
 
 /** Who recorded a turn entry for someone else: "GM (Ana Paula)" → "GM (Ana)", a plain user name → its first word. */
 export const authorLabel = (label: string): string => (label.includes('(') ? chatLabel(label) : firstWord(label));
+
+export interface ViewerContext {
+  userId: number | null;
+  isMaster: boolean;
+  /** The campaign's turn in progress (null while unknown). */
+  currentTurn: number | null;
+  /** The owner of a character, when known (the party). */
+  ownerOf: (characterId: number) => number | null;
+}
+
+const REPLYABLE: ReadonlySet<ChatKind> = new Set<ChatKind>([
+  CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio, CHAT_KIND.roll, CHAT_KIND.action, CHAT_KIND.narration,
+]);
+
+/**
+ * What this viewer may do with an entry (041/044) — the same rules the server applies, for items that arrive mapped
+ * for someone else (realtime events).
+ */
+export const permissionsFor = (item: ChatItemInfo, viewer: ViewerContext): ChatItemInfo => {
+  const owner = item.characterId !== null ? viewer.ownerOf(item.characterId) : null;
+  const mayChange = viewer.isMaster || (owner !== null && owner === viewer.userId);
+  const validAction = item.kind === CHAT_KIND.action && !item.cancelled && !item.deleted;
+  const canReply = !item.deleted && REPLYABLE.has(item.kind);
+  let canDelete = false;
+  if (!item.deleted) {
+    if (item.kind === CHAT_KIND.roll) canDelete = viewer.isMaster;
+    else if (CONVERSATION_KINDS.has(item.kind)) canDelete = item.userId === viewer.userId || viewer.isMaster;
+    else if (item.kind === CHAT_KIND.narration) canDelete = viewer.isMaster;
+    else if (item.kind === CHAT_KIND.action) canDelete = validAction && mayChange;
+  }
+  const currentTurn = viewer.currentTurn !== null && item.turnNo === viewer.currentTurn;
+  const canConvert = !currentTurn || !mayChange || item.characterId === null ? null
+    : item.kind === CHAT_KIND.text && !item.deleted ? 'action'
+    : validAction ? 'message'
+    : null;
+  return { ...item, canDelete, canReply, canReact: canReply, canConvert };
+};
+
+export interface ReactionSummary {
+  like: number;
+  love: number;
+  total: number;
+  /** The viewer's own reaction. */
+  mine: ReactionKind | null;
+}
+
+export const reactionSummary = (reactions: ChatReactionInfo[] | undefined, userId: number | null): ReactionSummary => {
+  const list = reactions ?? [];
+  const like = list.filter((r) => r.kind === REACTION.like).length;
+  const love = list.filter((r) => r.kind === REACTION.love).length;
+  return { like, love, total: like + love, mine: list.find((r) => r.userId === userId)?.kind ?? null };
+};
+
+/** The reaction that tapping `kind` leaves: the same one again removes it. */
+export const nextReaction = (mine: ReactionKind | null, kind: ReactionKind): ReactionKind | null => (mine === kind ? null : kind);
+
+/** What a reply card shows of the entry being answered (044), like the server's quote. */
+export const replyExcerpt = (item: ChatItemInfo): string => {
+  const plain = (item.text ?? item.description ?? '').replace(/[*_`~#>|]+/g, '').replace(/\s+/g, ' ').trim();
+  const cut = plain.length > 120 ? `${plain.slice(0, 119).trimEnd()}…` : plain;
+  switch (item.kind) {
+    case CHAT_KIND.image: return cut ? `Foto: ${cut}` : 'Foto';
+    case CHAT_KIND.audio: return 'Áudio';
+    case CHAT_KIND.roll: return `Rolou 3d6: total ${rollTotal(item.dice)}`;
+    case CHAT_KIND.action: return `Ação: ${(item.description ?? '').slice(0, 120)}`;
+    case CHAT_KIND.narration: return cut;
+    default: return cut;
+  }
+};

@@ -1,4 +1,4 @@
-import type { ChatAudioUploadInfo, ChatItemInfo, ChatPageInfo, ChatRollInfo, ChatSendInfo } from '../types/chat';
+import type { ChatAudioUploadInfo, ChatItemInfo, ChatPageInfo, ChatRollInfo, ChatSendInfo, ReactionKind } from '../types/chat';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface ChatServiceConfig {
@@ -49,6 +49,22 @@ class ChatService {
       method: 'POST',
       headers: getHeaders(true),
       body: JSON.stringify(info),
+    });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
+  /** Curtir / Amei, or null to remove the reaction (044). */
+  async react(turnId: number, kind: ReactionKind | null): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/chat/${turnId}/reaction`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ kind }),
+    });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
+  /** A character's text → its action ('action'), or the action → text ('message') (044). */
+  async convert(turnId: number, to: 'action' | 'message'): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/chat/${turnId}/convert`, {
+      method: 'POST', headers: getHeaders(true), body: JSON.stringify({ to }),
     });
     return this.handleResponse<ChatItemInfo>(response);
   }
