@@ -742,7 +742,42 @@
     "pasteOnlyFirst": "Só a primeira imagem colada será enviada.",
     "copy": "Copiar",
     "copied": "Copiado para a área de transferência!",
-    "copyFailed": "Não foi possível copiar."
+    "copyFailed": "Não foi possível copiar.",
+    "laugh": "Gargalhada",
+    "pollOption": "Enquete",
+    "poll": {
+      "title": "Nova enquete",
+      "question": "Pergunta",
+      "questionPlaceholder": "Faça uma pergunta",
+      "options": "Opções",
+      "optionPlaceholder": "Opção {{n}}",
+      "addHint": "Uma nova opção aparece quando você preenche a última (até {{max}}).",
+      "moveUp": "Subir opção",
+      "moveDown": "Descer opção",
+      "removeOption": "Remover opção",
+      "send": "Enviar",
+      "cancel": "Cancelar",
+      "chooseOne": "Escolha uma opção",
+      "seeVotes": "Ver votos",
+      "votesTitle": "Votos da enquete",
+      "votes_one": "{{count}} voto",
+      "votes_other": "{{count}} votos",
+      "noVotes": "Ninguém votou nesta opção.",
+      "vote": "Votar em {{option}}",
+      "chooseCharacter": "Escolha um personagem para votar.",
+      "discardTitle": "Descartar a enquete?",
+      "discardMessage": "A pergunta e as opções digitadas serão perdidas.",
+      "discard": "Descartar",
+      "master": "Mestre",
+      "errors": {
+        "required": "Escreva a pergunta.",
+        "questionTooLong": "A pergunta deve ter no máximo {{max}} caracteres.",
+        "tooFew": "Preencha ao menos 2 opções.",
+        "tooMany": "A enquete pode ter no máximo 12 opções.",
+        "optionTooLong": "Cada opção deve ter no máximo {{max}} caracteres.",
+        "repeated": "As opções não podem se repetir."
+      }
+    }
   },
   "layout": {
     "label": "Mapa e chat",

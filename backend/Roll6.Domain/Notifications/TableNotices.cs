@@ -21,6 +21,7 @@ public static class TableNotices
             "image" => NoticeTexts.PHOTO,
             "audio" => NoticeTexts.AUDIO,
             "roll" => NoticeTexts.Roll(item.Dice?.Sum() ?? 0),
+            "poll" => "Enquete: " + NoticeTexts.Excerpt(item.Text),
             _ => NoticeTexts.Excerpt(item.Text)
         };
         return new TableNotice

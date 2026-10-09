@@ -212,6 +212,7 @@ public partial class TurnService : IChatService
         var reactionNames = reactions.Count == 0 ? new Dictionary<long, string>()
             : (await _userRepository.ListByIdsAsync(reactions.Select(r => r.UserId).Distinct()))
                 .ToDictionary(u => u.UserId, u => NoticeTexts.FirstName(u.Name));
+        var polls = await LoadPollsAsync(page);
 
         return page.Select(t =>
         {
@@ -245,6 +246,8 @@ public partial class TurnService : IChatService
                     item.AudioType = AudioTypeOf(t.Audio);
                     if (t.TurnType == TurnType.Roll)
                         item.Dice = t.DiceValues().ToList();
+                    if (t.TurnType == TurnType.Poll)
+                        item.Poll = polls.GetValueOrDefault(t.TurnId);
                 }
             }
             else if (t.TurnType == TurnType.TurnFinished)
@@ -341,6 +344,7 @@ public partial class TurnService : IChatService
             TurnType.Audio => "Áudio",
             TurnType.Roll => $"Rolou 3d6: total {target.DiceValues().Sum()}",
             TurnType.Action => "Ação: " + NoticeTexts.Excerpt(target.Description),
+            TurnType.Poll => "Enquete: " + NoticeTexts.Excerpt(target.Description),
             _ => NoticeTexts.Excerpt(target.Description)
         };
         return new ChatReplyInfo
@@ -384,6 +388,7 @@ public partial class TurnService : IChatService
         TurnType.TurnFinished => "turnFinished",
         TurnType.Roll => "roll",
         TurnType.Poke => "poke",
+        TurnType.Poll => "poll",
         _ => type.ToString()
     };
 

@@ -52,7 +52,7 @@ public class ChatController : ApiControllerBase
         }
     }
 
-    /// <summary>Curtir (like) / Amei (love) the entry, or remove the caller's reaction (null or the same kind) (044).</summary>
+    /// <summary>Curtir (like) / Amei (love) / Gargalhada (laugh) the entry, or remove the caller's reaction (null or the same kind) (044).</summary>
     [HttpPut("{id:long}/reaction")]
     [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> React(long id, [FromBody] ChatReactInfo info)
@@ -60,6 +60,21 @@ public class ChatController : ApiControllerBase
         try
         {
             return Ok(await _chatService.ReactAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Puts the voter's vote on a poll option, moves it, or withdraws it (optionId null) (045).</summary>
+    [HttpPut("{id:long}/vote")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Vote(long id, [FromBody] ChatPollVoteInfo info)
+    {
+        try
+        {
+            return Ok(await _chatService.VoteAsync(CurrentUserId, id, info));
         }
         catch (Exception ex)
         {

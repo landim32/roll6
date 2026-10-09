@@ -17,6 +17,8 @@ export const CHAT_KIND = {
   roll: 'roll',
   /** "Rodrigo cutucou Ana e Bruno" (043): a gray line, never deleted. */
   poke: 'poke',
+  /** A poll (045): a question, 2–12 options, one vote per character and one for the master. */
+  poll: 'poll',
 } as const;
 
 export type ChatKind = (typeof CHAT_KIND)[keyof typeof CHAT_KIND];
@@ -79,6 +81,8 @@ export interface ChatItemInfo {
   canReact?: boolean;
   /** A character's text can become its action ('action'), its action can become text ('message'). */
   canConvert?: 'action' | 'message' | null;
+  /** The poll of a `poll` entry (045): votes are public. */
+  poll?: ChatPollInfo | null;
   deleted: boolean;
   canDelete: boolean;
 }
@@ -96,6 +100,8 @@ export interface ChatReplyInfo {
 export const REACTION = {
   like: 'like',
   love: 'love',
+  /** Gargalhada (045). */
+  laugh: 'laugh',
 } as const;
 
 export type ReactionKind = (typeof REACTION)[keyof typeof REACTION];
@@ -104,6 +110,35 @@ export interface ChatReactionInfo {
   userId: number;
   name: string;
   kind: ReactionKind;
+}
+
+/** One voter of a poll: a character, or the master (characterId null, "Mestre"). */
+export interface ChatPollVoterInfo {
+  characterId: number | null;
+  name: string;
+  imageUrl: string | null;
+}
+
+export interface ChatPollOptionInfo {
+  optionId: number;
+  text: string;
+  votes: number;
+  voters: ChatPollVoterInfo[];
+}
+
+export interface ChatPollInfo {
+  question: string;
+  totalVotes: number;
+  /** In the order the author wrote them. */
+  options: ChatPollOptionInfo[];
+}
+
+export interface ChatPollCreateInfo {
+  /** One of the user's approved characters; null = the master. */
+  characterId: number | null;
+  question: string;
+  options: string[];
+  replyToTurnId?: number | null;
 }
 
 export interface ChatPageInfo {

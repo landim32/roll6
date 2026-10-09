@@ -20,11 +20,17 @@ public interface IChatService
     /// <summary>Pokes the players who haven't acted in the turn (043): a chat line and a notice to each of them.</summary>
     Task<Roll6.DTO.Push.PokeResultInfo> PokeAsync(long userId, long campaignId);
 
-    /// <summary>Curtir / Amei (044): sets, switches or removes the caller's reaction.</summary>
+    /// <summary>Curtir / Amei / Gargalhada (044, 045): sets, switches or removes the caller's reaction.</summary>
     Task<ChatItemInfo> ReactAsync(long userId, long turnId, ChatReactInfo info);
 
     /// <summary>A text of a character → its action of the turn, or the valid action → text (044).</summary>
     Task<ChatItemInfo> ConvertAsync(long userId, long turnId, ChatConvertInfo info);
+
+    /// <summary>A poll in the chat (045): a question and 2–12 options, asked like a message.</summary>
+    Task<ChatItemInfo> CreatePollAsync(long userId, long campaignId, ChatPollCreateInfo info);
+
+    /// <summary>Puts the voter's single vote on an option, moves it, or withdraws it (<c>optionId</c> null) (045).</summary>
+    Task<ChatItemInfo> VoteAsync(long userId, long turnId, ChatPollVoteInfo info);
 
     /// <summary>Rolls 3d6 in the chat (server-side draw) and publishes it like a message.</summary>
     Task<ChatItemInfo> RollAsync(long userId, long campaignId, ChatRollInfo info);

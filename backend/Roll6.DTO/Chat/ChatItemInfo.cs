@@ -133,6 +133,82 @@ public class ChatItemInfo
     /// <summary>"action" (a text of a character can become its action), "message" (an action can become text) or null.</summary>
     [JsonPropertyName("canConvert")]
     public string? CanConvert { get; set; }
+
+    /// <summary>A poll (kind "poll", 045): the question, the options with their votes and who voted.</summary>
+    [JsonPropertyName("poll")]
+    public ChatPollInfo? Poll { get; set; }
+}
+
+/// <summary>A chat poll as everyone sees it (045): votes are public.</summary>
+public class ChatPollInfo
+{
+    [JsonPropertyName("question")]
+    public string Question { get; set; } = string.Empty;
+
+    /// <summary>How many voters (characters + the master) voted.</summary>
+    [JsonPropertyName("totalVotes")]
+    public int TotalVotes { get; set; }
+
+    /// <summary>In the order the author wrote them.</summary>
+    [JsonPropertyName("options")]
+    public List<ChatPollOptionInfo> Options { get; set; } = new();
+}
+
+public class ChatPollOptionInfo
+{
+    [JsonPropertyName("optionId")]
+    public long OptionId { get; set; }
+
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("votes")]
+    public int Votes { get; set; }
+
+    /// <summary>Who voted on it, in the order they voted.</summary>
+    [JsonPropertyName("voters")]
+    public List<ChatPollVoterInfo> Voters { get; set; } = new();
+}
+
+public class ChatPollVoterInfo
+{
+    /// <summary>The character; null = the master ("Mestre").</summary>
+    [JsonPropertyName("characterId")]
+    public long? CharacterId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("imageUrl")]
+    public string? ImageUrl { get; set; }
+}
+
+/// <summary>A new poll (045): asked as one of the caller's approved characters, or as the master (null).</summary>
+public class ChatPollCreateInfo
+{
+    [JsonPropertyName("characterId")]
+    public long? CharacterId { get; set; }
+
+    [JsonPropertyName("question")]
+    public string? Question { get; set; }
+
+    /// <summary>2–12 answers of up to 100 characters, no two alike.</summary>
+    [JsonPropertyName("options")]
+    public List<string>? Options { get; set; }
+
+    [JsonPropertyName("replyToTurnId")]
+    public long? ReplyToTurnId { get; set; }
+}
+
+/// <summary>Puts the voter's vote on an option (045), or withdraws it (<c>optionId</c> null).</summary>
+public class ChatPollVoteInfo
+{
+    /// <summary>The voting character; null = the master's own vote.</summary>
+    [JsonPropertyName("characterId")]
+    public long? CharacterId { get; set; }
+
+    [JsonPropertyName("optionId")]
+    public long? OptionId { get; set; }
 }
 
 /// <summary>What a reply shows of the entry it answers (044).</summary>
@@ -160,7 +236,7 @@ public class ChatReplyInfo
     public bool Cancelled { get; set; }
 }
 
-/// <summary>A user's reaction (044): kind "like" (Curtir) or "love" (Amei).</summary>
+/// <summary>A user's reaction (044): kind "like" (Curtir), "love" (Amei) or "laugh" (Gargalhada, 045).</summary>
 public class ChatReactionInfo
 {
     [JsonPropertyName("userId")]
@@ -173,7 +249,7 @@ public class ChatReactionInfo
     public string Kind { get; set; } = string.Empty;
 }
 
-/// <summary>Sets (like/love) or removes (null) the caller's reaction.</summary>
+/// <summary>Sets (like/love/laugh) or removes (null) the caller's reaction.</summary>
 public class ChatReactInfo
 {
     [JsonPropertyName("kind")]

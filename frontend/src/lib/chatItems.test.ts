@@ -148,7 +148,7 @@ describe('044: permissions and reactions', () => {
     const summary = reactionSummary([
       { userId: 2, name: 'Ana', kind: 'like' }, { userId: 3, name: 'Bruno', kind: 'love' }, { userId: 4, name: 'Caio', kind: 'love' },
     ], 2);
-    expect(summary).toEqual({ like: 1, love: 2, total: 3, mine: 'like' });
+    expect(summary).toEqual({ like: 1, love: 2, laugh: 0, total: 3, mine: 'like' });
     expect(nextReaction('like', 'like')).toBeNull();
     expect(nextReaction('like', 'love')).toBe('love');
   });
@@ -169,5 +169,29 @@ describe('copyableText', () => {
   it('has nothing to copy for a photo without caption or a deleted entry', () => {
     expect(copyableText(item(6, { kind: CHAT_KIND.image, text: null }))).toBeNull();
     expect(copyableText(item(7, { kind: CHAT_KIND.text, text: 'x', deleted: true }))).toBeNull();
+  });
+});
+
+describe('045: laugh and polls', () => {
+  it('counts the laugh and switches to it like the other reactions', () => {
+    const summary = reactionSummary([
+      { userId: 1, name: 'Ana', kind: 'like' }, { userId: 2, name: 'Bruno', kind: 'laugh' },
+    ], 2);
+    expect(summary).toEqual({ like: 1, love: 0, laugh: 1, total: 2, mine: 'laugh' });
+    expect(nextReaction('laugh', 'laugh')).toBeNull();
+    expect(nextReaction('like', 'laugh')).toBe('laugh');
+  });
+
+  it('copies a poll and lets everyone reply and react, never convert', () => {
+    const poll = item(9, {
+      kind: CHAT_KIND.poll, text: 'Para onde vamos?', characterId: 80, turnNo: 3,
+      poll: { question: 'Para onde vamos?', totalVotes: 1, options: [
+        { optionId: 1, text: 'Floresta', votes: 1, voters: [{ characterId: 80, name: 'Aria', imageUrl: null }] },
+        { optionId: 2, text: 'Vila', votes: 0, voters: [] },
+      ] },
+    });
+    expect(copyableText(poll)).toBe('Para onde vamos?\n• Floresta — 1 voto\n• Vila — 0 votos');
+    const viewed = permissionsFor(poll, { userId: 2, isMaster: false, currentTurn: 3, ownerOf: () => 2 });
+    expect([viewed.canReply, viewed.canReact, viewed.canConvert]).toEqual([true, true, null]);
   });
 });

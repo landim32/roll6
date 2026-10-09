@@ -41,6 +41,7 @@ public class TurnServiceTests
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<INotificationQueue> _queue = new();
     private readonly Mock<IChatReactionRepository<ChatReaction>> _chatReactions = new();
+    private readonly Mock<IChatPollRepository<ChatPollOption, ChatPollVote>> _chatPolls = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
@@ -96,12 +97,14 @@ public class TurnServiceTests
         // 044 defaults: no reactions, no reply targets, no earlier valid action.
         _repository.Setup(r => r.ListLogByTurnsAsync(It.IsAny<long>(), It.IsAny<IEnumerable<int>>())).ReturnsAsync(new List<Turn>());
         _chatReactions.Setup(r => r.ListByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatReaction>());
+        _chatPolls.Setup(r => r.ListOptionsByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatPollOption>());
+        _chatPolls.Setup(r => r.ListVotesByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatPollVote>());
         _repository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Turn>());
         _repository.Setup(r => r.ListValidActionsAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(new List<Turn>());
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object,
-            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _queue.Object, _notifier.Object);
+            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _chatPolls.Object, _queue.Object, _notifier.Object);
     }
 
     // --- State (US1) ---

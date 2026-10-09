@@ -32,6 +32,8 @@ public class Roll6Context : DbContext
     public DbSet<ChatRead> ChatReads { get; set; }
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
     public DbSet<ChatReaction> ChatReactions { get; set; }
+    public DbSet<ChatPollOption> ChatPollOptions { get; set; }
+    public DbSet<ChatPollVote> ChatPollVotes { get; set; }
     public DbSet<UserNotification> UserNotifications { get; set; }
     public DbSet<CampaignNotificationPref> CampaignNotificationPrefs { get; set; }
     public DbSet<CampaignPlan> CampaignPlans { get; set; }
@@ -434,6 +436,44 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_chat_reaction");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_chat_reaction");
+        });
+
+        modelBuilder.Entity<ChatPollOption>(entity =>
+        {
+            entity.ToTable("chat_poll_options");
+            entity.HasKey(e => e.ChatPollOptionId).HasName("chat_poll_options_pkey");
+            entity.Property(e => e.ChatPollOptionId).HasColumnName("chat_poll_option_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.TurnId).HasColumnName("turn_id");
+            entity.Property(e => e.Position).HasColumnName("position");
+            entity.Property(e => e.Text).HasColumnName("text").HasMaxLength(ChatPollOption.MAX_TEXT).IsRequired();
+            entity.HasIndex(e => new { e.TurnId, e.Position }).IsUnique().HasDatabaseName("ix_chat_poll_options_turn_position");
+            entity.HasOne<Turn>().WithMany().HasForeignKey(e => e.TurnId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_chat_poll_option");
+        });
+
+        modelBuilder.Entity<ChatPollVote>(entity =>
+        {
+            entity.ToTable("chat_poll_votes");
+            entity.HasKey(e => e.ChatPollVoteId).HasName("chat_poll_votes_pkey");
+            entity.Property(e => e.ChatPollVoteId).HasColumnName("chat_poll_vote_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.TurnId).HasColumnName("turn_id");
+            entity.Property(e => e.ChatPollOptionId).HasColumnName("chat_poll_option_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.CharacterId).HasColumnName("character_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP);
+            // One vote per character per poll, and one for the master (no character).
+            entity.HasIndex(e => new { e.TurnId, e.CharacterId }).IsUnique().HasFilter("character_id IS NOT NULL")
+                .HasDatabaseName("ix_chat_poll_votes_character");
+            entity.HasIndex(e => e.TurnId).IsUnique().HasFilter("character_id IS NULL").HasDatabaseName("ix_chat_poll_votes_master");
+            entity.HasIndex(e => e.ChatPollOptionId).HasDatabaseName("ix_chat_poll_votes_option");
+            entity.HasOne<Turn>().WithMany().HasForeignKey(e => e.TurnId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_chat_poll_vote");
+            entity.HasOne<ChatPollOption>().WithMany().HasForeignKey(e => e.ChatPollOptionId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_chat_poll_option_vote");
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_chat_poll_vote");
+            entity.HasOne<Character>().WithMany().HasForeignKey(e => e.CharacterId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_character_chat_poll_vote");
         });
 
         modelBuilder.Entity<PushSubscription>(entity =>

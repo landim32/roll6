@@ -15,7 +15,7 @@ using Roll6.Infra.Interfaces.Repository;
 namespace Roll6.Tests.Domain.Services;
 
 /// <summary>041: the campaign chat — the same timeline as the turn log, read and written by the TurnService.</summary>
-public class TurnServiceChatTests
+public partial class TurnServiceChatTests
 {
     private const long MASTER = 1;
     private const long PLAYER = 2;
@@ -36,6 +36,7 @@ public class TurnServiceChatTests
     private readonly Mock<INotificationQueue> _queue = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly Mock<IChatReactionRepository<ChatReaction>> _chatReactions = new();
+    private readonly Mock<IChatPollRepository<ChatPollOption, ChatPollVote>> _chatPolls = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IChatReadRepository<ChatRead>> _chatReadRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
@@ -71,6 +72,8 @@ public class TurnServiceChatTests
 
         // 044 defaults: no reactions, no reply targets, no earlier valid action.
         _chatReactions.Setup(r => r.ListByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatReaction>());
+        _chatPolls.Setup(r => r.ListOptionsByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatPollOption>());
+        _chatPolls.Setup(r => r.ListVotesByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatPollVote>());
         _repository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Turn>());
         _repository.Setup(r => r.ListValidActionsAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(new List<Turn>());
@@ -78,7 +81,7 @@ public class TurnServiceChatTests
             _mapTokenRepository.Object, _campaignCharacterRepository.Object, _characterRepository.Object,
             _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object,
             new Mock<IMapModelRepository<MapModel>>().Object, new Mock<ICampaignNpcRepository<CampaignNpc>>().Object,
-            new Mock<ITokenRepository<Token>>().Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _queue.Object, _notifier.Object);
+            new Mock<ITokenRepository<Token>>().Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _chatPolls.Object, _queue.Object, _notifier.Object);
     }
 
     private static Turn At(Turn t, long id, int second)

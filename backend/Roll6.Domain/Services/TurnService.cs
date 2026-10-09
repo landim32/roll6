@@ -37,6 +37,7 @@ public partial class TurnService : ITurnService
     private readonly IRealtimeNotifier _notifier;
     private readonly INotificationQueue _queue;
     private readonly IChatReactionRepository<ChatReaction> _chatReactionRepository;
+    private readonly IChatPollRepository<ChatPollOption, ChatPollVote> _chatPollRepository;
 
     /// <summary>Hexes taken on a map (031): resets and processed moves need the whole shape free.</summary>
     private readonly MapOccupancyLoader _occupancy;
@@ -58,9 +59,11 @@ public partial class TurnService : ITurnService
         IChatReadRepository<ChatRead> chatReadRepository,
         IImageStorageAppService imageStorage,
         IChatReactionRepository<ChatReaction> chatReactionRepository,
+        IChatPollRepository<ChatPollOption, ChatPollVote> chatPollRepository,
         INotificationQueue queue,
         IRealtimeNotifier notifier)
     {
+        _chatPollRepository = chatPollRepository;
         _queue = queue;
         _chatReactionRepository = chatReactionRepository;
         _chatReadRepository = chatReadRepository;

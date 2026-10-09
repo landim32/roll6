@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PollCard } from './PollCard';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import {
   Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, MoveIcon, PencilIcon,
@@ -196,8 +197,8 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
       );
 
     default: {
-      // Conversation: text, photo, recording or roll.
-      const caption = item.text?.trim() ? item.text : null;
+      // Conversation: text, photo, recording, roll or poll (the poll's text is its question, shown by the card).
+      const caption = item.kind !== CHAT_KIND.poll && item.text?.trim() ? item.text : null;
       return row(
         `stm-chat-message${own ? ' is-own' : ''}${continued ? ' is-continued' : ''}`,
         <>
@@ -225,6 +226,7 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
                   ))}
                 {item.kind === CHAT_KIND.audio && <AudioPlayer item={item} />}
                 {item.kind === CHAT_KIND.roll && <RollResult dice={item.dice ?? []} />}
+                {item.kind === CHAT_KIND.poll && <PollCard item={item} />}
                 {caption ? <div className="stm-chat-captioned"><Text value={caption} />{meta}</div> : <div className="stm-chat-meta-row">{meta}</div>}
                 {reactions}
               </>

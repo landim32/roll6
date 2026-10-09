@@ -32,6 +32,8 @@ public class TurnRepository : ITurnRepository<Turn>
         await _context.Turns.Where(e => e.ReplyToTurnId != null && ids.Contains(e.ReplyToTurnId.Value))
             .ExecuteUpdateAsync(s => s.SetProperty(e => e.ReplyToTurnId, (long?)null));
         await _context.ChatReactions.Where(r => ids.Contains(r.TurnId)).ExecuteDeleteAsync();
+        await _context.ChatPollVotes.Where(v => ids.Contains(v.TurnId)).ExecuteDeleteAsync();
+        await _context.ChatPollOptions.Where(o => ids.Contains(o.TurnId)).ExecuteDeleteAsync();
         return await rows.ExecuteDeleteAsync();
     }
 
@@ -153,6 +155,8 @@ public class TurnRepository : ITurnRepository<Turn>
     /// </summary>
     public async Task DeleteByCharacterAsync(long characterId)
     {
+        // Its poll votes (045) go with it: a deleted character no longer counts.
+        await _context.ChatPollVotes.Where(v => v.CharacterId == characterId).ExecuteDeleteAsync();
         await DeleteWhereAsync(_context.Turns.Where(e => e.CharacterId == characterId && !TurnTypes.CONVERSATION.Contains(e.TurnType)));
         await _context.Turns.Where(e => e.CharacterId == characterId)
             .ExecuteUpdateAsync(s => s.SetProperty(e => e.CharacterId, (long?)null));

@@ -142,7 +142,11 @@ public static class Roll6Guide
         - A character (or NPC occurrence) has **one valid action per turn**: acting again cancels the previous action, and
           resetting the turn or deleting the action cancels it too — it stays in the chat as "Ação cancelada" (`cancelled`)
           and leaves every turn read. `convert_chat_entry` turns a character's text into its action (or back);
-          `react_to_chat_message` likes/loves an entry; `replyToTurnId` on `send_chat_message`/`act_in_turn` quotes one.
+          `react_to_chat_message` reacts to an entry (like / love / laugh = Curtir / Amei / Gargalhada); `replyToTurnId` on
+          `send_chat_message`/`act_in_turn`/`create_chat_poll` quotes one.
+        - `create_chat_poll` asks the table a question with 2–12 options (kind `poll`, like a WhatsApp poll). Each approved
+          character votes once and the master has one vote as "Mestre"; `vote_chat_poll` puts, moves or withdraws that
+          vote. Votes are public (`poll.options[].voters`) and notify nobody; a poll is conversation, never a turn record.
         - `roll_dice` rolls **3d6** in the chat: the server draws the dice, the roll stays in the chat history for
           everyone (kind `roll`, `dice` = the three faces, `text` = the optional reason) and only the master can delete it.
 

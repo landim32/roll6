@@ -1,4 +1,5 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { applyVote, nextVote } from '../lib/chatPoll';
 import type { ReactNode } from 'react';
 import { chatService } from '../Services/chatService';
 import { pushService } from '../Services/pushService';
@@ -71,8 +72,12 @@ interface ChatContextType {
   replyTo: ChatItemInfo | null;
   startReply: (item: ChatItemInfo) => void;
   cancelReply: () => void;
-  /** Curtir / Amei: tapping the same one again removes it (044). */
+  /** Curtir / Amei / Gargalhada: tapping the same one again removes it (044, 045). */
   react: (item: ChatItemInfo, kind: ReactionKind) => Promise<void>;
+  /** Asks the table a question as the speaker (045). */
+  createPoll: (question: string, options: string[]) => Promise<void>;
+  /** The speaker's vote: tapping its own option withdraws it, another one moves it there (045). */
+  vote: (item: ChatItemInfo, optionId: number) => Promise<void>;
   /** Text → action of the character, or action → text (044). */
   convert: (item: ChatItemInfo, to: 'action' | 'message') => Promise<void>;
 }
@@ -369,12 +374,41 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     replace(await chatService.convert(item.turnId, to));
   }, [replace]);
 
+  const createPoll = useCallback(async (question: string, options: string[]) => {
+    if (!speaker || campaignId === null) return;
+    const item = await chatService.createPoll(campaignId, {
+      characterId: speaker.characterId, question, options, replyToTurnId: replyTo?.turnId ?? null,
+    });
+    setReplyTo(null);
+    if (campaignRef.current === campaignId) setItems((current) => mergeItems(current, [forViewer(item)]));
+    setFirstUnreadCursor(null);
+  }, [speaker, campaignId, forViewer, replyTo]);
+
+  const vote = useCallback(async (item: ChatItemInfo, optionId: number) => {
+    if (!item.poll || !speaker) return;
+    const characterId = speaker.characterId;
+    const next = nextVote(item.poll, characterId, optionId);
+    const voter = characterId === null
+      ? { characterId: null, name: 'Mestre', imageUrl: null }
+      : { characterId, name: speaker.participation?.characterName ?? '', imageUrl: speaker.participation?.characterImageUrl ?? null };
+    // Optimistic: the circle, counts and bars change at once and come back if the server refuses.
+    const optimistic = applyVote(item.poll, voter, next);
+    setItems((current) => current.map((i) => (i.key === item.key ? { ...i, poll: optimistic } : i)));
+    try {
+      replace(await chatService.vote(item.turnId, characterId, next));
+    } catch (err) {
+      setItems((current) => current.map((i) => (i.key === item.key ? { ...i, poll: item.poll } : i)));
+      throw err;
+    }
+  }, [speaker, replace]);
+
   const value = useMemo<ChatContextType>(() => ({
     items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters, loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert,
+    createPoll, vote,
   }), [items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters,
-    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert]);
+    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert, createPoll, vote]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };

@@ -26,7 +26,9 @@ public enum TurnType
     /// <summary>A dice roll made in the chat: 3d6 drawn by the server, values in <c>dice</c>, optional reason.</summary>
     Roll = 10,
     /// <summary>"Rodrigo cutucou Ana e Bruno" (043): a chat line, neither a turn record nor conversation.</summary>
-    Poke = 11
+    Poke = 11,
+    /// <summary>A poll in the chat (045): the question in the description, options and votes in chat_poll_*.</summary>
+    Poll = 12
 }
 
 /// <summary>Groups of <see cref="TurnType"/> (041).</summary>
@@ -37,9 +39,9 @@ public static class TurnTypes
         { TurnType.Movement, TurnType.Action, TurnType.ActionResult, TurnType.CharacterUpdate, TurnType.Narration };
 
     /// <summary>What people say in the chat, dice rolls included.</summary>
-    public static readonly TurnType[] CONVERSATION = { TurnType.Text, TurnType.Image, TurnType.Audio, TurnType.Roll };
+    public static readonly TurnType[] CONVERSATION = { TurnType.Text, TurnType.Image, TurnType.Audio, TurnType.Roll, TurnType.Poll };
 
     public static bool IsLog(TurnType type) => type is >= TurnType.Movement and <= TurnType.Narration;
 
-    public static bool IsConversation(TurnType type) => type is TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll;
+    public static bool IsConversation(TurnType type) => type is TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll or TurnType.Poll;
 }

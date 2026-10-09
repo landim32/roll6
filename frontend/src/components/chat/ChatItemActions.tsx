@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ChatLeftTextIcon, CopyIcon, HeartFillIcon, HeartIcon, LightningIcon, ReplyIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
+  ChatLeftTextIcon, CopyIcon, EmojiLaughingFillIcon, EmojiLaughingIcon, HeartFillIcon, HeartIcon, LightningIcon, ReplyIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
 } from '../ui/icons';
 import { copyableText, reactionSummary } from '../../lib/chatItems';
 import { REACTION } from '../../types/chat';
@@ -25,8 +25,8 @@ export interface ChatItemActionsProps {
 const BAR_HEIGHT = 56;
 
 /**
- * The bar that opens on holding a bubble (044): up to six big buttons — Curtir, Amei, Responder, Copiar, Ação/Mensagem
- * and Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
+ * The bar that opens on holding a bubble (044): up to seven big buttons — Curtir, Amei, Gargalhada, Responder, Copiar,
+ * Ação/Mensagem and Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
  * closes on a tap outside, a scroll or Esc.
  */
 export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onCopy, onClose }: ChatItemActionsProps) => {
@@ -80,6 +80,10 @@ export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConv
           <button type="button" className={`stm-chat-action is-love${mine === REACTION.love ? ' is-on' : ''}`}
             onClick={act(() => onReact(REACTION.love))} title={t('chat.love')} aria-label={t('chat.love')} aria-pressed={mine === REACTION.love}>
             {mine === REACTION.love ? <HeartFillIcon size={24} /> : <HeartIcon size={24} />}
+          </button>
+          <button type="button" className={`stm-chat-action is-laugh${mine === REACTION.laugh ? ' is-on' : ''}`}
+            onClick={act(() => onReact(REACTION.laugh))} title={t('chat.laugh')} aria-label={t('chat.laugh')} aria-pressed={mine === REACTION.laugh}>
+            {mine === REACTION.laugh ? <EmojiLaughingFillIcon size={24} /> : <EmojiLaughingIcon size={24} />}
           </button>
         </>
       )}
