@@ -24,6 +24,8 @@ public class CampaignServiceTests
     private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<IChatReadRepository<ChatRead>> _chatReadRepository = new();
+    private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Mock<ICampaignPlanRepository<CampaignPlan>> _campaignPlanRepository = new();
     private readonly CampaignService _service;
 
@@ -38,9 +40,11 @@ public class CampaignServiceTests
             new() { UserId = 2, Name = "Bruno" }
         });
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns<Func<Task>>(action => action());
+        _turnRepository.Setup(r => r.ListChatMediaAsync(It.IsAny<long>())).ReturnsAsync(new List<string>());
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
-            _unitOfWork.Object, _turnRepository.Object, _notifier.Object, _campaignPlanRepository.Object);
+            _unitOfWork.Object, _turnRepository.Object, _notifier.Object, _campaignPlanRepository.Object,
+            _chatReadRepository.Object, _imageStorage.Object);
     }
 
     [Fact]
@@ -69,6 +73,22 @@ public class CampaignServiceTests
         _campaignNpcRepository.Verify(r => r.DeleteByCampaignAsync(10));
         _campaignCharacterRepository.Verify(r => r.DeleteByCampaignAsync(10));
         _repository.Verify(r => r.DeleteAsync(10));
+    }
+
+    [Fact]
+    public async Task Delete_RemovesTheChatAndItsMedia()
+    {
+        _mapRepository.Setup(r => r.CountNotDeletedByCampaignAsync(10)).ReturnsAsync(0);
+        _mapRepository.Setup(r => r.ListDeletedIdsByCampaignAsync(10)).ReturnsAsync(new List<long>());
+        _turnRepository.Setup(r => r.ListChatMediaAsync(10)).ReturnsAsync(new List<string> { "a.png", "b.webm" });
+        _imageStorage.Setup(s => s.DeleteAsync("a.png")).ThrowsAsync(new InvalidOperationException("storage down"));
+
+        await _service.DeleteAsync(1, 10);
+
+        _chatReadRepository.Verify(r => r.DeleteByCampaignAsync(10));
+        _turnRepository.Verify(r => r.DeleteByCampaignAsync(10));
+        _imageStorage.Verify(s => s.DeleteAsync("a.png"));
+        _imageStorage.Verify(s => s.DeleteAsync("b.webm"), "a failing file doesn't stop the others");
     }
 
     [Fact]

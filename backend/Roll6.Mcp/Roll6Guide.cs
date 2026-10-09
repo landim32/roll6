@@ -130,6 +130,16 @@ public static class Roll6Guide
         - `update_map_model` and `update_token` replace every field: send `maskImage`, `backgroundImage`,
           `wallTextureImage` and the four "2.5D" images back unchanged or they are removed.
 
+        ## Chat
+        - Each campaign has one **chat**, and it is the campaign's whole timeline: what the players and the master say
+          (text, photo, audio), **every turn record** (moves, actions, action results, character/NPC changes,
+          narrations) and a "Turno N finalizado" divider where each turn ended. The turn tools below read and write
+          those same records, so `get_turn_summary` and `list_chat_messages` show the same turn.
+        - `list_chat_messages` pages it (newest first page, `before`/`after` cursors); `send_chat_message` speaks as one
+          of your approved characters or, without `characterId`, as the master; `delete_chat_message` removes a message
+          (its author or the master) or a narration (the master). Conversation is not a turn record: it never shows in
+          the turn summary, the turn data or the pending actions.
+
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move
           once** per turn (moving records a Movement entry) and **act** any number of times (`act_in_turn`, text).

@@ -26,7 +26,10 @@ public static class McpToolCatalog
         "POST /api/apikey/{id}/revoke",
         "DELETE /api/apikey/{id}",
         // 029: image bytes for the browser's map snapshot; assistants already get the presigned URLs.
-        "GET /api/image/file/{fileName}"
+        "GET /api/image/file/{fileName}",
+        // 041: the reader's mark (UI state) and the browser's audio recording upload.
+        "PUT /api/campaign/{id}/chat/read",
+        "POST /api/chat/audio"
     };
 
     public record Tool(MethodInfo Method, McpServerToolAttribute Attribute, string Name, string Description, ApiOperationAttribute? Operation);

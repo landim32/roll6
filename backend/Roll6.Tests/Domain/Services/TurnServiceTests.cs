@@ -41,6 +41,8 @@ public class TurnServiceTests
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
+    private readonly Mock<IChatReadRepository<ChatRead>> _chatReadRepository = new();
+    private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3 };
     private readonly MapToken _ariaPiece;
     private readonly TurnService _service;
@@ -89,7 +91,7 @@ public class TurnServiceTests
 
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object,
-            _tokenRepository.Object, _notifier.Object);
+            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _notifier.Object);
     }
 
     // --- State (US1) ---
@@ -317,7 +319,7 @@ public class TurnServiceTests
     [Fact]
     public async Task CreateAndDelete_NotMaster_Throw()
     {
-        _repository.Setup(r => r.GetByIdAsync(500)).ReturnsAsync(new Turn { TurnId = 500, CampaignId = CAMPAIGN });
+        _repository.Setup(r => r.GetByIdAsync(500)).ReturnsAsync(new Turn { TurnId = 500, CampaignId = CAMPAIGN, TurnType = TurnType.Action });
 
         await _service.Invoking(s => s.CreateAsync(PLAYER, new TurnInsertInfo { CampaignId = CAMPAIGN, CharacterId = ARIA, TurnType = 2, Description = "x" }))
             .Should().ThrowAsync<UnauthorizedAccessException>();
@@ -556,7 +558,8 @@ public class TurnServiceTests
         (ariaPlay.CurrentLife, ariaPlay.CharacterStatus, ariaPlay.Sheet).Should().Be((2, "Caída", "anotação"));
         (goblin1.CurrentLife, goblin.X, goblin.Y).Should().Be((-1, 6, 5));
         inserted.Select(t => (t.TurnType, t.UserId, t.TurnNo)).Should().Equal(
-            (TurnType.CharacterUpdate, MASTER, 3), (TurnType.CharacterUpdate, MASTER, 3), (TurnType.Movement, MASTER, 3), (TurnType.Narration, MASTER, 3));
+            (TurnType.CharacterUpdate, MASTER, 3), (TurnType.CharacterUpdate, MASTER, 3), (TurnType.Movement, MASTER, 3), (TurnType.Narration, MASTER, 3),
+            (TurnType.TurnFinished, MASTER, 3));
         inserted[2].Moved.Should().Be(1);
         _campaignRepository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.CurrentTurn == 4)), Times.Once);
         (result.FinishedTurn, result.TurnNo, result.Data.TurnNo).Should().Be((3, 4, 3));
@@ -577,7 +580,8 @@ public class TurnServiceTests
         });
 
         (ariaPlay.CurrentLife, ariaPlay.CurrentEnergy, ariaPlay.CharacterStatus).Should().Be((10, 8, "Em pé"));
-        inserted.Single().Changes!.Single().Field.Should().Be("characterStatus");
+        inserted.Single(t => t.IsLog).Changes!.Single().Field.Should().Be("characterStatus");
+        inserted.Last().TurnType.Should().Be(TurnType.TurnFinished, "the chat shows where the turn ended (041)");
     }
 
     [Fact]
@@ -594,7 +598,7 @@ public class TurnServiceTests
         });
 
         (ariaPlay.Posture, goblin1.Posture).Should().Be((Posture.OutOfCombat, Posture.Down));
-        inserted.Select(t => t.Changes!.Single().Field).Should().Equal("posture", "posture");
+        inserted.Where(t => t.IsLog).Select(t => t.Changes!.Single().Field).Should().Equal("posture", "posture");
         result.Data.Characters.Single(c => c.CharacterId == ARIA).Posture.Should().Be((int)Posture.OutOfCombat);
     }
 
@@ -622,7 +626,7 @@ public class TurnServiceTests
         });
 
         ariaPlay.CurrentMove.Should().Be(2);
-        inserted.Single().Changes!.Select(c => (c.Field, c.Before, c.After)).Should().Equal(("currentMove", "4", "2"));
+        inserted.Single(t => t.IsLog).Changes!.Select(c => (c.Field, c.Before, c.After)).Should().Equal(("currentMove", "4", "2"));
         result.Data.Characters.Single(c => c.CharacterId == ARIA).CurrentMove.Should().Be(2);
     }
 

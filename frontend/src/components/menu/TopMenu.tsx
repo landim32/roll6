@@ -1,3 +1,4 @@
+import { LayoutToggle } from './LayoutToggle';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -86,6 +87,7 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
         onInclude={() => setIncludeOpen(true)}
       />
       <TurnControls />
+      <LayoutToggle />
       {isDirty && canEdit && (
         <button type="button" className="btn btn-sm btn-warning" onClick={onSave} disabled={loading}>
           {t('menu.saveMap')}

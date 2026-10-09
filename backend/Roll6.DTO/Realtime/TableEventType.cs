@@ -29,4 +29,10 @@ public static class TableEventType
     public const string CAMPAIGN_CHANGED = "campaign.changed";
     /// <summary>The campaign was deleted.</summary>
     public const string CAMPAIGN_DELETED = "campaign.deleted";
+
+    /// <summary>A chat message or an end-of-turn divider was saved (041); data = ChatItemInfo.</summary>
+    public const string CHAT_MESSAGE = "chat.message";
+
+    /// <summary>A chat message or narration was deleted from the chat (041); data = { itemKey }.</summary>
+    public const string CHAT_DELETED = "chat.deleted";
 }

@@ -1,4 +1,4 @@
-import type { TurnFinishResultInfo, TurnInfo, TurnNarrationInfo, TurnResetResultInfo, TurnStateInfo, TurnSummaryInfo, TurnHistoryPageInfo } from '../types/turn';
+import type { TurnFinishResultInfo, TurnInfo, TurnNarrationInfo, TurnResetResultInfo, TurnStateInfo } from '../types/turn';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface TurnServiceConfig {
@@ -29,28 +29,11 @@ class TurnService {
     return this.handleResponse<TurnInfo[]>(response);
   }
 
-  /** Readable markdown of a turn (024); without `turnNo`, the turn in progress. */
-  async summary(campaignId: number, turnNo?: number): Promise<TurnSummaryInfo> {
-    const query = turnNo === undefined ? '' : `?turnNo=${turnNo}`;
-    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/summary${query}`, { headers: getHeaders(true) });
-    return this.handleResponse<TurnSummaryInfo>(response);
-  }
-
   /** Narration of a turn, or the latest finished turn that has one (029). 204 → null. */
   async narration(campaignId: number, turnNo?: number): Promise<TurnNarrationInfo | null> {
     const query = turnNo === undefined ? '' : `?turnNo=${turnNo}`;
     const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/narration${query}`, { headers: getHeaders(true) });
     return this.handleResponse<TurnNarrationInfo | null>(response);
-  }
-
-  /** Finished turns, newest first (028); `before` = previous page's `nextBefore`. */
-  async history(campaignId: number, before?: number, limit?: number): Promise<TurnHistoryPageInfo> {
-    const params = new URLSearchParams();
-    if (before !== undefined) params.set('before', String(before));
-    if (limit !== undefined) params.set('limit', String(limit));
-    const query = params.toString() ? `?${params}` : '';
-    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/turn/history${query}`, { headers: getHeaders(true) });
-    return this.handleResponse<TurnHistoryPageInfo>(response);
   }
 
   /** Records an action of the piece's character/NPC in the current turn. */

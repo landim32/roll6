@@ -14,8 +14,7 @@ public partial class TurnService
 {
     public async Task<TurnInfo> UpdateAsync(long userId, long turnId, TurnUpdateInfo info)
     {
-        var turn = await _repository.GetByIdAsync(turnId)
-            ?? throw new KeyNotFoundException("Registro de turno não encontrado.");
+        var turn = await GetLogEntryAsync(turnId);
         var campaign = await GetMasteredCampaignAsync(userId, turn.CampaignId);
 
         if (info.TurnNo is int turnNo)
@@ -55,7 +54,15 @@ public partial class TurnService
         if (info.TurnNo > previous)
         {
             campaign.SetCurrentTurn(info.TurnNo);
-            await _campaignRepository.UpdateAsync(campaign);
+            // Every turn skipped ends here: one divider each in the chat (041).
+            var dividers = Enumerable.Range(previous, info.TurnNo - previous)
+                .Select(turnNo => Turn.TurnFinished(campaignId, campaign.CurrentMapId, turnNo, userId)).ToList();
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                foreach (var divider in dividers)
+                    await _repository.InsertAsync(divider);
+                await _campaignRepository.UpdateAsync(campaign);
+            });
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
                 data: new { finishedTurn = info.TurnNo - 1, turnNo = info.TurnNo }));
             return result;
@@ -71,6 +78,8 @@ public partial class TurnService
         {
             if (laterTurns.Count > 0)
                 result.DiscardedEntries = await _repository.DeleteAfterTurnAsync(campaignId, info.TurnNo);
+            // The turns from the new current one on are open again: their dividers go (041).
+            await _repository.DeleteFinishedFromAsync(campaignId, info.TurnNo);
             await _campaignRepository.UpdateAsync(campaign);
         });
         await PublishTurnChangedAsync(campaignId, userId);

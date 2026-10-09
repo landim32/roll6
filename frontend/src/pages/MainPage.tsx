@@ -20,7 +20,11 @@ import { NpcPickerModal } from '../components/modals/NpcPickerModal';
 import { TokenModal } from '../components/modals/TokenModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
+import { ChatPanel } from '../components/chat/ChatPanel';
+import { useChat } from '../hooks/useChat';
 import { useMapEditor } from '../hooks/useMapEditor';
+import { LAYOUT_MODE, isChatVisible, isMapVisible } from '../lib/layoutMode';
+import { setMapRegion } from '../lib/mapRegion';
 import { useMapToken } from '../hooks/useMapToken';
 import { useTurn } from '../hooks/useTurn';
 import { useTableRoute } from '../hooks/useTableRoute';
@@ -33,7 +37,10 @@ import type { TokenInfo } from '../types/token';
 /** 3D view of story maps (033): its own chunk, so three.js is downloaded only when someone opens it. */
 const StoryView = lazy(() => import('../components/story/StoryView'));
 
-/** Main screen: always the map with the grid; every other window opens as a modal over it. */
+/**
+ * Main screen: the map with the grid and/or the campaign chat (041: map, map over chat, or chat only — the map isn't
+ * mounted in the last); every other window opens as a modal over it.
+ */
 export const MainPage = () => {
   const { isDirty, draft, viewMode, setViewMode } = useMapEditor();
   const { guard, requestSave, saveModalProps, unsavedModalProps } = useUnsavedGuard();
@@ -57,6 +64,11 @@ export const MainPage = () => {
   const { reset: resetTurn } = useTurn();
   const { addToken, changeToken, placeCharacter, deleteToken } = useMapToken();
   const { t } = useTranslation();
+  const { canRead: chatReadable, layoutMode } = useChat();
+  // Without access to a campaign's chat the table is only the map, whatever was chosen before.
+  const layout = chatReadable ? layoutMode : LAYOUT_MODE.map;
+  const showMap = isMapVisible(layout);
+  const showChat = isChatVisible(layout);
 
   // Closing or reloading the tab with unsaved changes asks the browser to confirm.
   useEffect(() => {
@@ -120,22 +132,35 @@ export const MainPage = () => {
     : undefined;
 
   return (
-    <div className="stm-main">
-      {viewMode === '3d' ? (
-        <Suspense fallback={<div className="stm-story"><div className="stm-story-loading text-secondary small">{t('story.loading')}</div></div>}>
-          <StoryView onUnsupported={() => {
-            toast.error(t('story.noWebgl'));
-            setViewMode('2d');
-          }} />
-        </Suspense>
-      ) : (
-        <MapCanvas
-          onPickToken={setTokenPick}
-          onDeleteToken={setToDelete}
-          onAct={setActing}
-          onResetTurn={setToReset}
-          picking={tokenPick !== null || toDelete !== null}
-        />
+    <div className={`stm-main stm-layout-${layout}`}>
+      {showMap && (
+        <div className="stm-map-region" ref={setMapRegion}>
+          {viewMode === '3d' ? (
+            <Suspense fallback={<div className="stm-story"><div className="stm-story-loading text-secondary small">{t('story.loading')}</div></div>}>
+              <StoryView onUnsupported={() => {
+                toast.error(t('story.noWebgl'));
+                setViewMode('2d');
+              }} />
+            </Suspense>
+          ) : (
+            <MapCanvas
+              onPickToken={setTokenPick}
+              onDeleteToken={setToDelete}
+              onAct={setActing}
+              onResetTurn={setToReset}
+              picking={tokenPick !== null || toDelete !== null}
+            />
+          )}
+          <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })} />
+          <NpcPanel onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} />
+          <MapControls onOpenImage={openImage} />
+          <GridSizeFooter onEditGrid={() => setGridOpen(true)} />
+        </div>
+      )}
+      {showChat && (
+        <div className="stm-chat-region">
+          <ChatPanel />
+        </div>
       )}
       <TopMenu
         onOpenCampaign={() => setCampaignOpen(true)}
@@ -143,10 +168,6 @@ export const MainPage = () => {
         onSave={() => { void requestSave(); }}
         guard={guard}
       />
-      <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })} />
-      <NpcPanel onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} />
-      <MapControls onOpenImage={openImage} />
-      <GridSizeFooter onEditGrid={() => setGridOpen(true)} />
 
       <CampaignModal open={campaignOpen} onOpenChange={setCampaignOpen} />
       <MapModal open={mapOpen} onOpenChange={setMapOpen} guard={guard} />

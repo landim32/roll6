@@ -23,6 +23,8 @@ public class CampaignService : ICampaignService
     private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IRealtimeNotifier _notifier;
     private readonly ICampaignPlanRepository<CampaignPlan> _campaignPlanRepository;
+    private readonly IChatReadRepository<ChatRead> _chatReadRepository;
+    private readonly IImageStorageAppService _imageStorage;
 
     public CampaignService(
         ICampaignRepository<Campaign> repository,
@@ -35,8 +37,12 @@ public class CampaignService : ICampaignService
         IUnitOfWork unitOfWork,
         ITurnRepository<Turn> turnRepository,
         IRealtimeNotifier notifier,
-        ICampaignPlanRepository<CampaignPlan> campaignPlanRepository)
+        ICampaignPlanRepository<CampaignPlan> campaignPlanRepository,
+        IChatReadRepository<ChatRead> chatReadRepository,
+        IImageStorageAppService imageStorage)
     {
+        _chatReadRepository = chatReadRepository;
+        _imageStorage = imageStorage;
         _campaignPlanRepository = campaignPlanRepository;
         _notifier = notifier;
         _turnRepository = turnRepository;
@@ -123,8 +129,11 @@ public class CampaignService : ICampaignService
         if (await _mapRepository.CountNotDeletedByCampaignAsync(campaignId) > 0)
             throw new ConflictException("A campanha possui mapas ativos ou arquivados e não pode ser excluída.");
 
+        // The chat's photos and audios (041) are referenced only by the campaign's chat: they go with it.
+        var chatMedia = await _turnRepository.ListChatMediaAsync(campaignId);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
+            await _chatReadRepository.DeleteByCampaignAsync(campaignId);
             await _turnRepository.DeleteByCampaignAsync(campaignId);
             var deletedMapIds = await _mapRepository.ListDeletedIdsByCampaignAsync(campaignId);
             if (deletedMapIds.Count > 0)
@@ -138,6 +147,17 @@ public class CampaignService : ICampaignService
             await _campaignCharacterRepository.DeleteByCampaignAsync(campaignId);
             await _repository.DeleteAsync(campaignId);
         });
+        foreach (var fileName in chatMedia)
+        {
+            try
+            {
+                await _imageStorage.DeleteAsync(fileName);
+            }
+            catch
+            {
+                // Best effort: the campaign is already gone; a file left behind is only storage.
+            }
+        }
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_DELETED, campaignId, userId));
     }
 

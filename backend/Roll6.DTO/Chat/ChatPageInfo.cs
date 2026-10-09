@@ -1,0 +1,66 @@
+using System.Text.Json.Serialization;
+
+namespace Roll6.DTO.Chat;
+
+/// <summary>A page of the campaign chat (041), oldest first, with the reader's unread state.</summary>
+public class ChatPageInfo
+{
+    [JsonPropertyName("items")]
+    public List<ChatItemInfo> Items { get; set; } = new();
+
+    /// <summary>There is more in the direction asked (older without cursor or with "before", newer with "after").</summary>
+    [JsonPropertyName("hasMore")]
+    public bool HasMore { get; set; }
+
+    /// <summary>Entries by others not read yet (at most 100: "99+").</summary>
+    [JsonPropertyName("unreadCount")]
+    public int UnreadCount { get; set; }
+
+    /// <summary>Cursor of the first unread entry, where the chat opens; null when everything was read.</summary>
+    [JsonPropertyName("firstUnreadCursor")]
+    public string? FirstUnreadCursor { get; set; }
+}
+
+/// <summary>What someone says (041): text, a photo or an audio, as a character or as the master.</summary>
+public class ChatSendInfo
+{
+    /// <summary>One of the sender's characters approved in the campaign; null = speak as the master.</summary>
+    [JsonPropertyName("characterId")]
+    public long? CharacterId { get; set; }
+
+    /// <summary>The message (1–4000) or the caption of a photo/audio.</summary>
+    [JsonPropertyName("text")]
+    public string? Text { get; set; }
+
+    /// <summary>fileName from POST /api/image.</summary>
+    [JsonPropertyName("image")]
+    public string? Image { get; set; }
+
+    /// <summary>fileName from POST /api/chat/audio.</summary>
+    [JsonPropertyName("audio")]
+    public string? Audio { get; set; }
+
+    /// <summary>Length of the audio (1–120).</summary>
+    [JsonPropertyName("audioSeconds")]
+    public int? AudioSeconds { get; set; }
+}
+
+/// <summary>Moves the reader's mark forward up to an entry (041).</summary>
+public class ChatReadInfo
+{
+    [JsonPropertyName("until")]
+    public string Until { get; set; } = string.Empty;
+}
+
+/// <summary>A recorded audio stored for the chat (041).</summary>
+public class ChatAudioUploadInfo
+{
+    [JsonPropertyName("fileName")]
+    public string FileName { get; set; } = string.Empty;
+
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
+
+    [JsonPropertyName("contentType")]
+    public string ContentType { get; set; } = string.Empty;
+}

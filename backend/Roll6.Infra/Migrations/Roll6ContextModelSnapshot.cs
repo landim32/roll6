@@ -379,6 +379,39 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("characters", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.ChatRead", b =>
+                {
+                    b.Property<long>("ChatReadId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("chat_read_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ChatReadId"));
+
+                    b.Property<long>("CampaignId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campaign_id");
+
+                    b.Property<DateTime>("LastReadAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_read_at");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("ChatReadId")
+                        .HasName("chat_reads_pkey");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("CampaignId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_chat_reads_campaign_user");
+
+                    b.ToTable("chat_reads", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.Map", b =>
                 {
                     b.Property<long>("MapId")
@@ -886,6 +919,15 @@ namespace Roll6.Infra.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("TurnId"));
 
+                    b.Property<string>("Audio")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("audio");
+
+                    b.Property<int?>("AudioSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("audio_seconds");
+
                     b.Property<int?>("BeforeLook")
                         .HasColumnType("integer")
                         .HasColumnName("before_look");
@@ -916,10 +958,29 @@ namespace Roll6.Infra.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Description")
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)")
                         .HasColumnName("description");
+
+                    b.Property<string>("DisplayImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("display_image");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Image")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("image");
 
                     b.Property<int?>("Look")
                         .HasColumnType("integer")
@@ -977,6 +1038,9 @@ namespace Roll6.Infra.Migrations
 
                     b.HasIndex("CampaignId", "TurnNo")
                         .HasDatabaseName("ix_turns_campaign_turn");
+
+                    b.HasIndex("CampaignId", "CreatedAt", "TurnId")
+                        .HasDatabaseName("ix_turns_campaign_created");
 
                     b.ToTable("turns", (string)null);
                 });
@@ -1104,6 +1168,21 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("fk_user_character");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.ChatRead", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("CampaignId")
+                        .IsRequired()
+                        .HasConstraintName("fk_campaign_chat_read");
+
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_chat_read");
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.Map", b =>

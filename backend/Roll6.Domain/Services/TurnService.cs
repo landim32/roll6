@@ -31,6 +31,8 @@ public partial class TurnService : ITurnService
     private readonly IUserRepository<User> _userRepository;
     private readonly IMapModelRepository<MapModel> _mapModelRepository;
     private readonly ICampaignNpcRepository<CampaignNpc> _campaignNpcRepository;
+    private readonly IChatReadRepository<ChatRead> _chatReadRepository;
+    private readonly IImageStorageAppService _imageStorage;
     private readonly IRealtimeNotifier _notifier;
 
     /// <summary>Hexes taken on a map (031): resets and processed moves need the whole shape free.</summary>
@@ -50,8 +52,12 @@ public partial class TurnService : ITurnService
         IMapModelRepository<MapModel> mapModelRepository,
         ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         ITokenRepository<Token> tokenRepository,
+        IChatReadRepository<ChatRead> chatReadRepository,
+        IImageStorageAppService imageStorage,
         IRealtimeNotifier notifier)
     {
+        _chatReadRepository = chatReadRepository;
+        _imageStorage = imageStorage;
         _occupancy = new MapOccupancyLoader(mapModelRepository, mapTokenRepository, tokenRepository, campaignCharacterRepository, mapNpcRepository);
         _campaignNpcRepository = campaignNpcRepository;
         _mapModelRepository = mapModelRepository;
@@ -222,7 +228,13 @@ public partial class TurnService : ITurnService
 
         var finished = campaign.CurrentTurn;
         campaign.AdvanceTurn();
-        await _campaignRepository.UpdateAsync(campaign);
+        // The chat shows where the turn ended (041).
+        var divider = Turn.TurnFinished(campaignId, campaign.CurrentMapId, finished, userId);
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await _repository.InsertAsync(divider);
+            await _campaignRepository.UpdateAsync(campaign);
+        });
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
             data: new { finishedTurn = finished, turnNo = campaign.CurrentTurn }));
         return new TurnFinishResultInfo { Finished = true, FinishedTurn = finished, TurnNo = campaign.CurrentTurn };
@@ -240,6 +252,10 @@ public partial class TurnService : ITurnService
         if (info.MapId is long mapId)
             await EnsureMapInCampaignAsync(mapId, campaign.CampaignId);
         var type = (TurnType)info.TurnType;
+        // Chat messages and dividers (041) are written by the chat and the turn itself, never as a turn record.
+        if (!TurnTypes.IsLog(type))
+            throw new DomainValidationException("turnType",
+                "O tipo deve ser 1 (Movement), 2 (Action), 3 (ActionResult), 4 (CharacterUpdate) ou 5 (Narration).");
         if (type == TurnType.Narration)
             EnsureNoActor(info);
         else if (Enum.IsDefined(type))
@@ -265,11 +281,22 @@ public partial class TurnService : ITurnService
     /// <summary>Deletes any entry of any turn (master only); pieces and values are not rolled back.</summary>
     public async Task DeleteAsync(long userId, long turnId)
     {
-        var turn = await _repository.GetByIdAsync(turnId)
-            ?? throw new KeyNotFoundException("Registro de turno não encontrado.");
+        var turn = await GetLogEntryAsync(turnId);
         await GetMasteredCampaignAsync(userId, turn.CampaignId);
         await _repository.DeleteAsync(turnId);
         await PublishTurnChangedAsync(turn.CampaignId, userId);
+    }
+
+    /// <summary>
+    /// A turn record (types 1–5, not deleted from the chat) by id (041): chat messages and end-of-turn dividers share
+    /// the table but are not turn records, so the turn's admin tools don't see them.
+    /// </summary>
+    private async Task<Turn> GetLogEntryAsync(long turnId)
+    {
+        var turn = await _repository.GetByIdAsync(turnId);
+        if (turn == null || !turn.IsLog || turn.IsDeleted)
+            throw new KeyNotFoundException("Registro de turno não encontrado.");
+        return turn;
     }
 
     private Task PublishTurnChangedAsync(long campaignId, long userId) =>

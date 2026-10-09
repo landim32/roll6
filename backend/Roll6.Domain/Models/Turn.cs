@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Validation;
@@ -9,6 +10,8 @@ namespace Roll6.Domain.Models;
 /// action or an action result (text), or a character/NPC change (024, list of fields before/after). Belongs to
 /// exactly one character or NPC; NPC entries made from the map keep the occurrence (<see cref="MapNpcId"/>)
 /// because each piece acts on its own. <see cref="UserId"/> is who made it (the master or the character owner).
+/// Since 041 the turn log and the chat are one timeline: the same table also keeps what people say (text, photo,
+/// audio) and the "turn finished" dividers — see <see cref="TurnType"/> and <see cref="TurnTypes"/>.
 /// </summary>
 public class Turn
 {
@@ -16,6 +19,14 @@ public class Turn
 
     /// <summary>A turn narration is longer than an action (027).</summary>
     public const int MAX_NARRATION = 10000;
+
+    /// <summary>Longest chat message (041).</summary>
+    public const int MAX_TEXT = 4000;
+
+    public const int MAX_AUDIO_SECONDS = 120;
+
+    /// <summary>Audio file names returned by the chat audio upload (041).</summary>
+    private static readonly Regex AUDIO_FILE_NAME_REGEX = new(@"^[0-9a-f]{32}\.(webm|mp4|m4a|ogg)$", RegexOptions.Compiled);
 
     public long TurnId { get; set; }
     public long CampaignId { get; set; }
@@ -43,6 +54,122 @@ public class Turn
     public List<TurnChange>? Changes { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>Chat (041): name shown for who spoke, as it was when sent (the character's or "Mestre (GM) — name").</summary>
+    public string? DisplayName { get; set; }
+
+    /// <summary>Chat (041): stored picture ({guid}.{ext}) of who spoke, as it was when sent.</summary>
+    public string? DisplayImage { get; set; }
+
+    /// <summary>Chat (041): the photo of an <see cref="TurnType.Image"/> message.</summary>
+    public string? Image { get; set; }
+
+    /// <summary>Chat (041): the recording of an <see cref="TurnType.Audio"/> message.</summary>
+    public string? Audio { get; set; }
+
+    public int? AudioSeconds { get; set; }
+
+    /// <summary>Deleted from the chat (041): kept as "Mensagem apagada", ignored by every turn read.</summary>
+    public DateTime? DeletedAt { get; set; }
+
+    // --- Chat (041) ---
+
+    /// <summary>What someone says in text. <paramref name="characterId"/> null = the master speaking.</summary>
+    public static Turn Text(long campaignId, long? mapId, int turnNo, long userId, long? characterId, string displayName,
+        string? displayImage, string? text)
+    {
+        var turn = Speech(campaignId, mapId, turnNo, userId, characterId, displayName, displayImage, TurnType.Text);
+        turn.Description = Guard.RequiredText(text, "text", MAX_TEXT);
+        return turn;
+    }
+
+    public static Turn Photo(long campaignId, long? mapId, int turnNo, long userId, long? characterId, string displayName,
+        string? displayImage, string? image, string? caption)
+    {
+        var turn = Speech(campaignId, mapId, turnNo, userId, characterId, displayName, displayImage, TurnType.Image);
+        turn.Image = Guard.ImageFileName(image, "image")
+            ?? throw new DomainValidationException("image", "Envie a foto.");
+        turn.Description = Guard.OptionalText(caption, "text", MAX_TEXT);
+        return turn;
+    }
+
+    public static Turn Recording(long campaignId, long? mapId, int turnNo, long userId, long? characterId, string displayName,
+        string? displayImage, string? audio, int? seconds, string? caption)
+    {
+        var turn = Speech(campaignId, mapId, turnNo, userId, characterId, displayName, displayImage, TurnType.Audio);
+        var fileName = Guard.OptionalText(audio, "audio", 260);
+        if (fileName == null || !AUDIO_FILE_NAME_REGEX.IsMatch(fileName))
+            throw new DomainValidationException("audio", "Áudio inválido. Use o fileName retornado pelo upload.");
+        if (seconds is not (>= 1 and <= MAX_AUDIO_SECONDS))
+            throw new DomainValidationException("audioSeconds", $"O áudio deve ter de 1 a {MAX_AUDIO_SECONDS} segundos.");
+        turn.Audio = fileName;
+        turn.AudioSeconds = seconds;
+        turn.Description = Guard.OptionalText(caption, "text", MAX_TEXT);
+        return turn;
+    }
+
+    /// <summary>The divider written where a turn ends (finish, process, moving the current turn forward).</summary>
+    public static Turn TurnFinished(long campaignId, long? mapId, int turnNo, long userId)
+    {
+        if (turnNo < 1)
+            throw new DomainValidationException("turnNo", "O turno deve ser maior que zero.");
+        return new Turn
+        {
+            CampaignId = campaignId,
+            MapId = mapId,
+            TurnNo = turnNo,
+            TurnType = TurnType.TurnFinished,
+            UserId = userId,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    public bool IsLog => TurnTypes.IsLog(TurnType);
+
+    public bool IsConversation => TurnTypes.IsConversation(TurnType);
+
+    public bool IsDeleted => DeletedAt.HasValue;
+
+    /// <summary>Who may delete it from the chat: the author their own message; the master any message and narrations.</summary>
+    public bool CanBeDeletedBy(long userId, bool isMaster) =>
+        (IsConversation && (UserId == userId || isMaster)) || (TurnType == TurnType.Narration && isMaster);
+
+    /// <summary>
+    /// Deletes it from the chat (041): text, photo, audio (author or master) and narrations (master). Moves, actions,
+    /// results, changes and dividers leave only through the turn's own tools. False when it already was deleted.
+    /// </summary>
+    public bool Delete(long userId, bool isMaster)
+    {
+        if (!IsConversation && TurnType != TurnType.Narration)
+            throw new DomainValidationException("type", "Este registro do turno não pode ser apagado pelo chat.");
+        if (!CanBeDeletedBy(userId, isMaster))
+            throw new UnauthorizedAccessException("Só o autor ou o mestre podem apagar esta mensagem.");
+        if (IsDeleted)
+            return false;
+        DeletedAt = DateTime.UtcNow;
+        return true;
+    }
+
+    private static Turn Speech(long campaignId, long? mapId, int turnNo, long userId, long? characterId, string displayName,
+        string? displayImage, TurnType type)
+    {
+        if (userId <= 0)
+            throw new DomainValidationException("userId", "Informe quem fez o registro.");
+        if (turnNo < 1)
+            throw new DomainValidationException("turnNo", "O turno deve ser maior que zero.");
+        return new Turn
+        {
+            CampaignId = campaignId,
+            MapId = mapId,
+            CharacterId = characterId,
+            TurnNo = turnNo,
+            TurnType = type,
+            UserId = userId,
+            DisplayName = Guard.RequiredText(displayName, "displayName", 260),
+            DisplayImage = displayImage,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
 
     public static Turn Movement(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,
         long userId, (int X, int Y, int Look) before, (int X, int Y, int Look) after, int? moved = null)
