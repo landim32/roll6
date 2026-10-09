@@ -19,7 +19,21 @@ public class TurnRepository : ITurnRepository<Turn>
     /// The turn records (041): what every turn rule and turn read looks at — types 1–5 that were not deleted from the
     /// chat. Conversation and end-of-turn dividers live in the same table but never reach the turn's contracts.
     /// </summary>
-    private IQueryable<Turn> Log => _context.Turns.Where(e => TurnTypes.LOG.Contains(e.TurnType) && e.DeletedAt == null);
+    private IQueryable<Turn> Log => _context.Turns.Where(e => TurnTypes.LOG.Contains(e.TurnType) && e.DeletedAt == null
+        && e.CancelledAt == null);
+
+    /// <summary>
+    /// Deletes the rows (044): first the replies pointing to them stop pointing (they show "Mensagem apagada") and their
+    /// reactions go, so the foreign keys never block a deletion.
+    /// </summary>
+    private async Task<int> DeleteWhereAsync(IQueryable<Turn> rows)
+    {
+        var ids = rows.Select(e => e.TurnId);
+        await _context.Turns.Where(e => e.ReplyToTurnId != null && ids.Contains(e.ReplyToTurnId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.ReplyToTurnId, (long?)null));
+        await _context.ChatReactions.Where(r => ids.Contains(r.TurnId)).ExecuteDeleteAsync();
+        return await rows.ExecuteDeleteAsync();
+    }
 
     /// <summary>Any entry by id, whatever its type (the services decide what may be done with it).</summary>
     public async Task<Turn?> GetByIdAsync(long id)
@@ -114,23 +128,23 @@ public class TurnRepository : ITurnRepository<Turn>
 
     public async Task<int> DeleteAfterTurnAsync(long campaignId, int turnNo)
     {
-        return await _context.Turns.Where(e => e.CampaignId == campaignId && e.TurnNo > turnNo).ExecuteDeleteAsync();
+        return await DeleteWhereAsync(_context.Turns.Where(e => e.CampaignId == campaignId && e.TurnNo > turnNo));
     }
 
     public async Task DeleteAsync(long id)
     {
-        await _context.Turns.Where(e => e.TurnId == id).ExecuteDeleteAsync();
+        await DeleteWhereAsync(_context.Turns.Where(e => e.TurnId == id));
     }
 
     public async Task DeleteRangeAsync(IEnumerable<long> ids)
     {
         var idList = ids.ToList();
-        await _context.Turns.Where(e => idList.Contains(e.TurnId)).ExecuteDeleteAsync();
+        await DeleteWhereAsync(_context.Turns.Where(e => idList.Contains(e.TurnId)));
     }
 
     public async Task DeleteByCampaignAsync(long campaignId)
     {
-        await _context.Turns.Where(e => e.CampaignId == campaignId).ExecuteDeleteAsync();
+        await DeleteWhereAsync(_context.Turns.Where(e => e.CampaignId == campaignId));
     }
 
     /// <summary>
@@ -139,8 +153,7 @@ public class TurnRepository : ITurnRepository<Turn>
     /// </summary>
     public async Task DeleteByCharacterAsync(long characterId)
     {
-        await _context.Turns.Where(e => e.CharacterId == characterId && !TurnTypes.CONVERSATION.Contains(e.TurnType))
-            .ExecuteDeleteAsync();
+        await DeleteWhereAsync(_context.Turns.Where(e => e.CharacterId == characterId && !TurnTypes.CONVERSATION.Contains(e.TurnType)));
         await _context.Turns.Where(e => e.CharacterId == characterId)
             .ExecuteUpdateAsync(s => s.SetProperty(e => e.CharacterId, (long?)null));
     }
@@ -208,19 +221,34 @@ public class TurnRepository : ITurnRepository<Turn>
 
     public async Task<int> DeleteFinishedFromAsync(long campaignId, int turnNo)
     {
-        return await _context.Turns
-            .Where(e => e.CampaignId == campaignId && e.TurnType == TurnType.TurnFinished && e.TurnNo >= turnNo)
-            .ExecuteDeleteAsync();
+        return await DeleteWhereAsync(_context.Turns
+            .Where(e => e.CampaignId == campaignId && e.TurnType == TurnType.TurnFinished && e.TurnNo >= turnNo));
     }
 
     public async Task DeleteByNpcAsync(long npcId)
     {
-        await _context.Turns.Where(e => e.NpcId == npcId).ExecuteDeleteAsync();
+        await DeleteWhereAsync(_context.Turns.Where(e => e.NpcId == npcId));
     }
 
     public async Task DeleteByMapNpcIdsAsync(IEnumerable<long> mapNpcIds)
     {
         var idList = mapNpcIds.Select(id => (long?)id).ToList();
-        await _context.Turns.Where(e => idList.Contains(e.MapNpcId)).ExecuteDeleteAsync();
+        await DeleteWhereAsync(_context.Turns.Where(e => idList.Contains(e.MapNpcId)));
+    }
+
+    // ------------------------------------------------------------------ replies, reactions, cancelled actions (044)
+
+    public async Task<List<Turn>> ListByIdsAsync(IEnumerable<long> ids)
+    {
+        var idList = ids.Distinct().ToList();
+        return await _context.Turns.AsNoTracking().Where(e => idList.Contains(e.TurnId)).ToListAsync();
+    }
+
+    public async Task<List<Turn>> ListValidActionsAsync(long campaignId, int turnNo, long? characterId, long? mapNpcId)
+    {
+        return await Log.AsNoTracking()
+            .Where(e => e.CampaignId == campaignId && e.TurnNo == turnNo && e.TurnType == TurnType.Action
+                && (characterId != null ? e.CharacterId == characterId : e.MapNpcId == mapNpcId))
+            .ToListAsync();
     }
 }

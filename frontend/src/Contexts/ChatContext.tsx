@@ -7,12 +7,12 @@ import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { useCharacter } from '../hooks/useCharacter';
 import { useRealtime, useTableEvents } from '../hooks/useRealtime';
-import { CHAT_KIND } from '../types/chat';
-import type { ChatItemInfo, ChatSendInfo } from '../types/chat';
+import { useTurn } from '../hooks/useTurn';
+import type { ChatItemInfo, ChatSendInfo, ReactionKind } from '../types/chat';
 import { TABLE_EVENT } from '../types/realtime';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
-import { CONVERSATION_KINDS, compareCursors, markDeleted, mergeItems, reconcileRange } from '../lib/chatItems';
+import { compareCursors, markDeleted, mergeItems, nextReaction, permissionsFor, reactionSummary, reconcileRange } from '../lib/chatItems';
 import { isChatVisible, readLayoutMode, writeLayoutMode } from '../lib/layoutMode';
 import { isShown, readChatFilters, writeChatFilters } from '../lib/chatFilters';
 import type { ChatFilters } from '../lib/chatFilters';
@@ -67,6 +67,14 @@ interface ChatContextType {
   roll: (text: string | null) => Promise<void>;
   /** Pokes who hasn't acted in the turn (043); the chat line comes back merged. */
   poke: () => Promise<PokeResultInfo>;
+  /** The entry the next message/action answers (044). */
+  replyTo: ChatItemInfo | null;
+  startReply: (item: ChatItemInfo) => void;
+  cancelReply: () => void;
+  /** Curtir / Amei: tapping the same one again removes it (044). */
+  react: (item: ChatItemInfo, kind: ReactionKind) => Promise<void>;
+  /** Text → action of the character, or action → text (044). */
+  convert: (item: ChatItemInfo, to: 'action' | 'message') => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -76,13 +84,15 @@ let pendingSeq = 0;
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
   const { currentCampaign, isMaster } = useCampaign();
-  const { myParticipations, currentSelection } = useCharacter();
+  const { myParticipations, currentSelection, party } = useCharacter();
+  const { turnNo } = useTurn();
   const { live, setPresence } = useRealtime();
   const [items, setItems] = useState<ChatItemInfo[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [firstUnreadCursor, setFirstUnreadCursor] = useState<string | null>(null);
   const [pending, setPending] = useState<ChatPending[]>([]);
+  const [replyTo, setReplyTo] = useState<ChatItemInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [layoutMode, setLayoutModeState] = useState<LayoutMode>(readLayoutMode);
   const [filters, setFiltersState] = useState<ChatFilters>(() => readChatFilters(session?.user.userId ?? null));
@@ -113,17 +123,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     return isMaster ? { characterId: null, participation: null } : null;
   }, [canRead, currentSelection, approved, isMaster]);
 
-  /** Items from events were mapped for their author: whether this user may delete them is decided here. */
-  const forViewer = useCallback((item: ChatItemInfo): ChatItemInfo => {
-    if (item.deleted) return { ...item, canDelete: false };
-    // A roll can't be taken back by whoever made it: only the master removes one.
-    const canDelete = item.kind === CHAT_KIND.roll
-      ? isMaster
-      : CONVERSATION_KINDS.has(item.kind)
-      ? item.userId === userId || isMaster
-      : item.kind === CHAT_KIND.narration && isMaster;
-    return { ...item, canDelete };
-  }, [userId, isMaster]);
+  /** Items from events were mapped for their author: what this user may do with them is decided here (044). */
+  const forViewer = useCallback((item: ChatItemInfo): ChatItemInfo => permissionsFor(item, {
+    userId,
+    isMaster,
+    currentTurn: turnNo,
+    ownerOf: (characterId) => party.find((p) => p.characterId === characterId)?.characterOwnerId
+      ?? myParticipations.find((p) => p.characterId === characterId)?.characterOwnerId ?? null,
+  }), [userId, isMaster, turnNo, party, myParticipations]);
 
   /** New entries by others count as unread while the chat is out of sight. */
   const countNew = useCallback((before: ChatItemInfo[], after: ChatItemInfo[]) => {
@@ -182,6 +189,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setUnreadCount(0);
     setFirstUnreadCursor(null);
     setPending([]);
+    setReplyTo(null);
     void loadNewest();
   }, [loadNewest]);
 
@@ -209,6 +217,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const next = mergeItems(current, [item]);
       countNew(current, next);
       setItems(next);
+    } else if (event.type === TABLE_EVENT.chatUpdated) {
+      // 044: reactions, conversions, cancelled actions — only entries already on screen change.
+      const item = forViewer(event.data as ChatItemInfo);
+      if (item.campaignId !== campaignRef.current) return;
+      setItems((current) => (current.some((i) => i.key === item.key) ? mergeItems(current, [item]) : current));
+      setReplyTo((reply) => (reply?.key === item.key ? item : reply));
     } else if (event.type === TABLE_EVENT.chatDeleted) {
       const { itemKey } = event.data as { itemKey: string };
       setItems((current) => markDeleted(current, itemKey));
@@ -284,8 +298,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (!speaker) return false;
     pendingSeq += 1;
     const entry: ChatPending = {
-      id: `p${pendingSeq}`, info: { ...info, characterId: speaker.characterId }, preview, status: 'sending',
+      id: `p${pendingSeq}`,
+      info: { ...info, characterId: speaker.characterId, replyToTurnId: info.replyToTurnId ?? replyTo?.turnId ?? null },
+      preview,
+      status: 'sending',
     };
+    setReplyTo(null);
     setPending((list) => [...list, entry]);
     try {
       await deliver(entry);
@@ -293,7 +311,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     } catch {
       return false;
     }
-  }, [speaker, deliver]);
+  }, [speaker, deliver, replyTo]);
 
   const retry = useCallback(async (id: string) => {
     const entry = pending.find((p) => p.id === id);
@@ -311,10 +329,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const roll = useCallback(async (text: string | null) => {
     if (!speaker || campaignId === null) return;
-    const item = await chatService.roll(campaignId, { characterId: speaker.characterId, text });
+    const item = await chatService.roll(campaignId, { characterId: speaker.characterId, text, replyToTurnId: replyTo?.turnId ?? null });
+    setReplyTo(null);
     if (campaignRef.current === campaignId) setItems((current) => mergeItems(current, [forViewer(item)]));
     setFirstUnreadCursor(null);
-  }, [speaker, campaignId, forViewer]);
+  }, [speaker, campaignId, forViewer, replyTo]);
 
   const poke = useCallback(async () => {
     if (campaignId === null) return { poked: 0, names: [] };
@@ -323,12 +342,39 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     return { poked: result.poked, names: result.names };
   }, [campaignId, forViewer]);
 
+  const startReply = useCallback((item: ChatItemInfo) => setReplyTo(item), []);
+  const cancelReply = useCallback(() => setReplyTo(null), []);
+
+  const replace = useCallback((item: ChatItemInfo) => {
+    if (campaignRef.current === item.campaignId) setItems((current) => mergeItems(current, [forViewer(item)]));
+  }, [forViewer]);
+
+  const react = useCallback(async (item: ChatItemInfo, kind: ReactionKind) => {
+    const mine = reactionSummary(item.reactions, userId).mine;
+    const next = nextReaction(mine, kind);
+    // Optimistic: the badge changes at once and comes back if the server refuses.
+    const others = (item.reactions ?? []).filter((r) => r.userId !== userId);
+    const optimistic = next === null || userId === null ? others
+      : [...others, { userId, name: session?.user.name.split(' ')[0] ?? '', kind: next }];
+    setItems((current) => current.map((i) => (i.key === item.key ? { ...i, reactions: optimistic } : i)));
+    try {
+      replace(await chatService.react(item.turnId, next));
+    } catch (err) {
+      setItems((current) => current.map((i) => (i.key === item.key ? { ...i, reactions: item.reactions } : i)));
+      throw err;
+    }
+  }, [userId, session, replace]);
+
+  const convert = useCallback(async (item: ChatItemInfo, to: 'action' | 'message') => {
+    replace(await chatService.convert(item.turnId, to));
+  }, [replace]);
+
   const value = useMemo<ChatContextType>(() => ({
     items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
-    filters, setFilters, loadOlder, send, retry, discard, remove, roll, poke,
+    filters, setFilters, loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert,
   }), [items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters,
-    loadOlder, send, retry, discard, remove, roll, poke]);
+    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };

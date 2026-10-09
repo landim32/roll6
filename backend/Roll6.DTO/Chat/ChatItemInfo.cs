@@ -111,6 +111,80 @@ public class ChatItemInfo
     /// <summary>The reader may delete it (author of a message, or the master for messages and narrations).</summary>
     [JsonPropertyName("canDelete")]
     public bool CanDelete { get; set; }
+
+    /// <summary>An action replaced, reset or deleted (044): shown as "Ação cancelada".</summary>
+    [JsonPropertyName("cancelled")]
+    public bool Cancelled { get; set; }
+
+    /// <summary>The entry this one answers (044).</summary>
+    [JsonPropertyName("replyTo")]
+    public ChatReplyInfo? ReplyTo { get; set; }
+
+    /// <summary>Curtir / Amei of each user (044).</summary>
+    [JsonPropertyName("reactions")]
+    public List<ChatReactionInfo> Reactions { get; set; } = new();
+
+    [JsonPropertyName("canReply")]
+    public bool CanReply { get; set; }
+
+    [JsonPropertyName("canReact")]
+    public bool CanReact { get; set; }
+
+    /// <summary>"action" (a text of a character can become its action), "message" (an action can become text) or null.</summary>
+    [JsonPropertyName("canConvert")]
+    public string? CanConvert { get; set; }
+}
+
+/// <summary>What a reply shows of the entry it answers (044).</summary>
+public class ChatReplyInfo
+{
+    [JsonPropertyName("key")]
+    public string Key { get; set; } = string.Empty;
+
+    [JsonPropertyName("turnId")]
+    public long TurnId { get; set; }
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = string.Empty;
+
+    [JsonPropertyName("excerpt")]
+    public string Excerpt { get; set; } = string.Empty;
+
+    [JsonPropertyName("deleted")]
+    public bool Deleted { get; set; }
+
+    [JsonPropertyName("cancelled")]
+    public bool Cancelled { get; set; }
+}
+
+/// <summary>A user's reaction (044): kind "like" (Curtir) or "love" (Amei).</summary>
+public class ChatReactionInfo
+{
+    [JsonPropertyName("userId")]
+    public long UserId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = string.Empty;
+}
+
+/// <summary>Sets (like/love) or removes (null) the caller's reaction.</summary>
+public class ChatReactInfo
+{
+    [JsonPropertyName("kind")]
+    public string? Kind { get; set; }
+}
+
+/// <summary>Turns a text into the character's action ("action") or an action into text ("message").</summary>
+public class ChatConvertInfo
+{
+    [JsonPropertyName("to")]
+    public string To { get; set; } = string.Empty;
 }
 
 public class ChatPointInfo

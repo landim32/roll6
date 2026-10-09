@@ -35,4 +35,7 @@ public static class TableEventType
 
     /// <summary>A chat message or narration was deleted from the chat (041); data = { itemKey }.</summary>
     public const string CHAT_DELETED = "chat.deleted";
+
+    /// <summary>A chat entry changed in place (044): reactions, converted, cancelled. Data = the ChatItemInfo.</summary>
+    public const string CHAT_UPDATED = "chat.updated";
 }

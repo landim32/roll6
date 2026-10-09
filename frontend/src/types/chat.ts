@@ -69,8 +69,41 @@ export interface ChatItemInfo {
   audioType: string | null;
   /** The three faces of a roll (kind `roll`). */
   dice?: number[] | null;
+  /** An action replaced, reset or deleted (044): "Ação cancelada". */
+  cancelled?: boolean;
+  /** The entry this one answers (044). */
+  replyTo?: ChatReplyInfo | null;
+  /** Curtir / Amei of each user (044). */
+  reactions?: ChatReactionInfo[];
+  canReply?: boolean;
+  canReact?: boolean;
+  /** A character's text can become its action ('action'), its action can become text ('message'). */
+  canConvert?: 'action' | 'message' | null;
   deleted: boolean;
   canDelete: boolean;
+}
+
+export interface ChatReplyInfo {
+  key: string;
+  turnId: number;
+  displayName: string;
+  kind: ChatKind;
+  excerpt: string;
+  deleted: boolean;
+  cancelled: boolean;
+}
+
+export const REACTION = {
+  like: 'like',
+  love: 'love',
+} as const;
+
+export type ReactionKind = (typeof REACTION)[keyof typeof REACTION];
+
+export interface ChatReactionInfo {
+  userId: number;
+  name: string;
+  kind: ReactionKind;
 }
 
 export interface ChatPageInfo {
@@ -87,12 +120,15 @@ export interface ChatSendInfo {
   image?: string | null;
   audio?: string | null;
   audioSeconds?: number | null;
+  /** The entry this message answers (044). */
+  replyToTurnId?: number | null;
 }
 
 /** A 3d6 roll in the chat; `text` is the optional reason. */
 export interface ChatRollInfo {
   characterId: number | null;
   text?: string | null;
+  replyToTurnId?: number | null;
 }
 
 export interface ChatAudioUploadInfo {

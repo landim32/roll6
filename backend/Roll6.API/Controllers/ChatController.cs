@@ -51,4 +51,34 @@ public class ChatController : ApiControllerBase
             return HandleException(ex);
         }
     }
+
+    /// <summary>Curtir (like) / Amei (love) the entry, or remove the caller's reaction (null or the same kind) (044).</summary>
+    [HttpPut("{id:long}/reaction")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> React(long id, [FromBody] ChatReactInfo info)
+    {
+        try
+        {
+            return Ok(await _chatService.ReactAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>A character's text → its action of the current turn ("action"), or the valid action → text ("message") (044).</summary>
+    [HttpPost("{id:long}/convert")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Convert(long id, [FromBody] ChatConvertInfo info)
+    {
+        try
+        {
+            return Ok(await _chatService.ConvertAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
 }

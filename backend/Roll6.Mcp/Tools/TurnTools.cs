@@ -31,8 +31,10 @@ public static class TurnTools
     public static Task<CallToolResult> ActInTurn(
         Roll6ApiClient api,
         [Description(McpDocs.MAP_TOKEN_ID + " Must be a character or NPC piece.")] long mapTokenId,
-        [Description("What the piece does, in plain text (required, up to 2000 characters). Example: \"Casts a fireball at the orcs\".")] string description) =>
-        api.SendAsync(HttpMethod.Post, "/api/turn/action", new TurnActInfo { MapTokenId = mapTokenId, Description = description });
+        [Description("What the piece does, in plain text (required, up to 2000 characters). Example: \"Casts a fireball at the orcs\".")] string description,
+        [Description("Optional: turnId of a chat entry this action answers (shown as a quote).")] long? replyToTurnId = null) =>
+        api.SendAsync(HttpMethod.Post, "/api/turn/action",
+            new TurnActInfo { MapTokenId = mapTokenId, Description = description, ReplyToTurnId = replyToTurnId });
 
     [McpServerTool(Name = "get_turn_summary", Title = "Get turn summary", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/turn/summary")]

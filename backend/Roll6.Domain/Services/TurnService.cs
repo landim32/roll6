@@ -36,6 +36,7 @@ public partial class TurnService : ITurnService
     private readonly IImageStorageAppService _imageStorage;
     private readonly IRealtimeNotifier _notifier;
     private readonly INotificationQueue _queue;
+    private readonly IChatReactionRepository<ChatReaction> _chatReactionRepository;
 
     /// <summary>Hexes taken on a map (031): resets and processed moves need the whole shape free.</summary>
     private readonly MapOccupancyLoader _occupancy;
@@ -56,10 +57,12 @@ public partial class TurnService : ITurnService
         ITokenRepository<Token> tokenRepository,
         IChatReadRepository<ChatRead> chatReadRepository,
         IImageStorageAppService imageStorage,
+        IChatReactionRepository<ChatReaction> chatReactionRepository,
         INotificationQueue queue,
         IRealtimeNotifier notifier)
     {
         _queue = queue;
+        _chatReactionRepository = chatReactionRepository;
         _chatReadRepository = chatReadRepository;
         _imageStorage = imageStorage;
         _occupancy = new MapOccupancyLoader(mapModelRepository, mapTokenRepository, tokenRepository, campaignCharacterRepository, mapNpcRepository);
@@ -163,7 +166,19 @@ public partial class TurnService : ITurnService
         var actor = await ResolveActorAsync(userId, piece, campaign);
         var turn = Turn.Action(campaign.CampaignId, map.MapId, actor.CharacterId, actor.NpcId, actor.MapNpcId,
             campaign.CurrentTurn, userId, info.Description);
-        var result = (await MapToDtoAsync(new List<Turn> { await _repository.InsertAsync(turn) })).Single();
+        await ApplyReplyAsync(turn, info.ReplyToTurnId);
+        // 044: one valid action per actor and turn — the previous one stays in the chat as "Ação cancelada".
+        var cancelled = await CancelValidActionsAsync(campaign, actor.CharacterId, actor.CharacterId.HasValue ? null : actor.MapNpcId);
+        var saved = turn;
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            foreach (var previous in cancelled)
+                await _repository.UpdateAsync(previous);
+            saved = await _repository.InsertAsync(turn);
+        });
+        var result = (await MapToDtoAsync(new List<Turn> { saved })).Single();
+        foreach (var previous in cancelled)
+            await PublishUpdatedAsync(campaign, userId, previous);
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
         await NotifyActionAsync(campaign, userId, actor.CharacterId, info.Description);
         return result;
@@ -190,6 +205,8 @@ public partial class TurnService : ITurnService
                 piece.MapTokenId) == FitResult.Ok;
         }
 
+        var cancelledAt = DateTime.UtcNow;
+        var actions = entries.Where(e => e.Cancel(cancelledAt)).ToList();
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             if (reverted)
@@ -198,9 +215,15 @@ public partial class TurnService : ITurnService
                 piece.Face(movement.BeforeLook!.Value);
                 await _mapTokenRepository.UpdateAsync(piece);
             }
-            if (entries.Count > 0)
-                await _repository.DeleteRangeAsync(entries.Select(e => e.TurnId));
+            // 044: the move is undone and deleted; the action stays in the chat as "Ação cancelada".
+            var movements = entries.Where(e => e.TurnType == TurnType.Movement).Select(e => e.TurnId).ToList();
+            if (movements.Count > 0)
+                await _repository.DeleteRangeAsync(movements);
+            foreach (var action in actions)
+                await _repository.UpdateAsync(action);
         });
+        foreach (var action in actions)
+            await PublishUpdatedAsync(campaign, userId, action);
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
         if (reverted)
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaign.CampaignId, userId, map.MapId));

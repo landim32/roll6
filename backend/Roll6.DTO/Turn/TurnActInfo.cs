@@ -10,4 +10,8 @@ public class TurnActInfo
 
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
+
+    /// <summary>The chat entry this action answers (044).</summary>
+    [JsonPropertyName("replyToTurnId")]
+    public long? ReplyToTurnId { get; set; }
 }

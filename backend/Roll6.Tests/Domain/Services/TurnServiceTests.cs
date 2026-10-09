@@ -40,6 +40,7 @@ public class TurnServiceTests
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<INotificationQueue> _queue = new();
+    private readonly Mock<IChatReactionRepository<ChatReaction>> _chatReactions = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
@@ -92,9 +93,15 @@ public class TurnServiceTests
         });
         _campaignNpcRepository.Setup(r => r.GetAsync(CAMPAIGN, NPC)).ReturnsAsync(new CampaignNpc { CampaignNpcId = 5, CampaignId = CAMPAIGN, NpcId = NPC });
 
+        // 044 defaults: no reactions, no reply targets, no earlier valid action.
+        _repository.Setup(r => r.ListLogByTurnsAsync(It.IsAny<long>(), It.IsAny<IEnumerable<int>>())).ReturnsAsync(new List<Turn>());
+        _chatReactions.Setup(r => r.ListByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatReaction>());
+        _repository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Turn>());
+        _repository.Setup(r => r.ListValidActionsAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(new List<Turn>());
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object,
-            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _queue.Object, _notifier.Object);
+            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _queue.Object, _notifier.Object);
     }
 
     // --- State (US1) ---
@@ -268,7 +275,9 @@ public class TurnServiceTests
 
         (result.Removed, result.Reverted).Should().Be((2, true));
         (_ariaPiece.X, _ariaPiece.Y, _ariaPiece.Look).Should().Be((4, 4, 3));
-        _repository.Verify(r => r.DeleteRangeAsync(It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new long[] { 500, 501 }))), Times.Once);
+        // 044: the move goes, the action stays as "Ação cancelada".
+        _repository.Verify(r => r.DeleteRangeAsync(It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new long[] { 500 }))), Times.Once);
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 501 && t.IsCancelled)), Times.Once);
     }
 
     [Fact]
@@ -372,7 +381,9 @@ public class TurnServiceTests
         var result = await _service.ResetAsync(PLAYER, new TurnPieceInfo { MapTokenId = ARIA_PIECE });
 
         result.Removed.Should().Be(1);
-        _repository.Verify(r => r.DeleteRangeAsync(It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new long[] { 601 }))), Times.Once);
+        _repository.Verify(r => r.DeleteRangeAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 601 && t.IsCancelled)), Times.Once);
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 602)), Times.Never);
     }
 
     [Fact]
@@ -1135,5 +1146,30 @@ public class TurnServiceTests
         _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.TurnFinished
             && n.Body == "Turno 3 terminado. Pode agir novamente" && n.TargetUserIds!.OrderBy(u => u).SequenceEqual(new[] { PLAYER, 5L, 6L }))), Times.Once);
         _campaign.CurrentTurn = 3;
+    }
+
+    // --- 044: one valid action per turn ---
+
+    [Fact]
+    public async Task Act_CancelsThePreviousActionOfTheActor()
+    {
+        var previous = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Ataco o orc");
+        previous.TurnId = 700;
+        _repository.Setup(r => r.ListValidActionsAsync(CAMPAIGN, 3, ARIA, null)).ReturnsAsync(new List<Turn> { previous });
+        _repository.Setup(r => r.GetByIdAsync(700)).ReturnsAsync(previous);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Recuo" });
+
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 700 && t.IsCancelled)), Times.Once);
+        _repository.Verify(r => r.InsertAsync(It.Is<Turn>(t => t.Description == "Recuo" && t.IsValidAction)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_ForAnNpc_CancelsOnlyThatOccurrence()
+    {
+        await _service.ActAsync(MASTER, new TurnActInfo { MapTokenId = GOBLIN_PIECE, Description = "Rosna" });
+
+        _repository.Verify(r => r.ListValidActionsAsync(CAMPAIGN, 3, null, MAP_NPC), Times.Once);
     }
 }

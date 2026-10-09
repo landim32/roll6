@@ -56,6 +56,7 @@ public static class Startup
         services.AddScoped<ITurnRepository<Turn>, TurnRepository>();
         services.AddScoped<IChatReadRepository<ChatRead>, ChatReadRepository>();
         services.AddScoped<IPushSubscriptionRepository<PushSubscription>, PushSubscriptionRepository>();
+        services.AddScoped<IChatReactionRepository<ChatReaction>, ChatReactionRepository>();
         services.AddScoped<ICampaignNotificationPrefRepository<CampaignNotificationPref>, CampaignNotificationPrefRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 

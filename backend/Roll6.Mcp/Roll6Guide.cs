@@ -139,6 +139,10 @@ public static class Roll6Guide
           of your approved characters or, without `characterId`, as the master; `delete_chat_message` removes a message
           (its author or the master) or a narration (the master). Conversation is not a turn record: it never shows in
           the turn summary, the turn data or the pending actions.
+        - A character (or NPC occurrence) has **one valid action per turn**: acting again cancels the previous action, and
+          resetting the turn or deleting the action cancels it too — it stays in the chat as "Ação cancelada" (`cancelled`)
+          and leaves every turn read. `convert_chat_entry` turns a character's text into its action (or back);
+          `react_to_chat_message` likes/loves an entry; `replyToTurnId` on `send_chat_message`/`act_in_turn` quotes one.
         - `roll_dice` rolls **3d6** in the chat: the server draws the dice, the roll stays in the chat history for
           everyone (kind `roll`, `dice` = the three faces, `text` = the optional reason) and only the master can delete it.
 

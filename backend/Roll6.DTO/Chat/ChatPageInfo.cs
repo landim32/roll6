@@ -43,6 +43,10 @@ public class ChatSendInfo
     /// <summary>Length of the audio (1–120).</summary>
     [JsonPropertyName("audioSeconds")]
     public int? AudioSeconds { get; set; }
+
+    /// <summary>The entry this message answers (044).</summary>
+    [JsonPropertyName("replyToTurnId")]
+    public long? ReplyToTurnId { get; set; }
 }
 
 /// <summary>A dice roll in the chat: 3d6 drawn by the server, as a character or as the master.</summary>
@@ -55,6 +59,10 @@ public class ChatRollInfo
     /// <summary>Optional reason (≤ 260): "Ataque com espada".</summary>
     [JsonPropertyName("text")]
     public string? Text { get; set; }
+
+    /// <summary>The entry this roll answers (044).</summary>
+    [JsonPropertyName("replyToTurnId")]
+    public long? ReplyToTurnId { get; set; }
 }
 
 /// <summary>Moves the reader's mark forward up to an entry (041).</summary>

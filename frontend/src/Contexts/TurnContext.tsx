@@ -38,7 +38,8 @@ interface TurnContextType {
   dismiss: (turnNo: number) => void;
   clearError: () => void;
   // API
-  act: (mapTokenId: number, description: string) => Promise<TurnInfo>;
+  /** Records the piece's action (044: replacing its previous one of the turn), optionally answering a chat entry. */
+  act: (mapTokenId: number, description: string, replyToTurnId?: number | null) => Promise<TurnInfo>;
   /** Also reloads the pieces (the move may be undone). */
   reset: (mapTokenId: number) => Promise<TurnResetResultInfo>;
   /** Master: finishes the turn; without `force` it only lists who still has to act. */
@@ -157,8 +158,8 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
     return campaignId;
   }, [campaignId]);
 
-  const act = useCallback(async (mapTokenId: number, description: string) => {
-    const result = await run(() => turnService.act(mapTokenId, description));
+  const act = useCallback(async (mapTokenId: number, description: string, replyToTurnId: number | null = null) => {
+    const result = await run(() => turnService.act(mapTokenId, description, replyToTurnId));
     await refresh();
     return result;
   }, [run, refresh]);

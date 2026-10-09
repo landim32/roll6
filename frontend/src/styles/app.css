@@ -831,31 +831,6 @@ body,
   margin-bottom: 0.1rem;
 }
 
-.stm-chat-menu {
-  min-width: 36px;
-  min-height: 36px;
-  padding: 0.25rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--bs-secondary-color);
-  opacity: 0;
-  border: none;
-}
-
-.stm-chat-message:hover .stm-chat-menu,
-.stm-chat-narration:hover .stm-chat-menu,
-.stm-chat-menu:focus-visible,
-.stm-chat-menu[data-state='open'] {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .stm-chat-menu {
-    opacity: 0.7;
-  }
-}
-
 .stm-chat-text .wmde-markdown {
   font-family: inherit;
   font-size: inherit;
@@ -1252,6 +1227,209 @@ body,
   to {
     opacity: 0.3;
   }
+}
+
+/* ---------- chat interactions (044) ---------- */
+/* Bubbles answer to holding and to a drag to the right: no text selection or callout on touch, and the browser keeps
+   the vertical scroll (pan-y) while a horizontal drag is ours. */
+.stm-chat-gestures {
+  position: relative;
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.15s ease-out;
+  outline: none;
+}
+
+.stm-chat-gestures:focus-visible .stm-chat-bubble,
+.stm-chat-gestures.stm-chat-narration:focus-visible {
+  box-shadow: 0 0 0 2px rgba(var(--stm-accent-rgb, 31, 214, 122), 0.6);
+}
+
+.stm-chat-swipe-icon {
+  position: absolute;
+  left: -2.2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--bs-body-color);
+}
+
+.is-flash .stm-chat-bubble,
+.stm-chat-narration.is-flash {
+  animation: stm-chat-flash 1.2s ease-out;
+}
+
+@keyframes stm-chat-flash {
+  0%, 40% { box-shadow: 0 0 0 3px rgba(var(--stm-accent-rgb, 31, 214, 122), 0.7); }
+  100% { box-shadow: none; }
+}
+
+/* The hold menu: up to five big buttons floating over the bubble. */
+.stm-chat-actions {
+  position: fixed;
+  z-index: 1070;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border-radius: 2rem;
+  background: var(--stm-surface, var(--bs-tertiary-bg));
+  border: 1px solid var(--stm-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.stm-chat-action {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--bs-body-color);
+}
+
+.stm-chat-action:hover,
+.stm-chat-action:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+
+.stm-chat-action.is-on { color: #4ea1ff; }
+.stm-chat-action.is-love.is-on { color: #ff5d73; }
+.stm-chat-action.is-act { color: var(--bs-danger-text-emphasis, #ea868f); }
+.stm-chat-action.is-danger { color: var(--bs-danger); }
+
+/* The quote inside a reply bubble and in the composer card. */
+.stm-chat-quote {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-left: 3px solid;
+  border-radius: 0.4rem;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  text-align: left;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+button.stm-chat-quote { cursor: pointer; }
+
+.stm-chat-quote-name {
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.stm-chat-quote-text {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--bs-secondary-color);
+}
+
+.stm-chat-reply-card,
+.stm-chat-paste {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--stm-surface, var(--bs-tertiary-bg));
+}
+
+.stm-chat-reply-card .stm-chat-quote {
+  flex: 1;
+  margin: 0;
+}
+
+.stm-chat-paste img {
+  max-height: 96px;
+  max-width: 50%;
+  border-radius: 0.5rem;
+}
+
+.stm-chat-paste-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+/* Reactions: a small pill at the bottom corner of the bubble. */
+.stm-chat-reactions-wrap {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.1rem -0.3rem -0.6rem 0;
+}
+
+.stm-chat-reactions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 24px;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--stm-border);
+  border-radius: 1rem;
+  background: var(--stm-surface, var(--bs-tertiary-bg));
+  color: var(--bs-body-color);
+  font-size: 0.72rem;
+}
+
+.stm-chat-reactions.is-mine { border-color: rgba(78, 161, 255, 0.6); }
+.stm-chat-reactions .is-like,
+.stm-chat-reactions-list .is-like { color: #4ea1ff; }
+.stm-chat-reactions .is-love,
+.stm-chat-reactions-list .is-love { color: #ff5d73; }
+
+.stm-chat-reactions-list {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 120px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.6rem;
+  background: var(--stm-surface, var(--bs-tertiary-bg));
+  border: 1px solid var(--stm-border);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* "Ação cancelada": the action stays, muted and struck. */
+.stm-chat-message.is-action.is-cancelled .stm-chat-bubble {
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.75;
+}
+
+.stm-chat-message.is-action.is-cancelled .stm-chat-text {
+  text-decoration: line-through;
+  color: var(--bs-secondary-color);
+}
+
+.stm-chat-cancelled-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--bs-secondary-color);
 }
 
 /* ---------- installable app (042) ---------- */

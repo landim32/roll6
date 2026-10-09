@@ -34,6 +34,8 @@ public class TurnServiceChatTests
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<INotificationQueue> _queue = new();
+    private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
+    private readonly Mock<IChatReactionRepository<ChatReaction>> _chatReactions = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IChatReadRepository<ChatRead>> _chatReadRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
@@ -67,11 +69,16 @@ public class TurnServiceChatTests
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string?>())).Returns((string? f) => f == null ? null : $"https://cdn/{f}");
 
+        // 044 defaults: no reactions, no reply targets, no earlier valid action.
+        _chatReactions.Setup(r => r.ListByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatReaction>());
+        _repository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Turn>());
+        _repository.Setup(r => r.ListValidActionsAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(new List<Turn>());
         _service = new TurnService(_repository.Object, _campaignRepository.Object, new Mock<IMapRepository<Map>>().Object,
-            new Mock<IMapTokenRepository<MapToken>>().Object, _campaignCharacterRepository.Object, _characterRepository.Object,
+            _mapTokenRepository.Object, _campaignCharacterRepository.Object, _characterRepository.Object,
             _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object,
             new Mock<IMapModelRepository<MapModel>>().Object, new Mock<ICampaignNpcRepository<CampaignNpc>>().Object,
-            new Mock<ITokenRepository<Token>>().Object, _chatReadRepository.Object, _imageStorage.Object, _queue.Object, _notifier.Object);
+            new Mock<ITokenRepository<Token>>().Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _queue.Object, _notifier.Object);
     }
 
     private static Turn At(Turn t, long id, int second)
@@ -444,5 +451,155 @@ public class TurnServiceChatTests
     public async Task Poke_Stranger_Is403()
     {
         await _service.Invoking(s => s.PokeAsync(STRANGER, CAMPAIGN)).Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    // --- 044: replies, reactions, conversion, cancelled actions ---
+
+    [Fact]
+    public async Task Send_AsAReply_CarriesTheQuote()
+    {
+        var target = Turn.Text(CAMPAIGN, MAP, 3, MASTER, null, "Mestre (GM) — Ana Paula", null, "Rolem **iniciativa**");
+        target.TurnId = 50;
+        _repository.Setup(r => r.GetByIdAsync(50)).ReturnsAsync(target);
+        _repository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Turn> { target });
+
+        var item = await _service.SendAsync(PLAYER, CAMPAIGN, new ChatSendInfo { CharacterId = ARIA, Text = "Rolei!", ReplyToTurnId = 50 });
+
+        item.ReplyTo.Should().BeEquivalentTo(new ChatReplyInfo
+        {
+            Key = "t50", TurnId = 50, DisplayName = "Mestre (GM) — Ana", Kind = "text", Excerpt = "Rolem iniciativa"
+        });
+        (item.CanReply, item.CanReact).Should().Be((true, true));
+    }
+
+    [Fact]
+    public async Task React_SetsSwitchesAndRemoves()
+    {
+        var target = Turn.Text(CAMPAIGN, MAP, 3, MASTER, null, "Mestre (GM) — Ana", null, "Oi");
+        target.TurnId = 60;
+        _repository.Setup(r => r.GetByIdAsync(60)).ReturnsAsync(target);
+
+        await _service.ReactAsync(PLAYER, 60, new ChatReactInfo { Kind = "like" });
+        _chatReactions.Verify(r => r.InsertAsync(It.Is<ChatReaction>(x => x.TurnId == 60 && x.UserId == PLAYER && x.Kind == ChatReactionKind.Like)), Times.Once);
+
+        var existing = ChatReaction.Create(60, PLAYER, ChatReactionKind.Like);
+        existing.ChatReactionId = 9;
+        _chatReactions.Setup(r => r.GetAsync(60, PLAYER)).ReturnsAsync(existing);
+        await _service.ReactAsync(PLAYER, 60, new ChatReactInfo { Kind = "love" });
+        _chatReactions.Verify(r => r.UpdateAsync(It.Is<ChatReaction>(x => x.Kind == ChatReactionKind.Love)), Times.Once);
+
+        await _service.ReactAsync(PLAYER, 60, new ChatReactInfo { Kind = "love" });
+        _chatReactions.Verify(r => r.DeleteAsync(9), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Exactly(3));
+        _queue.Verify(q => q.Enqueue(It.IsAny<TableNotice>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task React_StrangerIs403_AndMovesAreNotReactable()
+    {
+        var target = Turn.Text(CAMPAIGN, MAP, 3, MASTER, null, "Mestre (GM) — Ana", null, "Oi");
+        target.TurnId = 61;
+        _repository.Setup(r => r.GetByIdAsync(61)).ReturnsAsync(target);
+        await _service.Invoking(s => s.ReactAsync(STRANGER, 61, new ChatReactInfo { Kind = "like" })).Should().ThrowAsync<UnauthorizedAccessException>();
+
+        var move = Turn.Movement(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, (1, 1, 0), (1, 2, 0));
+        move.TurnId = 62;
+        _repository.Setup(r => r.GetByIdAsync(62)).ReturnsAsync(move);
+        await _service.Invoking(s => s.ReactAsync(PLAYER, 62, new ChatReactInfo { Kind = "like" })).Should().ThrowAsync<DomainValidationException>();
+    }
+
+    private Turn AriaText(long id, string text = "Abro a porta")
+    {
+        var turn = Turn.Text(CAMPAIGN, MAP, 3, PLAYER, ARIA, "Aria", null, text);
+        turn.TurnId = id;
+        _repository.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(turn);
+        return turn;
+    }
+
+    [Fact]
+    public async Task Convert_TextToAction_WhenThePieceIsOnTheMap()
+    {
+        var text = AriaText(70);
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken>
+        {
+            MapToken.PlaceCharacter(MAP, 5, 700, "Aria", 2, 2)
+        });
+        _campaignCharacterRepository.Setup(r => r.GetAsync(CAMPAIGN, ARIA)).ReturnsAsync(new CampaignCharacter
+            { CampaignCharacterId = 700, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved });
+
+        await _service.ConvertAsync(PLAYER, 70, new ChatConvertInfo { To = "action" });
+
+        text.IsValidAction.Should().BeTrue();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 70 && t.TurnType == TurnType.Action)), Times.Once);
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Convert_TextToAction_WithoutAPiece_Is400()
+    {
+        AriaText(71);
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken>());
+
+        await _service.Invoking(s => s.ConvertAsync(PLAYER, 71, new ChatConvertInfo { To = "action" }))
+            .Should().ThrowAsync<DomainValidationException>();
+    }
+
+    [Fact]
+    public async Task Convert_ActionToMessage_ByTheMaster()
+    {
+        var action = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Ataco");
+        action.TurnId = 72;
+        _repository.Setup(r => r.GetByIdAsync(72)).ReturnsAsync(action);
+
+        await _service.ConvertAsync(MASTER, 72, new ChatConvertInfo { To = "message" });
+
+        (action.TurnType, action.DisplayName).Should().Be((TurnType.Text, "Aria"));
+    }
+
+    [Fact]
+    public async Task Convert_SomeoneElsesCharacter_Is403_AndOldTurns400()
+    {
+        _userRepository.Setup(r => r.GetByIdAsync(STRANGER)).ReturnsAsync(new User { UserId = STRANGER, Name = "X" });
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(CAMPAIGN, STRANGER)).ReturnsAsync(true);
+        AriaText(73);
+        await _service.Invoking(s => s.ConvertAsync(STRANGER, 73, new ChatConvertInfo { To = "action" }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+
+        var old = Turn.Text(CAMPAIGN, MAP, 2, PLAYER, ARIA, "Aria", null, "Antes");
+        old.TurnId = 74;
+        _repository.Setup(r => r.GetByIdAsync(74)).ReturnsAsync(old);
+        await _service.Invoking(s => s.ConvertAsync(PLAYER, 74, new ChatConvertInfo { To = "action" }))
+            .Should().ThrowAsync<DomainValidationException>();
+    }
+
+    [Fact]
+    public async Task DeleteAnAction_CancelsIt_ForTheOwnerOrTheMaster()
+    {
+        var action = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Ataco");
+        action.TurnId = 75;
+        _repository.Setup(r => r.GetByIdAsync(75)).ReturnsAsync(action);
+
+        await _service.DeleteMessageAsync(PLAYER, 75);
+
+        action.IsCancelled.Should().BeTrue();
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_DELETED)), Times.Never);
+    }
+
+    [Fact]
+    public async Task List_ShowsCancelledActionsAndWhatTheViewerMayDo()
+    {
+        var cancelled = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Ataco");
+        cancelled.TurnId = 80;
+        cancelled.Cancel(DateTime.UtcNow);
+        var text = Turn.Text(CAMPAIGN, MAP, 3, PLAYER, ARIA, "Aria", null, "Abro");
+        text.TurnId = 81;
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, It.IsAny<int>())).ReturnsAsync(new List<Turn> { cancelled, text });
+
+        var page = await _service.ListAsync(PLAYER, CAMPAIGN, null, null, null);
+
+        var items = page.Items.ToDictionary(i => i.TurnId);
+        (items[80].Cancelled, items[80].CanDelete, items[80].CanConvert).Should().Be((true, false, (string?)null));
+        (items[81].CanConvert, items[81].CanReply).Should().Be(("action", true));
     }
 }

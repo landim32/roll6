@@ -19,6 +19,8 @@ export const TABLE_EVENT = {
   chatMessage: 'chat.message',
   /** A chat message or narration was deleted (041); data = { itemKey }. */
   chatDeleted: 'chat.deleted',
+  /** A chat entry changed in place (044): reactions, converted, cancelled; data = ChatItemInfo. */
+  chatUpdated: 'chat.updated',
   resync: 'resync',
 } as const;
 

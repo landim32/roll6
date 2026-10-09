@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent, KeyboardEvent } from 'react';
+import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AudioRecorder } from './AudioRecorder';
-import { Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
+import { ReplyQuote } from './ReplyQuote';
+import { pickClipboardImage } from '../../lib/clipboardImage';
+import { replyExcerpt } from '../../lib/chatItems';
+import { Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -27,7 +30,8 @@ type ComposerMode = 'talk' | 'act';
  */
 export const ChatComposer = () => {
   const { t } = useTranslation();
-  const { speaker, send, roll, poke, filters, setFilters } = useChat();
+  const { speaker, send, roll, poke, filters, setFilters, replyTo, cancelReply } = useChat();
+  const [pasted, setPasted] = useState<{ file: File; url: string } | null>(null);
   const { mapTokens } = useMapToken();
   const { act } = useTurn();
   const [text, setText] = useState('');
@@ -52,7 +56,8 @@ export const ChatComposer = () => {
       if (!piece) return;
       try {
         setBusy(true);
-        await act(piece.mapTokenId, value);
+        await act(piece.mapTokenId, value, replyTo?.turnId ?? null);
+        cancelReply();
         setText('');
         // Back to talking, like closing an attachment.
         setMode('talk');
@@ -75,10 +80,8 @@ export const ChatComposer = () => {
     }
   };
 
-  const onPickImage = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
+  /** A photo with the field's text as caption — from the clip or pasted (044). */
+  const sendPhoto = async (file: File) => {
     if (!IMAGE_TYPES.split(',').includes(file.type)) {
       toast.error(t('chat.imageType'));
       return;
@@ -98,6 +101,39 @@ export const ChatComposer = () => {
     } finally {
       setBusy(false);
     }
+  };
+
+  const onPickImage = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) await sendPhoto(file);
+  };
+
+  /** Ctrl+V / colar of a picture (044): a preview with Enviar/Cancelar; plain text pastes as usual. */
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const pick = pickClipboardImage(event.clipboardData.items);
+    if (!pick.file && !pick.unsupported) return;
+    event.preventDefault();
+    if (!pick.file) {
+      toast.error(t('chat.imageType'));
+      return;
+    }
+    if (pick.extra > 0) toast.info(t('chat.pasteOnlyFirst'));
+    setPasted((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return { file: pick.file!, url: URL.createObjectURL(pick.file!) };
+    });
+  };
+
+  const clearPasted = () => setPasted((current) => {
+    if (current) URL.revokeObjectURL(current.url);
+    return null;
+  });
+
+  const sendPasted = async () => {
+    const file = pasted?.file;
+    clearPasted();
+    if (file) await sendPhoto(file);
   };
 
   const onSendAudio = async (blob: Blob, type: string, seconds: number) => {
@@ -147,6 +183,25 @@ export const ChatComposer = () => {
 
   return (
     <div className="stm-chat-composer">
+      {replyTo && (
+        <div className="stm-chat-reply-card">
+          <ReplyIcon size={16} />
+          <ReplyQuote reply={{
+            key: replyTo.key, turnId: replyTo.turnId, displayName: replyTo.displayName, kind: replyTo.kind,
+            excerpt: replyExcerpt(replyTo), deleted: replyTo.deleted, cancelled: !!replyTo.cancelled,
+          }} />
+          <button type="button" className="btn-close" onClick={cancelReply} aria-label={t('chat.cancelReply')} title={t('chat.cancelReply')} />
+        </div>
+      )}
+      {pasted && (
+        <div className="stm-chat-paste">
+          <img src={pasted.url} alt={t('chat.image')} />
+          <div className="stm-chat-paste-actions">
+            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearPasted}>{t('common.cancel')}</button>
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => { void sendPasted(); }} disabled={busy}>{t('chat.send')}</button>
+          </div>
+        </div>
+      )}
       <input ref={fileRef} type="file" accept={IMAGE_TYPES} className="d-none" onChange={(e) => { void onPickImage(e); }} />
       <div className="stm-chat-input">
         {!recording && (
@@ -154,7 +209,7 @@ export const ChatComposer = () => {
             <textarea rows={1} maxLength={max} value={text}
               placeholder={acting ? t('chat.actPlaceholder') : t('chat.placeholder', { name: participation?.characterName ?? t('chat.master') })}
               aria-label={acting ? t('chat.actPlaceholder') : t('chat.messageLabel')}
-              onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} disabled={busy} />
+              onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} onPaste={onPaste} disabled={busy} />
             <DropdownMenu.Root modal={false}>
               <DropdownMenu.Trigger className="stm-chat-field-btn" disabled={busy} title={t('chat.attach')} aria-label={t('chat.attach')}>
                 <PaperclipIcon size={22} />

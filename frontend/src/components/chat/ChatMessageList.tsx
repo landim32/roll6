@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatItem } from './ChatItem';
+import { ChatItemActions } from './ChatItemActions';
 import { ImageLightbox } from './ImageLightbox';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { useAuth } from '../../hooks/useAuth';
@@ -17,7 +18,9 @@ const STICK_PX = 48;
 export const ChatMessageList = () => {
   const { t } = useTranslation();
   const { session } = useAuth();
-  const { items: allItems, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters } = useChat();
+  const {
+    items: allItems, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters, startReply, react, convert,
+  } = useChat();
   // Moves and character changes show only when the user turned them on in the paperclip.
   const items = useMemo(() => filterChatItems(allItems, filters), [allItems, filters]);
   /** "Novas mensagens" goes before the first unread item still shown (the first unread may be a hidden one). */
@@ -34,6 +37,36 @@ export const ChatMessageList = () => {
   const [toDelete, setToDelete] = useState<ChatItemInfo | null>(null);
   const [image, setImage] = useState<{ url: string; caption: string | null } | null>(null);
   const userId = session?.user.userId ?? null;
+  /** The entry whose action bar is open (044) and the bubble it floats over. */
+  const [actions, setActions] = useState<{ item: ChatItemInfo; anchor: HTMLElement } | null>(null);
+  /** The original of a quote just tapped, highlighted for a moment. */
+  const [flashKey, setFlashKey] = useState<string | null>(null);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const hasMoreRef = useRef(hasMore);
+  hasMoreRef.current = hasMore;
+
+  const run = (work: () => Promise<void>) => {
+    work().catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')));
+  };
+
+  /** Scrolls to an entry, loading older pages until it shows up (at most 10), and flashes it. */
+  const openQuote = async (key: string) => {
+    for (let page = 0; page <= 10; page += 1) {
+      const element = scrollRef.current?.querySelector<HTMLElement>(`[data-chat-key="${key}"]`);
+      if (element) {
+        element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setFlashKey(key);
+        window.setTimeout(() => setFlashKey((current) => (current === key ? null : current)), 1200);
+        return;
+      }
+      if (!hasMoreRef.current) break;
+      heightBeforeRef.current = scrollRef.current?.scrollHeight ?? null;
+      await loadOlder();
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    }
+    toast.info(t('chat.originalNotFound'));
+  };
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -94,7 +127,7 @@ export const ChatMessageList = () => {
         <p className="stm-chat-empty text-body-secondary">{t('chat.empty')}</p>
       )}
       {items.map((item, index) => (
-        <div key={item.key}>
+        <div key={item.key} data-chat-key={item.key}>
           {item.key === unreadKey && (
             <div ref={unreadRef} className="stm-chat-unread" role="separator"><span>{t('chat.newMessages')}</span></div>
           )}
@@ -102,7 +135,11 @@ export const ChatMessageList = () => {
             item={item}
             continued={index > 0 && item.key !== unreadKey && continuesPrevious(items[index - 1], item)}
             own={item.userId === userId}
-            onDelete={setToDelete}
+            userId={userId}
+            flash={item.key === flashKey}
+            onActions={(target, anchor) => setActions({ item: target, anchor })}
+            onReply={startReply}
+            onOpenQuote={(key) => { void openQuote(key); }}
             onOpenImage={(url, caption) => setImage({ url, caption })}
           />
         </div>
@@ -130,13 +167,25 @@ export const ChatMessageList = () => {
       <ConfirmModal
         open={toDelete !== null}
         onOpenChange={(o) => { if (!o) setToDelete(null); }}
-        title={t('chat.deleteTitle')}
-        message={t('chat.deleteMessage')}
-        confirmLabel={t('chat.delete')}
+        title={t(toDelete?.kind === 'action' ? 'chat.cancelActionTitle' : 'chat.deleteTitle')}
+        message={t(toDelete?.kind === 'action' ? 'chat.cancelActionMessage' : 'chat.deleteMessage')}
+        confirmLabel={t(toDelete?.kind === 'action' ? 'chat.cancelAction' : 'chat.delete')}
         onConfirm={onConfirmDelete}
         danger
       />
       <ImageLightbox image={image} onClose={() => setImage(null)} />
+      {actions && (
+        <ChatItemActions
+          item={allItems.find((i) => i.key === actions.item.key) ?? actions.item}
+          anchor={actions.anchor}
+          userId={userId}
+          onClose={() => setActions(null)}
+          onReact={(kind) => run(() => react(actions.item, kind))}
+          onReply={() => startReply(actions.item)}
+          onConvert={(to) => run(() => convert(actions.item, to))}
+          onDelete={() => setToDelete(actions.item)}
+        />
+      )}
     </div>
   );
 };
