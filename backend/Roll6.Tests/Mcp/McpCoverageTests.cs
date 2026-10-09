@@ -17,7 +17,7 @@ public class McpCoverageTests
         expected.Should().OnlyHaveUniqueItems();
         mapped.Should().OnlyHaveUniqueItems("each operation is exposed by a single tool");
         mapped.Should().BeEquivalentTo(expected);
-        expected.Should().HaveCount(95);
+        expected.Should().HaveCount(97);
     }
 
     [Fact]
@@ -37,6 +37,6 @@ public class McpCoverageTests
         tools.Select(t => t.Name).Should().OnlyHaveUniqueItems();
         tools.Should().OnlyContain(t => System.Text.RegularExpressions.Regex.IsMatch(t.Name, "^[a-z]+(_[a-z0-9]+)*$"));
         tools.Where(t => t.Operation == null).Select(t => t.Name).Should().Equal("get_roll6_guide");
-        tools.Should().HaveCount(96);
+        tools.Should().HaveCount(98);
     }
 }

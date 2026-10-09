@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HeartFillIcon, ThumbsUpFillIcon } from '../ui/icons';
+import { EmojiLaughingFillIcon, HeartFillIcon, ThumbsUpFillIcon } from '../ui/icons';
 import { reactionSummary } from '../../lib/chatItems';
 import { REACTION } from '../../types/chat';
 import type { ChatReactionInfo } from '../../types/chat';
@@ -24,13 +24,16 @@ export const ReactionsBadge = ({ reactions, userId }: ReactionsBadgeProps) => {
         aria-expanded={open} title={t('chat.whoReacted')} aria-label={t('chat.reactionsLabel', { count: summary.total })}>
         {summary.like > 0 && <ThumbsUpFillIcon size={13} className="is-like" />}
         {summary.love > 0 && <HeartFillIcon size={13} className="is-love" />}
+        {summary.laugh > 0 && <EmojiLaughingFillIcon size={13} className="is-laugh" />}
         {summary.total > 1 && <span>{summary.total}</span>}
       </button>
       {open && (
         <span className="stm-chat-reactions-list" role="list">
           {(reactions ?? []).map((r) => (
             <span key={r.userId} role="listitem">
-              {r.kind === REACTION.love ? <HeartFillIcon size={12} className="is-love" /> : <ThumbsUpFillIcon size={12} className="is-like" />}
+              {r.kind === REACTION.love ? <HeartFillIcon size={12} className="is-love" />
+                : r.kind === REACTION.laugh ? <EmojiLaughingFillIcon size={12} className="is-laugh" />
+                  : <ThumbsUpFillIcon size={12} className="is-like" />}
               {' '}{r.name}
             </span>
           ))}

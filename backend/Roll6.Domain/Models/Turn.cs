@@ -137,6 +137,21 @@ public class Turn
         return turn;
     }
 
+    /// <summary>
+    /// A poll in the chat (045), as a character or as the master: the question goes in the description; the options are
+    /// <see cref="ChatPollOption"/> rows checked by <see cref="ChatPollOption.CheckAll"/>.
+    /// </summary>
+    public static Turn Poll(long campaignId, long? mapId, int turnNo, long userId, long? characterId, string displayName,
+        string? displayImage, string? question)
+    {
+        var turn = Speech(campaignId, mapId, turnNo, userId, characterId, displayName, displayImage, TurnType.Poll);
+        var text = question?.Trim();
+        if (string.IsNullOrEmpty(text) || text.Length > ChatPollOption.MAX_QUESTION)
+            throw new DomainValidationException("question", $"A pergunta deve ter de 1 a {ChatPollOption.MAX_QUESTION} caracteres.");
+        turn.Description = text;
+        return turn;
+    }
+
     /// <summary>The faces of a roll; empty for anything else.</summary>
     public IReadOnlyList<int> DiceValues() =>
         string.IsNullOrEmpty(Dice) ? Array.Empty<int>() : Dice.Split(',').Select(int.Parse).ToArray();

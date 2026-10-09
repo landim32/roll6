@@ -5,9 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AudioRecorder } from './AudioRecorder';
 import { ReplyQuote } from './ReplyQuote';
+import { PollComposerModal } from './PollComposerModal';
 import { pickClipboardImage } from '../../lib/clipboardImage';
 import { replyExcerpt } from '../../lib/chatItems';
-import { Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
+import { BarChartLineIcon, Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -38,6 +39,7 @@ export const ChatComposer = () => {
   const [mode, setMode] = useState<ComposerMode>('talk');
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const recordable = useMemo(canRecord, []);
 
@@ -203,6 +205,7 @@ export const ChatComposer = () => {
         </div>
       )}
       <input ref={fileRef} type="file" accept={IMAGE_TYPES} className="d-none" onChange={(e) => { void onPickImage(e); }} />
+      <PollComposerModal open={pollOpen} onOpenChange={setPollOpen} />
       <div className="stm-chat-input">
         {!recording && (
           <div className={`stm-chat-field${acting ? ' is-acting' : ''}`}>
@@ -230,6 +233,10 @@ export const ChatComposer = () => {
                       <DropdownMenu.Item className="stm-chat-attach-item" onSelect={pickImage}>
                         <span className="stm-chat-attach-icon is-photo"><ImageIcon size={24} /></span>
                         <span>{t('chat.photoOption')}</span>
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => setPollOpen(true)}>
+                        <span className="stm-chat-attach-icon is-poll"><BarChartLineIcon size={24} /></span>
+                        <span>{t('chat.pollOption')}</span>
                       </DropdownMenu.Item>
                     </>
                   )}

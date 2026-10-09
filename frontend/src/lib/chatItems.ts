@@ -1,3 +1,4 @@
+import { pollCopyText } from './chatPoll';
 import { CHAT_KIND } from '../types/chat';
 import { REACTION } from '../types/chat';
 import type { ChatChangeInfo, ChatItemInfo, ChatKind, ChatReactionInfo, ReactionKind } from '../types/chat';
@@ -120,11 +121,12 @@ export const rollTotal = (dice: readonly number[] | null | undefined): number =>
 
 /**
  * What "Copiar" puts on the clipboard for a chat entry: the message or caption, the action's text, the narration's
- * markdown, a roll as "5 + 3 + 6 = 14" plus its reason. Null when there is nothing to copy (a photo or a recording
+ * markdown, a roll as "5 + 3 + 6 = 14" plus its reason, a poll as its question and options with their votes. Null when there is nothing to copy (a photo or a recording
  * without caption, a deleted entry), so the bar shows no Copiar button.
  */
 export const copyableText = (item: ChatItemInfo): string | null => {
   if (item.deleted) return null;
+  if (item.kind === CHAT_KIND.poll && item.poll) return pollCopyText(item.poll);
   if (item.kind === CHAT_KIND.roll && item.dice && item.dice.length > 0) {
     const roll = `${item.dice.join(' + ')} = ${rollTotal(item.dice)}`;
     const reason = item.text?.trim();
@@ -160,7 +162,7 @@ export interface ViewerContext {
 }
 
 const REPLYABLE: ReadonlySet<ChatKind> = new Set<ChatKind>([
-  CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio, CHAT_KIND.roll, CHAT_KIND.action, CHAT_KIND.narration,
+  CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio, CHAT_KIND.roll, CHAT_KIND.poll, CHAT_KIND.action, CHAT_KIND.narration,
 ]);
 
 /**
@@ -190,6 +192,7 @@ export const permissionsFor = (item: ChatItemInfo, viewer: ViewerContext): ChatI
 export interface ReactionSummary {
   like: number;
   love: number;
+  laugh: number;
   total: number;
   /** The viewer's own reaction. */
   mine: ReactionKind | null;
@@ -199,7 +202,8 @@ export const reactionSummary = (reactions: ChatReactionInfo[] | undefined, userI
   const list = reactions ?? [];
   const like = list.filter((r) => r.kind === REACTION.like).length;
   const love = list.filter((r) => r.kind === REACTION.love).length;
-  return { like, love, total: like + love, mine: list.find((r) => r.userId === userId)?.kind ?? null };
+  const laugh = list.filter((r) => r.kind === REACTION.laugh).length;
+  return { like, love, laugh, total: like + love + laugh, mine: list.find((r) => r.userId === userId)?.kind ?? null };
 };
 
 /** The reaction that tapping `kind` leaves: the same one again removes it. */
@@ -213,6 +217,7 @@ export const replyExcerpt = (item: ChatItemInfo): string => {
     case CHAT_KIND.image: return cut ? `Foto: ${cut}` : 'Foto';
     case CHAT_KIND.audio: return 'Áudio';
     case CHAT_KIND.roll: return `Rolou 3d6: total ${rollTotal(item.dice)}`;
+    case CHAT_KIND.poll: return `Enquete: ${cut}`;
     case CHAT_KIND.action: return `Ação: ${(item.description ?? '').slice(0, 120)}`;
     case CHAT_KIND.narration: return cut;
     default: return cut;

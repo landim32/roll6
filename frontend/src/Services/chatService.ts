@@ -1,4 +1,6 @@
-import type { ChatAudioUploadInfo, ChatItemInfo, ChatPageInfo, ChatRollInfo, ChatSendInfo, ReactionKind } from '../types/chat';
+import type {
+  ChatAudioUploadInfo, ChatItemInfo, ChatPageInfo, ChatPollCreateInfo, ChatRollInfo, ChatSendInfo, ReactionKind,
+} from '../types/chat';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface ChatServiceConfig {
@@ -53,7 +55,23 @@ class ChatService {
     return this.handleResponse<ChatItemInfo>(response);
   }
 
-  /** Curtir / Amei, or null to remove the reaction (044). */
+  /** A poll in the chat (045). */
+  async createPoll(campaignId: number, info: ChatPollCreateInfo): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/chat/poll`, {
+      method: 'POST', headers: getHeaders(true), body: JSON.stringify(info),
+    });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
+  /** Puts the voter's vote on `optionId`, or withdraws it (null) (045). `characterId` null = the master. */
+  async vote(turnId: number, characterId: number | null, optionId: number | null): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/chat/${turnId}/vote`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ characterId, optionId }),
+    });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
+  /** Curtir / Amei / Gargalhada, or null to remove the reaction (044, 045). */
   async react(turnId: number, kind: ReactionKind | null): Promise<ChatItemInfo> {
     const response = await fetch(`${API_URL}/api/chat/${turnId}/reaction`, {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ kind }),

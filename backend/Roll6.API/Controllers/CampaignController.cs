@@ -223,6 +223,22 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>A poll in the chat (045): a question and 2–12 options; each approved character and the master vote once.</summary>
+    [HttpPost("{id:long}/chat/poll")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status201Created)]
+    public async Task<IActionResult> CreatePoll(long id, [FromBody] ChatPollCreateInfo info)
+    {
+        try
+        {
+            var item = await _chatService.CreatePollAsync(CurrentUserId, id, info);
+            return StatusCode(StatusCodes.Status201Created, item);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>
     /// Pokes the players whose characters haven't acted in the turn (043): a line in the chat and a notification to each.
     /// Master or approved participant; once a minute per person (409 otherwise).

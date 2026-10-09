@@ -90,12 +90,58 @@ public static class ChatTools
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat/roll",
             new ChatRollInfo { CharacterId = characterId, Text = text });
 
+    [McpServerTool(Name = "create_chat_poll", Title = "Create a poll in the chat", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
+    [ApiOperation("POST", "/api/campaign/{id}/chat/poll")]
+    [Description($$"""
+        What it does: asks the table a question in the campaign chat, like a WhatsApp poll: one question (≤ 300
+        characters) and 2–12 options (≤ 100 characters each, no two alike ignoring case and spaces; empty ones are
+        dropped). Each character approved in the campaign votes once, and the master has one vote of his own as "Mestre";
+        votes are public and can be moved or withdrawn (vote_chat_poll). Asked as one of your approved characters
+        (characterId) or, omitting it, as the master. It is a chat message: it notifies the table ("Enquete: …"), can be
+        replied to, reacted to and deleted by its author or the master; it is not a turn record.
+        Who can use it: the campaign master (with or without a character) or a player as his own approved character.
+        Returns: the new item, kind "poll", with poll = { question, totalVotes, options: [{ optionId, text, votes,
+        voters: [{ characterId|null, name, imageUrl }] }] }. {{ITEM}}
+        Common errors: 400 question empty/too long, fewer than 2 or more than 12 options, an option too long or repeated,
+        bad replyToTurnId; 403 not your approved character / not the master without a character; 404 campaign not found.
+        Related tools: vote_chat_poll, list_chat_messages, send_chat_message.
+        """)]
+    public static Task<CallToolResult> CreateChatPoll(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("The question (≤ 300 characters). Example: \"Para onde vamos?\".")] string question,
+        [Description("The answers, 2 to 12, each ≤ 100 characters and different from the others. Example: [\"Floresta\", \"Caverna\"].")] List<string> options,
+        [Description("Optional: one of your characters approved in the campaign. Omit to ask as the master (only the master can).")] long? characterId = null,
+        [Description("Optional: turnId of the chat entry this poll answers.")] long? replyToTurnId = null) =>
+        api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat/poll",
+            new ChatPollCreateInfo { CharacterId = characterId, Question = question, Options = options, ReplyToTurnId = replyToTurnId });
+
+    [McpServerTool(Name = "vote_chat_poll", Title = "Vote on a chat poll", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/chat/{id}/vote")]
+    [Description($$"""
+        What it does: puts the voter's single vote on an option of a chat poll, moving it from the option it was on, or
+        withdraws it (optionId omitted). The voter is one of your characters approved in the campaign (characterId) or,
+        omitting it, the master's own vote. Each character and the master count once; votes are public and notify nobody.
+        Who can use it: the owner of an approved character (as that character) or the campaign master (as "Mestre").
+        Returns: the updated poll item. {{ITEM}}
+        Common errors: 400 not a poll, deleted poll, option of another poll; 403 not your approved character / not the
+        master without a character; 404 entry not found.
+        Related tools: create_chat_poll, list_chat_messages.
+        """)]
+    public static Task<CallToolResult> VoteChatPoll(
+        Roll6ApiClient api,
+        [Description("Id of the poll (turnId from list_chat_messages or create_chat_poll).")] long turnId,
+        [Description("optionId from the poll's options; omit to withdraw the vote.")] long? optionId = null,
+        [Description("Optional: the voting character (yours, approved). Omit to vote as the master.")] long? characterId = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/chat/{turnId}/vote", new ChatPollVoteInfo { CharacterId = characterId, OptionId = optionId });
+
     [McpServerTool(Name = "react_to_chat_message", Title = "React to a chat entry", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/chat/{id}/reaction")]
     [Description($$"""
-        What it does: sets your reaction to a chat entry — "like" (Curtir, thumbs up) or "love" (Amei, heart) — switching
-        the one you had, or removes it (kind omitted, or the same kind again). One reaction per person and entry. Works on
-        messages, photos, audios, rolls, actions and narrations. Reactions notify nobody.
+        What it does: sets your reaction to a chat entry — "like" (Curtir, thumbs up), "love" (Amei, heart) or "laugh"
+        (Gargalhada, laughing face) — switching the one you had, or removes it (kind omitted, or the same kind again). One
+        reaction per person and entry. Works on messages, photos, audios, rolls, polls, actions and narrations. Reactions
+        notify nobody.
         Who can use it: the campaign master or a player with an approved character.
         Returns: the updated item. {{ITEM}}
         Common errors: 400 not reactable (moves, changes, dividers, pokes, deleted) or unknown kind, 403 no access, 404 not found.
@@ -104,7 +150,7 @@ public static class ChatTools
     public static Task<CallToolResult> ReactToChatMessage(
         Roll6ApiClient api,
         [Description("Id of the item (turnId from list_chat_messages).")] long turnId,
-        [Description("\"like\" or \"love\"; omit to remove your reaction.")] string? kind = null) =>
+        [Description("\"like\", \"love\" or \"laugh\"; omit to remove your reaction.")] string? kind = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/chat/{turnId}/reaction", new ChatReactInfo { Kind = kind });
 
     [McpServerTool(Name = "convert_chat_entry", Title = "Convert a message into an action or back", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]

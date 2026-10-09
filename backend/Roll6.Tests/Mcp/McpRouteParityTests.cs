@@ -35,7 +35,7 @@ public class McpRouteParityTests
     private static string RoutePattern(string route) =>
         "^" + Regex.Replace(Regex.Escape(route), @"\\\{\w+}", @"[^/]+") + "$";
 
-    /// <summary>Calls a tool with sample values: numbers 11, 12…, texts "sample", base64 for content, defaults for optionals.</summary>
+    /// <summary>Calls a tool with sample values: numbers 11, 12…, texts "sample", text lists, base64 for content, defaults for optionals.</summary>
     private static async Task<CallToolResult> Invoke(MethodInfo method, Roll6ApiClient api)
     {
         var next = 11;
@@ -48,6 +48,7 @@ public class McpRouteParityTests
             if (type == typeof(int)) return next++;
             if (type == typeof(bool)) return true;
             if (type == typeof(string)) return p.Name == "contentBase64" ? Convert.ToBase64String(new byte[] { 1, 2, 3 }) : p.Name == "fileName" ? "sample.png" : "sample";
+            if (type == typeof(List<string>)) return new List<string> { "sample", "other" };
             throw new InvalidOperationException($"No sample for {p.ParameterType} {p.Name}");
         }).ToArray();
         return await (Task<CallToolResult>)method.Invoke(null, args)!;
