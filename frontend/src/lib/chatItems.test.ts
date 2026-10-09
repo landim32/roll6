@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  compareCursors, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
+  authorLabel, chatLabel, compareCursors, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
 
@@ -111,5 +111,16 @@ describe('rolls and turn bubbles', () => {
   it('runs moves, actions and character changes of the same actor together', () => {
     expect(continuesPrevious(item(1, { kind: 'movement' }), item(2, { kind: 'characterUpdate' }))).toBe(true);
     expect(continuesPrevious(item(1, { kind: 'roll' }), item(2, { kind: 'text' }))).toBe(true);
+  });
+});
+
+describe('first names', () => {
+  it('cuts only the names of the users', () => {
+    expect(chatLabel('Comam Obabaroy (Bruno Carneiro)')).toBe('Comam Obabaroy (Bruno)');
+    expect(chatLabel('Mestre (GM) — Rodrigo Landim')).toBe('Mestre (GM) — Rodrigo');
+    expect(chatLabel('Goblin Chefe (GM)')).toBe('Goblin Chefe (GM)');
+    expect(chatLabel('Comam Obabaroy')).toBe('Comam Obabaroy');
+    expect(authorLabel('GM (Ana Paula)')).toBe('GM (Ana)');
+    expect(authorLabel('Henrique Souza')).toBe('Henrique');
   });
 });

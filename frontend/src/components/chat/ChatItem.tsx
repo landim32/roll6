@@ -7,7 +7,7 @@ import {
 } from '../ui/icons';
 import { CHAT_KIND } from '../../types/chat';
 import type { ChatItemInfo } from '../../types/chat';
-import { formatChanges, formatMovement, nameColor, rollTotal, shortName } from '../../lib/chatItems';
+import { authorLabel, chatLabel, formatChanges, formatMovement, nameColor, rollTotal, shortName } from '../../lib/chatItems';
 import { formatSeconds } from '../../lib/audioFormat';
 
 const MarkdownView = lazy(() => import('../ui/MarkdownView'));
@@ -113,13 +113,13 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
         <div className={`stm-chat-message ${isAction ? 'is-action' : 'is-movement'}${own ? ' is-own' : ''}${continued ? ' is-continued' : ''}`}
           title={item.text ?? undefined}>
           <div className="stm-chat-avatar">
-            {!continued && <CharacterAvatar name={item.displayName} imageUrl={item.displayImageUrl} size={isAction ? 32 : 24} />}
+            {!continued && <CharacterAvatar name={chatLabel(item.displayName)} imageUrl={item.displayImageUrl} size={isAction ? 32 : 24} />}
           </div>
           <div className="stm-chat-bubble">
             {!continued && (
               <div className="stm-chat-name" style={isAction ? { color: nameColor(item.displayName) } : undefined}>
-                {item.displayName}
-                {item.authorLabel && <span className="stm-chat-author"> · {item.authorLabel}</span>}
+                {chatLabel(item.displayName)}
+                {item.authorLabel && <span className="stm-chat-author"> · {authorLabel(item.authorLabel)}</span>}
               </div>
             )}
             <div className="stm-chat-captioned">
@@ -151,7 +151,7 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
       return (
         <div className={`stm-chat-narration${item.deleted ? ' is-deleted' : ''}`}>
           <div className="stm-chat-narration-head">
-            <span>{t('chat.narration', { author: item.authorLabel ?? item.displayName })}</span>
+            <span>{t('chat.narration', { author: chatLabel(item.authorLabel ?? item.displayName) })}</span>
             <time className="stm-chat-time">{timeOf(item.createdAt)}</time>
             <ItemMenu item={item} onDelete={onDelete} />
           </div>
@@ -169,12 +169,12 @@ export const ChatItem = ({ item, continued, own, onDelete, onOpenImage }: ChatIt
         <div className={`stm-chat-message${own ? ' is-own' : ''}${continued ? ' is-continued' : ''}`}>
           {!own && (
             <div className="stm-chat-avatar">
-              {!continued && <CharacterAvatar name={item.displayName} imageUrl={item.displayImageUrl} size={32} />}
+              {!continued && <CharacterAvatar name={chatLabel(item.displayName)} imageUrl={item.displayImageUrl} size={32} />}
             </div>
           )}
           <div className="stm-chat-bubble">
             {!own && !continued && (
-              <div className="stm-chat-name" style={{ color: nameColor(item.displayName) }}>{item.displayName}</div>
+              <div className="stm-chat-name" style={{ color: nameColor(item.displayName) }}>{chatLabel(item.displayName)}</div>
             )}
             {item.deleted ? (
               <div className="stm-chat-text"><em className="text-body-secondary">{t('chat.deleted')}</em>{meta}</div>
