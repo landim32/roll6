@@ -32,6 +32,24 @@ export interface NoticeInfo {
   body: string;
 }
 
+/** A notice in the bell (inbox): exactly what the Web Push carried. */
+export interface UserNotificationInfo {
+  userNotificationId: number;
+  campaignId: number | null;
+  kind: string;
+  title: string;
+  body: string;
+  url: string | null;
+  /** UTC without a zone. */
+  createdAt: string;
+  read: boolean;
+}
+
+export interface UserNotificationPageInfo {
+  items: UserNotificationInfo[];
+  unreadCount: number;
+}
+
 export interface PokeResultInfo {
   poked: number;
   names: string[];

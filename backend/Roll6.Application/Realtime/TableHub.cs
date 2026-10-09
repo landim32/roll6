@@ -21,6 +21,9 @@ public class TableHub : Hub
     /// <summary>Personal notice shown as a toast (043).</summary>
     public const string NOTICE_METHOD = "notice";
 
+    /// <summary>The bell has a new notice (no data: the client reloads its inbox).</summary>
+    public const string INBOX_METHOD = "inbox";
+
     private readonly ICampaignService _campaignService;
     private readonly TableConnections _connections;
 

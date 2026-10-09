@@ -34,6 +34,9 @@ public static class McpToolCatalog
         "GET /api/push/key",
         "POST /api/push/subscription",
         "DELETE /api/push/subscription",
+        // The bell's inbox (what the Web Push already delivered to the person, read in the app).
+        "GET /api/push/inbox",
+        "PUT /api/push/inbox/read",
         // 040: link previews for crawlers (anonymous HTML fragment and picture), not for assistants.
         "GET /api/meta/head/{**path}",
         "GET /api/meta/image/map/{slug}.jpg"

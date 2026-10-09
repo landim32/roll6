@@ -80,4 +80,35 @@ public class PushController : ApiControllerBase
             return HandleException(ex);
         }
     }
+
+    /// <summary>The bell's inbox: the latest notices received (as the Web Push carried them) and the unread count.</summary>
+    [HttpGet("inbox")]
+    [ProducesResponseType(typeof(UserNotificationPageInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Inbox()
+    {
+        try
+        {
+            return Ok(await _pushService.ListInboxAsync(CurrentUserId));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Marks one notice (userNotificationId) or all of them as read.</summary>
+    [HttpPut("inbox/read")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> MarkInboxRead([FromBody] UserNotificationReadInfo info)
+    {
+        try
+        {
+            await _pushService.MarkInboxReadAsync(CurrentUserId, info);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
 }

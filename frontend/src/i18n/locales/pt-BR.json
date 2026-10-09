@@ -319,7 +319,16 @@
     "whatArrives": "Você recebe as mensagens do chat, os avisos do seu turno, as mudanças de PV e Fadiga do seu personagem e os cutucões. O mestre recebe também as ações dos personagens.",
     "campaigns": "Campanhas",
     "noCampaigns": "Você ainda não está em nenhuma campanha.",
-    "muted": "silenciada"
+    "muted": "silenciada",
+    "label": "Notificações",
+    "empty": "Nenhuma notificação",
+    "invite": "{{campaign}} (mestre {{owner}}) convidou {{character}}",
+    "accept": "Aceitar",
+    "decline": "Recusar",
+    "turnFinished": "Turno {{no}} finalizado",
+    "turnFinishedHint": "Clique para ver o resumo",
+    "markAllRead": "Marcar todas como lidas",
+    "unread": "Não lida"
   },
   "party": {
     "title": "Personagens ({{count}})",

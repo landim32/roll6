@@ -27,6 +27,7 @@ public class NoticeDispatcher
     private readonly ICampaignNotificationPrefRepository<CampaignNotificationPref> _prefRepository;
     private readonly IPushSubscriptionRepository<PushSubscription> _subscriptionRepository;
     private readonly IPushSender _sender;
+    private readonly IUserNotificationRepository<UserNotification> _inboxRepository;
     private readonly IPresence _presence;
     private readonly INoticeChannel _channel;
     private readonly ILogger<NoticeDispatcher> _logger;
@@ -37,6 +38,7 @@ public class NoticeDispatcher
         ICharacterRepository<Character> characterRepository,
         ICampaignNotificationPrefRepository<CampaignNotificationPref> prefRepository,
         IPushSubscriptionRepository<PushSubscription> subscriptionRepository,
+        IUserNotificationRepository<UserNotification> inboxRepository,
         IPushSender sender,
         IPresence presence,
         INoticeChannel channel,
@@ -47,6 +49,7 @@ public class NoticeDispatcher
         _characterRepository = characterRepository;
         _prefRepository = prefRepository;
         _subscriptionRepository = subscriptionRepository;
+        _inboxRepository = inboxRepository;
         _sender = sender;
         _presence = presence;
         _channel = channel;
@@ -69,14 +72,19 @@ public class NoticeDispatcher
             return;
 
         var title = NoticeTexts.Title(notice.Speaker, campaign.Name);
+        var url = UrlOf(campaign);
         var pushUsers = new List<long>();
+        var delivered = new List<long>();
         foreach (var userId in recipients)
         {
             if (!notice.IsPersonal)
             {
                 // Looking at the chat already: nothing to warn about.
                 if (!_presence.IsChatVisible(userId, campaign.CampaignId))
+                {
                     pushUsers.Add(userId);
+                    delivered.Add(userId);
+                }
             }
             else if (_presence.IsCampaignVisible(userId, campaign.CampaignId))
             {
@@ -87,11 +95,22 @@ public class NoticeDispatcher
                     Title = title,
                     Body = notice.BodyFor(userId)
                 });
+                delivered.Add(userId);
             }
             else
             {
                 pushUsers.Add(userId);
+                delivered.Add(userId);
             }
+        }
+
+        // The bell lists every notice exactly as it was sent (push or toast).
+        if (delivered.Count > 0)
+        {
+            await _inboxRepository.InsertRangeAsync(delivered.Select(userId =>
+                UserNotification.Create(userId, campaign.CampaignId, KindKey(notice.Kind), title, notice.BodyFor(userId), url)));
+            foreach (var userId in delivered)
+                await _channel.InboxChangedAsync(userId);
         }
 
         if (pushUsers.Count == 0 || !_sender.Enabled)
@@ -121,7 +140,7 @@ public class NoticeDispatcher
             body = notice.BodyFor(subscription.UserId),
             icon = notice.IconUrl ?? DEFAULT_ICON,
             tag = chat ? $"campaign:{campaign.CampaignId}:chat" : $"campaign:{campaign.CampaignId}:{kind}",
-            url = $"/campaign/{campaign.Slug}?chat=1",
+            url = UrlOf(campaign),
             kind,
             renotify = !chat
         }, JSON);
@@ -143,6 +162,8 @@ public class NoticeDispatcher
                 break;
         }
     }
+
+    private static string UrlOf(Campaign campaign) => $"/campaign/{campaign.Slug}?chat=1";
 
     public static string KindKey(NoticeKind kind) => kind switch
     {

@@ -15,14 +15,20 @@ public class PushService : IPushService
     private readonly ICampaignRepository<Campaign> _campaignRepository;
     private readonly ICampaignCharacterRepository<CampaignCharacter> _campaignCharacterRepository;
     private readonly IPushSender _sender;
+    private readonly IUserNotificationRepository<UserNotification> _inboxRepository;
+
+    /// <summary>How many notices the bell shows.</summary>
+    public const int INBOX_SIZE = 30;
 
     public PushService(
         IPushSubscriptionRepository<PushSubscription> subscriptionRepository,
         ICampaignNotificationPrefRepository<CampaignNotificationPref> prefRepository,
         ICampaignRepository<Campaign> campaignRepository,
         ICampaignCharacterRepository<CampaignCharacter> campaignCharacterRepository,
-        IPushSender sender)
+        IPushSender sender,
+        IUserNotificationRepository<UserNotification> inboxRepository)
     {
+        _inboxRepository = inboxRepository;
         _subscriptionRepository = subscriptionRepository;
         _prefRepository = prefRepository;
         _campaignRepository = campaignRepository;
@@ -91,4 +97,27 @@ public class PushService : IPushService
             Muted = info.Muted
         };
     }
+
+    public async Task<UserNotificationPageInfo> ListInboxAsync(long userId)
+    {
+        var items = await _inboxRepository.ListByUserAsync(userId, INBOX_SIZE);
+        return new UserNotificationPageInfo
+        {
+            Items = items.Select(n => new UserNotificationInfo
+            {
+                UserNotificationId = n.UserNotificationId,
+                CampaignId = n.CampaignId,
+                Kind = n.Kind,
+                Title = n.Title,
+                Body = n.Body,
+                Url = n.Url,
+                CreatedAt = n.CreatedAt,
+                Read = n.ReadAt.HasValue
+            }).ToList(),
+            UnreadCount = await _inboxRepository.CountUnreadAsync(userId)
+        };
+    }
+
+    public Task MarkInboxReadAsync(long userId, UserNotificationReadInfo info) =>
+        _inboxRepository.MarkReadAsync(userId, info.UserNotificationId, DateTime.UtcNow);
 }

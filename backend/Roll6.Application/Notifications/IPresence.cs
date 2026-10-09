@@ -16,4 +16,7 @@ public interface IPresence
 public interface INoticeChannel
 {
     Task SendNoticeAsync(long userId, long campaignId, NoticeInfo notice);
+
+    /// <summary>Tells every window of the user that the bell has something new (any campaign).</summary>
+    Task InboxChangedAsync(long userId);
 }

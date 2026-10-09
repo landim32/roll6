@@ -77,6 +77,20 @@ public class SignalRRealtimeNotifier : IRealtimeNotifier, INoticeChannel
         }
     }
 
+    public async Task InboxChangedAsync(long userId)
+    {
+        try
+        {
+            var connections = _connections.ConnectionsOfUser(userId);
+            if (connections.Count > 0)
+                await _hub.Clients.Clients(connections).SendAsync(TableHub.INBOX_METHOD);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not tell user {UserId} about a new notice", userId);
+        }
+    }
+
     public async Task RemoveUserFromCampaignAsync(long userId, long campaignId)
     {
         try

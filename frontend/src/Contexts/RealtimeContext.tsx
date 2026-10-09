@@ -33,6 +33,9 @@ interface RealtimeContextType {
 
 /** Hub method of the personal notices (043). */
 const NOTICE_METHOD = 'notice';
+/** Hub method telling the bell a notice arrived; re-dispatched as a window event for the bell. */
+const INBOX_METHOD = 'inbox';
+export const INBOX_EVENT = 'roll6:inbox';
 
 const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined);
 
@@ -140,6 +143,8 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
       if (event.campaignId === joinedRef.current && event.campaignId === wantedRef.current) dispatch(event);
     });
     // Personal notices of the campaign on screen (043): "Falta apenas você", turn finished, PV, Fadiga, pokes.
+    // The bell has a new notice (any campaign): it reloads its inbox.
+    connection.on(INBOX_METHOD, () => window.dispatchEvent(new Event(INBOX_EVENT)));
     connection.on(NOTICE_METHOD, (notice: NoticeInfo) => {
       if (notice.campaignId === joinedRef.current) toast.info(notice.title, { description: notice.body });
     });
