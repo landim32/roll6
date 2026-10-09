@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useCampaign } from './useCampaign';
 import { useMapEditor } from './useMapEditor';
-import { campaignService } from '../Services/campaignService';
 import { ApiError } from '../Services/apiHelpers';
 import { parseTablePath, tablePathFor } from '../lib/tableRoute';
 
@@ -67,12 +66,13 @@ export const useTableRoute = (guard: () => Promise<boolean>) => {
           return;
         }
 
-        const map = await editorRef.current.openCampaignMapBySlug(path.slug!);
+        // A player asking for a map that isn't the campaign's current one gets the current one (039); the URL
+        // follows through the state → URL effect below.
+        const { campaign, outcome } = await editorRef.current.openCampaignMapBySlug(path.slug!);
         if (cancelled) return;
-        if (campaignRef.current.currentCampaign?.campaignId !== map.campaignId) {
-          const owner = await campaignService.getById(map.campaignId);
-          if (!cancelled) campaignRef.current.selectCampaign(owner);
-        }
+        if (campaignRef.current.currentCampaign?.campaignId !== campaign.campaignId) campaignRef.current.selectCampaign(campaign);
+        if (outcome === 'redirected') toast.info(t('route.notCurrentMap'));
+        if (outcome === 'noCurrentMap') toast.info(t('map.noCurrentMap'));
       } catch (err) {
         if (cancelled) return;
         toast.error(t(err instanceof ApiError && err.status === 403 ? 'route.forbidden' : 'route.notFound'));

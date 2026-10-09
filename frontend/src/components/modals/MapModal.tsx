@@ -14,7 +14,9 @@ import { useMapEditor } from '../../hooks/useMapEditor';
 import { mapModelService } from '../../Services/mapModelService';
 import { mapService } from '../../Services/mapService';
 import type { PagedList } from '../../types/common';
+import { MAP_STATUS_DELETED } from '../../types/map';
 import type { MapInfo } from '../../types/map';
+import { visibleCampaignMaps } from '../../lib/viewerMap';
 import type { MapModelInfo } from '../../types/mapModel';
 
 interface MapModalProps {
@@ -32,7 +34,7 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
   const navigate = useNavigate();
   const { session } = useAuth();
   const userId = session?.user.userId ?? null;
-  const { currentCampaign } = useCampaign();
+  const { currentCampaign, isMaster } = useCampaign();
   const { loadMapModel, newMap } = useMapEditor();
   const [tab, setTab] = useState('campaign');
   const [campaignMaps, setCampaignMaps] = useState<PagedList<MapInfo> | null>(null);
@@ -42,11 +44,22 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
   /** Map whose "Editar" button was clicked (name, grid, image, 3D mask and background). */
   const [editing, setEditing] = useState<MapEditTarget | null>(null);
 
+  /**
+   * The master pages through every campaign map; a player gets only the current one (039 FR-006), read directly
+   * because it may not be on the first page of the full list.
+   */
+  const loadCampaignMaps = async (campaignId: number, currentMapId: number | null, page: number): Promise<PagedList<MapInfo>> => {
+    if (isMaster) return mapService.listByCampaign(campaignId, page, PAGE_SIZE);
+    const current = currentMapId !== null ? [await mapService.getById(currentMapId)] : [];
+    const items = visibleCampaignMaps(current.filter((m) => m.status !== MAP_STATUS_DELETED), { isMaster, currentMapId });
+    return { items, page: 1, pageSize: PAGE_SIZE, totalCount: items.length };
+  };
+
   const load = useCallback(async (page: number) => {
     setLoading(true);
     try {
       if (tab === 'campaign') {
-        setCampaignMaps(currentCampaign ? await mapService.listByCampaign(currentCampaign.campaignId, page, PAGE_SIZE) : null);
+        setCampaignMaps(currentCampaign ? await loadCampaignMaps(currentCampaign.campaignId, currentCampaign.currentMapId, page) : null);
       } else {
         setModels(await mapModelService.list({ page, pageSize: PAGE_SIZE, mine: tab === 'mine', search: tab === 'search' ? search : undefined }));
       }
@@ -55,7 +68,8 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
     } finally {
       setLoading(false);
     }
-  }, [tab, currentCampaign, search, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadCampaignMaps only reads isMaster
+  }, [tab, currentCampaign, isMaster, search, t]);
 
   useEffect(() => {
     if (open) load(1);
@@ -129,7 +143,9 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
         </form>
       )}
       {tab === 'campaign' ? (
-        currentCampaign ? (
+        currentCampaign && !isMaster && campaignMaps && campaignMaps.items.length === 0 ? (
+          <p className="text-body-secondary">{t('map.noCurrentMap')}</p>
+        ) : currentCampaign ? (
           <PagedListView
             data={campaignMaps}
             loading={loading}

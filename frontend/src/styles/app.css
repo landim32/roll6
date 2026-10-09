@@ -45,6 +45,23 @@ body,
 }
 
 /* ---------- main layout ---------- */
+/* A player whose campaign has no current map yet (039): centered over the empty map area. */
+.stm-no-map-notice {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  max-width: calc(100% - 2rem);
+  padding: 0.75rem 1.25rem;
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  color: var(--bs-secondary-color);
+  text-align: center;
+  pointer-events: none;
+}
+
 .stm-main {
   position: relative;
   height: 100%;

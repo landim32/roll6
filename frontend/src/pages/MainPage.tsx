@@ -21,6 +21,7 @@ import { TokenModal } from '../components/modals/TokenModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { useMapEditor } from '../hooks/useMapEditor';
+import { useCampaign } from '../hooks/useCampaign';
 import { useMapToken } from '../hooks/useMapToken';
 import { useTurn } from '../hooks/useTurn';
 import { useTableRoute } from '../hooks/useTableRoute';
@@ -36,6 +37,9 @@ const StoryView = lazy(() => import('../components/story/StoryView'));
 /** Main screen: always the map with the grid; every other window opens as a modal over it. */
 export const MainPage = () => {
   const { isDirty, draft, viewMode, setViewMode } = useMapEditor();
+  const { currentCampaign, isMaster } = useCampaign();
+  /** A player in a campaign whose master hasn't picked a map yet sees no map, and says so (039). */
+  const noCurrentMap = !!currentCampaign && !isMaster && currentCampaign.currentMapId === null && draft.mapId === null;
   const { guard, requestSave, saveModalProps, unsavedModalProps } = useUnsavedGuard();
   useTableRoute(guard);
   const [campaignOpen, setCampaignOpen] = useState(false);
@@ -137,6 +141,7 @@ export const MainPage = () => {
           picking={tokenPick !== null || toDelete !== null}
         />
       )}
+      {noCurrentMap && <div className="stm-no-map-notice" role="status">{t('map.noCurrentMap')}</div>}
       <TopMenu
         onOpenCampaign={() => setCampaignOpen(true)}
         onOpenMap={() => setMapOpen(true)}
