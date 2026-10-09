@@ -29,7 +29,10 @@ public static class McpToolCatalog
         "GET /api/image/file/{fileName}",
         // 041: the reader's mark (UI state) and the browser's audio recording upload.
         "PUT /api/campaign/{id}/chat/read",
-        "POST /api/chat/audio"
+        "POST /api/chat/audio",
+        // 040: link previews for crawlers (anonymous HTML fragment and picture), not for assistants.
+        "GET /api/meta/head/{**path}",
+        "GET /api/meta/image/map/{slug}.jpg"
     };
 
     public record Tool(MethodInfo Method, McpServerToolAttribute Attribute, string Name, string Description, ApiOperationAttribute? Operation);

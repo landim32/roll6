@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Tabs } from '../components/ui/Tabs';
 import { useAuth } from '../hooks/useAuth';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { isTablePath } from '../lib/tableRoute';
 import { BrandLogo } from '../components/ui/BrandLogo';
 
@@ -22,6 +23,8 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, login, register, loading } = useAuth();
+  // Nothing of the table shows on the login page, nor in its tab (040).
+  useDocumentTitle({ mapName: null, campaignName: null, isCampaignMap: false });
   const [tab, setTab] = useState('signIn');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
