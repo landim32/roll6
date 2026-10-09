@@ -9,6 +9,8 @@ import { App } from './App';
 import { AuthProvider } from './Contexts/AuthContext';
 import { CampaignProvider } from './Contexts/CampaignContext';
 import { ChatProvider } from './Contexts/ChatContext';
+import { InstallProvider } from './Contexts/InstallContext';
+import { registerServiceWorker } from './lib/serviceWorker';
 import { CharacterProvider } from './Contexts/CharacterContext';
 import { MapEditorProvider } from './Contexts/MapEditorContext';
 import { MapTokenProvider } from './Contexts/MapTokenContext';
@@ -17,8 +19,8 @@ import { RealtimeProvider } from './Contexts/RealtimeContext';
 import { TokenProvider } from './Contexts/TokenContext';
 import { TurnProvider } from './Contexts/TurnContext';
 
-// Provider chain: Auth → Campaign (needs the session) → Realtime (table events of the current campaign; every
-// provider below reacts to them) → Character (needs the campaign) → MapEditor →
+// Provider chain: Auth → Install (the installable app, 042) → Campaign (needs the session) → Realtime (table events
+// of the current campaign; every provider below reacts to them) → Character (needs the campaign) → MapEditor →
 // Token (library) → MapToken (pieces of the open map: needs the editor, the campaign and the characters) →
 // Npc (library and campaign NPCs; places pieces, so it needs MapToken) → Turn (turn of the current campaign;
 // resetting reloads the pieces) → Chat (the campaign's timeline: conversation + turn records, 041) → App.
@@ -26,26 +28,31 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <CampaignProvider>
-          <RealtimeProvider>
-            <CharacterProvider>
-              <MapEditorProvider>
-                <TokenProvider>
-                  <MapTokenProvider>
-                    <NpcProvider>
-                      <TurnProvider>
-                        <ChatProvider>
-                          <App />
-                        </ChatProvider>
-                      </TurnProvider>
-                    </NpcProvider>
-                  </MapTokenProvider>
-                </TokenProvider>
-              </MapEditorProvider>
-            </CharacterProvider>
-          </RealtimeProvider>
-        </CampaignProvider>
+        <InstallProvider>
+          <CampaignProvider>
+            <RealtimeProvider>
+              <CharacterProvider>
+                <MapEditorProvider>
+                  <TokenProvider>
+                    <MapTokenProvider>
+                      <NpcProvider>
+                        <TurnProvider>
+                          <ChatProvider>
+                            <App />
+                          </ChatProvider>
+                        </TurnProvider>
+                      </NpcProvider>
+                    </MapTokenProvider>
+                  </TokenProvider>
+                </MapEditorProvider>
+              </CharacterProvider>
+            </RealtimeProvider>
+          </CampaignProvider>
+        </InstallProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 );
+
+// Installable app (042): production builds only.
+registerServiceWorker();
