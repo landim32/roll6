@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  characterStatus, currentAction, hasEntries, hasMoved, lastActions, movementTrails, npcStatus, pieceKey, TURN_STATUS, trackTurn, trailHexes,
+  characterStatus, currentAction, hasEntries, hasMoved, lastActions, markAllTurnsRead, markTurnRead, movementTrails, npcStatus, pieceKey,
+  TURN_STATUS, trackTurn, trailHexes,
 } from './turnStatus';
 import { TURN_TYPE } from '../types/turn';
 import type { TurnInfo, TurnType } from '../types/turn';
@@ -136,10 +137,27 @@ describe('trackTurn', () => {
     expect(trackTurn(undefined, 4)).toEqual({ known: 4, unread: [] });
   });
 
-  it('a higher turn adds the finished one, most recent first', () => {
-    const seen = trackTurn({ known: 4, unread: [] }, 5);
-    expect(seen).toEqual({ known: 5, unread: [4] });
-    expect(trackTurn(seen, 6)).toEqual({ known: 6, unread: [5, 4] });
+  it('a higher turn adds the finished one, most recent first, with when it was noticed', () => {
+    const seen = trackTurn({ known: 4, unread: [] }, 5, 'T1');
+    expect(seen).toEqual({ known: 5, unread: [4], read: [], at: { 4: 'T1' } });
+    expect(trackTurn(seen, 6, 'T2')).toEqual({ known: 6, unread: [5, 4], read: [], at: { 4: 'T1', 5: 'T2' } });
+  });
+
+  it('046: marks one or all as read, keeping them listed (at most 20 read)', () => {
+    const seen = { known: 7, unread: [6, 5, 4], read: [3], at: { 3: 'a', 4: 'b', 5: 'c', 6: 'd' } };
+    expect(markTurnRead(seen, 5)).toEqual({ known: 7, unread: [6, 4], read: [5, 3], at: { 3: 'a', 4: 'b', 5: 'c', 6: 'd' } });
+    expect(markTurnRead(seen, 99)).toBe(seen);
+    expect(markAllTurnsRead(seen)).toEqual({ known: 7, unread: [], read: [6, 5, 4, 3], at: { 3: 'a', 4: 'b', 5: 'c', 6: 'd' } });
+    const many = { known: 40, unread: [39], read: Array.from({ length: 20 }, (_, i) => 38 - i), at: { 39: 'x', 19: 'old' } };
+    const capped = markAllTurnsRead(many);
+    expect(capped.read).toHaveLength(20);
+    expect(capped.read?.[0]).toBe(39);
+    expect(capped.at).toEqual({ 39: 'x' });
+  });
+
+  it('046: old records without read/at still work', () => {
+    const old = { known: 5, unread: [4] };
+    expect(markAllTurnsRead(old)).toEqual({ known: 5, unread: [], read: [4], at: {} });
   });
 
   it('the same turn keeps the record', () => {
