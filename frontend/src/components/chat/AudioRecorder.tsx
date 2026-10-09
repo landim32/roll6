@@ -130,9 +130,9 @@ export const AudioRecorder = ({ disabled, onSend, onActiveChange }: AudioRecorde
   }
 
   return (
-    <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => { void start(); }} disabled={disabled}
+    <button type="button" className="btn btn-primary stm-chat-send" onClick={() => { void start(); }} disabled={disabled}
       title={t('chat.record')} aria-label={t('chat.record')}>
-      <MicIcon size={14} />
+      <MicIcon size={18} />
     </button>
   );
 };

@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AudioRecorder } from './AudioRecorder';
-import { ImageIcon, SendIcon } from '../ui/icons';
+import { CameraIcon, ImageIcon, LightningIcon, PaperclipIcon, SendIcon, SpeechIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -53,6 +54,8 @@ export const ChatComposer = () => {
         setBusy(true);
         await act(piece.mapTokenId, value);
         setText('');
+        // Back to talking, like closing an attachment.
+        setMode('talk');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t('common.unknownError'));
       } finally {
@@ -113,45 +116,68 @@ export const ChatComposer = () => {
     return <div className="stm-chat-composer text-body-secondary small">{t('chat.chooseCharacter')}</div>;
   }
 
+  const pickImage = () => fileRef.current?.click();
+  // Like WhatsApp: an empty field offers the microphone, anything typed (or an action) offers "send".
+  const showRecorder = recordable && !acting && (recording || !text.trim());
+
   return (
     <div className="stm-chat-composer">
-      {participation && (
-        <div className="btn-group btn-group-sm stm-chat-mode" role="group" aria-label={t('chat.modeLabel')}>
-          <button type="button" className={`btn ${mode === 'talk' ? 'btn-primary' : 'btn-outline-secondary'}`}
-            aria-pressed={mode === 'talk'} onClick={() => setMode('talk')}>
-            {t('chat.modeTalk')}
-          </button>
-          <button type="button" className={`btn ${mode === 'act' ? 'btn-primary' : 'btn-outline-secondary'}`}
-            aria-pressed={mode === 'act'} onClick={() => setMode('act')} disabled={!piece}
-            title={piece ? t('chat.modeActHint') : t('chat.placeToAct')}>
-            {t('chat.modeAct')}
-          </button>
-        </div>
-      )}
+      <input ref={fileRef} type="file" accept={IMAGE_TYPES} className="d-none" onChange={(e) => { void onPickImage(e); }} />
       <div className="stm-chat-input">
         {!recording && (
-          <>
-            <textarea className="form-control form-control-sm" rows={1} maxLength={max} value={text}
+          <div className={`stm-chat-field${acting ? ' is-acting' : ''}`}>
+            {acting && (
+              <button type="button" className="badge rounded-pill text-bg-danger stm-chat-act-chip" onClick={() => setMode('talk')}
+                title={t('chat.cancelAct')} aria-label={t('chat.cancelAct')}>
+                {t('chat.modeAct')} ×
+              </button>
+            )}
+            <textarea rows={1} maxLength={max} value={text}
               placeholder={acting ? t('chat.actPlaceholder') : t('chat.placeholder', { name: participation?.characterName ?? t('chat.master') })}
               aria-label={acting ? t('chat.actPlaceholder') : t('chat.messageLabel')}
               onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} disabled={busy} />
-            {!acting && (
-              <>
-                <input ref={fileRef} type="file" accept={IMAGE_TYPES} className="d-none" onChange={(e) => { void onPickImage(e); }} />
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => fileRef.current?.click()} disabled={busy}
-                  title={t('chat.sendImage')} aria-label={t('chat.sendImage')}>
-                  <ImageIcon size={14} />
-                </button>
-              </>
+            <DropdownMenu.Root modal={false}>
+              <DropdownMenu.Trigger className="stm-chat-field-btn" disabled={busy} title={t('chat.attach')} aria-label={t('chat.attach')}>
+                <PaperclipIcon size={18} />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content className="dropdown-menu show stm-user-menu stm-chat-attach" side="top" align="end" sideOffset={8}>
+                  {participation && (
+                    acting ? (
+                      <DropdownMenu.Item className="dropdown-item" onSelect={() => setMode('talk')}>
+                        <SpeechIcon size={16} /> {t('chat.backToTalk')}
+                      </DropdownMenu.Item>
+                    ) : (
+                      <DropdownMenu.Item className="dropdown-item" disabled={!piece} onSelect={() => setMode('act')}
+                        title={piece ? t('chat.modeActHint') : t('chat.placeToAct')}>
+                        <LightningIcon size={16} /> {t('chat.actOption')}
+                        {!piece && <small className="d-block text-body-secondary">{t('chat.placeToAct')}</small>}
+                      </DropdownMenu.Item>
+                    )
+                  )}
+                  {!acting && (
+                    <DropdownMenu.Item className="dropdown-item" onSelect={pickImage}>
+                      <ImageIcon size={16} /> {t('chat.sendImage')}
+                    </DropdownMenu.Item>
+                  )}
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+            {!acting && !text.trim() && (
+              <button type="button" className="stm-chat-field-btn" onClick={pickImage} disabled={busy}
+                title={t('chat.sendImage')} aria-label={t('chat.sendImage')}>
+                <CameraIcon size={18} />
+              </button>
             )}
-          </>
+          </div>
         )}
-        {!acting && recordable && <AudioRecorder disabled={busy} onSend={onSendAudio} onActiveChange={onRecordingChange} />}
-        {!recording && (
-          <button type="button" className="btn btn-sm btn-primary" onClick={() => { void submit(); }}
+        {showRecorder ? (
+          <AudioRecorder disabled={busy} onSend={onSendAudio} onActiveChange={onRecordingChange} />
+        ) : (
+          <button type="button" className={`btn ${acting ? 'btn-danger' : 'btn-primary'} stm-chat-send`} onClick={() => { void submit(); }}
             disabled={busy || !text.trim() || (acting && !piece)}
             title={acting ? t('chat.sendAction') : t('chat.send')} aria-label={acting ? t('chat.sendAction') : t('chat.send')}>
-            <SendIcon size={14} />
+            {acting ? <LightningIcon size={18} /> : <SendIcon size={18} />}
           </button>
         )}
       </div>

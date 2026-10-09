@@ -670,8 +670,6 @@
     "placeholder": "Mensagem como {{name}}",
     "messageLabel": "Mensagem",
     "actPlaceholder": "O que o personagem faz neste turno?",
-    "modeLabel": "Tipo de envio",
-    "modeTalk": "Conversa",
     "modeAct": "Ação",
     "modeActHint": "Registra a ação do turno do seu personagem",
     "placeToAct": "Coloque o personagem no mapa aberto para agir",
@@ -689,7 +687,11 @@
     "stopRecording": "Parar a gravação",
     "discardRecording": "Descartar a gravação",
     "micDenied": "O microfone não foi liberado.",
-    "micDeniedHint": "Permita o uso do microfone para este site nas configurações do navegador e tente de novo."
+    "micDeniedHint": "Permita o uso do microfone para este site nas configurações do navegador e tente de novo.",
+    "attach": "Anexar",
+    "actOption": "Ação do turno",
+    "backToTalk": "Voltar à conversa",
+    "cancelAct": "Cancelar a ação"
   },
   "layout": {
     "label": "Mapa e chat",
