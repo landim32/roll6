@@ -182,7 +182,8 @@ public class CampaignService : ICampaignService
         {
             var map = await _mapRepository.GetByIdAsync(mapId)
                 ?? throw new KeyNotFoundException("Mapa não encontrado.");
-            if (map.CampaignId != campaignId || map.Status == Enums.MapStatus.Deleted)
+            // Only an active map can be the one the players follow (048: archived maps are refused too).
+            if (map.CampaignId != campaignId || map.Status != Enums.MapStatus.Active)
                 throw new DomainValidationException("mapId", "O mapa precisa ser um mapa ativo desta campanha.");
         }
         if (campaign.CurrentMapId == info.MapId)

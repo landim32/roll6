@@ -23,6 +23,11 @@ interface CampaignContextType {
   getCampaignBySlug: (slug: string) => Promise<CampaignInfo>;
   /** Reloads the table combo. A failed call keeps the list already shown. */
   refreshTableCampaigns: () => Promise<void>;
+  /**
+   * The master's deliberate "Tornar atual" (048): the map becomes the one the players follow. It never opens the map
+   * for the master. Throws the API error (the previous current map stays).
+   */
+  makeCurrentMap: (mapId: number) => Promise<CampaignInfo>;
   // State management
   selectCampaign: (campaign: CampaignInfo | null) => void;
   clearError: () => void;
@@ -126,10 +131,18 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
 
   const isMaster = !!currentCampaign && !!session && currentCampaign.userId === session.user.userId;
 
+  const currentCampaignId = currentCampaign?.campaignId ?? null;
+  const makeCurrentMap = useCallback(async (mapId: number): Promise<CampaignInfo> => {
+    if (currentCampaignId === null) throw new Error('no campaign');
+    const campaign = await campaignService.setCurrentMap(currentCampaignId, mapId);
+    selectCampaign(campaign);
+    return campaign;
+  }, [currentCampaignId, selectCampaign]);
+
   const value = useMemo<CampaignContextType>(() => ({
     currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug,
-    refreshTableCampaigns, selectCampaign, clearError,
-  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, selectCampaign, clearError]);
+    refreshTableCampaigns, makeCurrentMap, selectCampaign, clearError,
+  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, selectCampaign, clearError]);
 
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 };

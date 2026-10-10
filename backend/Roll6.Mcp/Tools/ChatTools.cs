@@ -13,12 +13,17 @@ public static class ChatTools
         Item: { key, cursor, kind, turnId, campaignId, turnNo, createdAt, userId, mapId, characterId, npcId, mapNpcId,
         displayName, displayImageUrl, authorLabel, text, description, before/after {x, y, look, lookName}, moved,
         movedTotal, changes [{field, label, before, after}], imageUrl, audioUrl, audioSeconds, audioType, deleted,
-        canDelete, dice, cancelled, replyTo {key, turnId, displayName, kind, excerpt, deleted, cancelled},
-        reactions [{userId, name, kind like|love}], canReply, canReact, canConvert (action|message|null) }. An action with
-        cancelled = true was replaced, reset or deleted ("Ação cancelada") and no longer counts in the turn. kind is text | image | audio | roll (what people said or rolled; a roll has dice = the three
-        faces and text = the optional reason), movement | action | actionResult |
-        characterUpdate | narration (the turn records — text is the same line as get_turn_summary) or turnFinished
-        (the divider "Turno N finalizado").
+        canDelete, dice, cancelled, replyTo {key, turnId, displayName, kind, excerpt, deleted, cancelled, hidden},
+        reactions [{userId, name, kind like|love|laugh}], canReply, canReact, canConvert (action|message|null),
+        poll {question, totalVotes, options [{optionId, text, votes, voters [{characterId|null, name, imageUrl}]}]},
+        whisper {master, recipients [{characterId|null, name, imageUrl}]} | null, whisperHidden }.
+        kind is text | image | audio | roll | poll (what people said, rolled or asked; a roll has dice = the three faces
+        and text = the optional reason; a poll has text = its question and poll = options with votes and voters — a
+        null characterId is the master), movement | action | actionResult | characterUpdate | narration (the turn
+        records — text is the same line as get_turn_summary), poke ("Ana cutucou Bruno") or turnFinished (the divider
+        "Turno N finalizado"). An action with cancelled = true was replaced, reset or deleted ("Ação cancelada") and no
+        longer counts in the turn. whisper (when not null) means only its recipients, the author and the master see the
+        entry; whisperHidden = true is a whispered action you are not in (its text is "está sussurrando!").
         """;
 
     [McpServerTool(Name = "list_chat_messages", Title = "List chat messages", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -29,19 +34,39 @@ public static class ChatTools
         narrations) and a "Turno N finalizado" divider at the end of each turn — the same records the turn tools read.
         Without a cursor it returns the newest page; pass "before" with the first item's cursor to go back in time, or
         "after" with the last item's cursor to get what came next. Items are oldest first within the page.
+        kind filters by entry kind (comma separated): the latest poll is kind = "poll", limit = 1 (the last item of the
+        page); the conversation only is "text,image,audio,roll,poll"; the actions are "action". Whispers you are not in
+        never appear (whispered actions appear masked).
         Who can use it: the campaign master or a player with an approved character in the campaign.
         Returns: { items, hasMore, unreadCount, firstUnreadCursor }.
         {{ITEM}}
-        Common errors: 400 malformed cursor, 403 no access to the campaign, 404 campaign not found.
-        Related tools: send_chat_message, get_turn_summary, get_turn_data.
+        Common errors: 400 malformed cursor or unknown kind, 403 no access to the campaign, 404 campaign not found.
+        Related tools: get_chat_message, send_chat_message, vote_chat_poll, get_turn_summary, get_turn_data.
         """)]
     public static Task<CallToolResult> ListChatMessages(
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Optional: cursor of the first item you have, to read older items.")] string? before = null,
         [Description("Optional: cursor of the last item you have, to read newer items.")] string? after = null,
-        [Description("Optional: how many items (1–100, default 50).")] int? limit = null) =>
-        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/chat", null, ("before", before), ("after", after), ("limit", limit));
+        [Description("Optional: how many items (1–100, default 50).")] int? limit = null,
+        [Description("Optional: only these kinds, comma separated — text, image, audio, roll, poll, poke, movement, action, actionResult, characterUpdate, narration, turnFinished. Example: \"poll\".")] string? kind = null) =>
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/chat", null, ("before", before), ("after", after), ("limit", limit), ("kind", kind));
+
+    [McpServerTool(Name = "get_chat_message", Title = "Get one chat entry", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/chat/{id}")]
+    [Description($$"""
+        What it does: reads one chat entry by its turnId — for example a poll with its current votes and voters (to see
+        a result after voting), a message being answered, or an action. Same visibility as list_chat_messages: a whisper
+        you are not in is 404 (a whispered action comes masked).
+        Who can use it: the campaign master or a player with an approved character in the campaign.
+        Returns: the item. {{ITEM}}
+        Common errors: 403 no access to the campaign, 404 entry not found (or a whisper you are not in).
+        Related tools: list_chat_messages (kind = "poll" finds polls), vote_chat_poll, react_to_chat_message.
+        """)]
+    public static Task<CallToolResult> GetChatMessage(
+        Roll6ApiClient api,
+        [Description("Id of the entry (turnId from list_chat_messages).")] long turnId) =>
+        api.SendAsync(HttpMethod.Get, $"/api/chat/{turnId}");
 
     [McpServerTool(Name = "send_chat_message", Title = "Send chat message", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaign/{id}/chat")]

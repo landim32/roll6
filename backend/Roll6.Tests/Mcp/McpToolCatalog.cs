@@ -34,8 +34,7 @@ public static class McpToolCatalog
         "GET /api/push/key",
         "POST /api/push/subscription",
         "DELETE /api/push/subscription",
-        // The bell's inbox (what the Web Push already delivered to the person, read in the app).
-        "GET /api/push/inbox",
+        // Marking the bell's notices as read is UI state (assistants list them with list_my_notifications).
         "PUT /api/push/inbox/read",
         // 040: link previews for crawlers (anonymous HTML fragment and picture), not for assistants.
         "GET /api/meta/head/{**path}",

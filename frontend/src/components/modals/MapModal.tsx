@@ -7,6 +7,7 @@ import { Tabs } from '../ui/Tabs';
 import { PagedListView } from '../ui/PagedListView';
 import { PencilIcon } from '../ui/icons';
 import { MapEditModal } from './MapEditModal';
+import { MakeCurrentMapButton } from '../campaign/MakeCurrentMapButton';
 import type { MapEditTarget } from './MapEditModal';
 import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
@@ -17,6 +18,7 @@ import type { PagedList } from '../../types/common';
 import { MAP_STATUS_DELETED } from '../../types/map';
 import type { MapInfo } from '../../types/map';
 import { visibleCampaignMaps } from '../../lib/viewerMap';
+import { canMakeCurrent } from '../../lib/currentMap';
 import type { MapModelInfo } from '../../types/mapModel';
 
 interface MapModalProps {
@@ -107,11 +109,14 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
     </button>
   );
 
-  const renderMap = (name: string, imageUrl: string | null, cols: number, rows: number, extra?: string) => (
+  const renderMap = (name: string, imageUrl: string | null, cols: number, rows: number, extra?: string, current = false) => (
     <div className="d-flex align-items-center gap-3">
       {imageUrl ? <img className="stm-thumb" src={imageUrl} alt="" /> : <div className="stm-thumb" />}
       <div>
-        <div className="fw-semibold">{name}</div>
+        <div className="fw-semibold d-flex align-items-center gap-2">
+          {name}
+          {current && <span className="badge text-bg-info">{t('campaignSettings.currentMap')}</span>}
+        </div>
         <small className="text-body-secondary">
           {t('mapModal.grid', { cols, rows })}{extra ? ` · ${extra}` : ''}
         </small>
@@ -149,10 +154,22 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
           <PagedListView
             data={campaignMaps}
             loading={loading}
-            renderItem={(m) => renderMap(m.name, m.mapModelImageUrl, m.gridWidth, m.gridHeight)}
+            renderItem={(m) => renderMap(m.name, m.mapModelImageUrl, m.gridWidth, m.gridHeight, undefined,
+              m.mapId === currentCampaign.currentMapId)}
             getKey={(m) => m.mapId}
             onSelect={(m) => open_(m.mapModelId, m)}
-            renderActions={(m) => (m.userId === userId ? editButton({ mapModelId: m.mapModelId, map: m }) : null)}
+            renderActions={(m) => {
+              // "Tornar atual" (048) for the master; opening a map from this list never changes the current one.
+              const makeCurrent = canMakeCurrent(m, { isMaster, currentMapId: currentCampaign.currentMapId ?? null });
+              const editable = m.userId === userId;
+              if (!makeCurrent && !editable) return null;
+              return (
+                <>
+                  {makeCurrent && <MakeCurrentMapButton map={m} />}
+                  {editable && editButton({ mapModelId: m.mapModelId, map: m })}
+                </>
+              );
+            }}
             onPageChange={load}
           />
         ) : (

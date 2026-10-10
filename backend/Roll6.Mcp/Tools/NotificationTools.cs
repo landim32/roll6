@@ -29,6 +29,21 @@ public static class NotificationTools
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/poke", new { });
 
+    [McpServerTool(Name = "list_my_notifications", Title = "List my notifications", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/push/inbox")]
+    [Description("""
+        What it does: lists the latest notices you received (the bell of the app), newest first, exactly as the Web Push
+        carried them: chat messages, polls, actions (to the master), "Falta apenas você…", turn finished, PV/Fadiga
+        changes and pokes, with the campaign and a link to its chat. Reading them here does not mark them as read.
+        Who can use it: any logged user (their own notices).
+        Returns: { items [{ userNotificationId, campaignId, kind, title, body, url, createdAt, read }], unreadCount } —
+        at most the 30 most recent.
+        Common errors: none besides authentication.
+        Related tools: list_notification_settings, list_chat_messages.
+        """)]
+    public static Task<CallToolResult> ListMyNotifications(Roll6ApiClient api) =>
+        api.SendAsync(HttpMethod.Get, "/api/push/inbox");
+
     [McpServerTool(Name = "list_notification_settings", Title = "List notification settings", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/push/campaigns")]
     [Description("""

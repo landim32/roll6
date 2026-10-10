@@ -443,18 +443,9 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   // ---------- real-time table (017) ----------
 
-  const { selectCampaign } = useCampaign();
+  // The current map changes only by the master's deliberate "Tornar atual" (048): opening a map here never does.
   const campaignId = currentCampaign?.campaignId ?? null;
   const currentMapId = currentCampaign?.currentMapId ?? null;
-
-  // The master opening a map of his current campaign makes it the map the players follow.
-  useEffect(() => {
-    if (!restored || !isMaster || campaignId === null || draft.mapId === null) return;
-    if (draft.campaignId !== campaignId || draft.mapId === currentMapId) return;
-    campaignService.setCurrentMap(campaignId, draft.mapId)
-      .then((campaign) => selectCampaign(campaign))
-      .catch(() => { /* players just don't follow this time */ });
-  }, [restored, isMaster, campaignId, currentMapId, draft.mapId, draft.campaignId, selectCampaign]);
 
   /** Opens a campaign map by id (following the master or reloading the same map). */
   const openCampaignMap = useCallback(async (mapId: number, options?: { keepView?: boolean }) => {

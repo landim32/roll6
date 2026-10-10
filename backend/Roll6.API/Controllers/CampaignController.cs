@@ -179,11 +179,12 @@ public class CampaignController : ApiControllerBase
     /// </summary>
     [HttpGet("{id:long}/chat")]
     [ProducesResponseType(typeof(ChatPageInfo), StatusCodes.Status200OK)]
-    public async Task<IActionResult> ListChat(long id, [FromQuery] string? before, [FromQuery] string? after, [FromQuery] int? limit)
+    public async Task<IActionResult> ListChat(long id, [FromQuery] string? before, [FromQuery] string? after, [FromQuery] int? limit,
+        [FromQuery] string? kind)
     {
         try
         {
-            return Ok(await _chatService.ListAsync(CurrentUserId, id, before, after, limit));
+            return Ok(await _chatService.ListAsync(CurrentUserId, id, before, after, limit, kind));
         }
         catch (Exception ex)
         {

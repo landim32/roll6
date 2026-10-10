@@ -176,9 +176,14 @@ public class TurnRepository : ITurnRepository<Turn>
                 && _context.Characters.Any(c => c.CharacterId == w.CharacterId && c.UserId == viewerId)));
 
     public async Task<List<Turn>> ListChatPageAsync(long campaignId, (DateTime At, long Id)? before, (DateTime At, long Id)? after, int limit,
-        long viewerId, bool viewerIsMaster)
+        long viewerId, bool viewerIsMaster, IReadOnlyCollection<int>? turnTypes = null)
     {
         var query = VisibleTo(_context.Turns.AsNoTracking().Where(e => e.CampaignId == campaignId), viewerId, viewerIsMaster);
+        if (turnTypes is { Count: > 0 })
+        {
+            var types = turnTypes.Select(t => (TurnType)t).ToList();
+            query = query.Where(e => types.Contains(e.TurnType));
+        }
         if (after is { } a)
         {
             return await query.Where(e => e.CreatedAt > a.At || (e.CreatedAt == a.At && e.TurnId > a.Id))
