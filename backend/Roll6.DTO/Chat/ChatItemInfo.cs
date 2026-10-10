@@ -134,9 +134,27 @@ public class ChatItemInfo
     [JsonPropertyName("canConvert")]
     public string? CanConvert { get; set; }
 
+    /// <summary>A whisper (047) the reader may see: who it was whispered to. Null for public entries.</summary>
+    [JsonPropertyName("whisper")]
+    public ChatWhisperInfo? Whisper { get; set; }
+
+    /// <summary>A whispered action the reader is not in (047): its text is "está sussurrando!".</summary>
+    [JsonPropertyName("whisperHidden")]
+    public bool WhisperHidden { get; set; }
+
     /// <summary>A poll (kind "poll", 045): the question, the options with their votes and who voted.</summary>
     [JsonPropertyName("poll")]
     public ChatPollInfo? Poll { get; set; }
+}
+
+/// <summary>The recipients of a whisper (047): characters and/or the master.</summary>
+public class ChatWhisperInfo
+{
+    [JsonPropertyName("master")]
+    public bool Master { get; set; }
+
+    [JsonPropertyName("recipients")]
+    public List<ChatPollVoterInfo> Recipients { get; set; } = new();
 }
 
 /// <summary>A chat poll as everyone sees it (045): votes are public.</summary>
@@ -234,6 +252,10 @@ public class ChatReplyInfo
 
     [JsonPropertyName("cancelled")]
     public bool Cancelled { get; set; }
+
+    /// <summary>A whisper the reader cannot see (047): shown as "Mensagem sussurrada", no excerpt.</summary>
+    [JsonPropertyName("hidden")]
+    public bool Hidden { get; set; }
 }
 
 /// <summary>A user's reaction (044): kind "like" (Curtir), "love" (Amei) or "laugh" (Gargalhada, 045).</summary>

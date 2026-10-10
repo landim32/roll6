@@ -63,6 +63,23 @@ public class SignalRRealtimeNotifier : IRealtimeNotifier, INoticeChannel
         }
     }
 
+    public async Task PublishSplitAsync(TableEventInfo full, IReadOnlyCollection<long> audienceUserIds, TableEventInfo? others)
+    {
+        try
+        {
+            var audience = audienceUserIds.SelectMany(userId => _connections.ConnectionsOf(userId, full.CampaignId)).Distinct().ToList();
+            if (audience.Count > 0)
+                await _hub.Clients.Clients(audience).SendAsync(TableHub.EVENT_METHOD, full);
+            if (others != null)
+                await _hub.Clients.GroupExcept(TableConnections.GroupName(full.CampaignId), audience)
+                    .SendAsync(TableHub.EVENT_METHOD, others);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not publish whisper {Type} to campaign {CampaignId}", full.Type, full.CampaignId);
+        }
+    }
+
     public async Task SendNoticeAsync(long userId, long campaignId, NoticeInfo notice)
     {
         try

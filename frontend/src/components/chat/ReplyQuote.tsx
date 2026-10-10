@@ -12,7 +12,9 @@ interface ReplyQuoteProps {
 export const ReplyQuote = ({ reply, onOpen }: ReplyQuoteProps) => {
   const { t } = useTranslation();
   const color = nameColor(reply.displayName || '?');
-  const body = reply.deleted ? t('chat.deleted') : reply.cancelled ? `${t('chat.actionCancelled')} — ${reply.excerpt}` : reply.excerpt;
+  const body = reply.deleted ? t('chat.deleted')
+    : reply.hidden && !reply.excerpt ? t('chat.whisper.hiddenQuote')
+      : reply.cancelled ? `${t('chat.actionCancelled')} — ${reply.excerpt}` : reply.excerpt;
   const content = (
     <>
       <span className="stm-chat-quote-name" style={{ color }}>{reply.deleted ? '' : chatLabel(reply.displayName)}</span>

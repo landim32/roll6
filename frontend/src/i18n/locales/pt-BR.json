@@ -778,6 +778,16 @@
         "optionTooLong": "Cada opção deve ter no máximo {{max}} caracteres.",
         "repeated": "As opções não podem se repetir."
       }
+    },
+    "whisper": {
+      "to": "Sussurrando para",
+      "visibleTo": "Visível apenas para",
+      "remove": "Remover {{name}} do sussurro",
+      "master": "Mestre",
+      "listLabel": "Sussurrar para",
+      "noMatch": "Ninguém com esse nome",
+      "hiddenQuote": "Mensagem sussurrada",
+      "placeholder": "Sussurrar para {{names}}…"
     }
   },
   "layout": {

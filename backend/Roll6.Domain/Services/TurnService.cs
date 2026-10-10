@@ -38,6 +38,7 @@ public partial class TurnService : ITurnService
     private readonly INotificationQueue _queue;
     private readonly IChatReactionRepository<ChatReaction> _chatReactionRepository;
     private readonly IChatPollRepository<ChatPollOption, ChatPollVote> _chatPollRepository;
+    private readonly ITurnWhisperRepository<TurnWhisperTarget> _whisperRepository;
 
     /// <summary>Hexes taken on a map (031): resets and processed moves need the whole shape free.</summary>
     private readonly MapOccupancyLoader _occupancy;
@@ -60,9 +61,11 @@ public partial class TurnService : ITurnService
         IImageStorageAppService imageStorage,
         IChatReactionRepository<ChatReaction> chatReactionRepository,
         IChatPollRepository<ChatPollOption, ChatPollVote> chatPollRepository,
+        ITurnWhisperRepository<TurnWhisperTarget> whisperRepository,
         INotificationQueue queue,
         IRealtimeNotifier notifier)
     {
+        _whisperRepository = whisperRepository;
         _chatPollRepository = chatPollRepository;
         _queue = queue;
         _chatReactionRepository = chatReactionRepository;
@@ -87,17 +90,19 @@ public partial class TurnService : ITurnService
     public async Task<TurnStateInfo> GetStateAsync(long userId, long campaignId)
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
+        var entries = await _repository.ListByCampaignTurnAsync(campaignId, campaign.CurrentTurn);
         return new TurnStateInfo
         {
             TurnNo = campaign.CurrentTurn,
-            Entries = await MapToDtoAsync(await _repository.ListByCampaignTurnAsync(campaignId, campaign.CurrentTurn))
+            Entries = await MapToDtoAsync(entries, await MaskForViewerAsync(campaign, userId, entries))
         };
     }
 
     public async Task<List<TurnInfo>> ListAsync(long userId, long campaignId, int turnNo)
     {
-        await GetReadableCampaignAsync(userId, campaignId);
-        return await MapToDtoAsync(await _repository.ListByCampaignTurnAsync(campaignId, turnNo));
+        var campaign = await GetReadableCampaignAsync(userId, campaignId);
+        var entries = await _repository.ListByCampaignTurnAsync(campaignId, turnNo);
+        return await MapToDtoAsync(entries, await MaskForViewerAsync(campaign, userId, entries));
     }
 
     /// <summary>
@@ -130,6 +135,7 @@ public partial class TurnService : ITurnService
         var current = number == campaign.CurrentTurn;
 
         var entries = await _repository.ListByCampaignTurnAsync(campaignId, number);
+        await MaskForViewerAsync(campaign, userId, entries);
         var mapId = current
             ? campaign.CurrentMapId ?? entries.LastOrDefault(e => e.MapId.HasValue)?.MapId
             : entries.LastOrDefault(e => e.MapId.HasValue)?.MapId ?? campaign.CurrentMapId;
@@ -169,17 +175,17 @@ public partial class TurnService : ITurnService
         var actor = await ResolveActorAsync(userId, piece, campaign);
         var turn = Turn.Action(campaign.CampaignId, map.MapId, actor.CharacterId, actor.NpcId, actor.MapNpcId,
             campaign.CurrentTurn, userId, info.Description);
+        // 047: a whispered action still is the actor's action of the turn; only who reads its text changes.
+        var whisper = await ResolveWhisperAsync(campaign, userId, actor.CharacterId, info.WhisperCharacterIds, info.WhisperMaster);
         await ApplyReplyAsync(turn, info.ReplyToTurnId);
         // 044: one valid action per actor and turn — the previous one stays in the chat as "Ação cancelada".
         var cancelled = await CancelValidActionsAsync(campaign, actor.CharacterId, actor.CharacterId.HasValue ? null : actor.MapNpcId);
-        var saved = turn;
-        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        var saved = await SaveEntryAsync(turn, whisper, async () =>
         {
             foreach (var previous in cancelled)
                 await _repository.UpdateAsync(previous);
-            saved = await _repository.InsertAsync(turn);
         });
-        var result = (await MapToDtoAsync(new List<Turn> { saved })).Single();
+        var result = (await MapToDtoAsync(new List<Turn> { saved }, await LoadWhispersAsync(new[] { saved }))).Single();
         foreach (var previous in cancelled)
             await PublishUpdatedAsync(campaign, userId, previous);
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
@@ -398,7 +404,9 @@ public partial class TurnService : ITurnService
     }
 
     /// <summary>Resolves the actor names in batch (characters, NPC occurrences and NPCs).</summary>
-    private async Task<List<TurnInfo>> MapToDtoAsync(List<Turn> turns)
+    private async Task<List<TurnInfo>> MapToDtoAsync(List<Turn> turns) => await MapToDtoAsync(turns, WhisperData.Empty);
+
+    private async Task<List<TurnInfo>> MapToDtoAsync(List<Turn> turns, WhisperData whispers)
     {
         if (turns.Count == 0)
             return new List<TurnInfo>();
@@ -437,6 +445,8 @@ public partial class TurnService : ITurnService
             Description = t.Description,
             UserId = t.UserId,
             UserName = users.GetValueOrDefault(t.UserId, string.Empty),
+            Whisper = t.IsWhisper && !whispers.Masked.Contains(t.TurnId),
+            WhisperHidden = whispers.Masked.Contains(t.TurnId),
             Moved = t.Moved,
             Changes = t.Changes?.Select(c => new TurnChangeInfo { Field = c.Field, Before = c.Before, After = c.After }).ToList(),
             CreatedAt = t.CreatedAt

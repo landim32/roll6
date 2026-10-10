@@ -81,6 +81,10 @@ export interface ChatItemInfo {
   canReact?: boolean;
   /** A character's text can become its action ('action'), its action can become text ('message'). */
   canConvert?: 'action' | 'message' | null;
+  /** A whisper the reader may see (047): who it was whispered to. */
+  whisper?: ChatWhisperInfo | null;
+  /** A whispered action the reader is not in (047): its text is "está sussurrando!". */
+  whisperHidden?: boolean;
   /** The poll of a `poll` entry (045): votes are public. */
   poll?: ChatPollInfo | null;
   deleted: boolean;
@@ -95,6 +99,14 @@ export interface ChatReplyInfo {
   excerpt: string;
   deleted: boolean;
   cancelled: boolean;
+  /** A whisper the reader can't see (047): "Mensagem sussurrada". */
+  hidden?: boolean;
+}
+
+/** The recipients of a whisper (047). */
+export interface ChatWhisperInfo {
+  master: boolean;
+  recipients: ChatPollVoterInfo[];
 }
 
 export const REACTION = {
@@ -157,6 +169,9 @@ export interface ChatSendInfo {
   audioSeconds?: number | null;
   /** The entry this message answers (044). */
   replyToTurnId?: number | null;
+  /** Whisper (047): approved characters who may see it, and/or the master. */
+  whisperCharacterIds?: number[];
+  whisperMaster?: boolean;
 }
 
 /** A 3d6 roll in the chat; `text` is the optional reason. */
@@ -164,6 +179,8 @@ export interface ChatRollInfo {
   characterId: number | null;
   text?: string | null;
   replyToTurnId?: number | null;
+  whisperCharacterIds?: number[];
+  whisperMaster?: boolean;
 }
 
 export interface ChatAudioUploadInfo {

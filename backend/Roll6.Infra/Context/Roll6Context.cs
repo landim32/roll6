@@ -33,6 +33,7 @@ public class Roll6Context : DbContext
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
     public DbSet<ChatReaction> ChatReactions { get; set; }
     public DbSet<ChatPollOption> ChatPollOptions { get; set; }
+    public DbSet<TurnWhisperTarget> TurnWhisperTargets { get; set; }
     public DbSet<ChatPollVote> ChatPollVotes { get; set; }
     public DbSet<UserNotification> UserNotifications { get; set; }
     public DbSet<CampaignNotificationPref> CampaignNotificationPrefs { get; set; }
@@ -366,6 +367,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Dice).HasColumnName("dice").HasMaxLength(100);
             entity.Property(e => e.CancelledAt).HasColumnName("cancelled_at").HasColumnType(TIMESTAMP);
             entity.Property(e => e.ReplyToTurnId).HasColumnName("reply_to_turn_id");
+            entity.Property(e => e.IsWhisper).HasColumnName("is_whisper").HasDefaultValue(false).HasSentinel(false);
             entity.HasIndex(e => e.ReplyToTurnId).HasDatabaseName("ix_turns_reply_to");
             entity.HasOne<Turn>().WithMany().HasForeignKey(e => e.ReplyToTurnId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_reply");
@@ -436,6 +438,21 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_chat_reaction");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_chat_reaction");
+        });
+
+        modelBuilder.Entity<TurnWhisperTarget>(entity =>
+        {
+            entity.ToTable("turn_whisper_targets");
+            entity.HasKey(e => e.TurnWhisperTargetId).HasName("turn_whisper_targets_pkey");
+            entity.Property(e => e.TurnWhisperTargetId).HasColumnName("turn_whisper_target_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.TurnId).HasColumnName("turn_id");
+            entity.Property(e => e.CharacterId).HasColumnName("character_id");
+            entity.HasIndex(e => e.TurnId).HasDatabaseName("ix_turn_whisper_targets_turn");
+            entity.HasIndex(e => e.CharacterId).HasDatabaseName("ix_turn_whisper_targets_character");
+            entity.HasOne<Turn>().WithMany().HasForeignKey(e => e.TurnId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_whisper_target");
+            entity.HasOne<Character>().WithMany().HasForeignKey(e => e.CharacterId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_character_whisper_target");
         });
 
         modelBuilder.Entity<ChatPollOption>(entity =>

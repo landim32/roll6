@@ -72,4 +72,12 @@ public class TurnInfo
 
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>A whisper (047): the reader sees it whole.</summary>
+    [JsonPropertyName("whisper")]
+    public bool Whisper { get; set; }
+
+    /// <summary>A whispered action the reader is not in (047): the description is "está sussurrando!".</summary>
+    [JsonPropertyName("whisperHidden")]
+    public bool WhisperHidden { get; set; }
 }

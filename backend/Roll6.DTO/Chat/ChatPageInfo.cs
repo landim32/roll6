@@ -47,6 +47,14 @@ public class ChatSendInfo
     /// <summary>The entry this message answers (044).</summary>
     [JsonPropertyName("replyToTurnId")]
     public long? ReplyToTurnId { get; set; }
+
+    /// <summary>Whisper (047): approved characters of the campaign that may see it (with <see cref="WhisperMaster"/>).</summary>
+    [JsonPropertyName("whisperCharacterIds")]
+    public List<long>? WhisperCharacterIds { get; set; }
+
+    /// <summary>Whisper (047): the master is a recipient.</summary>
+    [JsonPropertyName("whisperMaster")]
+    public bool? WhisperMaster { get; set; }
 }
 
 /// <summary>A dice roll in the chat: 3d6 drawn by the server, as a character or as the master.</summary>
@@ -63,6 +71,13 @@ public class ChatRollInfo
     /// <summary>The entry this roll answers (044).</summary>
     [JsonPropertyName("replyToTurnId")]
     public long? ReplyToTurnId { get; set; }
+
+    /// <summary>A secret roll (047): see <see cref="ChatSendInfo.WhisperCharacterIds"/>.</summary>
+    [JsonPropertyName("whisperCharacterIds")]
+    public List<long>? WhisperCharacterIds { get; set; }
+
+    [JsonPropertyName("whisperMaster")]
+    public bool? WhisperMaster { get; set; }
 }
 
 /// <summary>Moves the reader's mark forward up to an entry (041).</summary>

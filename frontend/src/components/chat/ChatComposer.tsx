@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +6,12 @@ import { toast } from 'sonner';
 import { AudioRecorder } from './AudioRecorder';
 import { ReplyQuote } from './ReplyQuote';
 import { PollComposerModal } from './PollComposerModal';
+import { MentionList } from './MentionList';
+import { WhisperChips } from './WhisperChips';
+import { useCampaign } from '../../hooks/useCampaign';
+import { useCharacter } from '../../hooks/useCharacter';
+import { addRecipient, mentionAt, mentionOptions, removeMention, removeRecipient, whisperPayload } from '../../lib/whisper';
+import type { MentionMatch, WhisperRecipient } from '../../lib/whisper';
 import { pickClipboardImage } from '../../lib/clipboardImage';
 import { replyExcerpt } from '../../lib/chatItems';
 import { BarChartLineIcon, Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
@@ -41,6 +47,14 @@ export const ChatComposer = () => {
   const [recording, setRecording] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  const { party } = useCharacter();
+  const { currentCampaign, isMaster } = useCampaign();
+  // 047: who the next entry is whispered to; empty = public. Cleared after every send (clarification B).
+  const [recipients, setRecipients] = useState<WhisperRecipient[]>([]);
+  const [mention, setMention] = useState<MentionMatch | null>(null);
+  const [activeOption, setActiveOption] = useState(0);
+  const whispering = recipients.length > 0;
   const recordable = useMemo(canRecord, []);
 
   const participation = speaker?.participation ?? null;
@@ -51,6 +65,48 @@ export const ChatComposer = () => {
   const max = acting ? MAX_ACTION : MAX_TEXT;
   const disabled = !speaker;
 
+  // A new campaign or another speaker starts public again.
+  const speakerKey = speaker?.characterId ?? null;
+  const campaignId = currentCampaign?.campaignId ?? null;
+  useEffect(() => {
+    setRecipients([]);
+    setMention(null);
+  }, [speakerKey, campaignId]);
+
+  const options = useMemo(() => (mention === null ? [] : mentionOptions({
+    party: party.map((p) => ({ characterId: p.characterId, name: p.characterName, imageUrl: p.characterImageUrl })),
+    ownCharacterId: participation?.characterId ?? null,
+    speakerIsMaster: isMaster,
+    chosen: recipients,
+    masterLabel: t('chat.whisper.master'),
+  }, mention.query)), [mention, party, participation, isMaster, recipients, t]);
+
+  /** Looks for an "@word" right before the caret (047). */
+  const trackMention = (value: string, caret: number | null) => {
+    const found = caret === null ? null : mentionAt(value, caret);
+    setMention(found);
+    if (found?.query !== mention?.query) setActiveOption(0);
+  };
+
+  const pickRecipient = (recipient: WhisperRecipient) => {
+    if (!mention) return;
+    const next = removeMention(text, mention);
+    setText(next.text);
+    setRecipients((list) => addRecipient(list, recipient));
+    setMention(null);
+    requestAnimationFrame(() => {
+      fieldRef.current?.focus();
+      fieldRef.current?.setSelectionRange(next.caret, next.caret);
+    });
+  };
+
+  /** What a send carries for the whisper; the whisper ends with it. */
+  const takeWhisper = () => {
+    const payload = whisperPayload(recipients);
+    setRecipients([]);
+    return payload;
+  };
+
   const submit = async () => {
     const value = text.trim();
     if (!value || busy || disabled) return;
@@ -58,7 +114,8 @@ export const ChatComposer = () => {
       if (!piece) return;
       try {
         setBusy(true);
-        await act(piece.mapTokenId, value, replyTo?.turnId ?? null);
+        await act(piece.mapTokenId, value, replyTo?.turnId ?? null, whisperPayload(recipients));
+        setRecipients([]);
         cancelReply();
         setText('');
         // Back to talking, like closing an attachment.
@@ -72,10 +129,31 @@ export const ChatComposer = () => {
     }
     // The text leaves the field at once; a failure stays at the bottom of the list with "tentar de novo".
     setText('');
-    await send({ text: value }, value);
+    await send({ text: value, ...takeWhisper() }, value);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    // The "@" list (047) takes ↑ ↓ Enter Tab Esc while open.
+    if (mention) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMention(null);
+        return;
+      }
+      if (options.length > 0) {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          const step = event.key === 'ArrowDown' ? 1 : -1;
+          setActiveOption((i) => (i + step + options.length) % options.length);
+          return;
+        }
+        if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+          event.preventDefault();
+          pickRecipient(options[Math.min(activeOption, options.length - 1)]);
+          return;
+        }
+      }
+    }
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       void submit();
@@ -97,7 +175,7 @@ export const ChatComposer = () => {
       setBusy(true);
       const uploaded = await imageService.upload(file);
       setText('');
-      await send({ image: uploaded.fileName, text: caption }, caption ?? t('chat.image'));
+      await send({ image: uploaded.fileName, text: caption, ...takeWhisper() }, caption ?? t('chat.image'));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
     } finally {
@@ -141,7 +219,7 @@ export const ChatComposer = () => {
   const onSendAudio = async (blob: Blob, type: string, seconds: number) => {
     try {
       const uploaded = await chatService.uploadAudio(blob, `audio.${audioExtension(type)}`);
-      await send({ audio: uploaded.fileName, audioSeconds: seconds }, t('chat.audio'));
+      await send({ audio: uploaded.fileName, audioSeconds: seconds, ...takeWhisper() }, t('chat.audio'));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
       throw err;
@@ -172,7 +250,8 @@ export const ChatComposer = () => {
     const reason = text.trim() || null;
     try {
       setBusy(true);
-      await roll(reason);
+      await roll(reason, whisperPayload(recipients));
+      setRecipients([]);
       setText('');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
@@ -206,13 +285,20 @@ export const ChatComposer = () => {
       )}
       <input ref={fileRef} type="file" accept={IMAGE_TYPES} className="d-none" onChange={(e) => { void onPickImage(e); }} />
       <PollComposerModal open={pollOpen} onOpenChange={setPollOpen} />
+      <WhisperChips recipients={recipients} onRemove={(r) => setRecipients((list) => removeRecipient(list, r))} />
       <div className="stm-chat-input">
         {!recording && (
-          <div className={`stm-chat-field${acting ? ' is-acting' : ''}`}>
-            <textarea rows={1} maxLength={max} value={text}
-              placeholder={acting ? t('chat.actPlaceholder') : t('chat.placeholder', { name: participation?.characterName ?? t('chat.master') })}
+          <div className={`stm-chat-field${acting ? ' is-acting' : ''}${whispering ? ' is-whisper' : ''}`}>
+            {mention && <MentionList options={options} active={activeOption} onPick={pickRecipient} onHover={setActiveOption} />}
+            <textarea ref={fieldRef} rows={1} maxLength={max} value={text}
+              placeholder={acting ? t('chat.actPlaceholder')
+                : whispering ? t('chat.whisper.placeholder', { names: recipients.map((r) => r.name).join(', ') })
+                  : t('chat.placeholder', { name: participation?.characterName ?? t('chat.master') })}
               aria-label={acting ? t('chat.actPlaceholder') : t('chat.messageLabel')}
-              onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} onPaste={onPaste} disabled={busy} />
+              onChange={(e) => { setText(e.target.value); trackMention(e.target.value, e.target.selectionStart); }}
+              onSelect={(e) => trackMention(e.currentTarget.value, e.currentTarget.selectionStart)}
+              onBlur={() => setMention(null)}
+              onKeyDown={onKeyDown} onPaste={onPaste} disabled={busy} />
             <DropdownMenu.Root modal={false}>
               <DropdownMenu.Trigger className="stm-chat-field-btn" disabled={busy} title={t('chat.attach')} aria-label={t('chat.attach')}>
                 <PaperclipIcon size={22} />

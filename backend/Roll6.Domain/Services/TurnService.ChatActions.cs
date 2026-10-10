@@ -17,6 +17,7 @@ public partial class TurnService
     {
         var turn = await _repository.GetByIdAsync(turnId) ?? throw new KeyNotFoundException("Mensagem não encontrada.");
         var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
+        await EnsureVisibleAsync(campaign, userId, turn);
         if (!turn.CanReply)
             throw new Exceptions.DomainValidationException("kind", "Não é possível reagir a esta entrada.");
         var existing = await _chatReactionRepository.GetAsync(turnId, userId);
@@ -49,6 +50,7 @@ public partial class TurnService
     {
         var turn = await _repository.GetByIdAsync(turnId) ?? throw new KeyNotFoundException("Mensagem não encontrada.");
         var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
+        await EnsureVisibleAsync(campaign, userId, turn);
         if (turn.TurnNo != campaign.CurrentTurn)
             throw new Exceptions.DomainValidationException("to", "Só entradas do turno atual podem ser convertidas.");
         if (turn.CharacterId is not long characterId)
@@ -108,6 +110,14 @@ public partial class TurnService
             return;
         var target = await _repository.GetByIdAsync(id)
             ?? throw new Exceptions.DomainValidationException("replyToTurnId", "A mensagem respondida não existe mais.");
+        if (target.IsWhisper && target.CampaignId == entry.CampaignId
+            && await _campaignRepository.GetByIdAsync(target.CampaignId) is { } campaign)
+        {
+            // 047: a whisper the author can't see can't be answered (it does not exist for them).
+            var data = await LoadWhispersAsync(new[] { target });
+            if (!data.CanSee(target, entry.UserId, campaign.UserId == entry.UserId))
+                throw new Exceptions.DomainValidationException("replyToTurnId", "A mensagem respondida não existe mais.");
+        }
         entry.SetReply(target);
     }
 
@@ -116,7 +126,7 @@ public partial class TurnService
     {
         var fresh = await _repository.GetByIdAsync(turn.TurnId) ?? turn;
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { fresh })).Single();
-        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_UPDATED, campaign.CampaignId, userId, data: item));
+        await PublishEntryAsync(campaign, userId, fresh, item, TableEventType.CHAT_UPDATED);
         return item;
     }
 }

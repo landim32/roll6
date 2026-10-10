@@ -2617,3 +2617,28 @@ button.stm-chat-quote { cursor: pointer; }
 .stm-poll-votes-option { padding: 0.6rem 0; border-bottom: 1px solid var(--stm-border); }
 .stm-poll-votes-option:last-child { border-bottom: 0; }
 .stm-poll-votes-voter { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; }
+
+/* Whispers (047): yellow field with the recipients, the "@" list, yellow bubbles with "Visível apenas para". */
+.stm-chat-field.is-whisper { border-color: #f5c518; box-shadow: 0 0 0 1px rgba(245, 197, 24, 0.5); background: rgba(245, 197, 24, 0.06); }
+.stm-chat-field { position: relative; }
+.stm-whisper-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-bottom: 0.35rem; font-size: 0.8rem; }
+.stm-whisper-chips-label { color: #f5c518; font-weight: 600; }
+.stm-whisper-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0.25rem 0.1rem 0.15rem;
+  border: 1px solid rgba(245, 197, 24, 0.6); border-radius: 999px; background: rgba(245, 197, 24, 0.12);
+}
+.stm-whisper-chip .btn-close { width: 0.6em; height: 0.6em; padding: 0.35rem; }
+.stm-mention-list {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 20; max-height: 240px; overflow-y: auto;
+  background: var(--stm-surface, #111a2e); border: 1px solid var(--stm-border-strong, #2c3a55); border-radius: var(--stm-radius-sm, 8px);
+  box-shadow: var(--stm-shadow, 0 6px 18px rgba(0, 0, 0, 0.35)); padding: 0.25rem;
+}
+.stm-mention-option {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; min-height: 44px; padding: 0.3rem 0.5rem;
+  border: 0; border-radius: 6px; background: none; color: inherit; text-align: left;
+}
+.stm-mention-option.is-active, .stm-mention-option:hover { background: rgba(245, 197, 24, 0.15); }
+.stm-mention-empty { padding: 0.5rem; color: var(--bs-secondary-color); font-size: 0.85rem; }
+.stm-chat-message.is-whisper .stm-chat-bubble { background: rgba(245, 197, 24, 0.14); border: 1px solid rgba(245, 197, 24, 0.55); }
+.stm-chat-message.is-whisper-hidden .stm-chat-text { color: var(--bs-secondary-color); }
+.stm-whisper-footer { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.25rem; font-size: 0.7rem; color: #f5c518; }

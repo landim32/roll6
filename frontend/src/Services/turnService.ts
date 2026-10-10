@@ -1,3 +1,4 @@
+import type { WhisperPayload } from '../lib/whisper';
 import type { TurnFinishResultInfo, TurnInfo, TurnNarrationInfo, TurnResetResultInfo, TurnStateInfo } from '../types/turn';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
@@ -37,9 +38,9 @@ class TurnService {
   }
 
   /** Records an action of the piece's character/NPC in the current turn. */
-  async act(mapTokenId: number, description: string, replyToTurnId: number | null = null): Promise<TurnInfo> {
+  async act(mapTokenId: number, description: string, replyToTurnId: number | null = null, whisper: WhisperPayload = {}): Promise<TurnInfo> {
     const response = await fetch(`${API_URL}/api/turn/action`, {
-      method: 'POST', headers: getHeaders(true), body: JSON.stringify({ mapTokenId, description, replyToTurnId }),
+      method: 'POST', headers: getHeaders(true), body: JSON.stringify({ mapTokenId, description, replyToTurnId, ...whisper }),
     });
     return this.handleResponse<TurnInfo>(response);
   }

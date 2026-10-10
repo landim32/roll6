@@ -46,6 +46,7 @@ public partial class TurnService
     {
         var turn = await _repository.GetByIdAsync(turnId) ?? throw new KeyNotFoundException("Enquete não encontrada.");
         var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
+        await EnsureVisibleAsync(campaign, userId, turn);
         if (turn.TurnType != TurnType.Poll)
             throw new DomainValidationException("optionId", "Esta mensagem não é uma enquete.");
         if (turn.IsDeleted)

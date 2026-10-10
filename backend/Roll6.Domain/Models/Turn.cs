@@ -78,6 +78,22 @@ public class Turn
     /// <summary>The entry this one answers (044); null when it isn't a reply.</summary>
     public long? ReplyToTurnId { get; set; }
 
+    /// <summary>
+    /// A whisper (047): only the author, the master and the owners of its targets (<see cref="TurnWhisperTarget"/>) see
+    /// it; anyone else doesn't get a whispered message at all and gets a whispered action masked.
+    /// </summary>
+    public bool IsWhisper { get; set; }
+
+    /// <summary>What can be whispered (047): what people say, rolls included, and actions.</summary>
+    public bool CanBeWhispered => TurnType is TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll or TurnType.Action;
+
+    public void MarkWhisper()
+    {
+        if (!CanBeWhispered)
+            throw new DomainValidationException("whisper", "Só mensagens, fotos, áudios, rolagens e ações podem ser sussurrados.");
+        IsWhisper = true;
+    }
+
     /// <summary>Chat: the faces of a <see cref="TurnType.Roll"/>, in order, comma separated ("5,3,6").</summary>
     public string? Dice { get; set; }
 
