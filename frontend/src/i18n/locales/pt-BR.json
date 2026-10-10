@@ -585,7 +585,7 @@
     "reconnecting": "Reconectando…",
     "offline": "Sem tempo real",
     "offlineHint": "As alterações dos outros chegam a cada 15 segundos até a conexão voltar.",
-    "followedMap": "O mestre abriu o mapa {{name}}.",
+    "followedMap": "O mestre levou a mesa para o mapa {{name}}.",
     "mapChangedDirty": "O mapa foi alterado por outra pessoa; salve ou descarte para ver a nova versão.",
     "mapDeleted": "O mapa aberto foi excluído.",
     "campaignDeleted": "A campanha foi excluída."
@@ -811,5 +811,11 @@
     "guideStep3": "Abra o Roll6 pelo novo ícone na tela de início: ele abre em tela cheia, como um aplicativo.",
     "guideOtherBrowser": "Neste navegador, use o botão de compartilhar do próprio navegador; se \"Adicionar à Tela de Início\" não aparecer, abra o roll6.site no Safari.",
     "guideClose": "Entendi"
+  },
+  "currentMap": {
+    "make": "Tornar atual",
+    "confirm": "Levar os jogadores para o mapa {{name}}?",
+    "confirmButton": "Levar os jogadores",
+    "changed": "Os jogadores foram levados para o mapa {{name}}."
   }
 }

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { ArchiveIcon, OpenIcon, PencilIcon, TrashIcon, UnarchiveIcon } from '../ui/icons';
 import { MapEditModal } from '../modals/MapEditModal';
+import { MakeCurrentMapButton } from './MakeCurrentMapButton';
 import { mapService } from '../../Services/mapService';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useTableEvents } from '../../hooks/useRealtime';
@@ -100,6 +101,7 @@ export const CampaignMapsTab = ({ onOpenMap }: CampaignMapsTabProps) => {
                 </small>
               </div>
               <div className="stm-character-actions">
+                <MakeCurrentMapButton map={map} disabled={busy} />
                 <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => onOpenMap(map)}
                   title={t('campaignSettings.openMap')} aria-label={t('campaignSettings.openMap')}>
                   <OpenIcon size={14} />

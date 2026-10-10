@@ -292,6 +292,19 @@ public class CampaignServiceTests
     }
 
     [Fact]
+    public async Task SetCurrentMap_ArchivedMap_IsRefused()
+    {
+        _mapRepository.Setup(r => r.GetByIdAsync(33)).ReturnsAsync(new Map { MapId = 33, CampaignId = 10, Status = MapStatus.Archived });
+
+        var error = await _service.Invoking(s => s.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 33 }))
+            .Should().ThrowAsync<DomainValidationException>();
+
+        error.Which.Errors.Should().ContainKey("mapId");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        Published(TableEventType.MAP_CURRENT, Times.Never());
+    }
+
+    [Fact]
     public async Task RenameAndDelete_PublishCampaignEvents()
     {
         _mapRepository.Setup(r => r.ListDeletedIdsByCampaignAsync(10)).ReturnsAsync(new List<long>());

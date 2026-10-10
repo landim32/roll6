@@ -137,16 +137,19 @@ public static class CampaignTools
     [McpServerTool(Name = "set_current_map", Title = "Set current map", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/current-map")]
     [Description("""
-        What it does: sets the campaign map every player follows in the app (their screens switch to it in real time).
+        What it does: sets the campaign map every player follows in the app — their screens switch to it in real time
+        (the master's own screen does not move). This is the only way the current map changes: opening, creating or
+        editing maps never does, so the master can prepare another map while the table plays on the current one.
         Who can use it: only the master.
         Returns: the updated campaign (currentMapId).
-        Common errors: 403 not the master, 404 map/campaign not found, 400 the map is not an active map of this campaign.
+        Common errors: 403 not the master, 404 map/campaign not found, 400 the map is not an active map of this campaign
+        (archived or deleted maps can't be current).
         Related tools: list_campaign_maps, add_map_to_campaign.
         """)]
     public static Task<CallToolResult> SetCurrentMap(
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
-        [Description("Map to follow (mapId of a non-deleted map of this campaign); null clears the current map.")] long? mapId) =>
+        [Description("Map to follow (mapId of an active map of this campaign); null clears the current map.")] long? mapId) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/current-map", new CampaignCurrentMapInfo { MapId = mapId });
 
     [McpServerTool(Name = "list_campaign_maps", Title = "List campaign maps", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
