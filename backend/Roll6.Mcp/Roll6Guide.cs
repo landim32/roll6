@@ -147,6 +147,11 @@ public static class Roll6Guide
         - `create_chat_poll` asks the table a question with 2–12 options (kind `poll`, like a WhatsApp poll). Each approved
           character votes once and the master has one vote as "Mestre"; `vote_chat_poll` puts, moves or withdraws that
           vote. Votes are public (`poll.options[].voters`) and notify nobody; a poll is conversation, never a turn record.
+        - **Whispers**: `send_chat_message`, `roll_dice` and `act_in_turn` take `whisperCharacterIds` (approved characters,
+          not your own) and/or `whisperMaster`. Only the author, the master (always) and the owners of those characters see
+          it whole (`whisper.recipients`); everyone else doesn't get a whispered message at all, and gets a whispered action
+          with the text "está sussurrando!" (`whisperHidden`) — in the chat, the turn state, the summary and the turn data.
+          A whispered action still is the character's action of the turn.
         - `roll_dice` rolls **3d6** in the chat: the server draws the dice, the roll stays in the chat history for
           everyone (kind `roll`, `dice` = the three faces, `text` = the optional reason) and only the master can delete it.
 

@@ -49,6 +49,10 @@ export interface TurnInfo {
   /** Fields changed (CharacterUpdate). */
   changes: TurnChangeInfo[] | null;
   createdAt: string;
+  /** A whisper the reader sees whole (047). */
+  whisper?: boolean;
+  /** A whispered action the reader is not in (047): the description is "está sussurrando!". */
+  whisperHidden?: boolean;
 }
 
 /** Current turn of a campaign with its entries (chronological). */

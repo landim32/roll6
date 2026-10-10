@@ -64,9 +64,15 @@ public static class ChatTools
         [Description("What to say (1–4000 characters, markdown), or the caption of a photo. Example: \"Vamos descansar antes de entrar na cripta?\".")] string? text = null,
         [Description("Optional: one of your characters approved in the campaign. Omit to speak as the master (only the master can).")] long? characterId = null,
         [Description("Optional: fileName returned by upload_image, to send a photo.")] string? image = null,
-        [Description("Optional: turnId of the chat entry this message answers (message, action, roll or narration; shown as a quote).")] long? replyToTurnId = null) =>
+        [Description("Optional: turnId of the chat entry this message answers (message, action, roll or narration; shown as a quote).")] long? replyToTurnId = null,
+        [Description("Optional whisper (047): ids of characters approved in the campaign who may see it (not your own). Others don't get a whispered message at all; a whispered action shows them \"está sussurrando!\". The master always sees whispers.")] List<long>? whisperCharacterIds = null,
+        [Description("Optional whisper (047): true to whisper to the master (not when you are the master).")] bool? whisperMaster = null) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat",
-            new ChatSendInfo { CharacterId = characterId, Text = text, Image = image, ReplyToTurnId = replyToTurnId });
+            new ChatSendInfo
+            {
+                CharacterId = characterId, Text = text, Image = image, ReplyToTurnId = replyToTurnId,
+                WhisperCharacterIds = whisperCharacterIds, WhisperMaster = whisperMaster
+            });
 
     [McpServerTool(Name = "roll_dice", Title = "Roll dice", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaign/{id}/chat/roll")]
@@ -86,9 +92,11 @@ public static class ChatTools
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Optional: what the roll is for (≤ 260 characters). Example: \"Ataque com espada\".")] string? text = null,
-        [Description("Optional: one of your characters approved in the campaign. Omit to roll as the master (only the master can).")] long? characterId = null) =>
+        [Description("Optional: one of your characters approved in the campaign. Omit to roll as the master (only the master can).")] long? characterId = null,
+        [Description("Optional whisper (047): ids of characters approved in the campaign who may see it (not your own). Others don't get a whispered message at all; a whispered action shows them \"está sussurrando!\". The master always sees whispers.")] List<long>? whisperCharacterIds = null,
+        [Description("Optional whisper (047): true to whisper to the master (not when you are the master).")] bool? whisperMaster = null) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat/roll",
-            new ChatRollInfo { CharacterId = characterId, Text = text });
+            new ChatRollInfo { CharacterId = characterId, Text = text, WhisperCharacterIds = whisperCharacterIds, WhisperMaster = whisperMaster });
 
     [McpServerTool(Name = "create_chat_poll", Title = "Create a poll in the chat", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/campaign/{id}/chat/poll")]

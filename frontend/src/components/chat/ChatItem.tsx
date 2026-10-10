@@ -89,14 +89,26 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
   const quote = item.replyTo ? <ReplyQuote reply={item.replyTo} onOpen={onOpenQuote} /> : null;
   const reactions = <ReactionsBadge reactions={item.reactions} userId={userId} />;
   const interactive = !!(item.canReply || item.canReact || item.canDelete || item.canConvert);
+  // 047: a whisper the reader sees is yellow and says who else sees it; a whispered action they aren't in is masked.
+  const whisperClass = `${item.whisper ? ' is-whisper' : ''}${item.whisperHidden ? ' is-whisper-hidden' : ''}`;
+  const whisperFooter = item.whisper && !item.deleted ? (
+    <div className="stm-whisper-footer">
+      <span>{t('chat.whisper.visibleTo')}</span>
+      {item.whisper.recipients.map((r) => (
+        <span key={r.characterId ?? 'master'} title={r.characterId === null ? t('chat.whisper.master') : r.name}>
+          <CharacterAvatar name={r.characterId === null ? t('chat.whisper.master') : r.name} imageUrl={r.imageUrl} size={18} />
+        </span>
+      ))}
+    </div>
+  ) : null;
 
   /** A row that answers to holding (action bar) and, when it can be answered, to a drag to the right. */
   const row = (className: string, children: ReactNode, title?: string) => (interactive ? (
-    <ChatBubbleGestures className={`${className}${flash ? ' is-flash' : ''}`} title={title}
+    <ChatBubbleGestures className={`${className}${whisperClass}${flash ? ' is-flash' : ''}`} title={title}
       onActions={(element) => onActions(item, element)} onReply={item.canReply ? () => onReply(item) : undefined}>
       {children}
     </ChatBubbleGestures>
-  ) : <div className={`${className}${flash ? ' is-flash' : ''}`} title={title}>{children}</div>);
+  ) : <div className={`${className}${whisperClass}${flash ? ' is-flash' : ''}`} title={title}>{children}</div>);
 
   switch (item.kind) {
     case CHAT_KIND.poke:
@@ -159,10 +171,13 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
             {cancelled && <div className="stm-chat-cancelled-label">{t('chat.actionCancelled')}</div>}
             <div className="stm-chat-captioned">
               <span className="stm-chat-kind-icon"><LightningIcon size={12} /></span>
-              <span className="stm-chat-plain stm-chat-text">{item.description ?? ''}</span>
+              {item.whisperHidden
+                ? <em className="stm-chat-plain stm-chat-text">{item.description ?? ''}</em>
+                : <span className="stm-chat-plain stm-chat-text">{item.description ?? ''}</span>}
               {meta}
             </div>
             {reactions}
+            {whisperFooter}
           </div>
         </>,
         item.text ?? undefined,
@@ -229,6 +244,7 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
                 {item.kind === CHAT_KIND.poll && <PollCard item={item} />}
                 {caption ? <div className="stm-chat-captioned"><Text value={caption} />{meta}</div> : <div className="stm-chat-meta-row">{meta}</div>}
                 {reactions}
+                {whisperFooter}
               </>
             )}
           </div>

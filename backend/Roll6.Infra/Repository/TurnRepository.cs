@@ -33,6 +33,7 @@ public class TurnRepository : ITurnRepository<Turn>
             .ExecuteUpdateAsync(s => s.SetProperty(e => e.ReplyToTurnId, (long?)null));
         await _context.ChatReactions.Where(r => ids.Contains(r.TurnId)).ExecuteDeleteAsync();
         await _context.ChatPollVotes.Where(v => ids.Contains(v.TurnId)).ExecuteDeleteAsync();
+        await _context.TurnWhisperTargets.Where(w => ids.Contains(w.TurnId)).ExecuteDeleteAsync();
         await _context.ChatPollOptions.Where(o => ids.Contains(o.TurnId)).ExecuteDeleteAsync();
         return await rows.ExecuteDeleteAsync();
     }
@@ -155,8 +156,9 @@ public class TurnRepository : ITurnRepository<Turn>
     /// </summary>
     public async Task DeleteByCharacterAsync(long characterId)
     {
-        // Its poll votes (045) go with it: a deleted character no longer counts.
+        // Its poll votes (045) go with it: a deleted character no longer counts; so does its place in whispers (047).
         await _context.ChatPollVotes.Where(v => v.CharacterId == characterId).ExecuteDeleteAsync();
+        await _context.TurnWhisperTargets.Where(w => w.CharacterId == characterId).ExecuteDeleteAsync();
         await DeleteWhereAsync(_context.Turns.Where(e => e.CharacterId == characterId && !TurnTypes.CONVERSATION.Contains(e.TurnType)));
         await _context.Turns.Where(e => e.CharacterId == characterId)
             .ExecuteUpdateAsync(s => s.SetProperty(e => e.CharacterId, (long?)null));
@@ -164,9 +166,19 @@ public class TurnRepository : ITurnRepository<Turn>
 
     // ------------------------------------------------------------------ chat (041)
 
-    public async Task<List<Turn>> ListChatPageAsync(long campaignId, (DateTime At, long Id)? before, (DateTime At, long Id)? after, int limit)
+    /// <summary>
+    /// What a non-master viewer may get (047): every public entry and every action (masked later when whispered), plus
+    /// the whispers they wrote or whose target characters they own now.
+    /// </summary>
+    private IQueryable<Turn> VisibleTo(IQueryable<Turn> query, long viewerId, bool viewerIsMaster) =>
+        viewerIsMaster ? query : query.Where(e => !e.IsWhisper || e.TurnType == TurnType.Action || e.UserId == viewerId
+            || _context.TurnWhisperTargets.Any(w => w.TurnId == e.TurnId && w.CharacterId != null
+                && _context.Characters.Any(c => c.CharacterId == w.CharacterId && c.UserId == viewerId)));
+
+    public async Task<List<Turn>> ListChatPageAsync(long campaignId, (DateTime At, long Id)? before, (DateTime At, long Id)? after, int limit,
+        long viewerId, bool viewerIsMaster)
     {
-        var query = _context.Turns.AsNoTracking().Where(e => e.CampaignId == campaignId);
+        var query = VisibleTo(_context.Turns.AsNoTracking().Where(e => e.CampaignId == campaignId), viewerId, viewerIsMaster);
         if (after is { } a)
         {
             return await query.Where(e => e.CreatedAt > a.At || (e.CreatedAt == a.At && e.TurnId > a.Id))
@@ -188,9 +200,10 @@ public class TurnRepository : ITurnRepository<Turn>
             .ToListAsync();
     }
 
-    public async Task<int> CountUnreadAsync(long campaignId, long userId, DateTime? since, int cap)
+    public async Task<int> CountUnreadAsync(long campaignId, long userId, DateTime? since, int cap, bool userIsMaster)
     {
-        var query = _context.Turns.Where(e => e.CampaignId == campaignId && e.UserId != userId && e.DeletedAt == null);
+        var query = VisibleTo(_context.Turns.Where(e => e.CampaignId == campaignId && e.UserId != userId && e.DeletedAt == null),
+            userId, userIsMaster);
         if (since is DateTime at)
             query = query.Where(e => e.CreatedAt > at);
         return await query.Take(cap).CountAsync();
@@ -205,10 +218,10 @@ public class TurnRepository : ITurnRepository<Turn>
             .FirstOrDefaultAsync();
     }
 
-    public async Task<Turn?> FirstUnreadAsync(long campaignId, long userId, DateTime? since)
+    public async Task<Turn?> FirstUnreadAsync(long campaignId, long userId, DateTime? since, bool userIsMaster)
     {
-        var query = _context.Turns.AsNoTracking()
-            .Where(e => e.CampaignId == campaignId && e.UserId != userId && e.DeletedAt == null);
+        var query = VisibleTo(_context.Turns.AsNoTracking()
+            .Where(e => e.CampaignId == campaignId && e.UserId != userId && e.DeletedAt == null), userId, userIsMaster);
         if (since is DateTime at)
             query = query.Where(e => e.CreatedAt > at);
         return await query.OrderBy(e => e.CreatedAt).ThenBy(e => e.TurnId).FirstOrDefaultAsync();

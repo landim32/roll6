@@ -32,9 +32,15 @@ public static class TurnTools
         Roll6ApiClient api,
         [Description(McpDocs.MAP_TOKEN_ID + " Must be a character or NPC piece.")] long mapTokenId,
         [Description("What the piece does, in plain text (required, up to 2000 characters). Example: \"Casts a fireball at the orcs\".")] string description,
-        [Description("Optional: turnId of a chat entry this action answers (shown as a quote).")] long? replyToTurnId = null) =>
+        [Description("Optional: turnId of a chat entry this action answers (shown as a quote).")] long? replyToTurnId = null,
+        [Description("Optional whisper (047): ids of characters approved in the campaign who may see it (not your own). Others don't get a whispered message at all; a whispered action shows them \"está sussurrando!\". The master always sees whispers.")] List<long>? whisperCharacterIds = null,
+        [Description("Optional whisper (047): true to whisper to the master (not when you are the master).")] bool? whisperMaster = null) =>
         api.SendAsync(HttpMethod.Post, "/api/turn/action",
-            new TurnActInfo { MapTokenId = mapTokenId, Description = description, ReplyToTurnId = replyToTurnId });
+            new TurnActInfo
+            {
+                MapTokenId = mapTokenId, Description = description, ReplyToTurnId = replyToTurnId,
+                WhisperCharacterIds = whisperCharacterIds, WhisperMaster = whisperMaster
+            });
 
     [McpServerTool(Name = "get_turn_summary", Title = "Get turn summary", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/turn/summary")]

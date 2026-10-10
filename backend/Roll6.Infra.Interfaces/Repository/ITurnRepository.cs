@@ -37,15 +37,20 @@ public interface ITurnRepository<TModel> where TModel : class
     /// A page ordered by (created_at, id), every type, deleted ones included, returned ascending: the newest without
     /// cursor, older with <paramref name="before"/>, newer with <paramref name="after"/>.
     /// </summary>
-    Task<List<TModel>> ListChatPageAsync(long campaignId, (DateTime At, long Id)? before, (DateTime At, long Id)? after, int limit);
+    /// <summary>
+    /// A chat page as <paramref name="viewerId"/> may see it (047): the master sees everything; anyone else doesn't get
+    /// whispered messages they are not in (whispered actions stay, masked by the service).
+    /// </summary>
+    Task<List<TModel>> ListChatPageAsync(long campaignId, (DateTime At, long Id)? before, (DateTime At, long Id)? after, int limit,
+        long viewerId, bool viewerIsMaster);
 
     /// <summary>The turn records (types 1–5, not deleted) of the given turns, in order.</summary>
     Task<List<TModel>> ListLogByTurnsAsync(long campaignId, IEnumerable<int> turnNos);
 
     /// <summary>Entries by others, not deleted, after <paramref name="since"/> (all when null), at most <paramref name="cap"/>.</summary>
-    Task<int> CountUnreadAsync(long campaignId, long userId, DateTime? since, int cap);
+    Task<int> CountUnreadAsync(long campaignId, long userId, DateTime? since, int cap, bool userIsMaster);
 
-    Task<TModel?> FirstUnreadAsync(long campaignId, long userId, DateTime? since);
+    Task<TModel?> FirstUnreadAsync(long campaignId, long userId, DateTime? since, bool userIsMaster);
 
     /// <summary>When the user last poked in the campaign (043), for the one-minute interval.</summary>
     Task<DateTime?> LastPokeAtAsync(long campaignId, long userId);

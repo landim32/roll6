@@ -186,6 +186,8 @@ export const permissionsFor = (item: ChatItemInfo, viewer: ViewerContext): ChatI
     : item.kind === CHAT_KIND.text && !item.deleted ? 'action'
     : validAction ? 'message'
     : null;
+  // 047: a whispered action the reader is not in can only be seen ("está sussurrando!"), never touched.
+  if (item.whisperHidden) return { ...item, canDelete: false, canReply: false, canReact: false, canConvert: null };
   return { ...item, canDelete, canReply, canReact: canReply, canConvert };
 };
 

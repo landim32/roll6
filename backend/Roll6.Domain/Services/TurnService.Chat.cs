@@ -5,6 +5,7 @@ using Roll6.Domain.Models;
 using Roll6.Domain.Notifications;
 using Roll6.Domain.Realtime;
 using Roll6.Domain.Turns;
+using Roll6.Domain.Whispers;
 using Roll6.DTO.Chat;
 using Roll6.DTO.Realtime;
 
@@ -32,7 +33,8 @@ public partial class TurnService : IChatService
         var afterCursor = ParseCursor(after, "after");
         var beforeCursor = afterCursor == null ? ParseCursor(before, "before") : null;
 
-        var page = await _repository.ListChatPageAsync(campaignId, beforeCursor, afterCursor, size + 1);
+        var isMaster = campaign.UserId == userId;
+        var page = await _repository.ListChatPageAsync(campaignId, beforeCursor, afterCursor, size + 1, userId, isMaster);
         var hasMore = page.Count > size;
         if (hasMore)
         {
@@ -42,12 +44,12 @@ public partial class TurnService : IChatService
         }
 
         var read = await _chatReadRepository.GetAsync(campaignId, userId);
-        var firstUnread = await _repository.FirstUnreadAsync(campaignId, userId, read?.LastReadAt);
+        var firstUnread = await _repository.FirstUnreadAsync(campaignId, userId, read?.LastReadAt, isMaster);
         return new ChatPageInfo
         {
             Items = await MapChatAsync(campaign, userId, page),
             HasMore = hasMore,
-            UnreadCount = await _repository.CountUnreadAsync(campaignId, userId, read?.LastReadAt, UNREAD_CAP),
+            UnreadCount = await _repository.CountUnreadAsync(campaignId, userId, read?.LastReadAt, UNREAD_CAP, isMaster),
             FirstUnreadCursor = firstUnread == null ? null : CursorOf(firstUnread)
         };
     }
@@ -56,6 +58,7 @@ public partial class TurnService : IChatService
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
         var (characterId, displayName, displayImage) = await SpeakerAsync(userId, campaign, info.CharacterId);
+        var whisper = await ResolveWhisperAsync(campaign, userId, characterId, info.WhisperCharacterIds, info.WhisperMaster);
 
         Turn message;
         if (!string.IsNullOrWhiteSpace(info.Audio))
@@ -69,10 +72,10 @@ public partial class TurnService : IChatService
                 displayName, displayImage, info.Text);
         await ApplyReplyAsync(message, info.ReplyToTurnId);
 
-        var saved = await _repository.InsertAsync(message);
+        var saved = await SaveEntryAsync(message, whisper);
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
-        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
-        _queue.Enqueue(TableNotices.Message(campaign.CampaignId, userId, item));
+        await PublishEntryAsync(campaign, userId, saved, item, TableEventType.CHAT_MESSAGE);
+        _queue.Enqueue(await RestrictNoticeAsync(campaign, saved, TableNotices.Message(campaign.CampaignId, userId, item)));
         return item;
     }
 
@@ -80,16 +83,17 @@ public partial class TurnService : IChatService
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
         var (characterId, displayName, displayImage) = await SpeakerAsync(userId, campaign, info.CharacterId);
+        var whisper = await ResolveWhisperAsync(campaign, userId, characterId, info.WhisperCharacterIds, info.WhisperMaster);
         // Drawn here, never by the client, so everyone sees the same fair roll.
         var dice = Enumerable.Range(0, Turn.ROLL_DICE)
             .Select(_ => System.Security.Cryptography.RandomNumberGenerator.GetInt32(1, Turn.ROLL_SIDES + 1)).ToArray();
         var roll = Turn.DiceRoll(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
             displayName, displayImage, dice, info.Text);
         await ApplyReplyAsync(roll, info.ReplyToTurnId);
-        var saved = await _repository.InsertAsync(roll);
+        var saved = await SaveEntryAsync(roll, whisper);
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
-        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
-        _queue.Enqueue(TableNotices.Message(campaign.CampaignId, userId, item));
+        await PublishEntryAsync(campaign, userId, saved, item, TableEventType.CHAT_MESSAGE);
+        _queue.Enqueue(await RestrictNoticeAsync(campaign, saved, TableNotices.Message(campaign.CampaignId, userId, item)));
         return item;
     }
 
@@ -98,6 +102,7 @@ public partial class TurnService : IChatService
         var turn = await _repository.GetByIdAsync(turnId)
             ?? throw new KeyNotFoundException("Mensagem não encontrada.");
         var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
+        await EnsureVisibleAsync(campaign, userId, turn);
         if (turn.TurnType == TurnType.Action)
         {
             // 044: deleting an action cancels it — the character's owner or the master.
@@ -114,8 +119,11 @@ public partial class TurnService : IChatService
         if (!turn.Delete(userId, campaign.UserId == userId))
             return;
         await _repository.UpdateAsync(turn);
-        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_DELETED, campaign.CampaignId, userId,
-            data: new { itemKey = KeyOf(turn) }));
+        var deleted = TableEvents.Create(TableEventType.CHAT_DELETED, campaign.CampaignId, userId, data: new { itemKey = KeyOf(turn) });
+        if (turn.IsWhisper)
+            await _notifier.PublishSplitAsync(deleted, (await AudienceOfAsync(campaign, turn)).Audience, null);
+        else
+            await _notifier.PublishAsync(deleted);
         // A deleted narration leaves the turn's reads too (summary, narration, history).
         if (turn.TurnType == TurnType.Narration)
             await PublishTurnChangedAsync(campaign.CampaignId, userId);
@@ -193,6 +201,10 @@ public partial class TurnService : IChatService
 
         var logTurns = page.Where(t => t.IsLog && !t.IsDeleted).Select(t => t.TurnNo).Distinct().ToList();
         var logs = logTurns.Count == 0 ? new List<Turn>() : await _repository.ListLogByTurnsAsync(campaign.CampaignId, logTurns);
+        // 047: whispered actions the reader is not in are masked before any line is built from them.
+        var whispers = await MaskForViewerAsync(campaign, userId, logs.Concat(page));
+        // 047: whispered actions the reader is not in are masked before any line is built from them.
+
         var names = await LoadNamesAsync(campaign, logs.Concat(page).ToList(), Array.Empty<long>(), Array.Empty<long>());
         var lines = logs.Zip(BuildLines(logs, names)).ToDictionary(p => p.First.TurnId, p => p.Second);
         var npcIds = page.Where(t => t.NpcId.HasValue).Select(t => t.NpcId!.Value).Distinct().ToList();
@@ -203,6 +215,8 @@ public partial class TurnService : IChatService
         var replyIds = page.Where(t => t.ReplyToTurnId.HasValue).Select(t => t.ReplyToTurnId!.Value).Distinct().ToList();
         var targets = replyIds.Count == 0 ? new Dictionary<long, Turn>()
             : (await _repository.ListByIdsAsync(replyIds)).ToDictionary(t => t.TurnId);
+        // 047: reply targets that are whispers the reader can't see are quoted as hidden.
+        var targetWhispers = await LoadWhispersAsync(targets.Values);
         var targetCharacterIds = targets.Values.Where(t => t.CharacterId.HasValue && !names.Characters.ContainsKey(t.CharacterId!.Value))
             .Select(t => t.CharacterId!.Value).Distinct().ToList();
         if (targetCharacterIds.Count > 0)
@@ -264,7 +278,7 @@ public partial class TurnService : IChatService
             {
                 FillLogItem(item, t, lines.GetValueOrDefault(t.TurnId), names, npcImages);
             }
-            FillInteractions(item, t, campaign, userId, isMaster, names, targets, reactions, reactionNames);
+            FillInteractions(item, t, campaign, userId, isMaster, names, targets, reactions, reactionNames, whispers, targetWhispers);
             return item;
         }).ToList();
     }
@@ -305,21 +319,25 @@ public partial class TurnService : IChatService
     /// for actions: the character's owner or the master, valid actions only).
     /// </summary>
     private void FillInteractions(ChatItemInfo item, Turn t, Campaign campaign, long userId, bool isMaster, TurnNames names,
-        Dictionary<long, Turn> targets, List<ChatReaction> reactions, Dictionary<long, string> reactionNames)
+        Dictionary<long, Turn> targets, List<ChatReaction> reactions, Dictionary<long, string> reactionNames, WhisperData whispers, WhisperData targetWhispers)
     {
         item.Cancelled = t.IsCancelled;
-        item.CanReply = t.CanReply;
-        item.CanReact = t.CanReply;
+        item.Whisper = WhisperInfoOf(t, whispers);
+        item.WhisperHidden = whispers.Masked.Contains(t.TurnId);
+        item.CanReply = t.CanReply && !item.WhisperHidden;
+        item.CanReact = item.CanReply;
         var ownerId = t.CharacterId is long c && names.Characters.TryGetValue(c, out var character) ? character.UserId : (long?)null;
         var mayChange = isMaster || (ownerId.HasValue && ownerId == userId);
         var currentTurn = t.TurnNo == campaign.CurrentTurn;
         if (t.TurnType == TurnType.Action)
             item.CanDelete = t.IsValidAction && (isMaster || (ownerId.HasValue && ownerId == userId));
-        item.CanConvert = !currentTurn || !mayChange || t.CharacterId == null ? null
+        if (item.WhisperHidden)
+            item.CanDelete = false;
+        item.CanConvert = !currentTurn || !mayChange || t.CharacterId == null || item.WhisperHidden ? null
             : t.TurnType == TurnType.Text && !t.IsDeleted ? "action"
             : t.IsValidAction ? "message"
             : null;
-        if (!t.IsDeleted)
+        if (!t.IsDeleted && !item.WhisperHidden)
             item.Reactions = reactions.Where(r => r.TurnId == t.TurnId).Select(r => new ChatReactionInfo
             {
                 UserId = r.UserId,
@@ -328,12 +346,20 @@ public partial class TurnService : IChatService
             }).ToList();
         if (t.ReplyToTurnId is long replyId)
             item.ReplyTo = targets.TryGetValue(replyId, out var target)
-                ? ReplyOf(target, names)
+                ? ReplyOf(target, names, targetWhispers.CanSee(target, userId, isMaster))
                 : new ChatReplyInfo { Key = $"t{replyId}", TurnId = replyId, Deleted = true };
     }
 
-    private static ChatReplyInfo ReplyOf(Turn target, TurnNames names)
+    private static ChatReplyInfo ReplyOf(Turn target, TurnNames names, bool visible = true)
     {
+        if (!visible)
+            return new ChatReplyInfo
+            {
+                Key = KeyOf(target), TurnId = target.TurnId, Kind = KindOf(target.TurnType), Hidden = true,
+                DisplayName = target.TurnType == TurnType.Action && target.CharacterId is long ac && names.Characters.TryGetValue(ac, out var actor)
+                    ? actor.Name : string.Empty,
+                Excerpt = target.TurnType == TurnType.Action ? WhisperAudience.MASKED_TEXT : string.Empty
+            };
         var name = target.TurnType == TurnType.Narration ? "Narração"
             : target.IsConversation ? TableNotices.Speaker(target.DisplayName ?? string.Empty)
             : target.CharacterId is long c && names.Characters.TryGetValue(c, out var character) ? character.Name

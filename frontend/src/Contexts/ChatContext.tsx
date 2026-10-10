@@ -1,5 +1,6 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { applyVote, nextVote } from '../lib/chatPoll';
+import type { WhisperPayload } from '../lib/whisper';
 import type { ReactNode } from 'react';
 import { chatService } from '../Services/chatService';
 import { pushService } from '../Services/pushService';
@@ -65,7 +66,7 @@ interface ChatContextType {
   discard: (id: string) => void;
   remove: (item: ChatItemInfo) => Promise<void>;
   /** Rolls 3d6 as the speaker, with an optional reason. */
-  roll: (text: string | null) => Promise<void>;
+  roll: (text: string | null, whisper?: WhisperPayload) => Promise<void>;
   /** Pokes who hasn't acted in the turn (043); the chat line comes back merged. */
   poke: () => Promise<PokeResultInfo>;
   /** The entry the next message/action answers (044). */
@@ -332,9 +333,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setItems((current) => markDeleted(current, item.key));
   }, []);
 
-  const roll = useCallback(async (text: string | null) => {
+  const roll = useCallback(async (text: string | null, whisper: WhisperPayload = {}) => {
     if (!speaker || campaignId === null) return;
-    const item = await chatService.roll(campaignId, { characterId: speaker.characterId, text, replyToTurnId: replyTo?.turnId ?? null });
+    const item = await chatService.roll(campaignId, {
+      characterId: speaker.characterId, text, replyToTurnId: replyTo?.turnId ?? null, ...whisper,
+    });
     setReplyTo(null);
     if (campaignRef.current === campaignId) setItems((current) => mergeItems(current, [forViewer(item)]));
     setFirstUnreadCursor(null);

@@ -195,3 +195,11 @@ describe('045: laugh and polls', () => {
     expect([viewed.canReply, viewed.canReact, viewed.canConvert]).toEqual([true, true, null]);
   });
 });
+
+describe('047: whispers', () => {
+  it('a masked whispered action can only be seen', () => {
+    const masked = item(10, { kind: CHAT_KIND.action, characterId: 80, turnNo: 3, whisperHidden: true, description: 'está sussurrando!' });
+    const viewed = permissionsFor(masked, { userId: 1, isMaster: true, currentTurn: 3, ownerOf: () => 2 });
+    expect([viewed.canReply, viewed.canReact, viewed.canDelete, viewed.canConvert]).toEqual([false, false, false, null]);
+  });
+});

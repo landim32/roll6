@@ -42,6 +42,7 @@ public class TurnServiceTests
     private readonly Mock<INotificationQueue> _queue = new();
     private readonly Mock<IChatReactionRepository<ChatReaction>> _chatReactions = new();
     private readonly Mock<IChatPollRepository<ChatPollOption, ChatPollVote>> _chatPolls = new();
+    private readonly Mock<ITurnWhisperRepository<TurnWhisperTarget>> _whispers = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
@@ -97,6 +98,7 @@ public class TurnServiceTests
         // 044 defaults: no reactions, no reply targets, no earlier valid action.
         _repository.Setup(r => r.ListLogByTurnsAsync(It.IsAny<long>(), It.IsAny<IEnumerable<int>>())).ReturnsAsync(new List<Turn>());
         _chatReactions.Setup(r => r.ListByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatReaction>());
+        _whispers.Setup(r => r.ListByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<TurnWhisperTarget>());
         _chatPolls.Setup(r => r.ListOptionsByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatPollOption>());
         _chatPolls.Setup(r => r.ListVotesByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatPollVote>());
         _repository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Turn>());
@@ -104,7 +106,7 @@ public class TurnServiceTests
             .ReturnsAsync(new List<Turn>());
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object,
-            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _chatPolls.Object, _queue.Object, _notifier.Object);
+            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _chatPolls.Object, _whispers.Object, _queue.Object, _notifier.Object);
     }
 
     // --- State (US1) ---
@@ -174,6 +176,27 @@ public class TurnServiceTests
             .Should().Be(((int)TurnType.Action, 3, (long?)ARIA, "Aria", "Ataca o goblin"));
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
             e.Type == TableEventType.TURN_CHANGED && e.CampaignId == CAMPAIGN && e.ActorUserId == PLAYER)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_Whispered_SavesTargets_StillCancelsThePreviousAction_AndTellsTheMasterTheText()
+    {
+        _campaignCharacterRepository.Setup(r => r.GetAsync(CAMPAIGN, BRAM)).ReturnsAsync(new CampaignCharacter
+            { CampaignId = CAMPAIGN, CharacterId = BRAM, Status = CampaignCharacterStatus.Approved });
+        List<TurnWhisperTarget>? saved = null;
+        _whispers.Setup(r => r.InsertAsync(It.IsAny<IEnumerable<TurnWhisperTarget>>()))
+            .Callback((IEnumerable<TurnWhisperTarget> t) => saved = t.ToList()).Returns(Task.CompletedTask);
+
+        var result = await _service.ActAsync(PLAYER, new TurnActInfo
+            { MapTokenId = ARIA_PIECE, Description = "Escondo a adaga", WhisperCharacterIds = new List<long> { BRAM } });
+
+        saved!.Single().CharacterId.Should().Be(BRAM);
+        _repository.Verify(r => r.InsertAsync(It.Is<Turn>(t => t.IsWhisper && t.TurnType == TurnType.Action)), Times.Once);
+        _repository.Verify(r => r.ListValidActionsAsync(CAMPAIGN, 3, ARIA, null), Times.Once);
+        (result.Description, result.WhisperHidden).Should().Be(("Escondo a adaga", false));
+        await _service.Invoking(s => s.ActAsync(PLAYER, new TurnActInfo
+            { MapTokenId = ARIA_PIECE, Description = "x", WhisperCharacterIds = new List<long> { ARIA } }))
+            .Should().ThrowAsync<DomainValidationException>();
     }
 
     [Fact]

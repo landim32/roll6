@@ -10,6 +10,7 @@ import { useRealtime, useTableEvents } from '../hooks/useRealtime';
 import { TABLE_EVENT } from '../types/realtime';
 import { markAllTurnsRead, markTurnRead, trackTurn } from '../lib/turnStatus';
 import type { TurnSeen } from '../lib/turnStatus';
+import type { WhisperPayload } from '../lib/whisper';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo } from '../types/turn';
 
@@ -45,7 +46,7 @@ interface TurnContextType {
   clearError: () => void;
   // API
   /** Records the piece's action (044: replacing its previous one of the turn), optionally answering a chat entry. */
-  act: (mapTokenId: number, description: string, replyToTurnId?: number | null) => Promise<TurnInfo>;
+  act: (mapTokenId: number, description: string, replyToTurnId?: number | null, whisper?: WhisperPayload) => Promise<TurnInfo>;
   /** Also reloads the pieces (the move may be undone). */
   reset: (mapTokenId: number) => Promise<TurnResetResultInfo>;
   /** Master: finishes the turn; without `force` it only lists who still has to act. */
@@ -164,8 +165,9 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
     return campaignId;
   }, [campaignId]);
 
-  const act = useCallback(async (mapTokenId: number, description: string, replyToTurnId: number | null = null) => {
-    const result = await run(() => turnService.act(mapTokenId, description, replyToTurnId));
+  const act = useCallback(async (mapTokenId: number, description: string, replyToTurnId: number | null = null,
+    whisper: WhisperPayload = {}) => {
+    const result = await run(() => turnService.act(mapTokenId, description, replyToTurnId, whisper));
     await refresh();
     return result;
   }, [run, refresh]);

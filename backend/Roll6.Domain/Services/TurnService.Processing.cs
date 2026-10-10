@@ -103,13 +103,15 @@ public partial class TurnService
     public async Task<TurnDataInfo> GetDataAsync(long userId, long campaignId, int? turnNo)
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
-        return await BuildDataAsync(campaign, CheckTurnNo(campaign, turnNo));
+        return await BuildDataAsync(campaign, CheckTurnNo(campaign, turnNo), userId);
     }
 
     /// <summary>Approved characters, NPC occurrences of the current map (current values) and the actions of the turn.</summary>
-    private async Task<TurnDataInfo> BuildDataAsync(Campaign campaign, int turnNo)
+    private async Task<TurnDataInfo> BuildDataAsync(Campaign campaign, int turnNo, long? viewerId = null)
     {
         var entries = await _repository.ListByCampaignTurnAsync(campaign.CampaignId, turnNo);
+        // 047: whispered actions are masked for whoever reads the data (the master sees them whole).
+        await MaskForViewerAsync(campaign, viewerId ?? campaign.UserId, entries);
         var participations = await _campaignCharacterRepository.ListByCampaignAsync(campaign.CampaignId, approvedOnly: true);
         var mapId = campaign.CurrentMapId;
         var pieces = mapId is long id ? await _mapTokenRepository.ListByMapAsync(id) : new List<MapToken>();
