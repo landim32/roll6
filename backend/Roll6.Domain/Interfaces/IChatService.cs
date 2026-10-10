@@ -9,7 +9,10 @@ namespace Roll6.Domain.Interfaces;
 public interface IChatService
 {
     /// <summary>A page: newest without cursor, older with <paramref name="before"/>, newer with <paramref name="after"/>.</summary>
-    Task<ChatPageInfo> ListAsync(long userId, long campaignId, string? before, string? after, int? limit);
+    Task<ChatPageInfo> ListAsync(long userId, long campaignId, string? before, string? after, int? limit, string? kind = null);
+
+    /// <summary>One chat entry by id, as the reader may see it (a whispered action they aren't in comes masked).</summary>
+    Task<ChatItemInfo> GetMessageAsync(long userId, long turnId);
 
     /// <summary>Says something as one of the sender's approved characters, or as the master when no character.</summary>
     Task<ChatItemInfo> SendAsync(long userId, long campaignId, ChatSendInfo info);

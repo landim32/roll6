@@ -171,7 +171,7 @@ public partial class TurnServiceChatTests
         var change = At(Turn.CharacterUpdate(CAMPAIGN, MAP, ARIA, null, null, 3, MASTER,
             new[] { new TurnChange("currentLife", "12", "8") }), 12, 3);
         var divider = At(Turn.TurnFinished(CAMPAIGN, MAP, 3, MASTER), 13, 4);
-        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, It.IsAny<long>(), It.IsAny<bool>())).ReturnsAsync(new List<Turn> { move, talk, change, divider });
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<IReadOnlyCollection<int>?>())).ReturnsAsync(new List<Turn> { move, talk, change, divider });
         _repository.Setup(r => r.ListLogByTurnsAsync(CAMPAIGN, It.IsAny<IEnumerable<int>>())).ReturnsAsync(new List<Turn> { move, change });
 
         var page = await _service.ListAsync(PLAYER, CAMPAIGN, null, null, null);
@@ -193,7 +193,7 @@ public partial class TurnServiceChatTests
         var a = At(Turn.Text(CAMPAIGN, MAP, 3, PLAYER, ARIA, "Aria", null, "1"), 1, 1);
         var b = At(Turn.Text(CAMPAIGN, MAP, 3, PLAYER, ARIA, "Aria", null, "2"), 2, 2);
         var c = At(Turn.Text(CAMPAIGN, MAP, 3, PLAYER, ARIA, "Aria", null, "3"), 3, 3);
-        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 3, It.IsAny<long>(), It.IsAny<bool>())).ReturnsAsync(new List<Turn> { a, b, c });
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 3, It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<IReadOnlyCollection<int>?>())).ReturnsAsync(new List<Turn> { a, b, c });
 
         var page = await _service.ListAsync(PLAYER, CAMPAIGN, null, null, 2);
 
@@ -213,7 +213,7 @@ public partial class TurnServiceChatTests
     {
         var gone = At(Turn.Photo(CAMPAIGN, MAP, 3, PLAYER, ARIA, "Aria", null, "0123456789abcdef0123456789abcdef.png", "x"), 5, 1);
         gone.Delete(PLAYER, false);
-        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, It.IsAny<long>(), It.IsAny<bool>())).ReturnsAsync(new List<Turn> { gone });
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<IReadOnlyCollection<int>?>())).ReturnsAsync(new List<Turn> { gone });
 
         var item = (await _service.ListAsync(MASTER, CAMPAIGN, null, null, null)).Items.Single();
 
@@ -227,7 +227,7 @@ public partial class TurnServiceChatTests
     {
         var mark = new DateTime(2026, 10, 9, 20, 0, 0);
         _chatReadRepository.Setup(r => r.GetAsync(CAMPAIGN, PLAYER)).ReturnsAsync(ChatRead.Create(CAMPAIGN, PLAYER, mark));
-        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, It.IsAny<long>(), It.IsAny<bool>())).ReturnsAsync(new List<Turn>());
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<IReadOnlyCollection<int>?>())).ReturnsAsync(new List<Turn>());
         _repository.Setup(r => r.CountUnreadAsync(CAMPAIGN, PLAYER, mark, TurnService.UNREAD_CAP, false)).ReturnsAsync(3);
         _repository.Setup(r => r.FirstUnreadAsync(CAMPAIGN, PLAYER, mark, false))
             .ReturnsAsync(At(Turn.Text(CAMPAIGN, MAP, 3, MASTER, null, "Mestre", null, "oi"), 77, 5));
@@ -599,7 +599,7 @@ public partial class TurnServiceChatTests
         cancelled.Cancel(DateTime.UtcNow);
         var text = Turn.Text(CAMPAIGN, MAP, 3, PLAYER, ARIA, "Aria", null, "Abro");
         text.TurnId = 81;
-        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, It.IsAny<int>(), It.IsAny<long>(), It.IsAny<bool>())).ReturnsAsync(new List<Turn> { cancelled, text });
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, It.IsAny<int>(), It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<IReadOnlyCollection<int>?>())).ReturnsAsync(new List<Turn> { cancelled, text });
 
         var page = await _service.ListAsync(PLAYER, CAMPAIGN, null, null, null);
 

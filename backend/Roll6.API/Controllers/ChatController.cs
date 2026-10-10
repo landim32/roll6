@@ -17,6 +17,21 @@ public class ChatController : ApiControllerBase
         _chatService = chatService;
     }
 
+    /// <summary>One chat entry by id (a poll with its votes, a message, an action…), as the caller may see it.</summary>
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Get(long id)
+    {
+        try
+        {
+            return Ok(await _chatService.GetMessageAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Deletes a message (its author or the master) or a narration (the master); it stays as "Mensagem apagada".</summary>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

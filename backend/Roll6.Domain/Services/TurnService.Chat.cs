@@ -26,15 +26,16 @@ public partial class TurnService : IChatService
 
     public const long MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 
-    public async Task<ChatPageInfo> ListAsync(long userId, long campaignId, string? before, string? after, int? limit)
+    public async Task<ChatPageInfo> ListAsync(long userId, long campaignId, string? before, string? after, int? limit, string? kind = null)
     {
+        var types = ParseKinds(kind);
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
         var size = Math.Clamp(limit ?? CHAT_PAGE_DEFAULT, 1, CHAT_PAGE_MAX);
         var afterCursor = ParseCursor(after, "after");
         var beforeCursor = afterCursor == null ? ParseCursor(before, "before") : null;
 
         var isMaster = campaign.UserId == userId;
-        var page = await _repository.ListChatPageAsync(campaignId, beforeCursor, afterCursor, size + 1, userId, isMaster);
+        var page = await _repository.ListChatPageAsync(campaignId, beforeCursor, afterCursor, size + 1, userId, isMaster, types);
         var hasMore = page.Count > size;
         if (hasMore)
         {
@@ -52,6 +53,31 @@ public partial class TurnService : IChatService
             UnreadCount = await _repository.CountUnreadAsync(campaignId, userId, read?.LastReadAt, UNREAD_CAP, isMaster),
             FirstUnreadCursor = firstUnread == null ? null : CursorOf(firstUnread)
         };
+    }
+
+    public async Task<ChatItemInfo> GetMessageAsync(long userId, long turnId)
+    {
+        var turn = await _repository.GetByIdAsync(turnId) ?? throw new KeyNotFoundException("Mensagem não encontrada.");
+        var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
+        // A whispered message the reader isn't in does not exist for them; a whispered action comes masked.
+        if (turn.TurnType != TurnType.Action)
+            await EnsureVisibleAsync(campaign, userId, turn);
+        return (await MapChatAsync(campaign, userId, new List<Turn> { turn })).Single();
+    }
+
+    /// <summary>"poll" or "text,image" → the turn types to keep; null/empty = every kind; an unknown kind → 400.</summary>
+    private static List<int>? ParseKinds(string? kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
+            return null;
+        var types = new List<int>();
+        foreach (var name in kind.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var type = Enum.GetValues<TurnType>().Cast<TurnType?>().FirstOrDefault(t => KindOf(t!.Value).Equals(name, StringComparison.OrdinalIgnoreCase))
+                ?? throw new DomainValidationException("kind", $"Tipo de entrada desconhecido: {name}.");
+            types.Add((int)type);
+        }
+        return types;
     }
 
     public async Task<ChatItemInfo> SendAsync(long userId, long campaignId, ChatSendInfo info)

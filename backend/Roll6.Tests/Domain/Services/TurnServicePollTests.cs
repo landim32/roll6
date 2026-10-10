@@ -188,4 +188,38 @@ public partial class TurnServiceChatTests
         await _service.DeleteMessageAsync(MASTER, POLL);
         _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == POLL && t.DeletedAt != null)), Times.Once);
     }
+
+    // --- MCP coverage: finding polls and reading one entry ---
+
+    [Fact]
+    public async Task List_FiltersByKind_AndRejectsUnknownKinds()
+    {
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 2, MASTER, true,
+            It.Is<IReadOnlyCollection<int>?>(t => t != null && t.Single() == (int)Roll6.Domain.Enums.TurnType.Poll))).ReturnsAsync(new List<Turn>());
+
+        await _service.ListAsync(MASTER, CAMPAIGN, null, null, 1, "poll");
+
+        _repository.Verify(r => r.ListChatPageAsync(CAMPAIGN, null, null, 2, MASTER, true,
+            It.Is<IReadOnlyCollection<int>?>(t => t != null && t.Single() == (int)Roll6.Domain.Enums.TurnType.Poll)), Times.Once);
+        await _service.Invoking(s => s.ListAsync(MASTER, CAMPAIGN, null, null, 1, "enquete")).Should().ThrowAsync<DomainValidationException>();
+    }
+
+    [Fact]
+    public async Task GetMessage_ReturnsThePollWithItsVotes_AndHidesWhispersFromOutsiders()
+    {
+        PollEntry();
+        _chatPolls.Setup(r => r.ListVotesByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<ChatPollVote>
+            { new() { TurnId = POLL, ChatPollOptionId = 2, UserId = PLAYER, CharacterId = ARIA } });
+
+        var item = await _service.GetMessageAsync(PLAYER, POLL);
+        (item.Kind, item.Poll!.TotalVotes, item.Poll.Options[1].Voters.Single().Name).Should().Be(("poll", 1, "Aria"));
+
+        var secret = Turn.Text(CAMPAIGN, MAP, 3, MASTER, null, "Mestre (GM) — Ana", null, "psiu");
+        secret.TurnId = 704;
+        secret.MarkWhisper();
+        _repository.Setup(r => r.GetByIdAsync(704)).ReturnsAsync(secret);
+        _whispers.Setup(r => r.ListByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<TurnWhisperTarget>());
+        await _service.Invoking(s => s.GetMessageAsync(PLAYER, 704)).Should().ThrowAsync<KeyNotFoundException>();
+        await _service.Invoking(s => s.GetMessageAsync(STRANGER, POLL)).Should().ThrowAsync<UnauthorizedAccessException>();
+    }
 }

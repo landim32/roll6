@@ -95,7 +95,7 @@ public partial class TurnServiceChatTests
     {
         SetupWhisperTable();
         var action = WhisperedAction(300);
-        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, OUTSIDER, false)).ReturnsAsync(new List<Turn> { action });
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, OUTSIDER, false, It.IsAny<IReadOnlyCollection<int>?>())).ReturnsAsync(new List<Turn> { action });
         _repository.Setup(r => r.ListLogByTurnsAsync(CAMPAIGN, It.IsAny<IEnumerable<int>>()))
             .ReturnsAsync(() => new List<Turn> { WhisperedAction(300) });
 
@@ -104,7 +104,7 @@ public partial class TurnServiceChatTests
             .Should().Be((true, (ChatWhisperInfo?)null, WhisperAudience.MASKED_TEXT, false, false));
         outsider.Text.Should().NotContain("adaga");
 
-        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, DARA_OWNER, false))
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, DARA_OWNER, false, It.IsAny<IReadOnlyCollection<int>?>()))
             .ReturnsAsync(new List<Turn> { WhisperedAction(300) });
         var target = (await _service.ListAsync(DARA_OWNER, CAMPAIGN, null, null, null)).Items.Single();
         (target.WhisperHidden, target.Description).Should().Be((false, "Escondo a adaga"));

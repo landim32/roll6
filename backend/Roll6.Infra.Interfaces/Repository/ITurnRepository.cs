@@ -42,7 +42,7 @@ public interface ITurnRepository<TModel> where TModel : class
     /// whispered messages they are not in (whispered actions stay, masked by the service).
     /// </summary>
     Task<List<TModel>> ListChatPageAsync(long campaignId, (DateTime At, long Id)? before, (DateTime At, long Id)? after, int limit,
-        long viewerId, bool viewerIsMaster);
+        long viewerId, bool viewerIsMaster, IReadOnlyCollection<int>? turnTypes = null);
 
     /// <summary>The turn records (types 1–5, not deleted) of the given turns, in order.</summary>
     Task<List<TModel>> ListLogByTurnsAsync(long campaignId, IEnumerable<int> turnNos);
