@@ -134,6 +134,9 @@ public class NpcServiceTests
         await _service.DeleteAsync(OWNER, NPC);
 
         _repository.Verify(r => r.DeleteAsync(NPC), Times.Once);
+        // 051: the instances removed from maps (kept for the turn entries) go with the NPC.
+        _turnRepository.Verify(r => r.DeleteByNpcAsync(NPC), Times.Once);
+        _mapNpcRepository.Verify(r => r.DeleteByNpcAsync(NPC), Times.Once);
     }
 
     [Fact]
@@ -160,5 +163,19 @@ public class NpcServiceTests
         foreach (var campaignId in new long[] { 20, 21 })
             _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
                 e.Type == TableEventType.MAP_TOKENS_CHANGED && e.CampaignId == campaignId && e.MapId == null)), Times.Once);
+    }
+
+    // ---- 051: the instances' Deslocamento follows a changed move while untouched ----
+
+    [Fact]
+    public async Task Update_ChangedMove_IsFollowedByTheUntouchedInstances()
+    {
+        _repository.Setup(r => r.GetByIdAsync(NPC)).ReturnsAsync(() => new Npc { NpcId = NPC, UserId = OWNER, TokenId = 5, Name = "Goblin", Move = 6 });
+
+        await _service.UpdateAsync(OWNER, NPC, new NpcInsertInfo { TokenId = 5, Name = "Goblin", Life = 7, Move = 8 });
+        _mapNpcRepository.Verify(r => r.FollowMoveAsync(NPC, 6, 8), Times.Once);
+
+        await _service.UpdateAsync(OWNER, NPC, new NpcInsertInfo { TokenId = 5, Name = "Goblin", Life = 7, Move = 6 });
+        _mapNpcRepository.Verify(r => r.FollowMoveAsync(NPC, It.IsAny<int>(), It.IsAny<int>()), Times.Once);
     }
 }

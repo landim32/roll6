@@ -72,4 +72,60 @@ public class MapNpcTests
         mapNpc.ChangePosture((int)Posture.OutOfCombat).Should().BeFalse();
         mapNpc.Invoking(m => m.ChangePosture(9)).Should().Throw<DomainValidationException>();
     }
+
+    // --- 051: instances ---
+
+    [Fact]
+    public void FromNpc_CopiesTheMoveAsTheInstanceDeslocamento()
+    {
+        MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7, Move = 6 }).CurrentMove.Should().Be(6);
+    }
+
+    [Fact]
+    public void Update_CurrentMove_NullKeeps_ValueSets_NegativeThrows()
+    {
+        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7, Move = 6 });
+
+        mapNpc.Update("Goblin", 7, 0, null, 7, 0);
+        mapNpc.CurrentMove.Should().Be(6);
+        mapNpc.Update("Goblin", 7, 0, null, 7, 0, 2);
+        mapNpc.CurrentMove.Should().Be(2);
+        ((Action)(() => mapNpc.Update("Goblin", 7, 0, null, 7, 0, -1))).Should().Throw<DomainValidationException>()
+            .Which.Errors.Keys.Should().Contain("currentMove");
+    }
+
+    [Fact]
+    public void Remove_MarksOnce()
+    {
+        var mapNpc = MapNpc.FromNpc(30, new Npc { NpcId = 8, Name = "Goblin", Life = 7 });
+        var now = new DateTime(2026, 10, 11, 12, 0, 0);
+
+        mapNpc.Remove(now).Should().BeTrue();
+        (mapNpc.IsRemoved, mapNpc.RemovedAt, mapNpc.UpdatedAt).Should().Be((true, (DateTime?)now, now));
+        mapNpc.Remove(now.AddMinutes(1)).Should().BeFalse();
+        mapNpc.RemovedAt.Should().Be(now);
+    }
+
+    [Theory]
+    [InlineData(new string[0], "Guarda")]
+    [InlineData(new[] { "Guarda" }, "Guarda 2")]
+    [InlineData(new[] { "Guarda", "Guarda 2" }, "Guarda 3")]
+    [InlineData(new[] { "Guarda", "Guarda 3" }, "Guarda 2")]
+    [InlineData(new[] { "Sargento", "Guarda 2" }, "Guarda")]
+    [InlineData(new[] { " Guarda " }, "Guarda 2")]
+    public void NextName_NumbersPerMapReusingFreeNumbers(string[] inUse, string expected)
+    {
+        MapNpc.NextName("Guarda", inUse).Should().Be(expected);
+    }
+
+    [Fact]
+    public void NextName_FitsTheLimit()
+    {
+        var longName = new string('x', MapNpc.MAX_NAME);
+
+        var name = MapNpc.NextName(longName, new[] { longName });
+
+        name.Length.Should().BeLessThanOrEqualTo(MapNpc.MAX_NAME);
+        name.Should().EndWith(" 2");
+    }
 }

@@ -348,6 +348,9 @@ public partial class TurnService
             var totalEnergy = npc?.Energy ?? occurrence.CurrentEnergy;
             var life = item.CurrentLife ?? occurrence.CurrentLife;
             var energy = item.CurrentEnergy ?? occurrence.CurrentEnergy;
+            var move = item.CurrentMove ?? occurrence.CurrentMove;
+            if (move < 0)
+                Error($"{prefix}.currentMove", "O deslocamento não pode ser negativo.");
             var status = NewStatus(prefix, item, occurrence.Status);
             var posture = NewPosture(prefix, item, occurrence.Posture);
             CheckVitals(prefix, life, energy, totalLife, totalEnergy);
@@ -359,11 +362,12 @@ public partial class TurnService
             var changes = TurnChange.Diff(
                 ("currentLife", occurrence.CurrentLife, life),
                 ("currentEnergy", occurrence.CurrentEnergy, energy),
+                ("currentMove", occurrence.CurrentMove, move),
                 ("status", occurrence.Status, status),
                 ("posture", (int)occurrence.Posture, (int)posture));
             if (changes.Count > 0)
             {
-                occurrence.Update(occurrence.Name, life, energy, status, totalLife, totalEnergy);
+                occurrence.Update(occurrence.Name, life, energy, status, totalLife, totalEnergy, move);
                 occurrence.ChangePosture((int)posture);
                 updatedOccurrences.Add(occurrence);
                 turns.Add(Turn.CharacterUpdate(campaignId, mapId, null, occurrence.NpcId, occurrence.MapNpcId, campaign.CurrentTurn, userId, changes));

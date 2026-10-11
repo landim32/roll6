@@ -1808,5 +1808,34 @@ BEGIN
     VALUES ('20261010003326_AddChatWhispers', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011054136_AddMapNpcInstances') THEN
+    ALTER TABLE map_npcs ADD current_move integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011054136_AddMapNpcInstances') THEN
+    UPDATE map_npcs m SET current_move = n.move FROM npcs n WHERE n.npc_id = m.npc_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011054136_AddMapNpcInstances') THEN
+    ALTER TABLE map_npcs ADD removed_at timestamp without time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011054136_AddMapNpcInstances') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261011054136_AddMapNpcInstances', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

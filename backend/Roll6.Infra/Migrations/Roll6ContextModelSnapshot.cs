@@ -763,6 +763,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("current_life");
 
+                    b.Property<int>("CurrentMove")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_move");
+
                     b.Property<long>("MapId")
                         .HasColumnType("bigint")
                         .HasColumnName("map_id");
@@ -782,6 +786,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(1)
                         .HasColumnName("posture");
+
+                    b.Property<DateTime?>("RemovedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("removed_at");
 
                     b.Property<string>("Status")
                         .HasMaxLength(260)

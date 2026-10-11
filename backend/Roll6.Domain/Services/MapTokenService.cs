@@ -222,18 +222,20 @@ public partial class MapTokenService : IMapTokenService
         return await PublishPieceAsync(map, userId, await MapToDtoAsync(await _repository.UpdateAsync(mapToken)));
     }
 
-    /// <summary>Removes the piece; a piece of an NPC occurrence takes the occurrence with it.</summary>
+    /// <summary>
+    /// Removes the piece; the piece of an NPC occurrence takes the occurrence off the map with it (051: marked removed,
+    /// its turn entries stay named).
+    /// </summary>
     public async Task DeleteAsync(long userId, long mapTokenId)
     {
         var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
+        var occurrence = mapToken.MapNpcId is long mapNpcId ? await _mapNpcRepository.GetByIdAsync(mapNpcId) : null;
+        occurrence?.Remove(DateTime.UtcNow);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _repository.DeleteAsync(mapToken.MapTokenId);
-            if (mapToken.MapNpcId is long mapNpcId)
-            {
-                await _turnRepository.DeleteByMapNpcIdsAsync(new[] { mapNpcId });
-                await _mapNpcRepository.DeleteAsync(mapNpcId);
-            }
+            if (occurrence != null)
+                await _mapNpcRepository.UpdateAsync(occurrence);
         });
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKEN_DELETED, map.CampaignId, userId, map.MapId,
             new { mapTokenId = mapToken.MapTokenId }));
@@ -372,7 +374,8 @@ public partial class MapTokenService : IMapTokenService
                 info.Status = mapNpc.Status;
                 info.Posture = (int)mapNpc.Posture;
                 info.Space = MapOccupancyLoader.PieceSpace(token, mapNpc.Posture);
-                info.Move = npc?.Move ?? 0;
+                // 051: the instance's own Deslocamento.
+                info.Move = mapNpc.CurrentMove;
                 info.Sheet = mapToken.Sheet ?? npc?.Sheet;
             }
             return info;

@@ -381,7 +381,7 @@ public class MapTokenServiceTests
     {
         _mapNpcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<MapNpc>
         {
-            new() { MapNpcId = 90, MapId = 30, NpcId = 8, Name = "Goblin 2", CurrentLife = -1, CurrentEnergy = 2, Status = "caído" }
+            new() { MapNpcId = 90, MapId = 30, NpcId = 8, Name = "Goblin 2", CurrentLife = -1, CurrentEnergy = 2, Status = "caído", CurrentMove = 6 }
         });
         _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Npc>
         {
@@ -401,16 +401,20 @@ public class MapTokenServiceTests
     }
 
     [Fact]
-    public async Task Delete_NpcPiece_DeletesTheOccurrenceToo()
+    public async Task Delete_NpcPiece_TakesTheOccurrenceOffTheMapKeepingItsEntries()
     {
         var piece = MapToken.PlaceNpc(30, 5, 90, "Goblin", 1, 1, 0);
         piece.MapTokenId = 44;
         _repository.Setup(r => r.GetByIdAsync(44)).ReturnsAsync(piece);
+        var occurrence = new MapNpc { MapNpcId = 90, MapId = 30, NpcId = 8, Name = "Goblin" };
+        _mapNpcRepository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(occurrence);
 
         await _service.DeleteAsync(1, 44);
 
         _repository.Verify(r => r.DeleteAsync(44), Times.Once);
-        _mapNpcRepository.Verify(r => r.DeleteAsync(90), Times.Once);
+        _mapNpcRepository.Verify(r => r.UpdateAsync(It.Is<MapNpc>(m => m.MapNpcId == 90 && m.IsRemoved)), Times.Once);
+        _mapNpcRepository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
+        _turnRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
             e.Type == TableEventType.MAP_TOKEN_DELETED && e.CampaignId == 10 && e.MapId == 30)), Times.Once);
     }
@@ -609,6 +613,17 @@ public class MapTokenServiceTests
         var piece = MapToken.PlaceNpc(30, 5, occurrence.MapNpcId, occurrence.Name, 3, 3, 0);
         piece.Sheet = pieceSheet;
         _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { piece });
+    }
+
+    [Fact]
+    public async Task ListByMap_NpcPiece_ShowsTheInstanceDeslocamento()
+    {
+        var npc = new Npc { NpcId = 8, Name = "Batedor", Life = 11, Energy = 11, Move = 6 };
+        var occurrence = WithId(MapNpc.FromNpc(30, npc), 94);
+        occurrence.Update("Batedor", 11, 11, null, 11, 11, 2);
+        NpcPiece(occurrence, npc);
+
+        (await _service.ListByMapAsync(1, 30)).Single().Move.Should().Be(2);
     }
 
     [Fact]

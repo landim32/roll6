@@ -86,14 +86,18 @@ public class CampaignNpcService : ICampaignNpcService
             ?? throw new KeyNotFoundException("NPC da campanha não encontrado.");
         await GetMasteredAsync(userId, campaignNpc.CampaignId);
 
+        // 051: the instances leave the maps but stay named in the turn entries (soft removal).
+        var mapNpcIds = await _mapNpcRepository.ListIdsByCampaignAndNpcAsync(campaignNpc.CampaignId, campaignNpc.NpcId);
+        var instances = mapNpcIds.Count == 0 ? new List<MapNpc>() : await _mapNpcRepository.ListByIdsAsync(mapNpcIds);
+        var now = DateTime.UtcNow;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            var mapNpcIds = await _mapNpcRepository.ListIdsByCampaignAndNpcAsync(campaignNpc.CampaignId, campaignNpc.NpcId);
             if (mapNpcIds.Count > 0)
-            {
                 await _mapTokenRepository.DeleteByMapNpcIdsAsync(mapNpcIds);
-                await _turnRepository.DeleteByMapNpcIdsAsync(mapNpcIds);
-                await _mapNpcRepository.DeleteRangeAsync(mapNpcIds);
+            foreach (var instance in instances)
+            {
+                if (instance.Remove(now))
+                    await _mapNpcRepository.UpdateAsync(instance);
             }
             await _repository.DeleteAsync(campaignNpc.CampaignNpcId);
         });
@@ -119,6 +123,8 @@ public class CampaignNpcService : ICampaignNpcService
 
         var npcs = (await _npcRepository.ListByIdsAsync(campaignNpcs.Select(c => c.NpcId))).ToDictionary(n => n.NpcId);
         var tokens = (await _tokenRepository.ListByIdsAsync(npcs.Values.Select(n => n.TokenId).Distinct())).ToDictionary(t => t.TokenId);
+        // 051: how many pieces "Retirar da campanha" would remove (all the campaign NPCs are of one campaign).
+        var counts = await _mapNpcRepository.CountByCampaignAsync(campaignNpcs[0].CampaignId);
 
         return campaignNpcs.Select(c =>
         {
@@ -136,6 +142,7 @@ public class CampaignNpcService : ICampaignNpcService
                 Life = npc?.Life ?? 0,
                 Energy = npc?.Energy ?? 0,
                 Move = npc?.Move ?? 0,
+                MapNpcCount = counts.GetValueOrDefault(c.NpcId),
                 CreatedAt = c.CreatedAt
             };
         }).ToList();

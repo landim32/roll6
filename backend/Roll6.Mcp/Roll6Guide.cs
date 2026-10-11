@@ -41,8 +41,13 @@ public static class Roll6Guide
           Both are copied to each participation when the character joins that campaign, and from then on the campaign's
           copy changes only there.
         - **NPCs**: belong to a master's library (require a token). The master adds his own NPCs to a campaign
-          (campaign NPC) and places **occurrences** on maps (each occurrence has its own name, status and current
-          life/energy, at most the NPC's totals; its piece shows them with the NPC's sheet).
+          (campaign NPC) and places **occurrences** (instances) on maps — what the map shows are the occurrences. Each one
+          has its own name (the NPC's, then "{name} 2", "{name} 3"… per map, the smallest free number), status, posture,
+          current life/energy (at most the NPC's totals) and Deslocamento (`currentMove`, starts at the NPC's move and
+          follows a changed NPC move only while untouched); its piece shows them with the NPC's sheet. `update_map_npc`
+          changes one occurrence; `delete_map_npc` takes it off the map keeping the NPC in the campaign and everything it
+          did in the chat and the turn summary under its name; `remove_npc_from_campaign` removes the NPC and all its
+          occurrences (history kept too).
         - **Map models**: the image + grid layout (a reusable map). A **campaign map** is a map model added to a
           campaign; its pieces live on the campaign map.
 

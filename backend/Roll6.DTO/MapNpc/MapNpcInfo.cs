@@ -43,6 +43,10 @@ public class MapNpcInfo
     [JsonPropertyName("posture")]
     public int Posture { get; set; } = 1;
 
+    /// <summary>Deslocamento of this instance (051): movement points per turn, shown on its piece.</summary>
+    [JsonPropertyName("currentMove")]
+    public int CurrentMove { get; set; }
+
     [JsonPropertyName("tokenId")]
     public long? TokenId { get; set; }
 

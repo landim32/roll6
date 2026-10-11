@@ -258,7 +258,7 @@
     "postureHint": "Postura com que cada nova peça do NPC entra no mapa.",
     "remove": "Retirar da campanha",
     "removeTitle": "Retirar NPC",
-    "removeMessage": "Retirar {{name}} da campanha? As peças dele saem dos mapas da campanha; o NPC continua na sua biblioteca.",
+    "removeMessage": "Retirar {{name}} da campanha? O NPC continua na sua biblioteca.",
     "errors": {
       "nameRequired": "Informe o nome do NPC.",
       "nameTooLong": "O nome deve ter no máximo 260 caracteres.",
@@ -267,7 +267,13 @@
       "statusTooLong": "O status pode ter no máximo 260 caracteres.",
       "sheetTooLong": "A ficha deve ter no máximo 20.000 caracteres.",
       "tokenRequired": "Escolha um token para o NPC."
-    }
+    },
+    "removeFromMapTitle": "Retirar NPC do mapa",
+    "removeFromMapMessage": "Retirar {{name}} do mapa? O NPC continua na campanha e o que ele fez fica no chat.",
+    "removeMessage_one": "Retirar {{name}} da campanha? A peça dele sai do mapa; o que ela fez fica no chat. O NPC continua na sua biblioteca.",
+    "removeMessage_other": "Retirar {{name}} da campanha? As {{count}} peças dele saem dos mapas da campanha; o que elas fizeram fica no chat. O NPC continua na sua biblioteca.",
+    "editInstance": "Editar {{name}}",
+    "removeInstance": "Retirar {{name}} do mapa"
   },
   "hexMenu": {
     "emptyHex": "Hex vazio",
@@ -277,7 +283,9 @@
     "deleteToken": "Excluir",
     "act": "Agir",
     "resetTurn": "Resetar turno",
-    "posture": "Postura"
+    "posture": "Postura",
+    "editNpc": "Editar NPC",
+    "removeNpc": "Retirar do mapa"
   },
   "posture": {
     "label": "Postura",
@@ -538,7 +546,8 @@
     "apiKeyCreated": "Chave de API gerada.",
     "apiKeyCopied": "Chave copiada.",
     "apiKeyRevoked": "Chave \"{{name}}\" revogada.",
-    "apiKeyDeleted": "Chave \"{{name}}\" excluída."
+    "apiKeyDeleted": "Chave \"{{name}}\" excluída.",
+    "npcRemovedFromMap": "{{name}} retirado do mapa."
   },
   "turn": {
     "label": "Turno {{no}}",
@@ -817,5 +826,24 @@
     "confirm": "Levar os jogadores para o mapa {{name}}?",
     "confirmButton": "Levar os jogadores",
     "changed": "Os jogadores foram levados para o mapa {{name}}."
+  },
+  "npcInstance": {
+    "title": "Editar {{name}}",
+    "name": "Nome",
+    "currentLife": "Vida atual",
+    "currentEnergy": "Energia atual",
+    "move": "Deslocamento",
+    "moveHint": "Pontos de movimento por turno desta peça. O cadastro do NPC e as outras peças não mudam.",
+    "status": "Status",
+    "posture": "Postura",
+    "errors": {
+      "nameRequired": "Informe o nome da peça.",
+      "nameTooLong": "O nome deve ter no máximo 260 caracteres.",
+      "notInteger": "Vida, energia e deslocamento devem ser números inteiros.",
+      "negativeMove": "O deslocamento não pode ser negativo.",
+      "lifeAboveTotal": "A vida atual não pode passar da vida total.",
+      "energyAboveTotal": "A energia atual não pode passar da energia total.",
+      "statusTooLong": "O status pode ter no máximo 260 caracteres."
+    }
   }
 }

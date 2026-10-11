@@ -18,6 +18,10 @@ public class MapNpcUpdateInfo
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 
+    /// <summary>Deslocamento of this instance (051, ≥ 0); null keeps the current one.</summary>
+    [JsonPropertyName("currentMove")]
+    public int? CurrentMove { get; set; }
+
     /// <summary>1 standing, 2 down, 3 out of combat (031); null keeps the current posture.</summary>
     [JsonPropertyName("posture")]
     public int? Posture { get; set; }

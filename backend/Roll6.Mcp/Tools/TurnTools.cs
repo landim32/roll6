@@ -103,7 +103,7 @@ public static class TurnTools
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, posture?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessCharacterInfo>? characters = null,
-        [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, status?, clearStatus?, posture?, x?, y?, look? }].")] List<TurnProcessNpcInfo>? npcs = null,
+        [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, posture?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessNpcInfo>? npcs = null,
         [Description("What happened in the turn, in plain text or markdown (up to 10000 characters); stays in the turn log.")] string? narration = null) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/process", new TurnProcessInfo
         {

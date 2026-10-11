@@ -6,8 +6,9 @@ import { useTurn } from '../../hooks/useTurn';
 import { npcStatus } from '../../lib/turnStatus';
 import { VitalBar } from './VitalBar';
 import { NPC_DRAG_TYPE } from '../../lib/mapTokens';
+import type { MapTokenInfo } from '../../types/mapToken';
 import type { CampaignNpcInfo } from '../../types/npc';
-import { PencilIcon } from '../ui/icons';
+import { PencilIcon, XIcon } from '../ui/icons';
 import { PostureBadge } from '../ui/PostureBadge';
 import { POSTURE } from '../../types/mapToken';
 
@@ -17,6 +18,9 @@ interface NpcCardProps {
   onEdit?: () => void;
   /** The master can drop the card on a hex of the open campaign map: each drop is a new piece. */
   draggable: boolean;
+  /** Master only (051): pencil and X on each instance row. */
+  onEditInstance?: (piece: MapTokenInfo) => void;
+  onRemoveInstance?: (piece: MapTokenInfo) => void;
 }
 
 /**
@@ -24,7 +28,7 @@ interface NpcCardProps {
  * current/total life and energy and its status (026); without occurrences, the NPC's totals. The turn circle
  * aggregates the NPC's pieces on the open map (each occurrence has its own turn).
  */
-export const NpcCard = ({ npc, onEdit, draggable }: NpcCardProps) => {
+export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstance }: NpcCardProps) => {
   const { t } = useTranslation();
   const { turnNo, entries } = useTurn();
   const { mapTokens } = useMapToken();
@@ -64,12 +68,24 @@ export const NpcCard = ({ npc, onEdit, draggable }: NpcCardProps) => {
           <ul className="list-unstyled mb-0" aria-label={t('npcs.occurrences', { name: npc.name })}>
             {occurrences.map((piece) => (
               <li key={piece.mapTokenId} className="mt-1">
-                {(occurrences.length > 1 || (piece.posture ?? POSTURE.standing) !== POSTURE.standing) && (
-                  <small className="d-flex align-items-center gap-1 text-truncate" title={piece.name}>
-                    {occurrences.length > 1 && <span className="text-truncate">{piece.name}</span>}
-                    <PostureBadge posture={piece.posture} />
-                  </small>
-                )}
+                {/* 051: every instance has its own name; the master edits or removes it from here. */}
+                <small className="d-flex align-items-center gap-1" title={piece.name}>
+                  <span className="text-truncate">{piece.name}</span>
+                  <PostureBadge posture={piece.posture} />
+                  {onEditInstance && (
+                    <button type="button" className="btn btn-link btn-sm p-0 ms-auto" aria-label={t('npcs.editInstance', { name: piece.name })}
+                      title={t('npcs.editInstance', { name: piece.name })} onClick={() => onEditInstance(piece)}>
+                      <PencilIcon size={12} />
+                    </button>
+                  )}
+                  {onRemoveInstance && (
+                    <button type="button" className={`btn btn-link btn-sm p-0 text-danger${onEditInstance ? '' : ' ms-auto'}`}
+                      aria-label={t('npcs.removeInstance', { name: piece.name })} title={t('npcs.removeInstance', { name: piece.name })}
+                      onClick={() => onRemoveInstance(piece)}>
+                      <XIcon size={12} />
+                    </button>
+                  )}
+                </small>
                 <VitalBar label={t('party.life')} current={piece.life} total={piece.totalLife} variant="life" />
                 <VitalBar label={t('party.energy')} current={piece.energy} total={piece.totalEnergy} variant="energy" />
                 {piece.status && <small className="d-block text-body-secondary text-truncate" title={piece.status}>{piece.status}</small>}
