@@ -5,6 +5,7 @@ import type {
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useAuth } from '../../hooks/useAuth';
+import { useCampaign } from '../../hooks/useCampaign';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { toMapPoint, useMapPointer } from '../../hooks/useMapPointer';
@@ -20,6 +21,7 @@ import { MAP_TOKEN_TYPE } from '../../types/mapToken';
 import type { MapTokenInfo } from '../../types/mapToken';
 import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt } from '../../lib/mapTokens';
 import { pieceHexes } from '../../lib/occupancy';
+import { isPlayable } from '../../lib/campaignStatus';
 import type { Offset } from '../../lib/hexGrid';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 import { HexGridLayer } from './HexGridLayer';
@@ -71,6 +73,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
   const { party, currentSelection } = useCharacter();
   const { session } = useAuth();
   const movement = useTokenMovement();
+  const { currentCampaign } = useCampaign();
   const { placeOnMap } = useNpc();
   const { turnNo, entries: turnEntries, refresh: refreshTurn } = useTurn();
   const hexAt = useMapPointer();
@@ -130,7 +133,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
 
   /** Characters and NPCs move once per turn (016); objects move freely. */
   const canMove = (token: MapTokenInfo): boolean => {
-    if (draft.mapId === null) return false;
+    if (draft.mapId === null || !canPlaceOwn) return false;
     if (!canPlace && !isOwnCharacter(token)) return false;
     return token.tokenType === MAP_TOKEN_TYPE.object || !hasMoved(turnEntries, token);
   };
@@ -138,12 +141,14 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
   /** "Agir"/"Resetar turno" (016): the master on characters and NPCs, a player on his own characters. */
   const canTakeTurn = (token: MapTokenInfo): boolean => {
     if (draft.mapId === null || turnNo === null || token.tokenType === MAP_TOKEN_TYPE.object) return false;
+    // 049: acting and resetting only while the campaign plays (not even the master while preparing).
+    if (!isPlayable(currentCampaign?.status)) return false;
     return canPlace || isOwnCharacter(token);
   };
 
   /** Posture (031): the master on characters and NPCs, a player on his own characters. */
   const canSetPosture = (token: MapTokenInfo): boolean =>
-    draft.mapId !== null && token.tokenType !== MAP_TOKEN_TYPE.object && (canPlace || isOwnCharacter(token));
+    draft.mapId !== null && canPlaceOwn && token.tokenType !== MAP_TOKEN_TYPE.object && (canPlace || isOwnCharacter(token));
 
   /** Movement mode: the path follows the hovered hex; in the facing phase the piece turns to the mouse. */
   const moveWithPointer = (event: ReactPointerEvent<SVGSVGElement>) => {

@@ -28,6 +28,8 @@ interface CampaignContextType {
    * for the master. Throws the API error (the previous current map stays).
    */
   makeCurrentMap: (mapId: number) => Promise<CampaignInfo>;
+  /** The master changes the campaign status (049). Throws the API error (the previous status stays). */
+  setCampaignStatus: (status: number) => Promise<CampaignInfo>;
   // State management
   selectCampaign: (campaign: CampaignInfo | null) => void;
   clearError: () => void;
@@ -139,10 +141,18 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
     return campaign;
   }, [currentCampaignId, selectCampaign]);
 
+  const setCampaignStatus = useCallback(async (status: number): Promise<CampaignInfo> => {
+    if (currentCampaignId === null) throw new Error('no campaign');
+    const campaign = await campaignService.setStatus(currentCampaignId, status);
+    selectCampaign(campaign);
+    void refreshTableCampaigns();
+    return campaign;
+  }, [currentCampaignId, selectCampaign, refreshTableCampaigns]);
+
   const value = useMemo<CampaignContextType>(() => ({
     currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug,
-    refreshTableCampaigns, makeCurrentMap, selectCampaign, clearError,
-  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, selectCampaign, clearError]);
+    refreshTableCampaigns, makeCurrentMap, setCampaignStatus, selectCampaign, clearError,
+  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, setCampaignStatus, selectCampaign, clearError]);
 
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 };

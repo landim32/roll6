@@ -7,6 +7,7 @@ import { ManageCharactersPanel } from '../campaign/ManageCharactersPanel';
 import { CampaignNpcsTab } from '../campaign/CampaignNpcsTab';
 import { CampaignMapsTab } from '../campaign/CampaignMapsTab';
 import { CampaignPlanTab } from '../campaign/CampaignPlanTab';
+import { CampaignStatusSelect } from '../campaign/CampaignStatusSelect';
 import { useCampaign } from '../../hooks/useCampaign';
 import type { MapInfo } from '../../types/map';
 
@@ -73,6 +74,7 @@ export const CampaignSettingsModal = ({ open, onOpenChange, onOpenMap }: Campaig
         title={t('campaignSettings.title', { name: currentCampaign?.name ?? '' })}
         wide
       >
+        <CampaignStatusSelect />
         <Tabs
           tabs={[
             { key: 'characters', label: t('campaignSettings.tabCharacters') },

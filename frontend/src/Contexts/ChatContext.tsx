@@ -7,6 +7,7 @@ import { pushService } from '../Services/pushService';
 import type { PokeResultInfo } from '../types/push';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
+import { isPlayable } from '../lib/campaignStatus';
 import { useCharacter } from '../hooks/useCharacter';
 import { useRealtime, useTableEvents } from '../hooks/useRealtime';
 import { useTurn } from '../hooks/useTurn';
@@ -134,9 +135,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     userId,
     isMaster,
     currentTurn: turnNo,
+    playable: isPlayable(currentCampaign?.status),
     ownerOf: (characterId) => party.find((p) => p.characterId === characterId)?.characterOwnerId
       ?? myParticipations.find((p) => p.characterId === characterId)?.characterOwnerId ?? null,
-  }), [userId, isMaster, turnNo, party, myParticipations]);
+  }), [userId, isMaster, turnNo, party, myParticipations, currentCampaign?.status]);
 
   /** New entries by others count as unread while the chat is out of sight. */
   const countNew = useCallback((before: ChatItemInfo[], after: ChatItemInfo[]) => {

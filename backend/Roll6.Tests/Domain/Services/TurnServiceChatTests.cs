@@ -540,6 +540,39 @@ public partial class TurnServiceChatTests
     }
 
     [Fact]
+    public async Task Convert_PausedCampaign_Throws409()
+    {
+        AriaText(73);
+        _campaign.Status = CampaignStatus.Paused;
+
+        await _service.Invoking(s => s.ConvertAsync(PLAYER, 73, new ChatConvertInfo { To = "action" }))
+            .Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task Poke_FinishedCampaign_Throws409()
+    {
+        _campaign.Status = CampaignStatus.Finished;
+
+        await _service.Invoking(s => s.PokeAsync(PLAYER, CAMPAIGN)).Should().ThrowAsync<ConflictException>()
+            .WithMessage("A campanha está finalizada.");
+    }
+
+    [Fact]
+    public async Task Chat_KeepsWorking_WhileTheCampaignIsNotActive()
+    {
+        // 049: the conversation is the one thing a paused or finished table keeps.
+        _campaign.Status = CampaignStatus.Paused;
+        var message = await _service.SendAsync(PLAYER, CAMPAIGN, new ChatSendInfo { CharacterId = ARIA, Text = "Até semana que vem" });
+        _campaign.Status = CampaignStatus.Finished;
+        var roll = await _service.RollAsync(PLAYER, CAMPAIGN, new ChatRollInfo { CharacterId = ARIA, Text = "Sorte" });
+
+        message.Kind.Should().Be("text");
+        roll.Kind.Should().Be("roll");
+        message.CanConvert.Should().BeNull("nothing becomes an action while the campaign is not active");
+    }
+
+    [Fact]
     public async Task Convert_TextToAction_WithoutAPiece_Is400()
     {
         AriaText(71);

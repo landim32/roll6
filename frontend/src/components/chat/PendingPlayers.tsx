@@ -7,6 +7,8 @@ import { useChat } from '../../hooks/useChat';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
+import { useCampaign } from '../../hooks/useCampaign';
+import { isPlayable } from '../../lib/campaignStatus';
 import { hexCenter } from '../../lib/hexGrid';
 import { LAYOUT_MODE } from '../../lib/layoutMode';
 import { TURN_STATUS, characterStatus } from '../../lib/turnStatus';
@@ -27,12 +29,14 @@ export const PendingPlayers = () => {
   const { mapTokens } = useMapToken();
   const { draft, hexSize, centerOn } = useMapEditor();
   const { layoutMode, setLayoutMode } = useChat();
+  const { currentCampaign } = useCampaign();
 
   const pending = useMemo(() => (turnNo === null ? [] : party
     .map((member) => ({ member, status: characterStatus(entries, member.characterId) }))
     .filter(({ status }) => status !== TURN_STATUS.acted)), [turnNo, party, entries]);
 
-  if (pending.length === 0) return null;
+  // 049: nobody owes a play while the campaign is not active.
+  if (pending.length === 0 || !isPlayable(currentCampaign?.status)) return null;
 
   const goTo = (member: CampaignCharacterInfo) => {
     const piece = draft.mapId === null ? undefined
