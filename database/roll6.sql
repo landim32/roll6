@@ -1808,5 +1808,20 @@ BEGIN
     VALUES ('20261010003326_AddChatWhispers', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011032007_AddCampaignStatus') THEN
+    ALTER TABLE campaigns ADD status integer NOT NULL DEFAULT 2;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011032007_AddCampaignStatus') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261011032007_AddCampaignStatus', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

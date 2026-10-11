@@ -11,6 +11,8 @@ export interface CampaignInfo {
   slug: string;
   /** Open campaigns approve access requests immediately. */
   open: boolean;
+  /** 1 Preparando, 2 Ativa, 3 Pausada, 4 Finalizada (049) — see `lib/campaignStatus`. */
+  status: number;
   /** Turn in progress (016), starts at 1. */
   currentTurn: number;
   /** Campaign map the master opened last; players follow it (017). */
@@ -24,6 +26,8 @@ export interface CampaignTableInfo {
   campaignId: number;
   name: string;
   slug: string;
+  /** Campaign status (049). */
+  status: number;
   isMaster: boolean;
   currentMapId: number | null;
   currentMapName: string | null;

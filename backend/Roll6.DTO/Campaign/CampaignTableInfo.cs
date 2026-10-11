@@ -17,6 +17,10 @@ public class CampaignTableInfo
     public string Slug { get; set; } = string.Empty;
 
     /// <summary>True when the current user is the master.</summary>
+    /// <summary>Campaign status (049): 1 Preparando, 2 Ativa, 3 Pausada, 4 Finalizada.</summary>
+    [JsonPropertyName("status")]
+    public int Status { get; set; }
+
     [JsonPropertyName("isMaster")]
     public bool IsMaster { get; set; }
 

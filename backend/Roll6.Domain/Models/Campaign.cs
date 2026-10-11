@@ -1,3 +1,4 @@
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Validation;
 
@@ -22,6 +23,12 @@ public class Campaign
 
     /// <summary>Campaign map the master opened last (017): players follow it. Null when there is none.</summary>
     public long? CurrentMapId { get; set; }
+
+    /// <summary>
+    /// Status (049). The model default is <see cref="CampaignStatus.Active"/> (what every campaign was before 049);
+    /// <c>CampaignService.CreateAsync</c> starts new campaigns as <see cref="CampaignStatus.Preparing"/>.
+    /// </summary>
+    public CampaignStatus Status { get; set; } = CampaignStatus.Active;
 
     /// <summary>The turn in which "Falta apenas você…" was already sent (043), so it goes once per turn.</summary>
     public int? MajorityNotifiedTurn { get; set; }
@@ -67,5 +74,41 @@ public class Campaign
     {
         Open = open;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Changes the status (master only, checked by the service).</summary>
+    public void SetStatus(int status)
+    {
+        if (!Enum.IsDefined(typeof(CampaignStatus), status))
+            throw new DomainValidationException("status", "Status inválido.");
+        Status = (CampaignStatus)status;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>The status as it reads in "A campanha está …".</summary>
+    public string StatusLabel => Status switch
+    {
+        CampaignStatus.Preparing => "em preparação",
+        CampaignStatus.Paused => "pausada",
+        CampaignStatus.Finished => "finalizada",
+        _ => "ativa"
+    };
+
+    /// <summary>The turn, actions and new characters only move while the campaign is active (049).</summary>
+    public void EnsurePlayable()
+    {
+        if (Status != CampaignStatus.Active)
+            throw new ConflictException($"A campanha está {StatusLabel}.");
+    }
+
+    /// <summary>
+    /// Pieces, NPC occurrences and maps of the campaign change while it is active — and, while it is being prepared,
+    /// only by the master (049).
+    /// </summary>
+    public void EnsureMapEditable(bool isMaster)
+    {
+        if (Status == CampaignStatus.Active || (Status == CampaignStatus.Preparing && isMaster))
+            return;
+        throw new ConflictException($"A campanha está {StatusLabel}.");
     }
 }

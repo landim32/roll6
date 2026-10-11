@@ -173,6 +173,7 @@ public partial class TurnService : ITurnService
     {
         var (piece, map, campaign) = await GetPieceAsync(info.MapTokenId);
         var actor = await ResolveActorAsync(userId, piece, campaign);
+        campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         var turn = Turn.Action(campaign.CampaignId, map.MapId, actor.CharacterId, actor.NpcId, actor.MapNpcId,
             campaign.CurrentTurn, userId, info.Description);
         // 047: a whispered action still is the actor's action of the turn; only who reads its text changes.
@@ -200,6 +201,7 @@ public partial class TurnService : ITurnService
     {
         var (piece, map, campaign) = await GetPieceAsync(info.MapTokenId);
         var actor = await ResolveActorAsync(userId, piece, campaign);
+        campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         // Character/NPC changes are history (024): the reset only undoes the move and the action.
         var entries = (await _repository.ListByActorTurnAsync(campaign.CampaignId, campaign.CurrentTurn, actor.CharacterId, actor.MapNpcId))
             .Where(e => e.TurnType is TurnType.Movement or TurnType.Action)
@@ -246,6 +248,7 @@ public partial class TurnService : ITurnService
     public async Task<TurnFinishResultInfo> FinishAsync(long userId, long campaignId, TurnFinishInfo info)
     {
         var campaign = await GetMasteredCampaignAsync(userId, campaignId);
+        campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         var entries = await _repository.ListByCampaignTurnAsync(campaignId, campaign.CurrentTurn);
         var acted = entries.Where(e => e.TurnType == TurnType.Action && e.CharacterId.HasValue)
             .Select(e => e.CharacterId!.Value).ToHashSet();

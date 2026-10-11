@@ -95,6 +95,7 @@ public class CampaignService : ICampaignService
             CampaignId = row.CampaignId,
             Name = row.Name,
             Slug = row.Slug,
+            Status = row.Status,
             IsMaster = row.UserId == userId,
             CurrentMapId = row.CurrentMapId,
             CurrentMapName = row.CurrentMapName,
@@ -107,6 +108,8 @@ public class CampaignService : ICampaignService
         var campaign = new Campaign { UserId = userId };
         campaign.Rename(info.Name);
         campaign.SetOpen(info.Open ?? false);
+        // 049: a new campaign is being prepared; the master activates it when the table starts.
+        campaign.SetStatus((int)Enums.CampaignStatus.Preparing);
         campaign.CreatedAt = campaign.UpdatedAt;
         return await MapToDtoAsync(await _repository.InsertAsync(campaign));
     }
@@ -124,6 +127,18 @@ public class CampaignService : ICampaignService
     {
         var campaign = await GetOwnedAsync(userId, campaignId);
         campaign.SetOpen(info.Open);
+        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
+        return result;
+    }
+
+    /// <summary>Changes the status (049, master only); a change reaches the table as <c>campaign.changed</c>.</summary>
+    public async Task<CampaignInfo> SetStatusAsync(long userId, long campaignId, CampaignStatusInfo info)
+    {
+        var campaign = await GetOwnedAsync(userId, campaignId);
+        if ((int)campaign.Status == info.Status)
+            return await MapToDtoAsync(campaign);
+        campaign.SetStatus(info.Status);
         var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
         return result;
@@ -228,6 +243,7 @@ public class CampaignService : ICampaignService
         Name = campaign.Name,
         Slug = campaign.Slug,
         Open = campaign.Open,
+        Status = (int)campaign.Status,
         CurrentTurn = campaign.CurrentTurn,
         CurrentMapId = campaign.CurrentMapId,
         CreatedAt = campaign.CreatedAt,

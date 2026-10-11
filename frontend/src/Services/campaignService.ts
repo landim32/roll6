@@ -45,6 +45,14 @@ class CampaignService {
   }
 
   /** Master: sets the map the players follow (017); null clears it. */
+  /** Master only (049): 1 Preparando, 2 Ativa, 3 Pausada, 4 Finalizada. */
+  async setStatus(id: number, status: number): Promise<CampaignInfo> {
+    const response = await fetch(`${API_BASE}/${id}/status`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ status }),
+    });
+    return this.handleResponse<CampaignInfo>(response);
+  }
+
   async setCurrentMap(id: number, mapId: number | null): Promise<CampaignInfo> {
     const response = await fetch(`${API_BASE}/${id}/current-map`, {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ mapId }),

@@ -205,6 +205,7 @@ public partial class TurnService
     public async Task<TurnProcessResultInfo> ProcessAsync(long userId, long campaignId, TurnProcessInfo info)
     {
         var campaign = await GetMasteredCampaignAsync(userId, campaignId);
+        campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         var characterItems = info.Characters ?? new List<TurnProcessCharacterInfo>();
         var npcItems = info.Npcs ?? new List<TurnProcessNpcInfo>();
         var narration = string.IsNullOrWhiteSpace(info.Narration) ? null : info.Narration.Trim();

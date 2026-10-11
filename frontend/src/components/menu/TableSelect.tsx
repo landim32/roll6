@@ -5,6 +5,7 @@ import { CampaignIcon, CollectionIcon, MapIcon } from '../ui/icons';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { tableEntries, triggerLabels } from '../../lib/tableSelect';
+import { isPlayable, statusLabelKey } from '../../lib/campaignStatus';
 
 interface TableSelectProps {
   onOpenCampaign: () => void;
@@ -25,6 +26,11 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
     campaignId: currentCampaign?.campaignId ?? null,
     mapId: draft.mapId,
   });
+  // 049: a campaign that is not active says so next to its name.
+  const statusOf = new Map(tableCampaigns.map((campaign) => [String(campaign.campaignId), campaign.status]));
+  const statusBadge = (status: number | undefined) => (isPlayable(status) ? null : (
+    <span className="badge text-bg-secondary ms-auto flex-shrink-0">{t(statusLabelKey(status))}</span>
+  ));
 
   return (
     <DropdownMenu.Root modal={false} onOpenChange={(open) => { if (open) void refreshTableCampaigns(); }}>
@@ -37,6 +43,7 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
           <span className="stm-table-select-campaign">
             <CampaignIcon size={11} />
             <span className="text-truncate">{labels.campaign ?? t('menu.chooseCampaign')}</span>
+            {currentCampaign && statusBadge(currentCampaign.status)}
           </span>
         </button>
       </DropdownMenu.Trigger>
@@ -51,6 +58,7 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
               >
                 <CampaignIcon size={13} />
                 <span className="text-truncate">{entry.campaignLabel}</span>
+                {statusBadge(statusOf.get(entry.key))}
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 className={`dropdown-item stm-table-item stm-table-map${entry.mapActive ? ' active' : ''}${entry.mapLabel ? '' : ' fst-italic'}`}

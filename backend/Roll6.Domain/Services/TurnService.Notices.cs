@@ -109,6 +109,7 @@ public partial class TurnService
     public async Task<PokeResultInfo> PokeAsync(long userId, long campaignId)
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
+        campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         var approved = await _campaignCharacterRepository.ListByCampaignAsync(campaign.CampaignId, approvedOnly: true);
         var acted = (await _repository.ListByCampaignTurnAsync(campaign.CampaignId, campaign.CurrentTurn))
             .Where(e => e.TurnType == TurnType.Action && e.CharacterId.HasValue)

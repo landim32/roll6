@@ -70,6 +70,28 @@ public class MapNpcServiceTests
     }
 
     [Fact]
+    public async Task Create_Paused_Throws409()
+    {
+        // 049: NPC occurrences freeze with the table; the master builds them only while preparing or active.
+        _campaignRepository.Setup(r => r.GetByIdAsync(CAMPAIGN)).ReturnsAsync(
+            new Campaign { CampaignId = CAMPAIGN, UserId = MASTER, CurrentTurn = 4, Status = CampaignStatus.Paused });
+
+        await _service.Invoking(s => s.CreateAsync(MASTER, At(2, 3))).Should().ThrowAsync<ConflictException>();
+        _insertedPieces.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Create_Preparing_ByTheMaster_Works()
+    {
+        _campaignRepository.Setup(r => r.GetByIdAsync(CAMPAIGN)).ReturnsAsync(
+            new Campaign { CampaignId = CAMPAIGN, UserId = MASTER, CurrentTurn = 4, Status = CampaignStatus.Preparing });
+
+        var result = await _service.CreateAsync(MASTER, At(2, 3));
+
+        result.Name.Should().Be("Goblin");
+    }
+
+    [Fact]
     public async Task Create_TwiceTheSameNpc_TwoOccurrences()
     {
         var first = await _service.CreateAsync(MASTER, At(1, 1));

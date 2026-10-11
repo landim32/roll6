@@ -7,6 +7,7 @@ public class CampaignTableRow
     public long UserId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
+    public int Status { get; set; }
     public long? CurrentMapId { get; set; }
     public string? CurrentMapName { get; set; }
     public string? CurrentMapSlug { get; set; }

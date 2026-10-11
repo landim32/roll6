@@ -58,6 +58,7 @@ public class CampaignCharacterService : ICampaignCharacterService
         var campaign = await GetCampaignAsync(info.CampaignId);
         var character = await GetCharacterAsync(info.CharacterId);
         EnsureCharacterOwner(userId, character);
+        campaign.EnsurePlayable(); // 049: characters join only an active campaign
 
         var existing = await _repository.GetAsync(campaign.CampaignId, character.CharacterId);
         existing?.EnsureCanRequestAgain();
@@ -73,7 +74,9 @@ public class CampaignCharacterService : ICampaignCharacterService
     public async Task<CampaignCharacterInfo> ApproveRequestAsync(long userId, long campaignCharacterId)
     {
         var participation = await GetParticipationAsync(campaignCharacterId);
-        EnsureMaster(userId, await GetCampaignAsync(participation.CampaignId));
+        var campaign = await GetCampaignAsync(participation.CampaignId);
+        EnsureMaster(userId, campaign);
+        campaign.EnsurePlayable(); // 049: characters join only an active campaign
         var character = await GetCharacterAsync(participation.CharacterId);
         participation.ApproveRequest(character);
         return await SaveAndPublishAsync(participation, userId);
@@ -93,6 +96,7 @@ public class CampaignCharacterService : ICampaignCharacterService
     {
         var campaign = await GetCampaignAsync(info.CampaignId);
         EnsureMaster(userId, campaign);
+        campaign.EnsurePlayable(); // 049: characters join only an active campaign
         var character = await GetCharacterAsync(info.CharacterId);
 
         var existing = await _repository.GetAsync(campaign.CampaignId, character.CharacterId);
@@ -113,6 +117,7 @@ public class CampaignCharacterService : ICampaignCharacterService
         var participation = await GetParticipationAsync(campaignCharacterId);
         var character = await GetCharacterAsync(participation.CharacterId);
         EnsureCharacterOwner(userId, character);
+        (await GetCampaignAsync(participation.CampaignId)).EnsurePlayable(); // 049: characters join only an active campaign
         participation.AcceptInvite(character);
         return await SaveAndPublishAsync(participation, userId);
     }

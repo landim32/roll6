@@ -129,6 +129,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("slug");
 
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2)
+                        .HasColumnName("status");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")

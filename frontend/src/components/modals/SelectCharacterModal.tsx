@@ -9,6 +9,8 @@ import { participationAction } from '../../lib/characterSelection';
 import type { CharacterInfo } from '../../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../../types/campaignCharacter';
 import { TransferIcon, PencilIcon } from '../ui/icons';
+import { isPlayable } from '../../lib/campaignStatus';
+import { useCampaign } from '../../hooks/useCampaign';
 
 interface SelectCharacterModalProps {
   open: boolean;
@@ -30,6 +32,10 @@ export const SelectCharacterModal = ({ open, onOpenChange, onInclude, onEdit, on
     myCharacters, myParticipations, currentSelection, loading, refresh, select, requestAccess, acceptInvite, declineInvite,
   } = useCharacter();
   const [busyId, setBusyId] = useState<number | null>(null);
+  // 049: characters join only an active campaign (the server refuses it too).
+  const { currentCampaign } = useCampaign();
+  const joinBlocked = !isPlayable(currentCampaign?.status);
+  const joinTitle = joinBlocked ? t('campaignStatus.blockedJoin') : undefined;
 
   useEffect(() => {
     if (open) void refresh();
@@ -75,11 +81,11 @@ export const SelectCharacterModal = ({ open, onOpenChange, onInclude, onEdit, on
     const busy = busyId === character.characterId;
     switch (participationAction(participation?.status)) {
       case 'request':
-        return <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => onRequest(character)}>{t('selectCharacter.request')}</button>;
+        return <button type="button" className="btn btn-sm btn-primary" disabled={busy || joinBlocked} title={joinTitle} onClick={() => onRequest(character)}>{t('selectCharacter.request')}</button>;
       case 'respondInvite':
         return (
           <>
-            <button type="button" className="btn btn-sm btn-success" disabled={busy} onClick={() => onAccept(character, participation!.campaignCharacterId)}>{t('selectCharacter.accept')}</button>
+            <button type="button" className="btn btn-sm btn-success" disabled={busy || joinBlocked} title={joinTitle} onClick={() => onAccept(character, participation!.campaignCharacterId)}>{t('selectCharacter.accept')}</button>
             <button type="button" className="btn btn-sm btn-outline-secondary" disabled={busy} onClick={() => onDecline(character, participation!.campaignCharacterId)}>{t('selectCharacter.decline')}</button>
           </>
         );
