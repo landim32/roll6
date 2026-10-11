@@ -144,6 +144,21 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Changes the campaign status (049, master): 1 Preparando, 2 Ativa, 3 Pausada, 4 Finalizada.</summary>
+    [HttpPut("{id:long}/status")]
+    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetStatus(long id, [FromBody] CampaignStatusInfo info)
+    {
+        try
+        {
+            return Ok(await _campaignService.SetStatusAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(long id)

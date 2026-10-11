@@ -3,18 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FinishTurnModal } from '../modals/FinishTurnModal';
 import { LightningIcon } from '../ui/icons';
+import { isPlayable } from '../../lib/campaignStatus';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useTurn } from '../../hooks/useTurn';
 
 /** "Finalizar turno" for the master (016); the turn number itself is shown in the map footer. */
 export const TurnControls = () => {
   const { t } = useTranslation();
-  const { isMaster } = useCampaign();
+  const { isMaster, currentCampaign } = useCampaign();
   const { turnNo, finish } = useTurn();
   const [pending, setPending] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
-  if (turnNo === null || !isMaster) return null;
+  // 049: the turn only ends while the campaign plays.
+  if (turnNo === null || !isMaster || !isPlayable(currentCampaign?.status)) return null;
 
   const run = async (force: boolean) => {
     try {

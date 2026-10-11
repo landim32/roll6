@@ -180,6 +180,8 @@ export interface ViewerContext {
   currentTurn: number | null;
   /** The owner of a character, when known (the party). */
   ownerOf: (characterId: number) => number | null;
+  /** 049: false while the campaign is not active — nothing turns into (or out of) an action. Default true. */
+  playable?: boolean;
 }
 
 const REPLYABLE: ReadonlySet<ChatKind> = new Set<ChatKind>([
@@ -204,7 +206,7 @@ export const permissionsFor = (item: ChatItemInfo, viewer: ViewerContext): ChatI
     else if (item.kind === CHAT_KIND.action) canDelete = validAction && mayChange;
   }
   const currentTurn = viewer.currentTurn !== null && item.turnNo === viewer.currentTurn;
-  const canConvert = !currentTurn || !mayChange || item.characterId === null ? null
+  const canConvert = viewer.playable === false || !currentTurn || !mayChange || item.characterId === null ? null
     : item.kind === CHAT_KIND.text && !item.deleted ? 'action'
     : validAction ? 'message'
     : null;

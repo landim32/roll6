@@ -2,6 +2,7 @@ import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { mapTokenService } from '../Services/mapTokenService';
 import { useCampaign } from '../hooks/useCampaign';
+import { canEditMap } from '../lib/campaignStatus';
 import { useCharacter } from '../hooks/useCharacter';
 import { useMapEditor } from '../hooks/useMapEditor';
 import { useTableEvents } from '../hooks/useRealtime';
@@ -49,7 +50,9 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   const mapIdRef = useRef<number | null>(null);
 
   const mapId = draft.mapId;
-  const canPlaceOwn = mapId !== null && draft.campaignId === currentCampaign?.campaignId;
+  // 049: pieces change while the campaign plays — or, while it is being prepared, by the master.
+  const canPlaceOwn = mapId !== null && draft.campaignId === currentCampaign?.campaignId
+    && canEditMap(currentCampaign?.status, isMaster);
   const canPlace = isMaster && canPlaceOwn;
 
   const refresh = useCallback(async () => {

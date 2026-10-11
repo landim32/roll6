@@ -16,6 +16,10 @@ public class CampaignInfo
     [JsonPropertyName("open")]
     public bool Open { get; set; }
 
+    /// <summary>1 Preparando, 2 Ativa, 3 Pausada, 4 Finalizada (049). Only an active campaign plays.</summary>
+    [JsonPropertyName("status")]
+    public int Status { get; set; }
+
     [JsonPropertyName("currentTurn")]
     public int CurrentTurn { get; set; }
 

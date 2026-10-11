@@ -362,7 +362,8 @@ public partial class TurnService : IChatService
             item.CanDelete = t.IsValidAction && (isMaster || (ownerId.HasValue && ownerId == userId));
         if (item.WhisperHidden)
             item.CanDelete = false;
-        item.CanConvert = !currentTurn || !mayChange || t.CharacterId == null || item.WhisperHidden ? null
+        // 049: nothing turns into (or out of) an action while the campaign is not active.
+        item.CanConvert = campaign.Status != Enums.CampaignStatus.Active || !currentTurn || !mayChange || t.CharacterId == null || item.WhisperHidden ? null
             : t.TurnType == TurnType.Text && !t.IsDeleted ? "action"
             : t.IsValidAction ? "message"
             : null;

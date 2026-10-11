@@ -142,6 +142,9 @@ describe('044: permissions and reactions', () => {
     expect([move.canReply, move.canReact]).toEqual([false, false]);
     const oldTurn = permissionsFor(item(6, { kind: 'text', characterId: 80, turnNo: 0 }), viewer);
     expect(oldTurn.canConvert).toBeNull();
+    // 049: a campaign that is not active converts nothing, the rest stays.
+    const paused = permissionsFor(item(7, { kind: 'text', characterId: 80 }), { ...viewer, playable: false });
+    expect([paused.canConvert, paused.canDelete, paused.canReply]).toEqual([null, true, true]);
   });
 
   it('summarizes reactions and toggles the own one', () => {

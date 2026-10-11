@@ -70,6 +70,17 @@ public static class Roll6Guide
           `list_my_table_campaigns` lists the campaigns where you are the master or have an approved character, each
           with the map the table is following.
 
+        ## Campaign status
+        - Every campaign has a `status`: `1 Preparing` ("Preparando", new campaigns start here), `2 Active` ("Ativa"),
+          `3 Paused` ("Pausada"), `4 Finished` ("Finalizada"). Only the master changes it (`set_campaign_status`), to any
+          other status.
+        - Only an **active** campaign plays. Otherwise these answer 409 "A campanha está …": acting, converting to/from
+          an action, resetting, finishing/processing/setting the turn, poking, and characters joining (request, invite,
+          approve, accept). Pieces, NPC occurrences and new campaign maps answer 409 too — except for the master while
+          the campaign is Preparing, so the table can be built before it starts.
+        - The conversation chat always works: messages, photos, audios, dice rolls, polls and votes, reactions, replies,
+          whispers. Sheets, settings, the plan, archiving maps and the current map are never blocked either.
+
         ## Hex grid (maps)
         - Flat-top hexagons in a rectangle of `gridWidth` columns × `gridHeight` rows; odd columns are shifted half a
           hex down ("odd-q" layout).

@@ -44,6 +44,7 @@ public partial class TurnService
     public async Task<TurnSetCurrentResultInfo> SetCurrentAsync(long userId, long campaignId, TurnSetCurrentInfo info)
     {
         var campaign = await GetMasteredCampaignAsync(userId, campaignId);
+        campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         var previous = campaign.CurrentTurn;
         if (info.TurnNo < 1)
             throw new DomainValidationException("turnNo", "O turno deve ser maior que zero.");
