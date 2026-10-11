@@ -285,6 +285,28 @@ public class TurnServiceTests
             .Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
+    // --- 049: only an active campaign plays ---
+
+    [Fact]
+    public async Task Act_PausedCampaign_Throws409()
+    {
+        _campaign.Status = CampaignStatus.Paused;
+
+        await _service.Invoking(s => s.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Ataca" }))
+            .Should().ThrowAsync<ConflictException>().WithMessage("A campanha está pausada.");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Finish_PreparingCampaign_Throws409()
+    {
+        _campaign.Status = CampaignStatus.Preparing;
+
+        await _service.Invoking(s => s.FinishAsync(MASTER, CAMPAIGN, new TurnFinishInfo { Force = true }))
+            .Should().ThrowAsync<ConflictException>();
+        _campaign.CurrentTurn.Should().Be(3);
+    }
+
     // --- Reset (US5) ---
 
     [Fact]

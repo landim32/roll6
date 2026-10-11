@@ -15,7 +15,7 @@ import type { MapTokenInfo } from '../types/mapToken';
  */
 export const useTokenMovement = () => {
   const { draft } = useMapEditor();
-  const { mapTokens, moveToken } = useMapToken();
+  const { mapTokens, moveToken, canPlaceOwn } = useMapToken();
   const [state, setState] = useState<MovementState>(IDLE);
   const active = state.phase !== 'idle';
 
@@ -25,6 +25,11 @@ export const useTokenMovement = () => {
   useEffect(() => {
     setState(IDLE);
   }, [draft.mapId]);
+
+  // 049: a campaign that stops playing (paused, finished…) cancels a move in progress.
+  useEffect(() => {
+    if (!canPlaceOwn) setState(IDLE);
+  }, [canPlaceOwn]);
 
   useEffect(() => {
     if (!active) return;

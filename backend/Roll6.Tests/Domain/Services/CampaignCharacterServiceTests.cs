@@ -163,6 +163,53 @@ public class CampaignCharacterServiceTests
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
+    // --- 049: characters join only an active campaign ---
+
+    private void CampaignIs(long campaignId, CampaignStatus status) =>
+        _campaignRepository.Setup(r => r.GetByIdAsync(campaignId)).ReturnsAsync(
+            new Campaign { CampaignId = campaignId, UserId = MASTER_ID, Name = "C", Open = campaignId == OPEN_CAMPAIGN, Status = status });
+
+    [Fact]
+    public async Task RequestAccess_Preparing_Throws409()
+    {
+        CampaignIs(OPEN_CAMPAIGN, CampaignStatus.Preparing);
+
+        await _service.Invoking(s => s.RequestAccessAsync(PLAYER_ID, Request(OPEN_CAMPAIGN)))
+            .Should().ThrowAsync<ConflictException>().WithMessage("A campanha está em preparação.");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Approve_Paused_Throws409_AndKeepsPending()
+    {
+        var participation = new CampaignCharacter
+            { CampaignCharacterId = 52, CampaignId = CLOSED_CAMPAIGN, CharacterId = CHARACTER, Status = CampaignCharacterStatus.RequestedAccess };
+        _repository.Setup(r => r.GetByIdAsync(52)).ReturnsAsync(participation);
+        CampaignIs(CLOSED_CAMPAIGN, CampaignStatus.Paused);
+
+        await _service.Invoking(s => s.ApproveRequestAsync(MASTER_ID, 52)).Should().ThrowAsync<ConflictException>();
+
+        participation.Status.Should().Be(CampaignCharacterStatus.RequestedAccess);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AcceptInvite_Finished_Throws409()
+    {
+        SetupParticipation(53, CLOSED_CAMPAIGN, CampaignCharacterStatus.Invited);
+        CampaignIs(CLOSED_CAMPAIGN, CampaignStatus.Finished);
+
+        await _service.Invoking(s => s.AcceptInviteAsync(PLAYER_ID, 53)).Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task Invite_Paused_Throws409()
+    {
+        CampaignIs(CLOSED_CAMPAIGN, CampaignStatus.Paused);
+
+        await _service.Invoking(s => s.InviteAsync(MASTER_ID, Request(CLOSED_CAMPAIGN))).Should().ThrowAsync<ConflictException>();
+    }
+
     [Fact]
     public async Task AcceptInvite_ByCharacterOwner_Approves()
     {

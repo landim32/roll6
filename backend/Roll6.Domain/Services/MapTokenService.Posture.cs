@@ -22,6 +22,7 @@ public partial class MapTokenService
         var map = await _mapRepository.GetByIdAsync(mapToken.MapId)
             ?? throw new KeyNotFoundException("Mapa não encontrado.");
         map.EnsureNotDeleted();
+        await EnsureMapEditableAsync(map, userId);
         if (mapToken.CampaignCharacterId is long participationId)
             await SetCharacterPostureAsync(userId, map, participationId, info.Posture);
         else if (mapToken.MapNpcId is long mapNpcId)

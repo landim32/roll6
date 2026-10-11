@@ -38,7 +38,10 @@ export const compareCursors = (a: string, b: string): number => {
   return 0;
 };
 
-/** Adds or replaces items by key and keeps the timeline order. */
+/**
+ * Adds or replaces items by key and keeps the timeline order — an item whose cursor changed (a poll moved by a vote,
+ * 050) goes to its new place.
+ */
 export const mergeItems = (current: ChatItemInfo[], incoming: ChatItemInfo[]): ChatItemInfo[] => {
   const byKey = new Map(current.map((item) => [item.key, item]));
   for (const item of incoming) byKey.set(item.key, item);
@@ -60,6 +63,24 @@ export const reconcileRange = (current: ChatItemInfo[], fresh: ChatItemInfo[]): 
     return !inside || !LOG_KINDS.has(item.kind) || freshKeys.has(item.key);
   });
   return mergeItems(kept, fresh);
+};
+
+/**
+ * The chat as drawn (050): `flow` is the timeline without the open polls, `pinned` those polls in the order they were
+ * created — always below everything else until every approved character has voted. A deleted poll is never pinned.
+ */
+export const pinOpenPolls = (items: ChatItemInfo[], isOpen: (item: ChatItemInfo) => boolean): {
+  flow: ChatItemInfo[];
+  pinned: ChatItemInfo[];
+} => {
+  const flow: ChatItemInfo[] = [];
+  const pinned: ChatItemInfo[] = [];
+  for (const item of items) {
+    if (item.kind === CHAT_KIND.poll && !item.deleted && isOpen(item)) pinned.push(item);
+    else flow.push(item);
+  }
+  pinned.sort((a, b) => a.turnId - b.turnId);
+  return { flow, pinned };
 };
 
 export const markDeleted = (items: ChatItemInfo[], key: string): ChatItemInfo[] =>
@@ -159,6 +180,8 @@ export interface ViewerContext {
   currentTurn: number | null;
   /** The owner of a character, when known (the party). */
   ownerOf: (characterId: number) => number | null;
+  /** 049: false while the campaign is not active — nothing turns into (or out of) an action. Default true. */
+  playable?: boolean;
 }
 
 const REPLYABLE: ReadonlySet<ChatKind> = new Set<ChatKind>([
@@ -177,12 +200,13 @@ export const permissionsFor = (item: ChatItemInfo, viewer: ViewerContext): ChatI
   let canDelete = false;
   if (!item.deleted) {
     if (item.kind === CHAT_KIND.roll) canDelete = viewer.isMaster;
-    else if (CONVERSATION_KINDS.has(item.kind)) canDelete = item.userId === viewer.userId || viewer.isMaster;
+    // 050: a poll too — its author or the master (polls aren't in CONVERSATION_KINDS, which also groups bubbles).
+    else if (CONVERSATION_KINDS.has(item.kind) || item.kind === CHAT_KIND.poll) canDelete = item.userId === viewer.userId || viewer.isMaster;
     else if (item.kind === CHAT_KIND.narration) canDelete = viewer.isMaster;
     else if (item.kind === CHAT_KIND.action) canDelete = validAction && mayChange;
   }
   const currentTurn = viewer.currentTurn !== null && item.turnNo === viewer.currentTurn;
-  const canConvert = !currentTurn || !mayChange || item.characterId === null ? null
+  const canConvert = viewer.playable === false || !currentTurn || !mayChange || item.characterId === null ? null
     : item.kind === CHAT_KIND.text && !item.deleted ? 'action'
     : validAction ? 'message'
     : null;

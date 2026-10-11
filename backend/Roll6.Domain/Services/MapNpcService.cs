@@ -185,6 +185,10 @@ public class MapNpcService : IMapNpcService
         var map = await GetMapAsync(mapId);
         if (map.UserId != userId)
             throw new UnauthorizedAccessException("Apenas o mestre da campanha pode gerenciar os NPCs do mapa.");
+        // 049: occurrences change while the campaign plays or is being prepared (the master is the only writer here).
+        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
+            ?? throw new KeyNotFoundException("Campanha não encontrada.");
+        campaign.EnsureMapEditable(true);
         return map;
     }
 

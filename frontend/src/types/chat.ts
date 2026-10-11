@@ -141,6 +141,8 @@ export interface ChatPollOptionInfo {
 export interface ChatPollInfo {
   question: string;
   totalVotes: number;
+  /** Some approved character has not voted yet (050; the master's vote doesn't count): pinned at the bottom. */
+  open?: boolean;
   /** In the order the author wrote them. */
   options: ChatPollOptionInfo[];
 }
@@ -158,6 +160,8 @@ export interface ChatPageInfo {
   hasMore: boolean;
   unreadCount: number;
   firstUnreadCursor: string | null;
+  /** Every open poll of the campaign (050), oldest first, loaded or not by this page. */
+  openPolls?: ChatItemInfo[];
 }
 
 export interface ChatSendInfo {

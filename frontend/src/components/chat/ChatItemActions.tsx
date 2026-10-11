@@ -5,6 +5,8 @@ import {
   ChatLeftTextIcon, CopyIcon, EmojiLaughingFillIcon, EmojiLaughingIcon, HeartFillIcon, HeartIcon, LightningIcon, ReplyIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
 } from '../ui/icons';
 import { copyableText, reactionSummary } from '../../lib/chatItems';
+import { isPlayable } from '../../lib/campaignStatus';
+import { useCampaign } from '../../hooks/useCampaign';
 import { REACTION } from '../../types/chat';
 import type { ChatItemInfo, ReactionKind } from '../../types/chat';
 
@@ -31,6 +33,9 @@ const BAR_HEIGHT = 56;
  */
 export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onCopy, onClose }: ChatItemActionsProps) => {
   const { t } = useTranslation();
+  // 049: items loaded before the campaign stopped playing still carry their old flag.
+  const { currentCampaign } = useCampaign();
+  const convert = isPlayable(currentCampaign?.status) ? item.canConvert : null;
   const bar = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const mine = reactionSummary(item.reactions, userId).mine;
@@ -97,13 +102,13 @@ export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConv
           <CopyIcon size={24} />
         </button>
       )}
-      {item.canConvert === 'action' && (
+      {convert === 'action' && (
         <button type="button" className="stm-chat-action is-act" onClick={act(() => onConvert('action'))}
           title={t('chat.toAction')} aria-label={t('chat.toAction')}>
           <LightningIcon size={24} />
         </button>
       )}
-      {item.canConvert === 'message' && (
+      {convert === 'message' && (
         <button type="button" className="stm-chat-action" onClick={act(() => onConvert('message'))}
           title={t('chat.toMessage')} aria-label={t('chat.toMessage')}>
           <ChatLeftTextIcon size={24} />

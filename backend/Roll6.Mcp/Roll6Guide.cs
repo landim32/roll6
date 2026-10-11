@@ -75,6 +75,17 @@ public static class Roll6Guide
           `list_my_table_campaigns` lists the campaigns where you are the master or have an approved character, each
           with the map the table is following.
 
+        ## Campaign status
+        - Every campaign has a `status`: `1 Preparing` ("Preparando", new campaigns start here), `2 Active` ("Ativa"),
+          `3 Paused` ("Pausada"), `4 Finished` ("Finalizada"). Only the master changes it (`set_campaign_status`), to any
+          other status.
+        - Only an **active** campaign plays. Otherwise these answer 409 "A campanha está …": acting, converting to/from
+          an action, resetting, finishing/processing/setting the turn, poking, and characters joining (request, invite,
+          approve, accept). Pieces, NPC occurrences and new campaign maps answer 409 too — except for the master while
+          the campaign is Preparing, so the table can be built before it starts.
+        - The conversation chat always works: messages, photos, audios, dice rolls, polls and votes, reactions, replies,
+          whispers. Sheets, settings, the plan, archiving maps and the current map are never blocked either.
+
         ## Hex grid (maps)
         - Flat-top hexagons in a rectangle of `gridWidth` columns × `gridHeight` rows; odd columns are shifted half a
           hex down ("odd-q" layout).
@@ -156,6 +167,11 @@ public static class Roll6Guide
           vote. Votes are public (`poll.options[].voters`) and notify nobody; a poll is conversation, never a turn record.
           To find polls use `list_chat_messages` with `kind = "poll"` (the latest one: `limit = 1`); `get_chat_message`
           re-reads one entry (a poll's current result) by its `turnId`. `kind` filters any kind (e.g. "action", "narration").
+          A poll is **open** (`poll.open`) while some approved character has not voted — the master's vote doesn't count —
+          and the app pins open polls below everything else in the chat (`list_chat_messages` returns them in `openPolls`,
+          loaded or not). Each vote or withdrawal moves the poll to that moment in the chat order, so once everyone has
+          voted it stays right after what was said before the last vote. Its author or the master deletes a poll with
+          `delete_chat_message`.
         - **Whispers**: `send_chat_message`, `roll_dice` and `act_in_turn` take `whisperCharacterIds` (approved characters,
           not your own) and/or `whisperMaster`. Only the author, the master (always) and the owners of those characters see
           it whole (`whisper.recipients`); everyone else doesn't get a whispered message at all, and gets a whispered action

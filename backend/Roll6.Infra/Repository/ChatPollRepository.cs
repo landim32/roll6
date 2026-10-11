@@ -43,12 +43,13 @@ public class ChatPollRepository : IChatPollRepository<ChatPollOption, ChatPollVo
         return await _context.ChatPollOptions.AsNoTracking().FirstOrDefaultAsync(o => o.ChatPollOptionId == optionId);
     }
 
-    public async Task SetVoteAsync(long turnId, long? characterId, ChatPollVote? vote)
+    public async Task SetVoteAsync(long turnId, long? characterId, ChatPollVote? vote, DateTime chatAt)
     {
         for (var attempt = 1; ; attempt++)
         {
             await using var transaction = await _context.Database.BeginTransactionAsync();
             await _context.ChatPollVotes.Where(v => v.TurnId == turnId && v.CharacterId == characterId).ExecuteDeleteAsync();
+            await _context.Turns.Where(t => t.TurnId == turnId).ExecuteUpdateAsync(s => s.SetProperty(t => t.ChatAt, chatAt));
             if (vote == null)
             {
                 await transaction.CommitAsync();

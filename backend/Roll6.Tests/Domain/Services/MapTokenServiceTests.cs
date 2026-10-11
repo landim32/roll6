@@ -429,6 +429,53 @@ public class MapTokenServiceTests
         return piece;
     }
 
+    // ---- 049: the campaign status freezes the pieces ----
+
+    private void CampaignIs(CampaignStatus status) =>
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentTurn = 3, Status = status });
+
+    [Fact]
+    public async Task Move_Player_PausedCampaign_Throws409()
+    {
+        AriaPiece();
+        CampaignIs(CampaignStatus.Paused);
+
+        await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 }))
+            .Should().ThrowAsync<ConflictException>().WithMessage("A campanha está pausada.");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Move_Player_PreparingCampaign_Throws409()
+    {
+        AriaPiece();
+        CampaignIs(CampaignStatus.Preparing);
+
+        await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 }))
+            .Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task Move_Master_PreparingCampaign_Moves()
+    {
+        AriaPiece();
+        CampaignIs(CampaignStatus.Preparing);
+
+        var moved = await _service.MoveAsync(1, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 });
+
+        (moved.X, moved.Y).Should().Be((2, 1));
+    }
+
+    [Fact]
+    public async Task Create_Master_FinishedCampaign_Throws409()
+    {
+        CampaignIs(CampaignStatus.Finished);
+
+        await _service.Invoking(s => s.CreateAsync(1, new MapTokenInsertInfo { MapId = 30, TokenId = 5, TokenType = (int)MapTokenType.Object }))
+            .Should().ThrowAsync<ConflictException>().WithMessage("A campanha está finalizada.");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
     // ---- 037: the Deslocamento of the campaign limits the player, not the character's move ----
 
     [Fact]

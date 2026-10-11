@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { MAX_ZOOM, MIN_ZOOM } from '../../Contexts/MapEditorContext';
 import { useCampaign } from '../../hooks/useCampaign';
+import { canEditMap } from '../../lib/campaignStatus';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapShare } from '../../hooks/useMapShare';
 import { FOV_MAX, FOV_MIN, FOV_STEP } from '../../lib/storyCamera';
@@ -18,10 +19,14 @@ interface MapControlsProps {
  */
 export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   const { t } = useTranslation();
-  const { currentCampaign } = useCampaign();
-  const { view, zoomIn, zoomOut, resizeMode, toggleResizeMode, canEdit, draft, viewMode, setViewMode, fov, setFov } = useMapEditor();
+  const { currentCampaign, isMaster } = useCampaign();
+  const { view, zoomIn, zoomOut, resizeMode, toggleResizeMode, canEdit: canEditModel, draft, viewMode, setViewMode, fov, setFov } = useMapEditor();
   const { share, sharing } = useMapShare();
   const canShare = draft.mapId !== null && currentCampaign !== null;
+  // 049: the open campaign map's picture stays as it is while the table is paused or finished.
+  const frozen = draft.mapId !== null && draft.campaignId === currentCampaign?.campaignId
+    && !canEditMap(currentCampaign?.status, isMaster);
+  const canEdit = canEditModel && !frozen;
 
   const in3d = viewMode === '3d';
 

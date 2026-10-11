@@ -15,6 +15,7 @@ public interface ICampaignService
     Task<CampaignInfo> CreateAsync(long userId, CampaignInsertInfo info);
     Task<CampaignInfo> RenameAsync(long userId, long campaignId, CampaignInsertInfo info);
     Task<CampaignInfo> SetOpenAsync(long userId, long campaignId, CampaignOpenInfo info);
+    Task<CampaignInfo> SetStatusAsync(long userId, long campaignId, CampaignStatusInfo info);
     Task DeleteAsync(long userId, long campaignId);
 
     /// <summary>True for the master and for users with an approved character (who may follow the table in real time).</summary>

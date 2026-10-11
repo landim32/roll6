@@ -1,5 +1,5 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { applyVote, nextVote } from '../lib/chatPoll';
+import { applyVote, isPollOpen, nextVote } from '../lib/chatPoll';
 import type { WhisperPayload } from '../lib/whisper';
 import type { ReactNode } from 'react';
 import { chatService } from '../Services/chatService';
@@ -7,14 +7,18 @@ import { pushService } from '../Services/pushService';
 import type { PokeResultInfo } from '../types/push';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
+import { isPlayable } from '../lib/campaignStatus';
 import { useCharacter } from '../hooks/useCharacter';
 import { useRealtime, useTableEvents } from '../hooks/useRealtime';
 import { useTurn } from '../hooks/useTurn';
+import { CHAT_KIND } from '../types/chat';
 import type { ChatItemInfo, ChatSendInfo, ReactionKind } from '../types/chat';
 import { TABLE_EVENT } from '../types/realtime';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
-import { compareCursors, markDeleted, mergeItems, nextReaction, permissionsFor, reactionSummary, reconcileRange } from '../lib/chatItems';
+import {
+  compareCursors, markDeleted, mergeItems, nextReaction, permissionsFor, pinOpenPolls, reactionSummary, reconcileRange,
+} from '../lib/chatItems';
 import { isChatVisible, readLayoutMode, writeLayoutMode } from '../lib/layoutMode';
 import { isShown, readChatFilters, writeChatFilters } from '../lib/chatFilters';
 import type { ChatFilters } from '../lib/chatFilters';
@@ -43,8 +47,10 @@ export interface ChatPending {
 }
 
 interface ChatContextType {
-  /** The campaign's timeline, oldest first. */
+  /** The campaign's timeline, oldest first, without the open polls (050). */
   items: ChatItemInfo[];
+  /** Open polls (050), oldest first: drawn below everything else until every approved character has voted. */
+  pinnedPolls: ChatItemInfo[];
   hasMore: boolean;
   /** Entries by others not read yet (shown as a badge while the chat is hidden). */
   unreadCount: number;
@@ -94,6 +100,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { turnNo } = useTurn();
   const { live, setPresence } = useRealtime();
   const [items, setItems] = useState<ChatItemInfo[]>([]);
+  /** Open polls older than the loaded pages (050): they come with every page and are pinned without scrolling back. */
+  const [extraPolls, setExtraPolls] = useState<ChatItemInfo[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [firstUnreadCursor, setFirstUnreadCursor] = useState<string | null>(null);
@@ -110,6 +118,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const itemsRef = useRef<ChatItemInfo[]>([]);
   itemsRef.current = items;
   const loadingOlderRef = useRef(false);
+  const hasMoreRef = useRef(false);
+  hasMoreRef.current = hasMore;
 
   const userId = session?.user.userId ?? null;
   const campaignId = currentCampaign?.campaignId ?? null;
@@ -134,9 +144,33 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     userId,
     isMaster,
     currentTurn: turnNo,
+    playable: isPlayable(currentCampaign?.status),
     ownerOf: (characterId) => party.find((p) => p.characterId === characterId)?.characterOwnerId
       ?? myParticipations.find((p) => p.characterId === characterId)?.characterOwnerId ?? null,
-  }), [userId, isMaster, turnNo, party, myParticipations]);
+  }), [userId, isMaster, turnNo, party, myParticipations, currentCampaign?.status]);
+
+  /**
+   * Puts an entry from the server in place (050): inside or after the loaded pages it joins the timeline; an older poll
+   * (open, pinned) is kept aside until it is loaded or moves forward with a vote.
+   */
+  const upsert = useCallback((item: ChatItemInfo) => {
+    const current = itemsRef.current;
+    const first = current[0];
+    const fits = !hasMoreRef.current || !first || compareCursors(item.cursor, first.cursor) >= 0
+      || current.some((i) => i.key === item.key);
+    if (fits) {
+      setItems((list) => mergeItems(list, [item]));
+      setExtraPolls((list) => list.filter((p) => p.key !== item.key));
+    } else if (item.kind === CHAT_KIND.poll) {
+      setExtraPolls((list) => mergeItems(list, [item]));
+    }
+  }, []);
+
+  /** Changes an entry where it is (timeline or the open polls kept aside) — the optimistic updates. */
+  const patch = useCallback((key: string, change: (item: ChatItemInfo) => ChatItemInfo) => {
+    setItems((list) => list.map((i) => (i.key === key ? change(i) : i)));
+    setExtraPolls((list) => list.map((i) => (i.key === key ? change(i) : i)));
+  }, []);
 
   /** New entries by others count as unread while the chat is out of sight. */
   const countNew = useCallback((before: ChatItemInfo[], after: ChatItemInfo[]) => {
@@ -155,6 +189,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const page = await chatService.list(campaignId);
       if (campaignRef.current !== campaignId) return;
       setItems(page.items);
+      setExtraPolls(page.openPolls ?? []);
       setHasMore(page.hasMore);
       setUnreadCount(page.unreadCount);
       setFirstUnreadCursor(page.firstUnreadCursor);
@@ -182,6 +217,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const next = gap ? page.items : reconcileRange(current, page.items);
       countNew(current, next);
       setItems(next);
+      setExtraPolls(page.openPolls ?? []);
       if (gap) setHasMore(true);
     } catch {
       // Next event or poll tries again.
@@ -191,6 +227,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // Campaign switch (or lost access): start over.
   useEffect(() => {
     setItems([]);
+    setExtraPolls([]);
     setHasMore(false);
     setUnreadCount(0);
     setFirstUnreadCursor(null);
@@ -227,11 +264,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       // 044: reactions, conversions, cancelled actions — only entries already on screen change.
       const item = forViewer(event.data as ChatItemInfo);
       if (item.campaignId !== campaignRef.current) return;
-      setItems((current) => (current.some((i) => i.key === item.key) ? mergeItems(current, [item]) : current));
+      // 050: a vote moves the poll to now, so an old one comes in (pinned while open, after the last entry once answered).
+      if (item.kind === CHAT_KIND.poll) upsert(item);
+      else setItems((current) => (current.some((i) => i.key === item.key) ? mergeItems(current, [item]) : current));
       setReplyTo((reply) => (reply?.key === item.key ? item : reply));
     } else if (event.type === TABLE_EVENT.chatDeleted) {
       const { itemKey } = event.data as { itemKey: string };
       setItems((current) => markDeleted(current, itemKey));
+      setExtraPolls((current) => current.filter((p) => p.key !== itemKey));
     } else if (event.type === TABLE_EVENT.turnChanged || event.type === TABLE_EVENT.turnFinished) {
       void refreshRecent();
     } else if (event.type === TABLE_EVENT.resync) {
@@ -259,8 +299,19 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  // While the chat is on screen everything shown is read: move the mark up to the last item.
-  const lastCursor = items.length > 0 ? items[items.length - 1].cursor : null;
+  // 050: the open polls (every approved character must vote; the master doesn't count) are drawn below the rest.
+  const approvedCharacterIds = useMemo(
+    () => (party.length > 0 ? party.map((p) => p.characterId) : undefined), [party]);
+  const { flow, pinned } = useMemo(() => {
+    const isOpen = (item: ChatItemInfo) => !!item.poll && isPollOpen(item.poll, approvedCharacterIds);
+    const keys = new Set(items.map((i) => i.key));
+    const extra = extraPolls.filter((p) => !keys.has(p.key) && !p.deleted && isOpen(p));
+    return pinOpenPolls([...items, ...extra], isOpen);
+  }, [items, extraPolls, approvedCharacterIds]);
+
+  // While the chat is on screen everything shown is read: move the mark up to the last item of the flow (a pinned
+  // poll may be old, and the server only moves the mark forward anyway).
+  const lastCursor = flow.length > 0 ? flow[flow.length - 1].cursor : null;
   useEffect(() => {
     if (!visible || campaignId === null || lastCursor === null) return;
     setUnreadCount(0);
@@ -331,6 +382,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const remove = useCallback(async (item: ChatItemInfo) => {
     await chatService.remove(item.turnId);
     setItems((current) => markDeleted(current, item.key));
+    setExtraPolls((current) => current.filter((p) => p.key !== item.key));
   }, []);
 
   const roll = useCallback(async (text: string | null, whisper: WhisperPayload = {}) => {
@@ -354,8 +406,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const cancelReply = useCallback(() => setReplyTo(null), []);
 
   const replace = useCallback((item: ChatItemInfo) => {
-    if (campaignRef.current === item.campaignId) setItems((current) => mergeItems(current, [forViewer(item)]));
-  }, [forViewer]);
+    if (campaignRef.current === item.campaignId) upsert(forViewer(item));
+  }, [forViewer, upsert]);
 
   const react = useCallback(async (item: ChatItemInfo, kind: ReactionKind) => {
     const mine = reactionSummary(item.reactions, userId).mine;
@@ -364,14 +416,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     const others = (item.reactions ?? []).filter((r) => r.userId !== userId);
     const optimistic = next === null || userId === null ? others
       : [...others, { userId, name: session?.user.name.split(' ')[0] ?? '', kind: next }];
-    setItems((current) => current.map((i) => (i.key === item.key ? { ...i, reactions: optimistic } : i)));
+    patch(item.key, (i) => ({ ...i, reactions: optimistic }));
     try {
       replace(await chatService.react(item.turnId, next));
     } catch (err) {
-      setItems((current) => current.map((i) => (i.key === item.key ? { ...i, reactions: item.reactions } : i)));
+      patch(item.key, (i) => ({ ...i, reactions: item.reactions }));
       throw err;
     }
-  }, [userId, session, replace]);
+  }, [userId, session, replace, patch]);
 
   const convert = useCallback(async (item: ChatItemInfo, to: 'action' | 'message') => {
     replace(await chatService.convert(item.turnId, to));
@@ -396,20 +448,21 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       : { characterId, name: speaker.participation?.characterName ?? '', imageUrl: speaker.participation?.characterImageUrl ?? null };
     // Optimistic: the circle, counts and bars change at once and come back if the server refuses.
     const optimistic = applyVote(item.poll, voter, next);
-    setItems((current) => current.map((i) => (i.key === item.key ? { ...i, poll: optimistic } : i)));
+    // The cursor stays: the server's answer brings the poll's new place (050).
+    patch(item.key, (i) => ({ ...i, poll: optimistic }));
     try {
       replace(await chatService.vote(item.turnId, characterId, next));
     } catch (err) {
-      setItems((current) => current.map((i) => (i.key === item.key ? { ...i, poll: item.poll } : i)));
+      patch(item.key, (i) => ({ ...i, poll: item.poll }));
       throw err;
     }
-  }, [speaker, replace]);
+  }, [speaker, replace, patch]);
 
   const value = useMemo<ChatContextType>(() => ({
-    items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
+    items: flow, pinnedPolls: pinned, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters, loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert,
     createPoll, vote,
-  }), [items, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
+  }), [flow, pinned, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters,
     loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert, createPoll, vote]);
 

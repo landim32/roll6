@@ -845,5 +845,23 @@
       "energyAboveTotal": "A energia atual não pode passar da energia total.",
       "statusTooLong": "O status pode ter no máximo 260 caracteres."
     }
+  },
+  "campaignStatus": {
+    "title": "Status da campanha",
+    "label": {
+      "preparing": "Preparando",
+      "active": "Ativa",
+      "paused": "Pausada",
+      "finished": "Finalizada"
+    },
+    "notice": {
+      "preparing": "Campanha em preparação",
+      "paused": "Campanha pausada",
+      "finished": "Campanha finalizada"
+    },
+    "changed": "Status da campanha: {{status}}.",
+    "blockedJoin": "A campanha precisa estar ativa para receber personagens.",
+    "blockedPlay": "A campanha precisa estar ativa.",
+    "hint": "Fora de \"Ativa\" só a conversa do chat continua; em \"Preparando\" o mestre ainda monta os mapas."
   }
 }

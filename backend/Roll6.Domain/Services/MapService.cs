@@ -70,7 +70,8 @@ public class MapService : IMapService
 
     public async Task<MapInfo> CreateAsync(long userId, MapInsertInfo info)
     {
-        await GetOwnedCampaignAsync(userId, info.CampaignId);
+        var campaign = await GetOwnedCampaignAsync(userId, info.CampaignId);
+        campaign.EnsureMapEditable(true); // 049: no new map at a paused or finished table
         var mapModel = await _mapModelRepository.GetByIdAsync(info.MapModelId)
             ?? throw new KeyNotFoundException("Modelo de mapa não encontrado.");
 
@@ -144,12 +145,13 @@ public class MapService : IMapService
         return map;
     }
 
-    private async Task GetOwnedCampaignAsync(long userId, long campaignId)
+    private async Task<Campaign> GetOwnedCampaignAsync(long userId, long campaignId)
     {
         var campaign = await _campaignRepository.GetByIdAsync(campaignId)
             ?? throw new KeyNotFoundException("Campanha não encontrada.");
         if (campaign.UserId != userId)
             throw new UnauthorizedAccessException("Apenas o dono da campanha pode acessar seus mapas.");
+        return campaign;
     }
 
     private MapInfo MapToDto(Map map, MapModel? mapModel) => new()

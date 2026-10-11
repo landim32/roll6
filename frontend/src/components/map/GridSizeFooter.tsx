@@ -3,6 +3,8 @@ import { useMapEditor } from '../../hooks/useMapEditor';
 import { useTurn } from '../../hooks/useTurn';
 import { useAuth } from '../../hooks/useAuth';
 import { useRealtime } from '../../hooks/useRealtime';
+import { useCampaign } from '../../hooks/useCampaign';
+import { statusNoticeKey } from '../../lib/campaignStatus';
 import { REALTIME_STATUS } from '../../types/realtime';
 
 interface GridSizeFooterProps {
@@ -20,10 +22,13 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
   const { session } = useAuth();
   const { status } = useRealtime();
   const offline = !!session && status !== REALTIME_STATUS.connected;
+  const { currentCampaign } = useCampaign();
+  const statusNotice = currentCampaign ? statusNoticeKey(currentCampaign.status) : null;
 
   return (
     <footer className="stm-footer">
       {turnNo !== null && <span className="badge stm-turn-badge">{t('turn.label', { no: turnNo })}</span>}
+      {statusNotice && <span className="badge text-bg-secondary" title={t('campaignStatus.blockedPlay')}>{t(statusNotice)}</span>}
       {offline && (
         <span className="badge stm-realtime-badge" title={t('realtime.offlineHint')}>
           {t(status === REALTIME_STATUS.reconnecting ? 'realtime.reconnecting' : 'realtime.offline')}

@@ -119,6 +119,26 @@ public static class CampaignTools
         [Description("true = open campaign, false = closed campaign.")] bool open) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/open", new CampaignOpenInfo { Open = open });
 
+    [McpServerTool(Name = "set_campaign_status", Title = "Set campaign status", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/campaign/{id}/status")]
+    [Description("""
+        What it does: sets the campaign status — 1 Preparing ("Preparando", new campaigns start here), 2 Active ("Ativa"),
+        3 Paused ("Pausada") or 4 Finished ("Finalizada"); any status can go to any other. Only an active campaign plays:
+        otherwise acting, resetting, finishing/processing/setting the turn, poking and characters joining (request,
+        invite, approve, accept) answer 409, and pieces/NPC occurrences/new campaign maps answer 409 too — except for
+        the master while Preparing. The conversation chat (messages, photos, audios, dice rolls, polls, reactions)
+        always works. Connected players see the change in real time.
+        Who can use it: only the master.
+        Returns: the updated campaign (status).
+        Common errors: 400 status not 1–4, 403 not the master, 404 not found.
+        Related tools: get_campaign, set_campaign_open.
+        """)]
+    public static Task<CallToolResult> SetCampaignStatus(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("1 = Preparing, 2 = Active, 3 = Paused, 4 = Finished.")] int status) =>
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/status", new CampaignStatusInfo { Status = status });
+
     [McpServerTool(Name = "delete_campaign", Title = "Delete campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaign/{id}")]
     [Description($$"""

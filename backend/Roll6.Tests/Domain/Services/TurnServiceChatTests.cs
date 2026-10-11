@@ -68,6 +68,7 @@ public partial class TurnServiceChatTests
         _repository.Setup(r => r.ListLogByTurnsAsync(CAMPAIGN, It.IsAny<IEnumerable<int>>())).ReturnsAsync(new List<Turn>());
         _repository.Setup(r => r.ListByCampaignTurnAsync(It.IsAny<long>(), It.IsAny<int>())).ReturnsAsync(new List<Turn>());
         _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(new List<CampaignCharacter>());
+        _repository.Setup(r => r.ListOpenPollsAsync(CAMPAIGN)).ReturnsAsync(new List<Turn>());
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string?>())).Returns((string? f) => f == null ? null : $"https://cdn/{f}");
 
@@ -537,6 +538,39 @@ public partial class TurnServiceChatTests
         text.IsValidAction.Should().BeTrue();
         _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 70 && t.TurnType == TurnType.Action)), Times.Once);
         _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Convert_PausedCampaign_Throws409()
+    {
+        AriaText(73);
+        _campaign.Status = CampaignStatus.Paused;
+
+        await _service.Invoking(s => s.ConvertAsync(PLAYER, 73, new ChatConvertInfo { To = "action" }))
+            .Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task Poke_FinishedCampaign_Throws409()
+    {
+        _campaign.Status = CampaignStatus.Finished;
+
+        await _service.Invoking(s => s.PokeAsync(PLAYER, CAMPAIGN)).Should().ThrowAsync<ConflictException>()
+            .WithMessage("A campanha está finalizada.");
+    }
+
+    [Fact]
+    public async Task Chat_KeepsWorking_WhileTheCampaignIsNotActive()
+    {
+        // 049: the conversation is the one thing a paused or finished table keeps.
+        _campaign.Status = CampaignStatus.Paused;
+        var message = await _service.SendAsync(PLAYER, CAMPAIGN, new ChatSendInfo { CharacterId = ARIA, Text = "Até semana que vem" });
+        _campaign.Status = CampaignStatus.Finished;
+        var roll = await _service.RollAsync(PLAYER, CAMPAIGN, new ChatRollInfo { CharacterId = ARIA, Text = "Sorte" });
+
+        message.Kind.Should().Be("text");
+        roll.Kind.Should().Be("roll");
+        message.CanConvert.Should().BeNull("nothing becomes an action while the campaign is not active");
     }
 
     [Fact]

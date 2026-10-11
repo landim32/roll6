@@ -51,6 +51,7 @@ public partial class TurnService
         var turn = await _repository.GetByIdAsync(turnId) ?? throw new KeyNotFoundException("Mensagem não encontrada.");
         var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
         await EnsureVisibleAsync(campaign, userId, turn);
+        campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         if (turn.TurnNo != campaign.CurrentTurn)
             throw new Exceptions.DomainValidationException("to", "Só entradas do turno atual podem ser convertidas.");
         if (turn.CharacterId is not long characterId)

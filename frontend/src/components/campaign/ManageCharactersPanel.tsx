@@ -8,6 +8,8 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { TrashIcon } from '../ui/icons';
 import { useCharacter } from '../../hooks/useCharacter';
 import { inviteAction } from '../../lib/characterSelection';
+import { isPlayable } from '../../lib/campaignStatus';
+import { useCampaign } from '../../hooks/useCampaign';
 import type { CharacterSearchInfo } from '../../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../../types/campaignCharacter';
 import type { CampaignCharacterInfo, CampaignCharacterStatus } from '../../types/campaignCharacter';
@@ -31,6 +33,10 @@ export const ManageCharactersPanel = ({ active }: ManageCharactersPanelProps) =>
   const open = active;
   const { t } = useTranslation();
   const { listCampaignCharacters, approve, deny, remove, invite, searchCharacters } = useCharacter();
+  // 049: characters join only an active campaign.
+  const { currentCampaign } = useCampaign();
+  const joinBlocked = !isPlayable(currentCampaign?.status);
+  const joinTitle = joinBlocked ? t('campaignStatus.blockedJoin') : undefined;
   const [tab, setTab] = useState('campaign');
   const [members, setMembers] = useState<CampaignCharacterInfo[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -161,7 +167,7 @@ export const ManageCharactersPanel = ({ active }: ManageCharactersPanelProps) =>
                           <StatusBadge status={m.status} />
                           {m.status === CAMPAIGN_CHARACTER_STATUS.requestedAccess && (
                             <>
-                              <button type="button" className="btn btn-sm btn-success" disabled={busy} onClick={() => onApprove(m)}>{t('manage.approve')}</button>
+                              <button type="button" className="btn btn-sm btn-success" disabled={busy || joinBlocked} title={joinTitle} onClick={() => onApprove(m)}>{t('manage.approve')}</button>
                               <button type="button" className="btn btn-sm btn-outline-warning" disabled={busy} onClick={() => onDeny(m)}>{t('manage.deny')}</button>
                             </>
                           )}
@@ -205,7 +211,7 @@ export const ManageCharactersPanel = ({ active }: ManageCharactersPanelProps) =>
                             <div className="stm-character-actions">
                               {status !== undefined && status !== CAMPAIGN_CHARACTER_STATUS.denied && <StatusBadge status={status} />}
                               {inviteAction(status) === 'invite' && (
-                                <button type="button" className="btn btn-sm btn-primary" disabled={busyId === c.characterId} onClick={() => onInvite(c)}>
+                                <button type="button" className="btn btn-sm btn-primary" disabled={busyId === c.characterId || joinBlocked} title={joinTitle} onClick={() => onInvite(c)}>
                                   {t('manage.invite')}
                                 </button>
                               )}

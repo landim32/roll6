@@ -305,6 +305,53 @@ public class CampaignServiceTests
     }
 
     [Fact]
+    public async Task Create_StartsPreparing()
+    {
+        var result = await _service.CreateAsync(1, new CampaignInsertInfo { Name = "Nova" });
+
+        result.Status.Should().Be((int)CampaignStatus.Preparing);
+        _repository.Verify(r => r.InsertAsync(It.Is<Campaign>(c => c.Status == CampaignStatus.Preparing)));
+    }
+
+    [Fact]
+    public async Task SetStatus_Master_UpdatesAndPublishesCampaignChanged()
+    {
+        var result = await _service.SetStatusAsync(1, 10, new CampaignStatusInfo { Status = (int)CampaignStatus.Paused });
+
+        result.Status.Should().Be((int)CampaignStatus.Paused);
+        _repository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.Status == CampaignStatus.Paused)));
+        Published(TableEventType.CAMPAIGN_CHANGED, Times.Once());
+    }
+
+    [Fact]
+    public async Task SetStatus_NotMaster_Throws403()
+    {
+        await _service.Invoking(s => s.SetStatusAsync(2, 10, new CampaignStatusInfo { Status = 3 }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetStatus_Invalid_Throws400()
+    {
+        var error = await _service.Invoking(s => s.SetStatusAsync(1, 10, new CampaignStatusInfo { Status = 9 }))
+            .Should().ThrowAsync<DomainValidationException>();
+
+        error.Which.Errors.Should().ContainKey("status");
+        Published(TableEventType.CAMPAIGN_CHANGED, Times.Never());
+    }
+
+    [Fact]
+    public async Task SetStatus_Same_NoEvent()
+    {
+        var result = await _service.SetStatusAsync(1, 10, new CampaignStatusInfo { Status = (int)CampaignStatus.Active });
+
+        result.Status.Should().Be((int)CampaignStatus.Active);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        Published(TableEventType.CAMPAIGN_CHANGED, Times.Never());
+    }
+
+    [Fact]
     public async Task RenameAndDelete_PublishCampaignEvents()
     {
         _mapRepository.Setup(r => r.ListDeletedIdsByCampaignAsync(10)).ReturnsAsync(new List<long>());

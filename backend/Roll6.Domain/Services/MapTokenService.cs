@@ -75,6 +75,7 @@ public partial class MapTokenService : IMapTokenService
     public async Task<MapTokenInfo> CreateAsync(long userId, MapTokenInsertInfo info)
     {
         var map = await EnsureMapOwnerAsync(userId, info.MapId);
+        await EnsureMapEditableAsync(map, userId);
         if (info.TokenType == (int)MapTokenType.Character)
             throw new DomainValidationException("tokenType", "Personagens entram no mapa pelo painel da campanha.");
         if (info.TokenType == (int)MapTokenType.Npc)
@@ -106,6 +107,7 @@ public partial class MapTokenService : IMapTokenService
             ?? throw new KeyNotFoundException("Personagem não encontrado.");
         if (map.UserId != userId && character.UserId != userId)
             throw new UnauthorizedAccessException("Você só pode colocar os seus personagens no mapa.");
+        await EnsureMapEditableAsync(map, userId);
         if (participation.CampaignId != map.CampaignId || participation.Status != CampaignCharacterStatus.Approved)
             throw new ConflictException("Só personagens aprovados nesta campanha podem ser colocados no mapa.");
         if (await _repository.GetByMapAndCampaignCharacterAsync(map.MapId, participation.CampaignCharacterId) != null)
@@ -130,6 +132,7 @@ public partial class MapTokenService : IMapTokenService
     public async Task<MapTokenInfo> UpdateAsync(long userId, long mapTokenId, MapTokenUpdateInfo info)
     {
         var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
+        await EnsureMapEditableAsync(map, userId);
         var layout = await _occupancy.LoadAsync(map);
         layout.EnsureFits(info.X, info.Y, info.Look ?? 0, layout.SpaceOf(mapToken), mapToken.MapTokenId);
         mapToken.Update(info.Name, info.TokenType, info.Sheet, info.Life, info.Energy, info.Status, info.Move, info.X, info.Y, info.Look);
@@ -148,6 +151,7 @@ public partial class MapTokenService : IMapTokenService
         var map = await _mapRepository.GetByIdAsync(mapToken.MapId)
             ?? throw new KeyNotFoundException("Mapa não encontrado.");
         map.EnsureNotDeleted();
+        await EnsureMapEditableAsync(map, userId);
         var look = info.Look ?? mapToken.Look;
         var layout = await _occupancy.LoadAsync(map);
         if (map.UserId != userId)
@@ -217,6 +221,7 @@ public partial class MapTokenService : IMapTokenService
     public async Task<MapTokenInfo> ChangeTokenAsync(long userId, long mapTokenId, MapTokenTokenInfo info)
     {
         var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
+        await EnsureMapEditableAsync(map, userId);
         await GetTokenAsync(info.TokenId);
         mapToken.ChangeToken(info.TokenId);
         return await PublishPieceAsync(map, userId, await MapToDtoAsync(await _repository.UpdateAsync(mapToken)));
@@ -229,6 +234,7 @@ public partial class MapTokenService : IMapTokenService
     public async Task DeleteAsync(long userId, long mapTokenId)
     {
         var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
+        await EnsureMapEditableAsync(map, userId);
         var occurrence = mapToken.MapNpcId is long mapNpcId ? await _mapNpcRepository.GetByIdAsync(mapNpcId) : null;
         occurrence?.Remove(DateTime.UtcNow);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -255,6 +261,16 @@ public partial class MapTokenService : IMapTokenService
         var mapToken = await _repository.GetByIdAsync(mapTokenId)
             ?? throw new KeyNotFoundException("Token do mapa não encontrado.");
         return (mapToken, await EnsureMapOwnerAsync(userId, mapToken.MapId));
+    }
+
+    /// <summary>
+    /// Pieces change only while the campaign plays — or, while it is being prepared, by the master (049).
+    /// </summary>
+    private async Task EnsureMapEditableAsync(Map map, long userId)
+    {
+        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
+            ?? throw new KeyNotFoundException("Campanha não encontrada.");
+        campaign.EnsureMapEditable(campaign.UserId == userId);
     }
 
     private async Task<Token> GetTokenAsync(long tokenId)

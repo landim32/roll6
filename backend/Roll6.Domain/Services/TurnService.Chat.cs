@@ -46,9 +46,12 @@ public partial class TurnService : IChatService
 
         var read = await _chatReadRepository.GetAsync(campaignId, userId);
         var firstUnread = await _repository.FirstUnreadAsync(campaignId, userId, read?.LastReadAt, isMaster);
+        // 050: open polls are pinned at the bottom of the chat, so they come with every page, old ones included.
+        var openPolls = await _repository.ListOpenPollsAsync(campaignId);
         return new ChatPageInfo
         {
             Items = await MapChatAsync(campaign, userId, page),
+            OpenPolls = await MapChatAsync(campaign, userId, openPolls),
             HasMore = hasMore,
             UnreadCount = await _repository.CountUnreadAsync(campaignId, userId, read?.LastReadAt, UNREAD_CAP, isMaster),
             FirstUnreadCursor = firstUnread == null ? null : CursorOf(firstUnread)
@@ -252,7 +255,7 @@ public partial class TurnService : IChatService
         var reactionNames = reactions.Count == 0 ? new Dictionary<long, string>()
             : (await _userRepository.ListByIdsAsync(reactions.Select(r => r.UserId).Distinct()))
                 .ToDictionary(u => u.UserId, u => NoticeTexts.FirstName(u.Name));
-        var polls = await LoadPollsAsync(page);
+        var polls = await LoadPollsAsync(campaign, page);
 
         return page.Select(t =>
         {
@@ -359,7 +362,8 @@ public partial class TurnService : IChatService
             item.CanDelete = t.IsValidAction && (isMaster || (ownerId.HasValue && ownerId == userId));
         if (item.WhisperHidden)
             item.CanDelete = false;
-        item.CanConvert = !currentTurn || !mayChange || t.CharacterId == null || item.WhisperHidden ? null
+        // 049: nothing turns into (or out of) an action while the campaign is not active.
+        item.CanConvert = campaign.Status != Enums.CampaignStatus.Active || !currentTurn || !mayChange || t.CharacterId == null || item.WhisperHidden ? null
             : t.TurnType == TurnType.Text && !t.IsDeleted ? "action"
             : t.IsValidAction ? "message"
             : null;
@@ -413,9 +417,9 @@ public partial class TurnService : IChatService
 
     private static string KeyOf(Turn t) => $"t{t.TurnId}";
 
-    private static string CursorOf(Turn t) => $"{t.CreatedAt.Ticks}_{t.TurnId}";
+    private static string CursorOf(Turn t) => $"{t.ChatAt.Ticks}_{t.TurnId}";
 
-    /// <summary>"{ticks}_{turnId}" → (created_at, id); null when absent, 400 when malformed.</summary>
+    /// <summary>"{ticks}_{turnId}" → (chat_at, id) (050); null when absent, 400 when malformed.</summary>
     private static (DateTime At, long Id)? ParseCursor(string? cursor, string field)
     {
         if (string.IsNullOrWhiteSpace(cursor))

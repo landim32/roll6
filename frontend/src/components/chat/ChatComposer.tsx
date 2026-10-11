@@ -21,6 +21,7 @@ import { useTurn } from '../../hooks/useTurn';
 import { chatService } from '../../Services/chatService';
 import { imageService } from '../../Services/imageService';
 import { audioExtension, canRecord } from '../../lib/audioFormat';
+import { isPlayable } from '../../lib/campaignStatus';
 
 /** Longest message (backend Turn.MAX_TEXT) and action (Turn.MAX_DESCRIPTION). */
 const MAX_TEXT = 4000;
@@ -61,7 +62,9 @@ export const ChatComposer = () => {
   const piece = participation
     ? mapTokens.find((p) => p.campaignCharacterId === participation.campaignCharacterId) ?? null
     : null;
-  const acting = mode === 'act' && !!participation;
+  // 049: only an active campaign takes actions (and pokes); the conversation always goes on.
+  const playable = isPlayable(currentCampaign?.status);
+  const acting = playable && mode === 'act' && !!participation;
   const max = acting ? MAX_ACTION : MAX_TEXT;
   const disabled = !speaker;
 
@@ -312,10 +315,12 @@ export const ChatComposer = () => {
                         <span className="stm-chat-attach-icon is-roll"><Dice5Icon size={24} /></span>
                         <span>{t('chat.rollOption')}</span>
                       </DropdownMenu.Item>
-                      <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => { void onPoke(); }}>
-                        <span className="stm-chat-attach-icon is-poke"><HandIndexIcon size={24} /></span>
-                        <span>{t('chat.pokeOption')}</span>
-                      </DropdownMenu.Item>
+                      {playable && (
+                        <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => { void onPoke(); }}>
+                          <span className="stm-chat-attach-icon is-poke"><HandIndexIcon size={24} /></span>
+                          <span>{t('chat.pokeOption')}</span>
+                        </DropdownMenu.Item>
+                      )}
                       <DropdownMenu.Item className="stm-chat-attach-item" onSelect={pickImage}>
                         <span className="stm-chat-attach-icon is-photo"><ImageIcon size={24} /></span>
                         <span>{t('chat.photoOption')}</span>
@@ -346,7 +351,7 @@ export const ChatComposer = () => {
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
-            {participation && (
+            {participation && playable && (
               // The action switch: on, the field turns red and sending records the turn's action; off, a message.
               <button type="button" className={`stm-chat-field-btn stm-chat-act-switch${acting ? ' is-on' : ''}`}
                 role="switch" aria-checked={acting} disabled={busy || (!acting && !piece)}

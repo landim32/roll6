@@ -1811,6 +1811,50 @@ END $EF$;
 
 DO $EF$
 BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011032007_AddCampaignStatus') THEN
+    ALTER TABLE campaigns ADD status integer NOT NULL DEFAULT 2;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011032007_AddCampaignStatus') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261011032007_AddCampaignStatus', '9.0.20');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011044452_AddTurnChatAt') THEN
+    ALTER TABLE turns ADD chat_at timestamp without time zone NOT NULL DEFAULT (now());
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011044452_AddTurnChatAt') THEN
+    UPDATE turns SET chat_at = created_at;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011044452_AddTurnChatAt') THEN
+    CREATE INDEX ix_turns_campaign_chat ON turns (campaign_id, chat_at, turn_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011044452_AddTurnChatAt') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261011044452_AddTurnChatAt', '9.0.20');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
     IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011054136_AddMapNpcInstances') THEN
     ALTER TABLE map_npcs ADD current_move integer NOT NULL DEFAULT 0;
     END IF;

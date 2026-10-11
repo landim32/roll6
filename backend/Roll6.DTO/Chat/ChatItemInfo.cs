@@ -167,6 +167,13 @@ public class ChatPollInfo
     [JsonPropertyName("totalVotes")]
     public int TotalVotes { get; set; }
 
+    /// <summary>
+    /// Some approved character has not voted yet (050; the master's vote doesn't count): the poll is pinned at the bottom
+    /// of the chat. False when the campaign has no approved character.
+    /// </summary>
+    [JsonPropertyName("open")]
+    public bool Open { get; set; }
+
     /// <summary>In the order the author wrote them.</summary>
     [JsonPropertyName("options")]
     public List<ChatPollOptionInfo> Options { get; set; } = new();
