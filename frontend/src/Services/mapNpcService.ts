@@ -1,4 +1,4 @@
-import type { MapNpcInfo, MapNpcInsertInfo } from '../types/npc';
+import type { MapNpcInfo, MapNpcInsertInfo, MapNpcUpdateInfo } from '../types/npc';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 const API_BASE = `${API_URL}/api/mapnpc`;
@@ -23,6 +23,18 @@ class MapNpcService {
   async create(data: MapNpcInsertInfo): Promise<MapNpcInfo> {
     const response = await fetch(API_BASE, { method: 'POST', headers: getHeaders(true), body: JSON.stringify(data) });
     return this.handleResponse<MapNpcInfo>(response);
+  }
+
+  /** Changes one instance (051): name, current life/energy, Deslocamento, status, posture. */
+  async update(mapNpcId: number, data: MapNpcUpdateInfo): Promise<MapNpcInfo> {
+    const response = await fetch(`${API_BASE}/${mapNpcId}`, { method: 'PUT', headers: getHeaders(true), body: JSON.stringify(data) });
+    return this.handleResponse<MapNpcInfo>(response);
+  }
+
+  /** Takes the instance off the map (051); the NPC stays in the campaign and the history stays in the chat. */
+  async remove(mapNpcId: number): Promise<void> {
+    const response = await fetch(`${API_BASE}/${mapNpcId}`, { method: 'DELETE', headers: getHeaders(true) });
+    await this.handleResponse<void>(response);
   }
 }
 

@@ -73,11 +73,15 @@ public class NpcService : INpcService
     public async Task<NpcInfo> UpdateAsync(long userId, long npcId, NpcInsertInfo info)
     {
         var npc = await GetOwnedAsync(userId, npcId);
+        var oldMove = npc.Move;
         npc.Update(info.TokenId, info.Name, info.Life, info.Energy, info.Move, info.Sheet, info.Image, info.Status, info.Posture);
         var token = await GetTokenAsync(npc.TokenId);
         var result = MapToDto(await _repository.UpdateAsync(npc), token);
         // Lower totals also lower the current values of the occurrences above them (026, like characters).
         await _mapNpcRepository.ClampVitalsAsync(npc.NpcId, npc.Life, npc.Energy);
+        // 051: instances whose Deslocamento the master never adjusted follow the new move (like 037 for characters).
+        if (npc.Move != oldMove)
+            await _mapNpcRepository.FollowMoveAsync(npc.NpcId, oldMove, npc.Move);
         // The campaign NPC cards show the library NPC (017) and the pieces show its totals, sheet and move (026).
         foreach (var campaignId in await _campaignNpcRepository.ListCampaignIdsByNpcAsync(npcId))
         {
@@ -93,6 +97,8 @@ public class NpcService : INpcService
         if (await _campaignNpcRepository.ExistsByNpcAsync(npcId))
             throw new ConflictException("O NPC está em uso em campanhas e não pode ser excluído.");
         await _turnRepository.DeleteByNpcAsync(npcId);
+        // 051: instances removed from maps stay as rows until their NPC leaves the library.
+        await _mapNpcRepository.DeleteByNpcAsync(npcId);
         await _repository.DeleteAsync(npcId);
     }
 

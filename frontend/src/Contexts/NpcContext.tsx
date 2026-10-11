@@ -11,7 +11,7 @@ import { useRealtime, useTableEvents } from '../hooks/useRealtime';
 import { TABLE_EVENT } from '../types/realtime';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { ListQuery, PagedList } from '../types/common';
-import type { CampaignNpcInfo, MapNpcInfo, NpcInfo, NpcInsertInfo } from '../types/npc';
+import type { CampaignNpcInfo, MapNpcInfo, MapNpcUpdateInfo, NpcInfo, NpcInsertInfo } from '../types/npc';
 
 interface NpcContextType {
   // State
@@ -33,6 +33,10 @@ interface NpcContextType {
   removeFromCampaign: (campaignNpcId: number) => Promise<void>;
   /** New occurrence (and piece) on the open campaign map. */
   placeOnMap: (npcId: number, x: number, y: number) => Promise<MapNpcInfo>;
+  /** Changes one instance on the map (051): name, current vitals, Deslocamento, status, posture. */
+  updateInstance: (mapNpcId: number, data: MapNpcUpdateInfo) => Promise<MapNpcInfo>;
+  /** Takes one instance off the map (051); the NPC stays in the campaign, its history stays in the chat. */
+  removeFromMap: (mapNpcId: number) => Promise<void>;
 }
 
 const NpcContext = createContext<NpcContextType | undefined>(undefined);
@@ -149,11 +153,24 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
     return result;
   }, [run, draft.mapId, refreshMapTokens]);
 
+  const updateInstance = useCallback(async (mapNpcId: number, data: MapNpcUpdateInfo) => {
+    const result = await run(() => mapNpcService.update(mapNpcId, data));
+    await refreshMapTokens();
+    return result;
+  }, [run, refreshMapTokens]);
+
+  const removeFromMap = useCallback(async (mapNpcId: number) => {
+    await run(() => mapNpcService.remove(mapNpcId));
+    await refreshMapTokens();
+    // The card counts the instances (051).
+    await refreshCampaignNpcs();
+  }, [run, refreshMapTokens, refreshCampaignNpcs]);
+
   const clearError = useCallback(() => setError(null), []);
 
   const value: NpcContextType = {
     campaignNpcs, loading, error, refreshCampaignNpcs, clearError,
-    searchMyNpcs, getNpc, createNpc, updateNpc, addToCampaign, removeFromCampaign, placeOnMap,
+    searchMyNpcs, getNpc, createNpc, updateNpc, addToCampaign, removeFromCampaign, placeOnMap, updateInstance, removeFromMap,
   };
   return <NpcContext.Provider value={value}>{children}</NpcContext.Provider>;
 };

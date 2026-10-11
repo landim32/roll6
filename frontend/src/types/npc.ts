@@ -52,6 +52,8 @@ export interface CampaignNpcInfo {
   life: number;
   energy: number;
   move: number;
+  /** Active instances across the campaign's maps (051): how many pieces "Retirar da campanha" removes. */
+  mapNpcCount: number;
   createdAt: string;
 }
 
@@ -76,12 +78,24 @@ export interface MapNpcInfo {
   status: string | null;
   /** Standing, down or out of combat (031). */
   posture: Posture;
+  /** Deslocamento of this instance (051). */
+  currentMove: number;
   tokenId: number | null;
   tokenImageUrl: string | null;
   x: number | null;
   y: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Changes to one instance (051): the whole set; `currentMove` null keeps it. */
+export interface MapNpcUpdateInfo {
+  name: string;
+  currentLife: number;
+  currentEnergy: number;
+  currentMove: number | null;
+  status: string | null;
+  posture: Posture | null;
 }
 
 /** New occurrence (and piece) of a campaign NPC on a free hex (column/row, odd-q). */

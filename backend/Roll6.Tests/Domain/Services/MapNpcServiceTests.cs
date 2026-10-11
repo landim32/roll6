@@ -44,6 +44,7 @@ public class MapNpcServiceTests
         _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
             .ReturnsAsync(new List<Npc> { new() { NpcId = NPC, UserId = MASTER, TokenId = 5, Name = "Goblin", Life = 7, Energy = 2 } });
         _campaignNpcRepository.Setup(r => r.GetAsync(CAMPAIGN, NPC)).ReturnsAsync(new CampaignNpc { CampaignNpcId = 3, CampaignId = CAMPAIGN, NpcId = NPC });
+        _repository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapNpc>());
         _repository.Setup(r => r.InsertAsync(It.IsAny<MapNpc>())).ReturnsAsync((MapNpc m) => { m.MapNpcId = _nextId++; return m; });
         _repository.Setup(r => r.UpdateAsync(It.IsAny<MapNpc>())).ReturnsAsync((MapNpc m) => m);
         _mapTokenRepository.Setup(r => r.InsertAsync(It.IsAny<MapToken>())).ReturnsAsync((MapToken t) => { _insertedPieces.Add(t); return t; });
@@ -160,15 +161,91 @@ public class MapNpcServiceTests
     }
 
     [Fact]
-    public async Task Delete_RemovesThePieceAndTheOccurrence()
+    public async Task Delete_RemovesThePiece_MarksTheInstanceRemoved_AndKeepsItsEntries()
     {
-        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin" });
+        var instance = new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin" };
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(instance);
 
         await _service.DeleteAsync(MASTER, 90);
 
         _mapTokenRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.Is<IEnumerable<long>>(ids => ids.Single() == 90)), Times.Once);
-        _repository.Verify(r => r.DeleteAsync(90), Times.Once);
+        _repository.Verify(r => r.UpdateAsync(It.Is<MapNpc>(m => m.MapNpcId == 90 && m.IsRemoved)), Times.Once);
+        _repository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
+        _turnRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.MapId == MAP)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Once);
     }
+
+    [Fact]
+    public async Task RemovedInstance_IsNotFoundForUpdateAndDelete()
+    {
+        var removed = new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", RemovedAt = DateTime.UtcNow };
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(removed);
+
+        await _service.Invoking(s => s.DeleteAsync(MASTER, 90)).Should().ThrowAsync<KeyNotFoundException>();
+        await _service.Invoking(s => s.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "x", CurrentLife = 1, CurrentEnergy = 1 }))
+            .Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    // ---- 051: numbered names per map ----
+
+    private void InstancesOnMap(params (long NpcId, string Name)[] instances) =>
+        _repository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(instances
+            .Select((i, k) => new MapNpc { MapNpcId = 500 + k, MapId = MAP, NpcId = i.NpcId, Name = i.Name }).ToList());
+
+    [Fact]
+    public async Task Create_SecondOfTheSameNpcOnTheMap_IsNumbered()
+    {
+        InstancesOnMap((NPC, "Goblin"));
+
+        var result = await _service.CreateAsync(MASTER, At(2, 3));
+
+        result.Name.Should().Be("Goblin 2");
+        _insertedPieces.Single().Name.Should().Be("Goblin 2");
+    }
+
+    [Fact]
+    public async Task Create_OtherNpcsOnTheMap_DoNotCount()
+    {
+        InstancesOnMap((99, "Goblin"), (99, "Orc"));
+
+        (await _service.CreateAsync(MASTER, At(2, 3))).Name.Should().Be("Goblin");
+    }
+
+    [Fact]
+    public async Task Create_ReusesAFreedNumber()
+    {
+        InstancesOnMap((NPC, "Goblin"), (NPC, "Goblin 3"));
+
+        (await _service.CreateAsync(MASTER, At(2, 3))).Name.Should().Be("Goblin 2");
+    }
+
+    // ---- 051: Deslocamento per instance ----
+
+    [Fact]
+    public async Task Create_CopiesTheNpcMove()
+    {
+        _npcRepository.Setup(r => r.GetByIdAsync(NPC)).ReturnsAsync(new Npc { NpcId = NPC, UserId = MASTER, TokenId = 5, Name = "Goblin", Life = 7, Energy = 2, Move = 6 });
+
+        (await _service.CreateAsync(MASTER, At(2, 3))).CurrentMove.Should().Be(6);
+    }
+
+    [Fact]
+    public async Task Update_CurrentMove_IsSavedAndLogged_NullKeeps()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2, CurrentMove = 6 });
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        var kept = await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2 });
+        kept.CurrentMove.Should().Be(6);
+        recorded.Should().BeNull();
+
+        var changed = await _service.UpdateAsync(MASTER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2, CurrentMove = 2 });
+        changed.CurrentMove.Should().Be(2);
+        recorded!.Changes!.Single().Should().BeEquivalentTo(new TurnChange("currentMove", "6", "2"));
+    }
+
 
     // ---- 024: NPC occurrence updates in the turn ----
 

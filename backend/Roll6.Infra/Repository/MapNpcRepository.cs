@@ -28,7 +28,7 @@ public class MapNpcRepository : IMapNpcRepository<MapNpc>
     public async Task<List<MapNpc>> ListByMapAsync(long mapId)
     {
         return await _context.MapNpcs.AsNoTracking()
-            .Where(e => e.MapId == mapId)
+            .Where(e => e.MapId == mapId && e.RemovedAt == null)
             .OrderBy(e => e.Name).ThenBy(e => e.MapNpcId)
             .ToListAsync();
     }
@@ -36,9 +36,30 @@ public class MapNpcRepository : IMapNpcRepository<MapNpc>
     public async Task<List<long>> ListIdsByCampaignAndNpcAsync(long campaignId, long npcId)
     {
         return await _context.MapNpcs
-            .Where(e => e.NpcId == npcId && _context.Maps.Any(m => m.MapId == e.MapId && m.CampaignId == campaignId))
+            .Where(e => e.NpcId == npcId && e.RemovedAt == null && _context.Maps.Any(m => m.MapId == e.MapId && m.CampaignId == campaignId))
             .Select(e => e.MapNpcId)
             .ToListAsync();
+    }
+
+    public async Task<Dictionary<long, int>> CountByCampaignAsync(long campaignId)
+    {
+        return await _context.MapNpcs
+            .Where(e => e.RemovedAt == null && _context.Maps.Any(m => m.MapId == e.MapId && m.CampaignId == campaignId))
+            .GroupBy(e => e.NpcId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.Key, g => g.Count);
+    }
+
+    public async Task FollowMoveAsync(long npcId, int oldMove, int newMove)
+    {
+        await _context.MapNpcs
+            .Where(e => e.NpcId == npcId && e.RemovedAt == null && e.CurrentMove == oldMove)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.CurrentMove, newMove));
+    }
+
+    public async Task DeleteByNpcAsync(long npcId)
+    {
+        await _context.MapNpcs.Where(e => e.NpcId == npcId).ExecuteDeleteAsync();
     }
 
     public async Task<MapNpc> InsertAsync(MapNpc entity)

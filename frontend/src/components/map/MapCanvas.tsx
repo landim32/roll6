@@ -43,8 +43,10 @@ export type TokenPickRequest =
 
 interface MapCanvasProps {
   onPickToken: (request: TokenPickRequest) => void;
-  /** Asks to remove a piece (the page confirms first). */
-  onDeleteToken: (target: { mapTokenId: number; name: string }) => void;
+  /** Asks to remove a piece (the page confirms first); `mapNpcId` set = an NPC instance leaving the map (051). */
+  onDeleteToken: (target: { mapTokenId: number; name: string; mapNpcId: number | null }) => void;
+  /** "Editar NPC" on an NPC piece (051): the page opens the instance form. */
+  onEditNpc: (piece: MapTokenInfo) => void;
   /** "Agir" on a piece (the page opens the action modal, 016). */
   onAct: (target: ActTarget) => void;
   /** "Resetar turno" on a piece (the page confirms first, 016). */
@@ -66,7 +68,7 @@ const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y ==
  * The hex under the mouse is highlighted; the master clicks a hex for its menu and drops party cards
  * on hexes (011).
  */
-export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, picking = false }: MapCanvasProps) => {
+export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onResetTurn, picking = false }: MapCanvasProps) => {
   const { t } = useTranslation();
   const { draft, hexSize, view, panBy, zoomIn, zoomOut, centerOn, resizeMode, canEdit, setImageLayout } = useMapEditor();
   const { mapTokens, canPlace, canPlaceOwn, placeCharacter, moveToken, setPosture } = useMapToken();
@@ -403,6 +405,8 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
           top={menu.top}
           token={menuToken ? { name: menuToken.name, imageUrl: menuToken.upImageUrl } : null}
           canManage={canPlace}
+          onEditNpc={menuToken && menuToken.mapNpcId !== null ? () => onEditNpc(menuToken) : undefined}
+          deleteLabel={menuToken && menuToken.mapNpcId !== null ? t('hexMenu.removeNpc') : undefined}
           onMove={menuToken && canMove(menuToken) ? () => movement.start(menuToken) : undefined}
           onAct={menuToken && canTakeTurn(menuToken)
             ? () => onAct({
@@ -429,7 +433,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onAct, onResetTurn, pick
           onDelete={() => {
             if (!menuToken) return;
             setPickedHex(menu.hex);
-            onDeleteToken({ mapTokenId: menuToken.mapTokenId, name: menuToken.name });
+            onDeleteToken({ mapTokenId: menuToken.mapTokenId, name: menuToken.name, mapNpcId: menuToken.mapNpcId });
           }}
         />
       )}

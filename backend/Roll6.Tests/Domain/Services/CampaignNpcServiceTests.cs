@@ -40,6 +40,8 @@ public class CampaignNpcServiceTests
         _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token> { new() { TokenId = 5 } });
         _repository.Setup(r => r.InsertAsync(It.IsAny<CampaignNpc>())).ReturnsAsync((CampaignNpc c) => c);
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
+        _mapNpcRepository.Setup(r => r.CountByCampaignAsync(It.IsAny<long>())).ReturnsAsync(new Dictionary<long, int>());
+        _mapNpcRepository.Setup(r => r.UpdateAsync(It.IsAny<MapNpc>())).ReturnsAsync((MapNpc m) => m);
         _service = new CampaignNpcService(_repository.Object, _campaignRepository.Object, _npcRepository.Object, _tokenRepository.Object,
             _mapNpcRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object,
             _campaignCharacterRepository.Object, _notifier.Object);
@@ -91,17 +93,31 @@ public class CampaignNpcServiceTests
     }
 
     [Fact]
-    public async Task Remove_DeletesItsOccurrencesAndPiecesFirst()
+    public async Task Remove_TakesItsOccurrencesOffTheMaps_KeepingTheirEntries()
     {
         _repository.Setup(r => r.GetByIdAsync(3)).ReturnsAsync(new CampaignNpc { CampaignNpcId = 3, CampaignId = CAMPAIGN, NpcId = NPC });
         var occurrences = new List<long> { 90, 91 };
         _mapNpcRepository.Setup(r => r.ListIdsByCampaignAndNpcAsync(CAMPAIGN, NPC)).ReturnsAsync(occurrences);
+        var instances = occurrences.Select(id => new MapNpc { MapNpcId = id, MapId = 30, NpcId = NPC, Name = $"Goblin {id}" }).ToList();
+        _mapNpcRepository.Setup(r => r.ListByIdsAsync(occurrences)).ReturnsAsync(instances);
 
         await _service.RemoveAsync(MASTER, 3);
 
         _mapTokenRepository.Verify(r => r.DeleteByMapNpcIdsAsync(occurrences), Times.Once);
-        _mapNpcRepository.Verify(r => r.DeleteRangeAsync(occurrences), Times.Once);
+        instances.Should().OnlyContain(i => i.IsRemoved);
+        _mapNpcRepository.Verify(r => r.UpdateAsync(It.Is<MapNpc>(m => m.IsRemoved)), Times.Exactly(2));
+        _mapNpcRepository.Verify(r => r.DeleteRangeAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
+        _turnRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
         _repository.Verify(r => r.DeleteAsync(3), Times.Once);
+    }
+
+    [Fact]
+    public async Task List_CarriesHowManyInstancesEachNpcHasOnTheMaps()
+    {
+        _repository.Setup(r => r.ListByCampaignAsync(CAMPAIGN)).ReturnsAsync(new List<CampaignNpc> { new() { CampaignNpcId = 3, CampaignId = CAMPAIGN, NpcId = NPC } });
+        _mapNpcRepository.Setup(r => r.CountByCampaignAsync(CAMPAIGN)).ReturnsAsync(new Dictionary<long, int> { [NPC] = 3 });
+
+        (await _service.ListByCampaignAsync(MASTER, CAMPAIGN)).Single().MapNpcCount.Should().Be(3);
     }
 
     [Fact]

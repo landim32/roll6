@@ -35,6 +35,10 @@ public class CampaignNpcInfo
     [JsonPropertyName("move")]
     public int Move { get; set; }
 
+    /// <summary>Active instances of the NPC across the campaign's maps (051): how many pieces "Retirar da campanha" removes.</summary>
+    [JsonPropertyName("mapNpcCount")]
+    public int MapNpcCount { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 }

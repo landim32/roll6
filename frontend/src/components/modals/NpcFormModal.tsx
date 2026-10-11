@@ -130,7 +130,7 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
         open={confirmRemove}
         onOpenChange={setConfirmRemove}
         title={t('npcs.removeTitle')}
-        message={npc ? t('npcs.removeMessage', { name: npc.name }) : ''}
+        message={npc ? t('npcs.removeMessage', { name: npc.name, count: npc.mapNpcCount }) : ''}
         confirmLabel={t('npcs.remove')}
         onConfirm={onConfirmRemove}
         danger

@@ -4,11 +4,15 @@ import { SidePanel } from './SidePanel';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useNpc } from '../../hooks/useNpc';
+import type { MapTokenInfo } from '../../types/mapToken';
 import type { CampaignNpcInfo } from '../../types/npc';
 
 interface NpcPanelProps {
   onAdd: () => void;
   onEdit: (npc: CampaignNpcInfo) => void;
+  /** "Editar NPC" / "Retirar do mapa" on an instance row (051, master only). */
+  onEditInstance: (piece: MapTokenInfo) => void;
+  onRemoveInstance: (piece: MapTokenInfo) => void;
   /** A fixed column beside the chat instead of a panel over the map. */
   docked?: boolean;
 }
@@ -17,7 +21,7 @@ interface NpcPanelProps {
  * Right-hand panel with the NPCs of the current campaign (014). Mirrors the party panel. The master edits,
  * drags and adds NPCs ("Incluir NPC" closes the list); approved players only see the cards.
  */
-export const NpcPanel = ({ onAdd, onEdit, docked = false }: NpcPanelProps) => {
+export const NpcPanel = ({ onAdd, onEdit, onEditInstance, onRemoveInstance, docked = false }: NpcPanelProps) => {
   const { t } = useTranslation();
   const { currentCampaign, isMaster } = useCampaign();
   const { campaignNpcs } = useNpc();
@@ -40,7 +44,14 @@ export const NpcPanel = ({ onAdd, onEdit, docked = false }: NpcPanelProps) => {
     >
       {campaignNpcs.length === 0 && <li className="text-body-secondary small px-1">{t('npcs.empty')}</li>}
       {campaignNpcs.map((npc) => (
-        <NpcCard key={npc.campaignNpcId} npc={npc} onEdit={isMaster ? () => onEdit(npc) : undefined} draggable={isMaster && canPlace} />
+        <NpcCard
+          key={npc.campaignNpcId}
+          npc={npc}
+          onEdit={isMaster ? () => onEdit(npc) : undefined}
+          onEditInstance={isMaster ? onEditInstance : undefined}
+          onRemoveInstance={isMaster ? onRemoveInstance : undefined}
+          draggable={isMaster && canPlace}
+        />
       ))}
     </SidePanel>
   );

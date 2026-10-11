@@ -6,6 +6,8 @@ import { MapCanvas } from '../components/map/MapCanvas';
 import type { TokenPickRequest } from '../components/map/MapCanvas';
 import { MapControls } from '../components/map/MapControls';
 import { NpcPanel } from '../components/map/NpcPanel';
+import { MapNpcFormModal } from '../components/npcs/MapNpcFormModal';
+import type { MapTokenInfo } from '../types/mapToken';
 import { PartyPanel } from '../components/map/PartyPanel';
 import { TopMenu } from '../components/menu/TopMenu';
 import { ActModal } from '../components/modals/ActModal';
@@ -70,8 +72,10 @@ export const MainPage = () => {
   /** "Incluir NPC" window and the NPC whose pencil was clicked (014). */
   const [npcPickerOpen, setNpcPickerOpen] = useState(false);
   const [editingNpc, setEditingNpc] = useState<CampaignNpcInfo | null>(null);
-  /** Piece waiting for the delete confirmation. */
-  const [toDelete, setToDelete] = useState<{ mapTokenId: number; name: string } | null>(null);
+  /** Piece waiting for the delete confirmation; with `mapNpcId` it is an NPC instance leaving the map (051). */
+  const [toDelete, setToDelete] = useState<{ mapTokenId: number; name: string; mapNpcId: number | null } | null>(null);
+  /** NPC instance open in "Editar NPC" (051). */
+  const [editingInstance, setEditingInstance] = useState<MapTokenInfo | null>(null);
   /** Piece acting ("Agir") and piece waiting for the "Resetar turno" confirmation (016). */
   const [acting, setActing] = useState<ActTarget | null>(null);
   const [toReset, setToReset] = useState<{ mapTokenId: number; name: string } | null>(null);
@@ -119,11 +123,15 @@ export const MainPage = () => {
     }
   };
 
+  /** The X of an instance row (051): same confirmation as "Retirar do mapa" on the piece. */
+  const askRemoveInstance = (piece: MapTokenInfo) =>
+    setToDelete({ mapTokenId: piece.mapTokenId, name: piece.name, mapNpcId: piece.mapNpcId });
+
   const onConfirmDelete = async () => {
     if (!toDelete) return;
     try {
       await deleteToken(toDelete.mapTokenId);
-      toast.success(t('toast.mapTokenDeleted', { name: toDelete.name }));
+      toast.success(t(toDelete.mapNpcId !== null ? 'toast.npcRemovedFromMap' : 'toast.mapTokenDeleted', { name: toDelete.name }));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
       throw err;
@@ -161,13 +169,14 @@ export const MainPage = () => {
             <MapCanvas
               onPickToken={setTokenPick}
               onDeleteToken={setToDelete}
+              onEditNpc={setEditingInstance}
               onAct={setActing}
               onResetTurn={setToReset}
               picking={tokenPick !== null || toDelete !== null}
             />
           )}
           <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })} />
-          <NpcPanel onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} />
+          <NpcPanel onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />
           <MapControls onOpenImage={openImage} />
           <GridSizeFooter onEditGrid={() => setGridOpen(true)} />
         </div>
@@ -178,7 +187,7 @@ export const MainPage = () => {
           <div className="stm-chat-body">
             {!showMap && <PartyPanel docked={desktop} onOpen={(participation, mode) => setEditing({ participation, mode })} />}
             <ChatPanel />
-            {!showMap && <NpcPanel docked={desktop} onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} />}
+            {!showMap && <NpcPanel docked={desktop} onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />}
           </div>
         </div>
       )}
@@ -207,12 +216,13 @@ export const MainPage = () => {
       />
       <NpcPickerModal open={npcPickerOpen} onOpenChange={setNpcPickerOpen} />
       <NpcFormModal npc={editingNpc} onClose={() => setEditingNpc(null)} />
+      <MapNpcFormModal piece={editingInstance} onClose={() => setEditingInstance(null)} />
       <ConfirmModal
         open={toDelete !== null}
         onOpenChange={(o) => { if (!o) setToDelete(null); }}
-        title={t('mapTokens.deleteTitle')}
-        message={toDelete ? t('mapTokens.deleteMessage', { name: toDelete.name }) : ''}
-        confirmLabel={t('hexMenu.deleteToken')}
+        title={t(toDelete?.mapNpcId !== null && toDelete !== null ? 'npcs.removeFromMapTitle' : 'mapTokens.deleteTitle')}
+        message={toDelete ? t(toDelete.mapNpcId !== null ? 'npcs.removeFromMapMessage' : 'mapTokens.deleteMessage', { name: toDelete.name }) : ''}
+        confirmLabel={t(toDelete?.mapNpcId !== null && toDelete !== null ? 'hexMenu.removeNpc' : 'hexMenu.deleteToken')}
         onConfirm={onConfirmDelete}
         danger
       />

@@ -213,7 +213,8 @@ public static class CampaignTools
     [Description("""
         What it does: lists the NPCs available in a campaign (the master's library NPCs added to it).
         Who can use it: the master and approved participants.
-        Returns: [{ campaignNpcId, campaignId, npcId, name, tokenId, tokenImageUrl, imageUrl, life, energy, move, createdAt }].
+        Returns: [{ campaignNpcId, campaignId, npcId, name, tokenId, tokenImageUrl, imageUrl, life, energy, move, mapNpcCount
+        (active occurrences across the campaign's maps), createdAt }].
         Common errors: 403 not allowed, 404 campaign not found.
         Related tools: add_npc_to_campaign, place_npc_on_map, list_map_npcs.
         """)]

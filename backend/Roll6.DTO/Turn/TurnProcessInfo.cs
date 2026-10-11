@@ -64,6 +64,10 @@ public class TurnProcessCharacterInfo : TurnProcessPieceInfo
 
 public class TurnProcessNpcInfo : TurnProcessPieceInfo
 {
+    /// <summary>Deslocamento of the occurrence (051, ≥ 0); omitted keeps it.</summary>
+    [JsonPropertyName("currentMove")]
+    public int? CurrentMove { get; set; }
+
     [JsonPropertyName("mapNpcId")]
     public long MapNpcId { get; set; }
 }

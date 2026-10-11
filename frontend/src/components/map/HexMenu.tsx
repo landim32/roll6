@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
-import { CheckIcon, MoveIcon, PlusIcon, SpeechIcon, SwapIcon, TrashIcon, UndoIcon } from '../ui/icons';
+import { CheckIcon, MoveIcon, PencilIcon, PlusIcon, SpeechIcon, SwapIcon, TrashIcon, UndoIcon } from '../ui/icons';
 import { POSTURES } from '../../types/mapToken';
 import type { Posture } from '../../types/mapToken';
 
@@ -27,6 +27,10 @@ interface HexMenuProps {
   onPosture?: (posture: Posture) => void;
   /** Master: add/change/delete tokens. Players only get "Mover" on their own characters. */
   canManage?: boolean;
+  /** "Editar NPC" (051): the instance form of an NPC piece; absent for other pieces and for players. */
+  onEditNpc?: () => void;
+  /** Text of the destructive item: "Excluir" for tokens, "Retirar do mapa" for NPC pieces (051). */
+  deleteLabel?: string;
   onClose: () => void;
 }
 
@@ -43,7 +47,7 @@ const MARGIN = 8;
  */
 export const HexMenu = ({
   left, top, token = null, onAdd, onChange, onDelete, onMove, onAct, onResetTurn, posture = null, onPosture, canManage = true,
-  onClose,
+  onEditNpc, deleteLabel, onClose,
 }: HexMenuProps) => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -139,12 +143,18 @@ export const HexMenu = ({
       )}
       {!canManage ? null : token ? (
         <>
+          {onEditNpc && (
+            <button type="button" className="stm-float-menu-item" role="menuitem" onClick={choose(onEditNpc)}>
+              <span>{t('hexMenu.editNpc')}</span>
+              <PencilIcon size={18} />
+            </button>
+          )}
           <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove && !onAct} onClick={choose(onChange)}>
             <span>{t('hexMenu.changeToken')}</span>
             <SwapIcon size={18} />
           </button>
           <button type="button" className="stm-float-menu-item is-destructive" role="menuitem" onClick={choose(onDelete)}>
-            <span>{t('hexMenu.deleteToken')}</span>
+            <span>{deleteLabel ?? t('hexMenu.deleteToken')}</span>
             <TrashIcon size={18} />
           </button>
         </>

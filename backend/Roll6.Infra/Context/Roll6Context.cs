@@ -321,6 +321,9 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CurrentEnergy).HasColumnName("current_energy");
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(260);
             entity.Property(e => e.Posture).HasColumnName("posture").HasConversion<int>().HasDefaultValue(Posture.Standing).HasSentinel((Posture)0);
+            // Instances (051): own Deslocamento and a soft removal that keeps the turn entries named.
+            entity.Property(e => e.CurrentMove).HasColumnName("current_move");
+            entity.Property(e => e.RemovedAt).HasColumnName("removed_at").HasColumnType(TIMESTAMP);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.MapId)

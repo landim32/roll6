@@ -88,10 +88,15 @@ public class MapNpcService : IMapNpcService
         (await _occupancy.LoadAsync(map)).EnsureFits(info.X, info.Y, info.Look ?? 0,
             await _occupancy.SpaceOfTokenAsync(npc.TokenId, npc.Posture), null);
 
+        // 051: "Guarda", then "Guarda 2", "Guarda 3"… among the active instances of this NPC on this map.
+        var instance = MapNpc.FromNpc(map.MapId, npc);
+        var namesInUse = (await _repository.ListByMapAsync(map.MapId)).Where(m => m.NpcId == npc.NpcId).Select(m => m.Name);
+        instance.Name = MapNpc.NextName(npc.Name, namesInUse);
+
         MapNpc saved = null!;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            saved = await _repository.InsertAsync(MapNpc.FromNpc(map.MapId, npc));
+            saved = await _repository.InsertAsync(instance);
             await _mapTokenRepository.InsertAsync(MapToken.PlaceNpc(map.MapId, npc.TokenId, saved.MapNpcId, saved.Name, info.X, info.Y, info.Look));
         });
         await PublishPiecesChangedAsync(map, userId);
@@ -101,10 +106,10 @@ public class MapNpcService : IMapNpcService
     public async Task<MapNpcInfo> UpdateAsync(long userId, long mapNpcId, MapNpcUpdateInfo info)
     {
         var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
-        var before = (mapNpc.Name, mapNpc.CurrentLife, mapNpc.CurrentEnergy, mapNpc.Status, mapNpc.Posture);
+        var before = (mapNpc.Name, mapNpc.CurrentLife, mapNpc.CurrentEnergy, mapNpc.Status, mapNpc.Posture, mapNpc.CurrentMove);
         var npc = await _npcRepository.GetByIdAsync(mapNpc.NpcId)
             ?? throw new KeyNotFoundException("NPC não encontrado.");
-        mapNpc.Update(info.Name, info.CurrentLife, info.CurrentEnergy, info.Status, npc.Life, npc.Energy);
+        mapNpc.Update(info.Name, info.CurrentLife, info.CurrentEnergy, info.Status, npc.Life, npc.Energy, info.CurrentMove);
         if (info.Posture is int posture)
             mapNpc.ChangePosture(posture);
 
@@ -113,6 +118,7 @@ public class MapNpcService : IMapNpcService
             ("name", before.Name, mapNpc.Name),
             ("currentLife", before.CurrentLife, mapNpc.CurrentLife),
             ("currentEnergy", before.CurrentEnergy, mapNpc.CurrentEnergy),
+            ("currentMove", before.CurrentMove, mapNpc.CurrentMove),
             ("status", before.Status, mapNpc.Status),
             ("posture", (int)before.Posture, (int)mapNpc.Posture));
         Turn? turn = null;
@@ -137,15 +143,18 @@ public class MapNpcService : IMapNpcService
         return result;
     }
 
-    /// <summary>Removes the occurrence and its piece.</summary>
+    /// <summary>
+    /// Takes the instance off the map (051): its piece goes, the row is marked removed and its turn entries stay — the
+    /// chat and the summary keep naming it. The NPC stays in the campaign.
+    /// </summary>
     public async Task DeleteAsync(long userId, long mapNpcId)
     {
         var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
+        mapNpc.Remove(DateTime.UtcNow);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _mapTokenRepository.DeleteByMapNpcIdsAsync(new[] { mapNpc.MapNpcId });
-            await _turnRepository.DeleteByMapNpcIdsAsync(new[] { mapNpc.MapNpcId });
-            await _repository.DeleteAsync(mapNpc.MapNpcId);
+            await _repository.UpdateAsync(mapNpc);
         });
         await PublishPiecesChangedAsync(map, userId);
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, map.CampaignId, userId));
@@ -157,8 +166,9 @@ public class MapNpcService : IMapNpcService
 
     private async Task<(MapNpc MapNpc, Map Map)> GetOwnedAsync(long userId, long mapNpcId)
     {
-        var mapNpc = await _repository.GetByIdAsync(mapNpcId)
-            ?? throw new KeyNotFoundException("NPC do mapa não encontrado.");
+        var mapNpc = await _repository.GetByIdAsync(mapNpcId);
+        if (mapNpc == null || mapNpc.IsRemoved)
+            throw new KeyNotFoundException("NPC do mapa não encontrado.");
         return (mapNpc, await GetMasteredMapAsync(userId, mapNpc.MapId));
     }
 
@@ -213,6 +223,7 @@ public class MapNpcService : IMapNpcService
                 TotalEnergy = npc?.Energy ?? m.CurrentEnergy,
                 Status = m.Status,
                 Posture = (int)m.Posture,
+                CurrentMove = m.CurrentMove,
                 TokenId = piece?.TokenId,
                 TokenImageUrl = _imageStorage.GetUrl(token?.UpImage),
                 X = piece?.X,

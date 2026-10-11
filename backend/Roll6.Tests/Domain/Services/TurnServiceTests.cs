@@ -722,8 +722,26 @@ public class TurnServiceTests
         new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, X = 3 } } }, "characters[0].x" },
         new object[] { new TurnProcessInfo { Narration = new string('a', Turn.MAX_NARRATION + 1) }, "narration" },
         new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, Posture = 5 } } }, "characters[0].posture" },
-        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, CurrentMove = -1 } } }, "characters[0].currentMove" }
+        new object[] { new TurnProcessInfo { Characters = new() { new TurnProcessCharacterInfo { CharacterId = ARIA, CurrentMove = -1 } } }, "characters[0].currentMove" },
+        new object[] { new TurnProcessInfo { Npcs = new() { new TurnProcessNpcInfo { MapNpcId = MAP_NPC, CurrentMove = -1 } } }, "npcs[0].currentMove" }
     };
+
+    [Fact]
+    public async Task Process_NpcCurrentMove_IsAppliedAndLogged()
+    {
+        var (_, _, _, _, goblin1) = Table();
+        goblin1.CurrentMove = 6;
+        var inserted = new List<Turn>();
+        _repository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => inserted.Add(t)).ReturnsAsync((Turn t) => t);
+
+        await _service.ProcessAsync(MASTER, CAMPAIGN, new TurnProcessInfo
+        {
+            Npcs = new() { new TurnProcessNpcInfo { MapNpcId = MAP_NPC, CurrentMove = 2 } }
+        });
+
+        goblin1.CurrentMove.Should().Be(2);
+        inserted.First(t => t.TurnType == TurnType.CharacterUpdate).Changes!.Single().Should().BeEquivalentTo(new TurnChange("currentMove", "6", "2"));
+    }
 
     [Theory]
     [MemberData(nameof(InvalidBatches))]
