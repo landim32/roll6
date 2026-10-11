@@ -10,7 +10,8 @@ public interface IChatPollRepository<TOption, TVote> where TOption : class where
 
     /// <summary>
     /// Replaces the voter's vote on the poll (characterId null = the master's): removes the one there is and saves
-    /// <paramref name="vote"/> when given, in one transaction.
+    /// <paramref name="vote"/> when given, and moves the poll's place in the chat to <paramref name="chatAt"/> (050), in
+    /// one transaction.
     /// </summary>
-    Task SetVoteAsync(long turnId, long? characterId, TVote? vote);
+    Task SetVoteAsync(long turnId, long? characterId, TVote? vote, DateTime chatAt);
 }

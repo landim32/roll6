@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyVote, cleanOptions, isPollDirty, isPollValid, moveOption, myVote, nextVote, normalizeOption, percent, pollCopyText,
+  applyVote, cleanOptions, isPollOpen, isPollDirty, isPollValid, moveOption, myVote, nextVote, normalizeOption, percent, pollCopyText,
   removeOption, validatePoll, votesByRank, withTrailingEmpty, POLL_LIMITS,
 } from './chatPoll';
 import type { ChatPollInfo } from '../types/chat';
@@ -79,5 +79,23 @@ describe('votes', () => {
     expect(percent(1, 3)).toBe(33);
     expect(percent(0, 0)).toBe(0);
     expect(pollCopyText(poll())).toBe('Para onde vamos?\n• Floresta — 1 voto\n• Caverna — 1 voto\n• Vila — 0 votos');
+  });
+});
+
+describe('050: isPollOpen', () => {
+  it('is open while an approved character has not voted', () => {
+    expect(isPollOpen(poll(), [80, 81])).toBe(true);
+    expect(isPollOpen(poll(), [80])).toBe(false);
+  });
+
+  it('ignores the master and needs someone to be missing', () => {
+    const onlyMaster = { ...poll(), options: [{ optionId: 1, text: 'A', votes: 1, voters: [{ characterId: null, name: 'Mestre', imageUrl: null }] }] };
+    expect(isPollOpen(onlyMaster, [80])).toBe(true);
+    expect(isPollOpen(poll(), [])).toBe(false);
+  });
+
+  it('falls back to the server without the party', () => {
+    expect(isPollOpen({ ...poll(), open: true })).toBe(true);
+    expect(isPollOpen(poll())).toBe(false);
   });
 });

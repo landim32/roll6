@@ -186,14 +186,26 @@ public class TurnRepository : ITurnRepository<Turn>
         }
         if (after is { } a)
         {
-            return await query.Where(e => e.CreatedAt > a.At || (e.CreatedAt == a.At && e.TurnId > a.Id))
-                .OrderBy(e => e.CreatedAt).ThenBy(e => e.TurnId).Take(limit).ToListAsync();
+            return await query.Where(e => e.ChatAt > a.At || (e.ChatAt == a.At && e.TurnId > a.Id))
+                .OrderBy(e => e.ChatAt).ThenBy(e => e.TurnId).Take(limit).ToListAsync();
         }
         if (before is { } b)
-            query = query.Where(e => e.CreatedAt < b.At || (e.CreatedAt == b.At && e.TurnId < b.Id));
-        var page = await query.OrderByDescending(e => e.CreatedAt).ThenByDescending(e => e.TurnId).Take(limit).ToListAsync();
+            query = query.Where(e => e.ChatAt < b.At || (e.ChatAt == b.At && e.TurnId < b.Id));
+        var page = await query.OrderByDescending(e => e.ChatAt).ThenByDescending(e => e.TurnId).Take(limit).ToListAsync();
         page.Reverse();
         return page;
+    }
+
+    public async Task<List<Turn>> ListOpenPollsAsync(long campaignId)
+    {
+        var approved = _context.CampaignCharacters
+            .Where(p => p.CampaignId == campaignId && p.Status == CampaignCharacterStatus.Approved)
+            .Select(p => p.CharacterId);
+        return await _context.Turns.AsNoTracking()
+            .Where(e => e.CampaignId == campaignId && e.TurnType == TurnType.Poll && e.DeletedAt == null
+                && approved.Any(c => !_context.ChatPollVotes.Any(v => v.TurnId == e.TurnId && v.CharacterId == c)))
+            .OrderBy(e => e.TurnId)
+            .ToListAsync();
     }
 
     public async Task<List<Turn>> ListLogByTurnsAsync(long campaignId, IEnumerable<int> turnNos)

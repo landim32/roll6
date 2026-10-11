@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  authorLabel, chatLabel, compareCursors, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
+  authorLabel, chatLabel, compareCursors, pinOpenPolls, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
 import { CHAT_KIND } from '../types/chat';
@@ -201,5 +201,43 @@ describe('047: whispers', () => {
     const masked = item(10, { kind: CHAT_KIND.action, characterId: 80, turnNo: 3, whisperHidden: true, description: 'está sussurrando!' });
     const viewed = permissionsFor(masked, { userId: 1, isMaster: true, currentTurn: 3, ownerOf: () => 2 });
     expect([viewed.canReply, viewed.canReact, viewed.canDelete, viewed.canConvert]).toEqual([false, false, false, null]);
+  });
+});
+
+describe('050: open polls pinned at the bottom', () => {
+  const poll = (id: number, open: boolean, over: Partial<ChatItemInfo> = {}) =>
+    item(id, { kind: CHAT_KIND.poll, poll: { question: `q${id}`, totalVotes: 0, open, options: [] }, ...over });
+  const isOpen = (i: ChatItemInfo) => i.poll?.open ?? false;
+
+  it('takes the open polls out of the flow, oldest first', () => {
+    const { flow, pinned } = pinOpenPolls([item(1), poll(5, true, { cursor: '1002_5' }), poll(2, true), item(3)], isOpen);
+    expect(flow.map((i) => i.key)).toEqual(['t1', 't3']);
+    expect(pinned.map((i) => i.key)).toEqual(['t2', 't5']);
+  });
+
+  it('keeps closed and deleted polls in the flow at their place', () => {
+    const { flow, pinned } = pinOpenPolls([item(1), poll(2, false), poll(3, true, { deleted: true }), item(4)], isOpen);
+    expect(flow.map((i) => i.key)).toEqual(['t1', 't2', 't3', 't4']);
+    expect(pinned).toEqual([]);
+  });
+
+  it('a poll closed by the last vote moves to its new cursor, after the last entry', () => {
+    const items = [item(1), poll(2, true), item(3), item(4)];
+    const closed = poll(2, false, { cursor: '1010_2' });
+    const merged = mergeItems(items, [closed]);
+    expect(merged.map((i) => i.key)).toEqual(['t1', 't3', 't4', 't2']);
+    expect(pinOpenPolls(merged, isOpen).flow.map((i) => i.key)).toEqual(['t1', 't3', 't4', 't2']);
+  });
+
+  it('lets the author and the master delete a poll, nobody else', () => {
+    const viewer = { userId: 2, isMaster: false, currentTurn: 1, ownerOf: () => 2 };
+    expect(permissionsFor(poll(1, true, { userId: 2 }), viewer).canDelete).toBe(true);
+    expect(permissionsFor(poll(1, true, { userId: 9 }), viewer).canDelete).toBe(false);
+    expect(permissionsFor(poll(1, true, { userId: 9 }), { ...viewer, isMaster: true }).canDelete).toBe(true);
+    expect(permissionsFor(poll(1, true, { userId: 2, deleted: true }), viewer).canDelete).toBe(false);
+  });
+
+  it('polls still do not group with messages', () => {
+    expect(continuesPrevious(item(1), poll(2, true))).toBe(false);
   });
 });

@@ -151,6 +151,11 @@ public static class Roll6Guide
           vote. Votes are public (`poll.options[].voters`) and notify nobody; a poll is conversation, never a turn record.
           To find polls use `list_chat_messages` with `kind = "poll"` (the latest one: `limit = 1`); `get_chat_message`
           re-reads one entry (a poll's current result) by its `turnId`. `kind` filters any kind (e.g. "action", "narration").
+          A poll is **open** (`poll.open`) while some approved character has not voted — the master's vote doesn't count —
+          and the app pins open polls below everything else in the chat (`list_chat_messages` returns them in `openPolls`,
+          loaded or not). Each vote or withdrawal moves the poll to that moment in the chat order, so once everyone has
+          voted it stays right after what was said before the last vote. Its author or the master deletes a poll with
+          `delete_chat_message`.
         - **Whispers**: `send_chat_message`, `roll_dice` and `act_in_turn` take `whisperCharacterIds` (approved characters,
           not your own) and/or `whisperMaster`. Only the author, the master (always) and the owners of those characters see
           it whole (`whisper.recipients`); everyone else doesn't get a whispered message at all, and gets a whispered action

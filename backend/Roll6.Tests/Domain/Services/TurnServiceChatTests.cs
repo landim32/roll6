@@ -68,6 +68,7 @@ public partial class TurnServiceChatTests
         _repository.Setup(r => r.ListLogByTurnsAsync(CAMPAIGN, It.IsAny<IEnumerable<int>>())).ReturnsAsync(new List<Turn>());
         _repository.Setup(r => r.ListByCampaignTurnAsync(It.IsAny<long>(), It.IsAny<int>())).ReturnsAsync(new List<Turn>());
         _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(new List<CampaignCharacter>());
+        _repository.Setup(r => r.ListOpenPollsAsync(CAMPAIGN)).ReturnsAsync(new List<Turn>());
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string?>())).Returns((string? f) => f == null ? null : $"https://cdn/{f}");
 

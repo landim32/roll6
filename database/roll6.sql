@@ -1808,5 +1808,34 @@ BEGIN
     VALUES ('20261010003326_AddChatWhispers', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011044452_AddTurnChatAt') THEN
+    ALTER TABLE turns ADD chat_at timestamp without time zone NOT NULL DEFAULT (now());
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011044452_AddTurnChatAt') THEN
+    UPDATE turns SET chat_at = created_at;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011044452_AddTurnChatAt') THEN
+    CREATE INDEX ix_turns_campaign_chat ON turns (campaign_id, chat_at, turn_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261011044452_AddTurnChatAt') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261011044452_AddTurnChatAt', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

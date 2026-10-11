@@ -158,4 +158,32 @@ public class TurnChatTests
         var longText = Turn.Text(1, null, 3, 5, 80, "Aria", null, new string('a', 2500));
         FluentActions.Invoking(() => longText.ToAction(30)).Should().Throw<DomainValidationException>();
     }
+
+    // --- 050: place in the chat ---
+
+    [Fact]
+    public void ChatAt_IsTheCreationTime()
+    {
+        var turn = Text();
+
+        turn.ChatAt.Should().Be(turn.CreatedAt);
+    }
+
+    [Fact]
+    public void TouchChat_MovesAPollAndKeepsItsCreation()
+    {
+        var poll = Turn.Poll(10, 30, 3, 1, null, "Mestre (GM) — Ana", null, "Para onde?");
+        var created = poll.CreatedAt;
+        var vote = created.AddMinutes(5);
+
+        poll.TouchChat(vote);
+
+        (poll.ChatAt, poll.CreatedAt).Should().Be((vote, created));
+    }
+
+    [Fact]
+    public void TouchChat_OnlyForPolls()
+    {
+        FluentActions.Invoking(() => Text().TouchChat(DateTime.UtcNow)).Should().Throw<DomainValidationException>();
+    }
 }
