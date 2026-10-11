@@ -15,11 +15,12 @@ public static class ChatTools
         movedTotal, changes [{field, label, before, after}], imageUrl, audioUrl, audioSeconds, audioType, deleted,
         canDelete, dice, cancelled, replyTo {key, turnId, displayName, kind, excerpt, deleted, cancelled, hidden},
         reactions [{userId, name, kind like|love|laugh}], canReply, canReact, canConvert (action|message|null),
-        poll {question, totalVotes, options [{optionId, text, votes, voters [{characterId|null, name, imageUrl}]}]},
+        poll {question, totalVotes, open, options [{optionId, text, votes, voters [{characterId|null, name, imageUrl}]}]},
         whisper {master, recipients [{characterId|null, name, imageUrl}]} | null, whisperHidden }.
         kind is text | image | audio | roll | poll (what people said, rolled or asked; a roll has dice = the three faces
         and text = the optional reason; a poll has text = its question and poll = options with votes and voters — a
-        null characterId is the master), movement | action | actionResult | characterUpdate | narration (the turn
+        null characterId is the master; open = true while some approved character has not voted — the master's vote
+        doesn't count — and the poll is pinned at the bottom of the chat until then), movement | action | actionResult | characterUpdate | narration (the turn
         records — text is the same line as get_turn_summary), poke ("Ana cutucou Bruno") or turnFinished (the divider
         "Turno N finalizado"). An action with cancelled = true was replaced, reset or deleted ("Ação cancelada") and no
         longer counts in the turn. whisper (when not null) means only its recipients, the author and the master see the
@@ -33,12 +34,15 @@ public static class ChatTools
         said (text, photo, audio), every turn record (moves, actions, action results, character/NPC changes,
         narrations) and a "Turno N finalizado" divider at the end of each turn — the same records the turn tools read.
         Without a cursor it returns the newest page; pass "before" with the first item's cursor to go back in time, or
-        "after" with the last item's cursor to get what came next. Items are oldest first within the page.
-        kind filters by entry kind (comma separated): the latest poll is kind = "poll", limit = 1 (the last item of the
-        page); the conversation only is "text,image,audio,roll,poll"; the actions are "action". Whispers you are not in
+        "after" with the last item's cursor to get what came next. Items are oldest first within the page, in chat order:
+        the time each entry was written, except a poll, which moves to the moment of its latest vote (so a poll answered
+        by everyone sits right after what was said before the last vote). openPolls lists every open poll of the campaign,
+        oldest first, whether or not it is in the page — the app pins them below everything else.
+        kind filters by entry kind (comma separated): the most recently created or voted poll is kind = "poll",
+        limit = 1 (the last item of the page); the conversation only is "text,image,audio,roll,poll"; the actions are "action". Whispers you are not in
         never appear (whispered actions appear masked).
         Who can use it: the campaign master or a player with an approved character in the campaign.
-        Returns: { items, hasMore, unreadCount, firstUnreadCursor }.
+        Returns: { items, hasMore, unreadCount, firstUnreadCursor, openPolls }.
         {{ITEM}}
         Common errors: 400 malformed cursor or unknown kind, 403 no access to the campaign, 404 campaign not found.
         Related tools: get_chat_message, send_chat_message, vote_chat_poll, get_turn_summary, get_turn_data.
@@ -155,6 +159,8 @@ public static class ChatTools
         What it does: puts the voter's single vote on an option of a chat poll, moving it from the option it was on, or
         withdraws it (optionId omitted). The voter is one of your characters approved in the campaign (characterId) or,
         omitting it, the master's own vote. Each character and the master count once; votes are public and notify nobody.
+        Each vote or withdrawal moves the poll to now in the chat order; poll.open says whether some approved character
+        still has to vote (the master's vote doesn't count).
         Who can use it: the owner of an approved character (as that character) or the campaign master (as "Mestre").
         Returns: the updated poll item. {{ITEM}}
         Common errors: 400 not a poll, deleted poll, option of another poll; 403 not your approved character / not the

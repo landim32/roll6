@@ -72,16 +72,31 @@ public partial class TurnService
                 throw new DomainValidationException("optionId", "Esta opção não é desta enquete.");
             vote = ChatPollVote.Create(turn.TurnId, option.ChatPollOptionId, userId, info.CharacterId);
         }
-        await _chatPollRepository.SetVoteAsync(turn.TurnId, info.CharacterId, vote);
+        // 050: every vote or withdrawal moves the poll to this moment, so the vote that answers it for everyone leaves
+        // it right after the last entry — where it was drawn while pinned.
+        turn.TouchChat(DateTime.UtcNow);
+        await _chatPollRepository.SetVoteAsync(turn.TurnId, info.CharacterId, vote, turn.ChatAt);
         return await PublishUpdatedAsync(campaign, userId, turn);
     }
 
+    /// <summary>
+    /// Open (050): some approved character has no vote; the master's vote (no character) neither counts nor is needed,
+    /// and with no approved character there is no one missing.
+    /// </summary>
+    public static bool IsPollOpen(IEnumerable<long> approvedCharacterIds, IEnumerable<long?> votedCharacterIds)
+    {
+        var voted = votedCharacterIds.OfType<long>().ToHashSet();
+        return approvedCharacterIds.Any(id => !voted.Contains(id));
+    }
+
     /// <summary>The polls of a chat page, with their options, votes and the voters' names and pictures.</summary>
-    private async Task<Dictionary<long, ChatPollInfo>> LoadPollsAsync(List<Turn> page)
+    private async Task<Dictionary<long, ChatPollInfo>> LoadPollsAsync(Campaign campaign, List<Turn> page)
     {
         var ids = page.Where(t => t.TurnType == TurnType.Poll && !t.IsDeleted).Select(t => t.TurnId).ToList();
         if (ids.Count == 0)
             return new Dictionary<long, ChatPollInfo>();
+        var approved = (await _campaignCharacterRepository.ListByCampaignAsync(campaign.CampaignId, true))
+            .Select(p => p.CharacterId).ToList();
         var options = await _chatPollRepository.ListOptionsByTurnsAsync(ids);
         var votes = await _chatPollRepository.ListVotesByTurnsAsync(ids);
         var characterIds = votes.Where(v => v.CharacterId.HasValue).Select(v => v.CharacterId!.Value).Distinct().ToList();
@@ -95,6 +110,7 @@ public partial class TurnService
             {
                 Question = t.Description ?? string.Empty,
                 TotalVotes = pollVotes.Count,
+                Open = IsPollOpen(approved, pollVotes.Select(v => v.CharacterId)),
                 Options = options.Where(o => o.TurnId == t.TurnId).Select(o =>
                 {
                     var voters = pollVotes.Where(v => v.ChatPollOptionId == o.ChatPollOptionId).Select(v =>

@@ -20,7 +20,8 @@ export const ChatMessageList = () => {
   const { t } = useTranslation();
   const { session } = useAuth();
   const {
-    items: allItems, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters, startReply, react, convert,
+    items: allItems, pinnedPolls, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters, startReply,
+    react, convert,
   } = useChat();
   // Moves and character changes show only when the user turned them on in the paperclip.
   const items = useMemo(() => filterChatItems(allItems, filters), [allItems, filters]);
@@ -92,7 +93,7 @@ export const ChatMessageList = () => {
     heightBeforeRef.current = null;
     firstKeyRef.current = firstKey;
     onScroll();
-  }, [items, pending]);
+  }, [items, pending, pinnedPolls]);
 
   // A new campaign (empty list) opens again at the right place.
   useEffect(() => {
@@ -121,10 +122,24 @@ export const ChatMessageList = () => {
     }
   };
 
+  const renderItem = (item: ChatItemInfo, continued: boolean) => (
+    <ChatItem
+      item={item}
+      continued={continued}
+      own={item.userId === userId}
+      userId={userId}
+      flash={item.key === flashKey}
+      onActions={(target, anchor) => setActions({ item: target, anchor })}
+      onReply={startReply}
+      onOpenQuote={(key) => { void openQuote(key); }}
+      onOpenImage={(url, caption) => setImage({ url, caption })}
+    />
+  );
+
   return (
     <div className="stm-chat-scroll" ref={scrollRef} onScroll={onScroll}>
       {hasMore && <div ref={sentinelRef} className="stm-chat-sentinel" />}
-      {!loading && items.length === 0 && pending.length === 0 && (
+      {!loading && items.length === 0 && pending.length === 0 && pinnedPolls.length === 0 && (
         <p className="stm-chat-empty text-body-secondary">{t('chat.empty')}</p>
       )}
       {items.map((item, index) => (
@@ -132,17 +147,7 @@ export const ChatMessageList = () => {
           {item.key === unreadKey && (
             <div ref={unreadRef} className="stm-chat-unread" role="separator"><span>{t('chat.newMessages')}</span></div>
           )}
-          <ChatItem
-            item={item}
-            continued={index > 0 && item.key !== unreadKey && continuesPrevious(items[index - 1], item)}
-            own={item.userId === userId}
-            userId={userId}
-            flash={item.key === flashKey}
-            onActions={(target, anchor) => setActions({ item: target, anchor })}
-            onReply={startReply}
-            onOpenQuote={(key) => { void openQuote(key); }}
-            onOpenImage={(url, caption) => setImage({ url, caption })}
-          />
+          {renderItem(item, index > 0 && item.key !== unreadKey && continuesPrevious(items[index - 1], item))}
         </div>
       ))}
       {pending.map((p) => (
@@ -165,6 +170,12 @@ export const ChatMessageList = () => {
           </div>
         </div>
       ))}
+      {/* 050: open polls stay below everything until every approved character has voted. */}
+      {pinnedPolls.map((item) => (
+        <div key={item.key} data-chat-key={item.key}>
+          {renderItem(item, false)}
+        </div>
+      ))}
       <ConfirmModal
         open={toDelete !== null}
         onOpenChange={(o) => { if (!o) setToDelete(null); }}
@@ -177,7 +188,7 @@ export const ChatMessageList = () => {
       <ImageLightbox image={image} onClose={() => setImage(null)} />
       {actions && (
         <ChatItemActions
-          item={allItems.find((i) => i.key === actions.item.key) ?? actions.item}
+          item={allItems.find((i) => i.key === actions.item.key) ?? pinnedPolls.find((i) => i.key === actions.item.key) ?? actions.item}
           anchor={actions.anchor}
           userId={userId}
           onClose={() => setActions(null)}

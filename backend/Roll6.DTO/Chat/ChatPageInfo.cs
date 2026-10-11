@@ -19,6 +19,13 @@ public class ChatPageInfo
     /// <summary>Cursor of the first unread entry, where the chat opens; null when everything was read.</summary>
     [JsonPropertyName("firstUnreadCursor")]
     public string? FirstUnreadCursor { get; set; }
+
+    /// <summary>
+    /// Every open poll of the campaign (050), oldest first, loaded or not by this page: they are pinned at the bottom of
+    /// the chat until every approved character has voted.
+    /// </summary>
+    [JsonPropertyName("openPolls")]
+    public List<ChatItemInfo> OpenPolls { get; set; } = new();
 }
 
 /// <summary>What someone says (041): text, a photo or an audio, as a character or as the master.</summary>

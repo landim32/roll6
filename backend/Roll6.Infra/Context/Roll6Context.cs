@@ -360,6 +360,9 @@ public class Roll6Context : DbContext
                         v => JsonSerializer.Serialize(v, TURN_CHANGE_JSON).GetHashCode(),
                         v => v == null ? null : v.Select(c => new TurnChange(c.Field, c.Before, c.After)).ToList()));
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            // Place in the chat (050): created_at, or the last vote of a poll.
+            entity.Property(e => e.ChatAt).HasColumnName("chat_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()")
+                .UsePropertyAccessMode(PropertyAccessMode.Property);
             // Chat (041): the same timeline holds what people say and the end-of-turn dividers.
             entity.Property(e => e.DisplayName).HasColumnName("display_name").HasMaxLength(260);
             entity.Property(e => e.DisplayImage).HasColumnName("display_image").HasMaxLength(260);
@@ -376,6 +379,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at").HasColumnType(TIMESTAMP);
             entity.HasIndex(e => new { e.CampaignId, e.TurnNo }).HasDatabaseName("ix_turns_campaign_turn");
             entity.HasIndex(e => new { e.CampaignId, e.CreatedAt, e.TurnId }).HasDatabaseName("ix_turns_campaign_created");
+            entity.HasIndex(e => new { e.CampaignId, e.ChatAt, e.TurnId }).HasDatabaseName("ix_turns_campaign_chat");
             entity.HasIndex(e => e.UserId).HasDatabaseName("ix_turns_user");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_turn");

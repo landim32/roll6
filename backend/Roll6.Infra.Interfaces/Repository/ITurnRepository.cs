@@ -34,7 +34,7 @@ public interface ITurnRepository<TModel> where TModel : class
     // --- Chat (041): the same timeline read as the campaign chat ---
 
     /// <summary>
-    /// A page ordered by (created_at, id), every type, deleted ones included, returned ascending: the newest without
+    /// A page ordered by (chat_at, id) — 050: created_at, or the last vote of a poll —, every type, deleted ones included, returned ascending: the newest without
     /// cursor, older with <paramref name="before"/>, newer with <paramref name="after"/>.
     /// </summary>
     /// <summary>
@@ -43,6 +43,12 @@ public interface ITurnRepository<TModel> where TModel : class
     /// </summary>
     Task<List<TModel>> ListChatPageAsync(long campaignId, (DateTime At, long Id)? before, (DateTime At, long Id)? after, int limit,
         long viewerId, bool viewerIsMaster, IReadOnlyCollection<int>? turnTypes = null);
+
+    /// <summary>
+    /// The campaign's open polls (050), oldest first: not deleted, with some approved character that has not voted (the
+    /// master's vote doesn't count). None while the campaign has no approved character.
+    /// </summary>
+    Task<List<TModel>> ListOpenPollsAsync(long campaignId);
 
     /// <summary>The turn records (types 1–5, not deleted) of the given turns, in order.</summary>
     Task<List<TModel>> ListLogByTurnsAsync(long campaignId, IEnumerable<int> turnNos);

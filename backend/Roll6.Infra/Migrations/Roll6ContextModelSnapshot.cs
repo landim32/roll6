@@ -1178,6 +1178,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("character_id");
 
+                    b.Property<DateTime>("ChatAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("chat_at")
+                        .HasDefaultValueSql("now()");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -1282,6 +1288,9 @@ namespace Roll6.Infra.Migrations
 
                     b.HasIndex("CampaignId", "TurnNo")
                         .HasDatabaseName("ix_turns_campaign_turn");
+
+                    b.HasIndex("CampaignId", "ChatAt", "TurnId")
+                        .HasDatabaseName("ix_turns_campaign_chat");
 
                     b.HasIndex("CampaignId", "CreatedAt", "TurnId")
                         .HasDatabaseName("ix_turns_campaign_created");

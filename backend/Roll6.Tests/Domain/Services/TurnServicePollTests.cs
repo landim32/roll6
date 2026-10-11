@@ -1,8 +1,10 @@
 using FluentAssertions;
 using Moq;
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Notifications;
+using Roll6.Domain.Services;
 using Roll6.DTO.Chat;
 using Roll6.DTO.Realtime;
 
@@ -110,7 +112,7 @@ public partial class TurnServiceChatTests
             new() { TurnId = POLL, ChatPollOptionId = 1, UserId = PLAYER, CharacterId = ARIA },
             new() { TurnId = POLL, ChatPollOptionId = 1, UserId = MASTER, CharacterId = null }
         });
-        _chatPolls.Setup(r => r.SetVoteAsync(It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<ChatPollVote?>())).Returns(Task.CompletedTask);
+        _chatPolls.Setup(r => r.SetVoteAsync(It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<ChatPollVote?>(), It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
         var item = await _service.VoteAsync(MASTER, POLL, new ChatPollVoteInfo { OptionId = 1 });
 
@@ -129,10 +131,10 @@ public partial class TurnServiceChatTests
 
         await _service.VoteAsync(PLAYER, POLL, new ChatPollVoteInfo { CharacterId = ARIA, OptionId = 1 });
         _chatPolls.Verify(r => r.SetVoteAsync(POLL, ARIA, It.Is<ChatPollVote>(v =>
-            v.ChatPollOptionId == 1 && v.UserId == PLAYER && v.CharacterId == ARIA)), Times.Once);
+            v.ChatPollOptionId == 1 && v.UserId == PLAYER && v.CharacterId == ARIA), It.IsAny<DateTime>()), Times.Once);
 
         await _service.VoteAsync(PLAYER, POLL, new ChatPollVoteInfo { CharacterId = ARIA, OptionId = null });
-        _chatPolls.Verify(r => r.SetVoteAsync(POLL, ARIA, null), Times.Once);
+        _chatPolls.Verify(r => r.SetVoteAsync(POLL, ARIA, null, It.IsAny<DateTime>()), Times.Once);
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Exactly(2));
         _queue.Verify(q => q.Enqueue(It.IsAny<TableNotice>()), Times.Never);
     }
@@ -142,7 +144,7 @@ public partial class TurnServiceChatTests
     {
         PollEntry();
         await _service.VoteAsync(MASTER, POLL, new ChatPollVoteInfo { OptionId = 1 });
-        _chatPolls.Verify(r => r.SetVoteAsync(POLL, null, It.Is<ChatPollVote>(v => v.CharacterId == null && v.UserId == MASTER)), Times.Once);
+        _chatPolls.Verify(r => r.SetVoteAsync(POLL, null, It.Is<ChatPollVote>(v => v.CharacterId == null && v.UserId == MASTER), It.IsAny<DateTime>()), Times.Once);
     }
 
     [Fact]
@@ -157,7 +159,7 @@ public partial class TurnServiceChatTests
         await _service.Invoking(s => s.VoteAsync(STRANGER, POLL, new ChatPollVoteInfo { OptionId = 1 })).Should().ThrowAsync<UnauthorizedAccessException>();
         // An option of another poll.
         await _service.Invoking(s => s.VoteAsync(MASTER, POLL, new ChatPollVoteInfo { OptionId = 99 })).Should().ThrowAsync<DomainValidationException>();
-        _chatPolls.Verify(r => r.SetVoteAsync(It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<ChatPollVote?>()), Times.Never);
+        _chatPolls.Verify(r => r.SetVoteAsync(It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<ChatPollVote?>(), It.IsAny<DateTime>()), Times.Never);
     }
 
     [Fact]
@@ -221,5 +223,113 @@ public partial class TurnServiceChatTests
         _whispers.Setup(r => r.ListByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<TurnWhisperTarget>());
         await _service.Invoking(s => s.GetMessageAsync(PLAYER, 704)).Should().ThrowAsync<KeyNotFoundException>();
         await _service.Invoking(s => s.GetMessageAsync(STRANGER, POLL)).Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    // --- 050: open polls pinned at the bottom ---
+
+    private void Approved(params long[] characterIds) =>
+        _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(characterIds
+            .Select(id => new CampaignCharacter { CampaignId = CAMPAIGN, CharacterId = id, Status = CampaignCharacterStatus.Approved }).ToList());
+
+    private void Votes(params long?[] characterIds) =>
+        _chatPolls.Setup(r => r.ListVotesByTurnsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(characterIds
+            .Select(c => new ChatPollVote { TurnId = POLL, ChatPollOptionId = 1, UserId = c == null ? MASTER : PLAYER, CharacterId = c }).ToList());
+
+    [Theory]
+    [InlineData(new long[] { ARIA, BRAM }, new long[] { ARIA }, false, true)]   // Bram is missing
+    [InlineData(new long[] { ARIA, BRAM }, new long[] { ARIA, BRAM }, false, false)] // everyone voted
+    [InlineData(new long[] { ARIA }, new long[0], true, true)]                // the master's vote doesn't count
+    [InlineData(new long[0], new long[0], true, false)]                       // no approved character: never open
+    public void IsPollOpen_ApprovedCharactersAgainstTheirVotes(long[] approved, long[] voted, bool masterVoted, bool open)
+    {
+        var votes = voted.Select(v => (long?)v).ToList();
+        if (masterVoted) votes.Add(null);
+
+        TurnService.IsPollOpen(approved, votes).Should().Be(open);
+    }
+
+    [Fact]
+    public async Task Poll_Open_WhileAnApprovedCharacterHasNotVoted()
+    {
+        PollEntry();
+        Approved(ARIA, BRAM);
+        Votes(ARIA, null);
+
+        var item = await _service.GetMessageAsync(MASTER, POLL);
+
+        item.Poll!.Open.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Poll_Closed_WhenEveryCharacterVoted_TwoCharactersOfOnePlayerBothCount()
+    {
+        PollEntry();
+        Approved(ARIA, BRAM);
+        Votes(ARIA);
+        (await _service.GetMessageAsync(MASTER, POLL)).Poll!.Open.Should().BeTrue();
+
+        Votes(ARIA, BRAM);
+        (await _service.GetMessageAsync(MASTER, POLL)).Poll!.Open.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Vote_MovesThePollToNow_AndPublishesTheNewCursor()
+    {
+        var poll = PollEntry();
+        var created = poll.CreatedAt;
+        Approved(ARIA);
+        Votes(ARIA);
+        DateTime? movedTo = null;
+        _chatPolls.Setup(r => r.SetVoteAsync(POLL, ARIA, It.IsAny<ChatPollVote?>(), It.IsAny<DateTime>()))
+            .Callback((long _, long? _, ChatPollVote? _, DateTime at) => movedTo = at).Returns(Task.CompletedTask);
+
+        var item = await _service.VoteAsync(PLAYER, POLL, new ChatPollVoteInfo { CharacterId = ARIA, OptionId = 1 });
+
+        movedTo.Should().NotBeNull().And.BeOnOrAfter(created);
+        poll.CreatedAt.Should().Be(created);
+        item.Cursor.Should().Be($"{movedTo!.Value.Ticks}_{POLL}");
+        item.Poll!.Open.Should().BeFalse();
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Withdraw_AlsoMovesThePoll()
+    {
+        PollEntry();
+        await _service.VoteAsync(PLAYER, POLL, new ChatPollVoteInfo { CharacterId = ARIA, OptionId = null });
+        _chatPolls.Verify(r => r.SetVoteAsync(POLL, ARIA, null, It.Is<DateTime>(d => d > DateTime.MinValue)), Times.Once);
+    }
+
+    [Fact]
+    public async Task List_CarriesTheOpenPolls_OldestFirst()
+    {
+        var poll = PollEntry();
+        var older = Turn.Poll(CAMPAIGN, MAP, 2, MASTER, null, "Mestre (GM) — Ana", null, "Antes?");
+        older.TurnId = POLL - 1;
+        Approved(ARIA);
+        Votes();
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<IReadOnlyCollection<int>?>()))
+            .ReturnsAsync(new List<Turn>());
+        _repository.Setup(r => r.ListOpenPollsAsync(CAMPAIGN)).ReturnsAsync(new List<Turn> { older, poll });
+
+        var page = await _service.ListAsync(PLAYER, CAMPAIGN, null, null, null);
+
+        page.Items.Should().BeEmpty();
+        page.OpenPolls.Select(p => p.TurnId).Should().Equal(POLL - 1, POLL);
+        page.OpenPolls.Should().OnlyContain(p => p.Kind == "poll");
+    }
+
+    [Fact]
+    public async Task List_CursorIsTheChatTime()
+    {
+        var poll = PollEntry();
+        poll.TouchChat(poll.CreatedAt.AddMinutes(10));
+        _repository.Setup(r => r.ListChatPageAsync(CAMPAIGN, null, null, 51, It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<IReadOnlyCollection<int>?>()))
+            .ReturnsAsync(new List<Turn> { poll });
+
+        var page = await _service.ListAsync(PLAYER, CAMPAIGN, null, null, null);
+
+        page.Items.Single().Cursor.Should().Be($"{poll.ChatAt.Ticks}_{POLL}");
+        poll.ChatAt.Should().BeAfter(poll.CreatedAt);
     }
 }

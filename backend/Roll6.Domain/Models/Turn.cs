@@ -55,6 +55,27 @@ public class Turn
 
     public DateTime CreatedAt { get; set; }
 
+    private DateTime? _pollChatAt;
+
+    /// <summary>
+    /// Place in the chat (050): the creation time, except for a poll, which moves to the moment of each vote or
+    /// withdrawal (<see cref="TouchChat"/>) so that a poll answered by everyone stays where it was drawn while pinned.
+    /// Chat pages and cursors use it; unread counts and read marks stay on <see cref="CreatedAt"/>.
+    /// </summary>
+    public DateTime ChatAt
+    {
+        get => _pollChatAt ?? CreatedAt;
+        set => _pollChatAt = value;
+    }
+
+    /// <summary>A vote or withdrawal on a poll (050) moves its place in the chat to <paramref name="now"/>.</summary>
+    public void TouchChat(DateTime now)
+    {
+        if (TurnType != TurnType.Poll)
+            throw new DomainValidationException("type", "Só enquetes mudam de lugar no chat.");
+        ChatAt = now;
+    }
+
     /// <summary>Chat (041): name shown for who spoke, as it was when sent (the character's or "Mestre (GM) — name").</summary>
     public string? DisplayName { get; set; }
 

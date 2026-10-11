@@ -92,3 +92,14 @@ export const votesByRank = (poll: ChatPollInfo) =>
 /** What "Copiar" puts on the clipboard for a poll: the question, then one line per option with its votes. */
 export const pollCopyText = (poll: ChatPollInfo): string =>
   [poll.question, ...poll.options.map((o) => `• ${o.text} — ${o.votes} ${o.votes === 1 ? 'voto' : 'votos'}`)].join('\n');
+
+/**
+ * Open (050): some approved character of the campaign has not voted; the master's vote (characterId null) neither
+ * counts nor is needed, and with no approved character nobody is missing. Without the party (not loaded) the server's
+ * own answer is used.
+ */
+export const isPollOpen = (poll: ChatPollInfo, approvedCharacterIds?: readonly number[]): boolean => {
+  if (!approvedCharacterIds) return poll.open ?? false;
+  const voted = new Set(poll.options.flatMap((o) => o.voters.map((v) => v.characterId)).filter((id): id is number => id !== null));
+  return approvedCharacterIds.some((id) => !voted.has(id));
+};
