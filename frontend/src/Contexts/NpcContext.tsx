@@ -31,8 +31,8 @@ interface NpcContextType {
   addToCampaign: (npcId: number) => Promise<CampaignNpcInfo>;
   /** Also removes the NPC's pieces from the campaign's maps. */
   removeFromCampaign: (campaignNpcId: number) => Promise<void>;
-  /** New occurrence (and piece) on the open campaign map. */
-  placeOnMap: (npcId: number, x: number, y: number) => Promise<MapNpcInfo>;
+  /** New occurrence (and piece) on the open campaign map; without a hex (052) the server picks a free one near the middle. */
+  placeOnMap: (npcId: number, x?: number, y?: number) => Promise<MapNpcInfo>;
   /** Changes one instance on the map (051): name, current vitals, Deslocamento, status, posture. */
   updateInstance: (mapNpcId: number, data: MapNpcUpdateInfo) => Promise<MapNpcInfo>;
   /** Takes one instance off the map (051); the NPC stays in the campaign, its history stays in the chat. */
@@ -145,13 +145,15 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
     await refreshMapTokens();
   }, [run, refreshCampaignNpcs, refreshMapTokens]);
 
-  const placeOnMap = useCallback(async (npcId: number, x: number, y: number) => {
+  const placeOnMap = useCallback(async (npcId: number, x?: number, y?: number) => {
     const mapId = draft.mapId;
     if (mapId === null) throw new Error('no campaign map open');
     const result = await run(() => mapNpcService.create({ mapId, npcId, x, y, look: 0 }));
     await refreshMapTokens();
+    // The card counts the instances (051).
+    await refreshCampaignNpcs();
     return result;
-  }, [run, draft.mapId, refreshMapTokens]);
+  }, [run, draft.mapId, refreshMapTokens, refreshCampaignNpcs]);
 
   const updateInstance = useCallback(async (mapNpcId: number, data: MapNpcUpdateInfo) => {
     const result = await run(() => mapNpcService.update(mapNpcId, data));

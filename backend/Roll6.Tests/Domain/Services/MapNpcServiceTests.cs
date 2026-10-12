@@ -346,4 +346,27 @@ public class MapNpcServiceTests
             .Which.Errors.Should().ContainKey("x");
         _repository.Verify(r => r.InsertAsync(It.IsAny<MapNpc>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Create_WithoutPosition_TakesTheFreeHexNearestToTheMiddle()
+    {
+        // The middle of the 10 × 8 grid is (5, 4); it is taken, so the piece goes to (5, 3).
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 99, MapId = MAP, TokenId = 1, X = 5, Y = 4 } });
+
+        var result = await _service.CreateAsync(MASTER, new MapNpcInsertInfo { MapId = MAP, NpcId = NPC });
+
+        result.X.Should().Be(5);
+        result.Y.Should().Be(3);
+        _insertedPieces.Single().Should().Match<MapToken>(p => p.X == 5 && p.Y == 3);
+    }
+
+    [Fact]
+    public async Task Create_WithoutPosition_FullMap_Throws409()
+    {
+        _mapModelRepository.Setup(r => r.GetByIdAsync(50)).ReturnsAsync(new MapModel { MapModelId = 50, GridWidth = 1, GridHeight = 1 });
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 99, MapId = MAP, TokenId = 1, X = 0, Y = 0 } });
+
+        await _service.Invoking(s => s.CreateAsync(MASTER, new MapNpcInsertInfo { MapId = MAP, NpcId = NPC })).Should().ThrowAsync<ConflictException>();
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapNpc>()), Times.Never);
+    }
 }

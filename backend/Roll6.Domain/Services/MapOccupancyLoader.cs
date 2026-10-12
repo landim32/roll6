@@ -39,6 +39,11 @@ public sealed class MapLayout
                 throw new ConflictException("O hex já está ocupado.");
         }
     }
+
+    /// <summary>The free hex nearest to the middle of the map for a new piece (052), or 409 when the map is full.</summary>
+    public (int X, int Y) FirstFree(int look, int space) =>
+        Occupancy.FirstFree(look, space, Columns, Rows)
+            ?? throw new ConflictException("Não há um hex livre para a peça neste mapa.");
 }
 
 /// <summary>

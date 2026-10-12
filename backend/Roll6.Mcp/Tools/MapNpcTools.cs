@@ -23,18 +23,19 @@ public static class MapNpcTools
         own turn. The name is the NPC's for the first occurrence on that map and "{name} N" (smallest free N ≥ 2 among the
         NPC's occurrences on the map) for the next ones: "Guarda", "Guarda 2", "Guarda 3". The piece reads these values
         (list_map_tokens: life/energy = current, totalLife/totalEnergy = the NPC's, move = currentMove, sheet = the NPC's sheet).
+        Omit x and y to let the server place the piece on the free hex nearest to the middle of the map.
         Who can use it: only the master; the NPC must be in the campaign (add_npc_to_campaign).
         {{RETURNS}}
-        Common errors: 403 not the master, 404 map/NPC not found, 409 NPC not in the campaign or a hex of the token's shape
-        occupied, 400 shape outside the grid.
+        Common errors: 403 not the master, 404 map/NPC not found, 409 NPC not in the campaign, a hex of the token's shape
+        occupied or no free hex left on the map, 400 shape outside the grid.
         Related tools: list_campaign_npcs, list_map_tokens, move_map_token, update_map_npc.
         """)]
     public static Task<CallToolResult> PlaceNpcOnMap(
         Roll6ApiClient api,
         [Description(McpDocs.MAP_ID)] long mapId,
         [Description("Id of the NPC (npcId from list_campaign_npcs).")] long npcId,
-        [Description(McpDocs.X)] int x,
-        [Description(McpDocs.Y)] int y,
+        [Description(McpDocs.X + " Omit together with y for the free hex nearest to the middle of the map.")] int? x = null,
+        [Description(McpDocs.Y + " Omit together with x for the free hex nearest to the middle of the map.")] int? y = null,
         [Description(McpDocs.LOOK + " Omit for 0 (up).")] int? look = null) =>
         api.SendAsync(HttpMethod.Post, "/api/mapnpc", new MapNpcInsertInfo { MapId = mapId, NpcId = npcId, X = x, Y = y, Look = look });
 

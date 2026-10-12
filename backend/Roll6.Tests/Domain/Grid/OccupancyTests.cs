@@ -38,4 +38,45 @@ public class OccupancyTests
         occupancy.IsBlocked(4, 5, 2).Should().BeTrue();
         occupancy.IsBlocked(4, 4, 1).Should().BeFalse();
     }
+
+    [Fact]
+    public void FirstFree_EmptyGrid_IsTheMiddle()
+    {
+        Occupancy.Build(Array.Empty<PieceShape>()).FirstFree(0, 1, 10, 8).Should().Be((5, 4));
+        Occupancy.Build(Array.Empty<PieceShape>()).FirstFree(0, 1, 1, 1).Should().Be((0, 0));
+    }
+
+    [Fact]
+    public void FirstFree_SkipsTakenHexes_NearestFirst()
+    {
+        // The middle (5, 4) is taken: the nearest free hex, with ties going to the upper rows.
+        var occupancy = Occupancy.Build(new[] { new PieceShape(1, 5, 4, 0, 1) });
+
+        var found = occupancy.FirstFree(0, 1, 10, 8);
+
+        found.Should().NotBeNull();
+        HexGrid.Footprint(found!.Value.X, found.Value.Y, 0, 1).Should().NotContain((5, 4));
+        found.Should().Be((5, 3));
+    }
+
+    [Fact]
+    public void FirstFree_BigShape_FitsWholeInsideTheGrid()
+    {
+        var found = Occupancy.Build(Array.Empty<PieceShape>()).FirstFree(0, 7, 10, 8);
+
+        found.Should().NotBeNull();
+        foreach (var (x, y) in HexGrid.Footprint(found!.Value.X, found.Value.Y, 0, 7))
+            HexGrid.IsInsideGrid(x, y, 10, 8).Should().BeTrue();
+    }
+
+    [Fact]
+    public void FirstFree_FullGrid_IsNull()
+    {
+        var pieces = new List<PieceShape>();
+        for (var x = 0; x < 2; x++) for (var y = 0; y < 2; y++) pieces.Add(new PieceShape(pieces.Count + 1, x, y, 0, 1));
+
+        Occupancy.Build(pieces).FirstFree(0, 1, 2, 2).Should().BeNull();
+        // A 7-hex shape never fits a 2 × 2 grid.
+        Occupancy.Build(Array.Empty<PieceShape>()).FirstFree(0, 7, 2, 2).Should().BeNull();
+    }
 }

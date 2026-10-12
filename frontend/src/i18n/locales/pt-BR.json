@@ -240,6 +240,8 @@
     "mineTab": "Meus NPCs",
     "newTab": "Novo NPC",
     "inCampaign": "Na campanha",
+    "addInstance": "Incluir outra peça de {{name}} no mapa",
+    "addInstanceHint": "Clique para incluir outra peça no mapa aberto.",
     "mineEmpty": "Você ainda não tem NPCs. Cadastre um na aba Novo NPC.",
     "search": "Buscar por nome",
     "stats": "Vida {{life}} · Energia {{energy}} · Movimento {{move}}",
