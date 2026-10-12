@@ -30,6 +30,8 @@ interface CampaignContextType {
   makeCurrentMap: (mapId: number) => Promise<CampaignInfo>;
   /** The master changes the campaign status (049). Throws the API error (the previous status stays). */
   setCampaignStatus: (status: number) => Promise<CampaignInfo>;
+  /** The master switches the free mode (054). Throws the API error (the previous value stays). Never touches the turn. */
+  setFreeMode: (freeMode: boolean) => Promise<CampaignInfo>;
   // State management
   selectCampaign: (campaign: CampaignInfo | null) => void;
   clearError: () => void;
@@ -149,10 +151,18 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
     return campaign;
   }, [currentCampaignId, selectCampaign, refreshTableCampaigns]);
 
+  const setFreeMode = useCallback(async (freeMode: boolean): Promise<CampaignInfo> => {
+    if (currentCampaignId === null) throw new Error('no campaign');
+    const campaign = await campaignService.setFreeMode(currentCampaignId, freeMode);
+    selectCampaign(campaign);
+    void refreshTableCampaigns();
+    return campaign;
+  }, [currentCampaignId, selectCampaign, refreshTableCampaigns]);
+
   const value = useMemo<CampaignContextType>(() => ({
     currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug,
-    refreshTableCampaigns, makeCurrentMap, setCampaignStatus, selectCampaign, clearError,
-  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, setCampaignStatus, selectCampaign, clearError]);
+    refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, selectCampaign, clearError,
+  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, selectCampaign, clearError]);
 
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 };

@@ -85,6 +85,8 @@ public static class MapTokenTools
         0-based, inside gridWidth × gridHeight of the map. look = side the piece faces, 0-5 clockwise from the top side
         (0 up, 1 up-right, 2 down-right, 3 down, 4 down-left, 5 up-left).
         Cost (players): 1 per step into the hex ahead + 1 per 60° turn, shortest path around other pieces.
+        Free mode (set_campaign_free_mode): character and NPC pieces move any number of times per turn, without the
+        Deslocamento limit, and no Movement entry is written; an occupied hex or a hex outside the grid is still refused.
         Returns: the updated piece.
         Common errors: 409 a hex of the piece's shape occupied or already moved this turn, 400 beyond the move or shape
         outside the grid (big pieces need their whole shape free at every step and turn), 403 not your piece.

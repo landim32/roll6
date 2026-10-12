@@ -139,6 +139,30 @@ public static class CampaignTools
         [Description("1 = Preparing, 2 = Active, 3 = Paused, 4 = Finished.")] int status) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/status", new CampaignStatusInfo { Status = status });
 
+    [McpServerTool(Name = "set_campaign_free_mode", Title = "Set campaign free mode", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/campaign/{id}/free-mode")]
+    [Description("""
+        What it does: switches the campaign's free mode (054) on or off. While it is on: every action of a character or NPC
+        piece stays valid (act_in_turn and convert_chat_entry cancel nothing; the map balloon shows the last one, the
+        summary and the turn data list them all); character and NPC pieces move any number of times per turn, without
+        the Deslocamento limit and without a Movement entry (so there is no trail and nothing to undo); finish_turn
+        finishes at once without the pending list; no "Falta apenas você…" notice goes out; reset_turn only cancels the
+        actions and leaves the piece where it is. Nothing else changes: process_turn, set_current_turn, the turn number,
+        the chat, pokes and the campaign status keep working as always, and the mode stays on after a turn finishes.
+        Switching it never touches the turn: no confirmation, no finish, no cancellation — leaving free mode just brings
+        the normal rules back from the next action or move of each actor. Connected participants see the change in
+        real time.
+        Who can use it: only the master, in any campaign status (outside Active the turn stays frozen anyway).
+        Returns: the updated campaign (freeMode).
+        Common errors: 403 not the master, 404 not found.
+        Related tools: get_campaign, finish_turn, act_in_turn, move_map_token, reset_turn, set_campaign_status.
+        """)]
+    public static Task<CallToolResult> SetCampaignFreeMode(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("true = free mode on (several actions, unlimited unrecorded moves, no pending list); false = turn mode.")] bool freeMode) =>
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/free-mode", new CampaignFreeModeInfo { FreeMode = freeMode });
+
     [McpServerTool(Name = "delete_campaign", Title = "Delete campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaign/{id}")]
     [Description($$"""
@@ -274,7 +298,8 @@ public static class CampaignTools
     [Description("""
         What it does: finishes the turn in progress and starts the next one; everyone gets a "turn finished" notification.
         Without force it only finishes when every approved character has acted — otherwise it returns who is missing and
-        changes nothing. NPCs never block.
+        changes nothing. NPCs never block. In free mode (set_campaign_free_mode) it finishes at once, with no pending
+        list, and the mode stays on for the next turn.
         Who can use it: only the master.
         Returns: { finished, pending: [character names], finishedTurn, turnNo (turn in progress after the call) }.
         Common errors: 403 not the master, 404 campaign not found.

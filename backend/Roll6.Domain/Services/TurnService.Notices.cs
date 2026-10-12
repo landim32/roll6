@@ -51,7 +51,8 @@ public partial class TurnService
 
     private async Task NotifyMajorityAsync(Campaign campaign, long userId, long actedCharacterId)
     {
-        if (campaign.MajorityNotifiedTurn == campaign.CurrentTurn)
+        // 054: no "Falta apenas você…" in free mode; otherwise once per turn.
+        if (campaign.FreeMode || campaign.MajorityNotifiedTurn == campaign.CurrentTurn)
             return;
         var approved = (await _campaignCharacterRepository.ListByCampaignAsync(campaign.CampaignId, approvedOnly: true))
             .Select(p => p.CharacterId).ToHashSet();

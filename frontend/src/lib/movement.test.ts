@@ -78,6 +78,63 @@ describe('facing phase', () => {
   });
 });
 
+describe('free mode (054): unlimited pieces', () => {
+  const unlimited = (changes: Partial<MovingPiece> = {}) => {
+    const p = piece({ kind: MOVEMENT_KIND.unlimited, total: null, ...changes });
+    return startMovement(p, { start: { x: p.x, y: p.y, look: p.look }, dist: new Map(), parent: new Map() });
+  };
+  // A 1-hex piece fits anywhere but (4, 4), which another piece takes.
+  const fits = (x: number, y: number) => !(x === 4 && y === 4);
+
+  it('accepts any hex where the shape fits, with no path and no counter', () => {
+    const state = hoverPath(unlimited(), { x: 4, y: 7 }, fits);
+    expect(state.phase).toBe('path');
+    if (state.phase !== 'path') return;
+    expect(state.cost).toBe(0);
+    expect(state.trail).toEqual([]);
+    expect(currentStatus(state)).toBe('ok');
+    expect(canPickDestination(state, false)).toBe(true);
+    expect(previewHexes(state)).toEqual([{ x: 4, y: 7 }]);
+    expect(previewOf(state)).toEqual({ x: 2, y: 2, look: 0 });
+  });
+
+  it('refuses a hex where the shape does not fit, still outlining it', () => {
+    const state = hoverPath(unlimited(), { x: 4, y: 4 }, fits);
+    if (state.phase !== 'path') throw new Error('path expected');
+    expect(state.cost).toBeNull();
+    expect(currentStatus(state)).toBe('over');
+    expect(canPickDestination(state, false)).toBe(false);
+    expect(canPickDestination(state, true)).toBe(false);
+    expect(previewHexes(state)).toEqual([{ x: 4, y: 4 }]);
+  });
+
+  it('keeps the facing on pick and checks the fit again when turning', () => {
+    const facing = pickDestination(hoverPath(unlimited(), { x: 4, y: 7 }, fits));
+    if (facing.phase !== 'facing') throw new Error('facing expected');
+    expect(facing.look).toBe(0);
+    expect(canConfirm(facing, false)).toBe(true);
+
+    const turned = pointFacing(facing, 3, fits);
+    if (turned.phase !== 'facing') throw new Error('facing expected');
+    expect(turned.look).toBe(3);
+    expect(turned.cost).toBe(0);
+    expect(turned.trail).toEqual([]);
+    expect(canConfirm(turned, false)).toBe(true);
+
+    const blocked = pointFacing(facing, 3, () => false);
+    if (blocked.phase !== 'facing') throw new Error('facing expected');
+    expect(blocked.cost).toBeNull();
+    expect(canConfirm(blocked, false)).toBe(false);
+  });
+
+  it('leaves limited pieces as they were', () => {
+    const state = hoverPath(start(), { x: 2, y: 0 }, fits);
+    if (state.phase !== 'path') throw new Error('path expected');
+    expect(state.cost).toBe(2);
+    expect(state.trail.length).toBeGreaterThan(1);
+  });
+});
+
 describe('big pieces (031)', () => {
   it('outlines the whole shape at the target and refuses facings where it does not fit', () => {
     // A 3-hex line in column 2 of a 5 × 8 grid, facing up.

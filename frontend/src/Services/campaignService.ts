@@ -53,6 +53,14 @@ class CampaignService {
     return this.handleResponse<CampaignInfo>(response);
   }
 
+  /** Master only (054): switches the campaign's free mode. Allowed in any status. */
+  async setFreeMode(id: number, freeMode: boolean): Promise<CampaignInfo> {
+    const response = await fetch(`${API_BASE}/${id}/free-mode`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ freeMode }),
+    });
+    return this.handleResponse<CampaignInfo>(response);
+  }
+
   async setCurrentMap(id: number, mapId: number | null): Promise<CampaignInfo> {
     const response = await fetch(`${API_BASE}/${id}/current-map`, {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ mapId }),

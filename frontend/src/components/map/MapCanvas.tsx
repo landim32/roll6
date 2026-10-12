@@ -22,6 +22,7 @@ import type { MapTokenInfo } from '../../types/mapToken';
 import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt } from '../../lib/mapTokens';
 import { pieceHexes } from '../../lib/occupancy';
 import { isPlayable } from '../../lib/campaignStatus';
+import { isFreeMode, showTrails } from '../../lib/freeMode';
 import type { Offset } from '../../lib/hexGrid';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 import { HexGridLayer } from './HexGridLayer';
@@ -76,6 +77,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
   const { session } = useAuth();
   const movement = useTokenMovement();
   const { currentCampaign } = useCampaign();
+  const freeMode = isFreeMode(currentCampaign);
   const { placeOnMap } = useNpc();
   const { turnNo, entries: turnEntries, refresh: refreshTurn } = useTurn();
   const hexAt = useMapPointer();
@@ -133,11 +135,11 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
     token.tokenType === MAP_TOKEN_TYPE.character
     && party.some((p) => p.campaignCharacterId === token.campaignCharacterId && p.characterOwnerId === session?.user.userId);
 
-  /** Characters and NPCs move once per turn (016); objects move freely. */
+  /** Characters and NPCs move once per turn (016); objects move freely; in free mode (054) everyone does. */
   const canMove = (token: MapTokenInfo): boolean => {
     if (draft.mapId === null || !canPlaceOwn) return false;
     if (!canPlace && !isOwnCharacter(token)) return false;
-    return token.tokenType === MAP_TOKEN_TYPE.object || !hasMoved(turnEntries, token);
+    return token.tokenType === MAP_TOKEN_TYPE.object || freeMode || !hasMoved(turnEntries, token);
   };
 
   /** "Agir"/"Resetar turno" (016): the master on characters and NPCs, a player on his own characters. */
@@ -177,7 +179,8 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
         return;
       }
       if (state.cost === null) {
-        if (state.target) toast.warning(t('movement.unreachable'));
+        if (state.target)
+          toast.warning(t(state.piece.kind === MOVEMENT_KIND.unlimited ? 'movement.blocked' : 'movement.unreachable'));
         return;
       }
       if (!canPickDestination(state, canPlace)) {
@@ -338,7 +341,8 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
   };
 
   const hasImage = !!draft.imageUrl && !!draft.imageWidth && !!draft.imageHeight;
-  const trails = movementTrails(turnEntries, draft.mapId);
+  // 054: in free mode nothing is recorded for moves and even the earlier trails leave the map.
+  const trails = showTrails(freeMode) ? movementTrails(turnEntries, draft.mapId) : [];
   const bubbles = lastActions(turnEntries);
   const menuToken = menu ? tokenAt(mapTokens, menu.hex.x, menu.hex.y) : undefined;
   /** A hex, or the whole shape of the piece on it (031). */
@@ -354,7 +358,9 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
   const moveState = movement.state;
   const moveStatus = currentStatus(moveState);
   const movePreview = moveState.phase === 'idle' ? null : { mapTokenId: moveState.piece.mapTokenId, ...previewOf(moveState)! };
-  const moveDestination = moveState.phase === 'facing' || (moveState.phase === 'path' && moveState.cost !== null)
+  // An unlimited piece (054) outlines the target even where it does not fit (red), since there is no path to show.
+  const moveDestination = moveState.phase === 'facing'
+    || (moveState.phase === 'path' && (moveState.cost !== null || moveState.piece.kind === MOVEMENT_KIND.unlimited))
     ? previewHexes(moveState) : [];
 
   return (

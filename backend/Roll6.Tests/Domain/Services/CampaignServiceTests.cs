@@ -314,6 +314,47 @@ public class CampaignServiceTests
     }
 
     [Fact]
+    public async Task SetFreeMode_Change_PublishesCampaignChanged()
+    {
+        var result = await _service.SetFreeModeAsync(1, 10, new CampaignFreeModeInfo { FreeMode = true });
+
+        result.FreeMode.Should().BeTrue();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.FreeMode)));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CAMPAIGN_CHANGED
+            && ((CampaignInfo)e.Data!).FreeMode)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetFreeMode_SameValue_PublishesNothing()
+    {
+        var result = await _service.SetFreeModeAsync(1, 10, new CampaignFreeModeInfo { FreeMode = false });
+
+        result.FreeMode.Should().BeFalse();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        Published(TableEventType.CAMPAIGN_CHANGED, Times.Never());
+    }
+
+    [Fact]
+    public async Task SetFreeMode_OnlyMaster()
+    {
+        await _service.Invoking(s => s.SetFreeModeAsync(2, 10, new CampaignFreeModeInfo { FreeMode = true }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetFreeMode_AllowedWhilePaused()
+    {
+        _repository.Setup(r => r.GetByIdAsync(10))
+            .ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "Campanha", Status = CampaignStatus.Paused });
+
+        var result = await _service.SetFreeModeAsync(1, 10, new CampaignFreeModeInfo { FreeMode = true });
+
+        result.FreeMode.Should().BeTrue();
+        result.Status.Should().Be((int)CampaignStatus.Paused);
+    }
+
+    [Fact]
     public async Task SetStatus_Master_UpdatesAndPublishesCampaignChanged()
     {
         var result = await _service.SetStatusAsync(1, 10, new CampaignStatusInfo { Status = (int)CampaignStatus.Paused });

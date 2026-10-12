@@ -7,6 +7,25 @@ namespace Roll6.Tests.Domain.Models;
 public class CampaignTests
 {
     [Fact]
+    public void NewCampaign_IsNotFree()
+    {
+        new Campaign().FreeMode.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SetFreeMode_TogglesAndBumpsUpdatedAt()
+    {
+        var campaign = new Campaign { CampaignId = 10, UpdatedAt = DateTime.UtcNow.AddDays(-1) };
+
+        campaign.SetFreeMode(true);
+        campaign.FreeMode.Should().BeTrue();
+        campaign.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+
+        campaign.SetFreeMode(false);
+        campaign.FreeMode.Should().BeFalse();
+    }
+
+    [Fact]
     public void SetCurrentTurn_SetsTheTurnAndTheUpdateDate()
     {
         var campaign = new Campaign { CampaignId = 10, CurrentTurn = 5, UpdatedAt = DateTime.UtcNow.AddDays(-1) };

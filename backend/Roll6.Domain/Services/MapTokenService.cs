@@ -151,15 +151,16 @@ public partial class MapTokenService : IMapTokenService
         var map = await _mapRepository.GetByIdAsync(mapToken.MapId)
             ?? throw new KeyNotFoundException("Mapa não encontrado.");
         map.EnsureNotDeleted();
-        await EnsureMapEditableAsync(map, userId);
+        var campaign = await EnsureMapEditableAsync(map, userId);
         var look = info.Look ?? mapToken.Look;
         var layout = await _occupancy.LoadAsync(map);
         if (map.UserId != userId)
-            await EnsurePlayerMoveAsync(userId, layout, mapToken, info.X, info.Y, look);
+            await EnsurePlayerMoveAsync(userId, layout, mapToken, info.X, info.Y, look, campaign.FreeMode);
         layout.EnsureFits(info.X, info.Y, look, layout.SpaceOf(mapToken), mapToken.MapTokenId);
 
         // Characters and NPC occurrences move once per turn, and the move is recorded (016); objects don't.
-        var turn = await PrepareMovementTurnAsync(userId, map, layout, mapToken, info.X, info.Y, look);
+        // 054: in free mode nothing is recorded — any number of moves, no trail, nothing to undo.
+        var turn = campaign.FreeMode ? null : await PrepareMovementTurnAsync(userId, campaign, map, layout, mapToken, info.X, info.Y, look);
         mapToken.MoveTo(info.X, info.Y);
         mapToken.Face(look);
         MapToken saved = mapToken;
@@ -179,7 +180,7 @@ public partial class MapTokenService : IMapTokenService
     /// The Movement entry of a character/NPC piece, or null for objects; refuses a second move in the turn. It keeps
     /// who moved and the movement points spent (024) — also for the master, who is not limited by them.
     /// </summary>
-    private async Task<Turn?> PrepareMovementTurnAsync(long userId, Map map, MapLayout layout, MapToken mapToken, int x, int y, int look)
+    private async Task<Turn?> PrepareMovementTurnAsync(long userId, Campaign campaign, Map map, MapLayout layout, MapToken mapToken, int x, int y, int look)
     {
         long? characterId = null;
         long? npcId = null;
@@ -190,8 +191,6 @@ public partial class MapTokenService : IMapTokenService
         if (characterId == null && npcId == null)
             return null;
 
-        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
-            ?? throw new KeyNotFoundException("Campanha não encontrada.");
         var mapNpcId = characterId == null ? mapToken.MapNpcId : null;
         if (await _turnRepository.ExistsMovementAsync(campaign.CampaignId, campaign.CurrentTurn, characterId, mapNpcId))
             throw new ConflictException("Já se moveu neste turno.");
@@ -202,9 +201,9 @@ public partial class MapTokenService : IMapTokenService
 
     /// <summary>
     /// A player moves only his own approved character, within its Deslocamento in this campaign (037) — the whole
-    /// shape around the other pieces.
+    /// shape around the other pieces. In free mode (054) only the ownership check remains: any distance, any path.
     /// </summary>
-    private async Task EnsurePlayerMoveAsync(long userId, MapLayout layout, MapToken mapToken, int x, int y, int look)
+    private async Task EnsurePlayerMoveAsync(long userId, MapLayout layout, MapToken mapToken, int x, int y, int look, bool freeMode)
     {
         var participation = mapToken.CampaignCharacterId is long participationId
             ? await _campaignCharacterRepository.GetByIdAsync(participationId)
@@ -212,6 +211,8 @@ public partial class MapTokenService : IMapTokenService
         var character = participation != null ? await _characterRepository.GetByIdAsync(participation.CharacterId) : null;
         if (participation == null || participation.Status != CampaignCharacterStatus.Approved || character?.UserId != userId)
             throw new UnauthorizedAccessException("Você só pode mover os seus personagens.");
+        if (freeMode)
+            return;
 
         var cost = layout.MovementCost(mapToken, x, y, look);
         if (cost == null || cost > participation.CurrentMove)
@@ -266,11 +267,13 @@ public partial class MapTokenService : IMapTokenService
     /// <summary>
     /// Pieces change only while the campaign plays — or, while it is being prepared, by the master (049).
     /// </summary>
-    private async Task EnsureMapEditableAsync(Map map, long userId)
+    /// <summary>Loads the map's campaign and checks that its pieces may change (049); returns it for the free-mode rules (054).</summary>
+    private async Task<Campaign> EnsureMapEditableAsync(Map map, long userId)
     {
         var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
             ?? throw new KeyNotFoundException("Campanha não encontrada.");
         campaign.EnsureMapEditable(campaign.UserId == userId);
+        return campaign;
     }
 
     private async Task<Token> GetTokenAsync(long tokenId)

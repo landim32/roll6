@@ -96,6 +96,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.MajorityNotifiedTurn).HasColumnName("majority_notified_turn");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>()
                 .HasDefaultValue(CampaignStatus.Active).HasSentinel((CampaignStatus)0);
+            entity.Property(e => e.FreeMode).HasColumnName("free_mode").HasDefaultValue(false);
             // Map the table follows (017); a map belongs to its campaign, so no navigation both ways.
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.CurrentMapId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_campaign_current");

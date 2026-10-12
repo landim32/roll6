@@ -180,7 +180,10 @@ public partial class TurnService : ITurnService
         var whisper = await ResolveWhisperAsync(campaign, userId, actor.CharacterId, info.WhisperCharacterIds, info.WhisperMaster);
         await ApplyReplyAsync(turn, info.ReplyToTurnId);
         // 044: one valid action per actor and turn — the previous one stays in the chat as "Ação cancelada".
-        var cancelled = await CancelValidActionsAsync(campaign, actor.CharacterId, actor.CharacterId.HasValue ? null : actor.MapNpcId);
+        // 054: in free mode every action of the actor stays valid (the map shows the last one).
+        var cancelled = campaign.FreeMode
+            ? new List<Turn>()
+            : await CancelValidActionsAsync(campaign, actor.CharacterId, actor.CharacterId.HasValue ? null : actor.MapNpcId);
         var saved = await SaveEntryAsync(turn, whisper, async () =>
         {
             foreach (var previous in cancelled)
@@ -203,8 +206,10 @@ public partial class TurnService : ITurnService
         var actor = await ResolveActorAsync(userId, piece, campaign);
         campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         // Character/NPC changes are history (024): the reset only undoes the move and the action.
+        // 054: in free mode no move is recorded and a move recorded before the switch must not teleport the piece
+        // back during a free scene — the reset cancels the actions only and the piece stays where it is.
         var entries = (await _repository.ListByActorTurnAsync(campaign.CampaignId, campaign.CurrentTurn, actor.CharacterId, actor.MapNpcId))
-            .Where(e => e.TurnType is TurnType.Movement or TurnType.Action)
+            .Where(e => e.TurnType == TurnType.Action || (e.TurnType == TurnType.Movement && !campaign.FreeMode))
             .ToList();
         var movement = entries.FirstOrDefault(e => e.TurnType == TurnType.Movement);
 
@@ -255,7 +260,8 @@ public partial class TurnService : ITurnService
         var participations = await _campaignCharacterRepository.ListByCampaignAsync(campaignId, approvedOnly: true);
         var missingIds = participations.Select(p => p.CharacterId).Where(id => !acted.Contains(id)).Distinct().ToList();
 
-        if (missingIds.Count > 0 && !info.Force)
+        // 054: in free mode nobody owes the play — the turn finishes at once (and the mode stays on).
+        if (missingIds.Count > 0 && !info.Force && !campaign.FreeMode)
         {
             var characters = await _characterRepository.ListByIdsAsync(missingIds);
             return new TurnFinishResultInfo

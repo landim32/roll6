@@ -144,6 +144,21 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Switches the campaign's free mode (054, master, any status): several valid actions per actor, unlimited unrecorded moves, no pending list.</summary>
+    [HttpPut("{id:long}/free-mode")]
+    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetFreeMode(long id, [FromBody] CampaignFreeModeInfo info)
+    {
+        try
+        {
+            return Ok(await _campaignService.SetFreeModeAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Changes the campaign status (049, master): 1 Preparando, 2 Ativa, 3 Pausada, 4 Finalizada.</summary>
     [HttpPut("{id:long}/status")]
     [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]

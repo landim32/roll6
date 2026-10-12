@@ -4,11 +4,11 @@ import type { CampaignTableInfo } from '../types/campaign';
 
 const campaigns: CampaignTableInfo[] = [
   {
-    campaignId: 3, name: 'Tormento Vil', slug: 'tormento-vil', status: 2, isMaster: true,
+    campaignId: 3, name: 'Tormento Vil', slug: 'tormento-vil', status: 2, freeMode: false, isMaster: true,
     currentMapId: 12, currentMapName: 'Estrada 1', currentMapSlug: 'estrada-1',
   },
   {
-    campaignId: 9, name: 'Teste 2', slug: 'teste-2', status: 3, isMaster: false,
+    campaignId: 9, name: 'Teste 2', slug: 'teste-2', status: 3, freeMode: false, isMaster: false,
     currentMapId: null, currentMapName: null, currentMapSlug: null,
   },
 ];

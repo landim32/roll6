@@ -8,6 +8,7 @@ public class CampaignTableRow
     public string Name { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
     public int Status { get; set; }
+    public bool FreeMode { get; set; }
     public long? CurrentMapId { get; set; }
     public string? CurrentMapName { get; set; }
     public string? CurrentMapSlug { get; set; }

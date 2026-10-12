@@ -86,6 +86,23 @@ public static class Roll6Guide
         - The conversation chat always works: messages, photos, audios, dice rolls, polls and votes, reactions, replies,
           whispers. Sheets, settings, the plan, archiving maps and the current map are never blocked either.
 
+        ## Free mode
+        - The master switches the campaign's `freeMode` (`set_campaign_free_mode`, any status; read it in `get_campaign`,
+          `get_campaign_by_slug`, `list_my_table_campaigns`). It is a flag of the campaign: it stays on across turns
+          until the master turns it off, and switching it never touches the turn (no confirmation, no finish, nothing
+          cancelled or deleted).
+        - While it is **on**: every action of an actor stays valid (`act_in_turn` and `convert_chat_entry` cancel
+          nothing; the map balloon shows the last one, `get_turn_summary`/`get_turn_data` list them all, in order);
+          character and NPC pieces move any number of times per turn (`move_map_token`), without the Deslocamento limit
+          and **without a Movement entry** — nothing is recorded, so there is no trail and the summary's positions are
+          just where the pieces are; `finish_turn` finishes at once (no pending list); no "Falta apenas você…" notice;
+          `reset_turn` only cancels the actor's actions and leaves the piece where it is.
+        - Never changed by it: `process_turn` (still finishes the turn; the mode stays on), `set_current_turn`, the admin
+          log tools, pokes, the chat, the campaign status rules (outside Active everything stays frozen) and the
+          occupancy rules (an occupied hex or a hex outside the grid is still refused).
+        - When it goes **off**, the normal rules return from the next action or move of each actor: the next action
+          cancels every earlier valid action of the turn; moves are again one per turn and limited.
+
         ## Hex grid (maps)
         - Flat-top hexagons in a rectangle of `gridWidth` columns × `gridHeight` rows; odd columns are shifted half a
           hex down ("odd-q" layout).
@@ -190,8 +207,9 @@ public static class Roll6Guide
           a minute per person); `list_notification_settings` / `set_campaign_notifications` read and mute campaigns.
 
         ## Turns
-        - A campaign is always in turn `N` (`get_turn_state`). Each character and each NPC occurrence can **move
-          once** per turn (moving records a Movement entry) and **act** any number of times (`act_in_turn`, text).
+        - A campaign is always in turn `N` (`get_turn_state`). Outside free mode (see "Free mode"), each character and
+          each NPC occurrence can **move once** per turn (moving records a Movement entry) and has **one valid action**
+          (`act_in_turn`, text — a new one cancels the previous).
         - `reset_turn` deletes a piece's entries of the current turn and moves it back if the former hex is free.
         - Every entry records who made it (`userId`/`userName`); moves record the movement points spent (`moved`); any
           change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the

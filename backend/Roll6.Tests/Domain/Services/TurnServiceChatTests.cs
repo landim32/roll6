@@ -541,6 +541,29 @@ public partial class TurnServiceChatTests
     }
 
     [Fact]
+    public async Task Convert_ToAction_InFreeMode_CancelsNothing()
+    {
+        _campaign.FreeMode = true;
+        var text = AriaText(70);
+        var previous = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Antes");
+        previous.TurnId = 71;
+        _repository.Setup(r => r.ListValidActionsAsync(CAMPAIGN, 3, ARIA, null)).ReturnsAsync(new List<Turn> { previous });
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken>
+        {
+            MapToken.PlaceCharacter(MAP, 5, 700, "Aria", 2, 2)
+        });
+        _campaignCharacterRepository.Setup(r => r.GetAsync(CAMPAIGN, ARIA)).ReturnsAsync(new CampaignCharacter
+            { CampaignCharacterId = 700, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved });
+
+        await _service.ConvertAsync(PLAYER, 70, new ChatConvertInfo { To = "action" });
+
+        text.IsValidAction.Should().BeTrue();
+        previous.IsCancelled.Should().BeFalse();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 71)), Times.Never);
+        _campaign.FreeMode = false;
+    }
+
+    [Fact]
     public async Task Convert_PausedCampaign_Throws409()
     {
         AriaText(73);

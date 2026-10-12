@@ -15,6 +15,8 @@ export interface CampaignInfo {
   status: number;
   /** Turn in progress (016), starts at 1. */
   currentTurn: number;
+  /** Free mode (054) — see `lib/freeMode`. A missing value reads as false. */
+  freeMode: boolean;
   /** Campaign map the master opened last; players follow it (017). */
   currentMapId: number | null;
   createdAt: string;
@@ -28,6 +30,8 @@ export interface CampaignTableInfo {
   slug: string;
   /** Campaign status (049). */
   status: number;
+  /** Free mode (054). */
+  freeMode: boolean;
   isMaster: boolean;
   currentMapId: number | null;
   currentMapName: string | null;

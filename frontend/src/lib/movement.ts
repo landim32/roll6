@@ -6,16 +6,26 @@ import type { MoveState, MovementField, Offset } from './hexGrid';
  * hex ahead + 1 per 60° turn), then choose the facing; a player can't go past the piece's move.
  */
 
-/** Characters and NPCs spend movement; objects move freely (gray trail, no counter). */
+/**
+ * Characters and NPCs spend movement; objects move freely (gray trail, no counter); in the campaign's free mode (054)
+ * characters and NPCs are `unlimited`: no path, no counter, any hex where the whole shape fits.
+ */
 export const MOVEMENT_KIND = {
   limited: 'limited',
   free: 'free',
+  unlimited: 'unlimited',
 } as const;
 
 export type MovementKind = (typeof MOVEMENT_KIND)[keyof typeof MOVEMENT_KIND];
 
 /** Trail color: within the move, past it, or a free (object) move. */
 export type MovementStatus = 'ok' | 'over' | 'free';
+
+/**
+ * Whether the piece's whole shape fits on a hex with a facing (free mode, 054): the only rule left when there is no
+ * path to follow. Built by the hook from `lib/occupancy`.
+ */
+export type Fits = (x: number, y: number, look: number) => boolean;
 
 export interface MovingPiece {
   mapTokenId: number;
@@ -24,7 +34,7 @@ export interface MovingPiece {
   y: number;
   look: number;
   kind: MovementKind;
-  /** The piece's move (characters/NPCs); null for objects. */
+  /** The piece's move (characters/NPCs); null for objects and for unlimited moves. */
   total: number | null;
   /** Hexes the piece takes (031): the whole shape moves and turns. */
   space: number;
@@ -64,10 +74,15 @@ export const startMovement = (piece: MovingPiece, field: MovementField): Movemen
   cost: 0,
 });
 
-/** Cheapest path to the hex under the mouse (walking into it). */
-export const hoverPath = (state: MovementState, hex: Offset | null): MovementState => {
+/**
+ * Cheapest path to the hex under the mouse (walking into it). An unlimited piece (054) follows no path: the target is
+ * fine (cost 0) when its whole shape fits there, impossible (cost null) otherwise.
+ */
+export const hoverPath = (state: MovementState, hex: Offset | null, fits?: Fits): MovementState => {
   if (state.phase !== 'path') return state;
   if (!hex) return { ...state, target: null, trail: [], cost: null };
+  if (state.piece.kind === MOVEMENT_KIND.unlimited)
+    return { ...state, target: hex, trail: [], cost: fits?.(hex.x, hex.y, state.field.start.look) ? 0 : null };
   const arrival = arrivalCost(state.field, hex.x, hex.y);
   if (!arrival) return { ...state, target: hex, trail: [], cost: null };
   return { ...state, target: hex, trail: pathTo(state.field, arrival.state), cost: arrival.cost };
@@ -75,6 +90,8 @@ export const hoverPath = (state: MovementState, hex: Offset | null): MovementSta
 
 export const statusOf = (piece: MovingPiece, cost: number | null): MovementStatus => {
   if (piece.kind === MOVEMENT_KIND.free) return 'free';
+  // Unlimited (054): green wherever the shape fits, red where it does not — never "past the move".
+  if (piece.kind === MOVEMENT_KIND.unlimited) return cost !== null ? 'ok' : 'over';
   return cost !== null && piece.total !== null && cost <= piece.total ? 'ok' : 'over';
 };
 
@@ -106,9 +123,14 @@ export const pickDestination = (state: MovementState): MovementState => {
   };
 };
 
-/** Facing mode: the piece turns to `look`; the cost is the cheapest way to end there with that facing. */
-export const pointFacing = (state: MovementState, look: number): MovementState => {
+/**
+ * Facing mode: the piece turns to `look`; the cost is the cheapest way to end there with that facing. An unlimited
+ * piece (054) only needs its shape to fit with the new facing.
+ */
+export const pointFacing = (state: MovementState, look: number, fits?: Fits): MovementState => {
   if (state.phase !== 'facing') return state;
+  if (state.piece.kind === MOVEMENT_KIND.unlimited)
+    return { ...state, look, cost: fits?.(state.destination.x, state.destination.y, look) ? 0 : null, trail: [] };
   const end = { x: state.destination.x, y: state.destination.y, look };
   const cost = movementCost(state.field, end);
   return { ...state, look, cost, trail: cost === null ? state.trail : pathTo(state.field, end) };
@@ -131,6 +153,9 @@ export const previewOf = (state: MovementState): MoveState | null => {
 export const previewHexes = (state: MovementState): Offset[] => {
   if (state.phase === 'idle') return [];
   if (state.phase === 'facing') return footprint(state.destination.x, state.destination.y, state.look, state.piece.space);
+  // Unlimited (054): the shape on the target with the facing it keeps, also where it does not fit (drawn red).
+  if (state.piece.kind === MOVEMENT_KIND.unlimited)
+    return state.target ? footprint(state.target.x, state.target.y, state.field.start.look, state.piece.space) : [];
   if (!state.target || state.cost === null) return state.target ? [state.target] : [];
   const arrival = state.trail[state.trail.length - 1] ?? state.field.start;
   return footprint(arrival.x, arrival.y, arrival.look, state.piece.space);

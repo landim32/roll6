@@ -199,6 +199,94 @@ public class TurnServiceTests
             .Should().ThrowAsync<DomainValidationException>();
     }
 
+    // ---- 054: free mode ----
+
+    [Fact]
+    public async Task Act_InFreeMode_KeepsPreviousActionValid()
+    {
+        _campaign.FreeMode = true;
+        var previous = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Antes");
+        previous.TurnId = 600;
+        _repository.Setup(r => r.ListValidActionsAsync(CAMPAIGN, 3, ARIA, null)).ReturnsAsync(new List<Turn> { previous });
+
+        var result = await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Depois" });
+
+        result.Description.Should().Be("Depois");
+        previous.IsCancelled.Should().BeFalse();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Turn>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Once);
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_AfterLeavingFreeMode_CancelsAllEarlierActions()
+    {
+        _campaign.FreeMode = false;
+        var earlier = Enumerable.Range(0, 3).Select(i =>
+        {
+            var t = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, $"Ação {i}");
+            t.TurnId = 610 + i;
+            return t;
+        }).ToList();
+        _repository.Setup(r => r.ListValidActionsAsync(CAMPAIGN, 3, ARIA, null)).ReturnsAsync(earlier);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Nova" });
+
+        earlier.Should().OnlyContain(t => t.IsCancelled);
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.IsCancelled)), Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task Reset_InFreeMode_CancelsActionsOnly()
+    {
+        _campaign.FreeMode = true;
+        _ariaPiece.MoveTo(4, 2);
+        var movement = Turn.Movement(CAMPAIGN, MAP, ARIA, null, null, 3, 1, (4, 4, 3), (4, 2, 0));
+        movement.TurnId = 500;
+        var first = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, 1, "Um");
+        first.TurnId = 501;
+        var second = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, 1, "Dois");
+        second.TurnId = 502;
+        _repository.Setup(r => r.ListByActorTurnAsync(CAMPAIGN, 3, ARIA, null)).ReturnsAsync(new List<Turn> { movement, first, second });
+
+        var result = await _service.ResetAsync(PLAYER, new TurnPieceInfo { MapTokenId = ARIA_PIECE });
+
+        (result.Removed, result.Reverted).Should().Be((2, true));
+        (_ariaPiece.X, _ariaPiece.Y).Should().Be((4, 2));
+        _mapTokenRepository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+        _repository.Verify(r => r.DeleteRangeAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.IsCancelled)), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Finish_InFreeMode_IgnoresPending()
+    {
+        _campaign.FreeMode = true;
+        SetupApproved(ARIA, BRAM);
+
+        var result = await _service.FinishAsync(MASTER, CAMPAIGN, new TurnFinishInfo());
+
+        (result.Finished, result.FinishedTurn, result.TurnNo).Should().Be((true, (int?)3, 4));
+        result.Pending.Should().BeEmpty();
+        _campaign.FreeMode.Should().BeTrue();
+        _repository.Verify(r => r.InsertAsync(It.Is<Turn>(t => t.TurnType == TurnType.TurnFinished)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_FINISHED)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_InFreeMode_SendsNoMajorityNotice()
+    {
+        _campaign.FreeMode = true;
+        ThreePlayers(BRAM, ARIA);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Majority)), Times.Never);
+        _campaignRepository.Verify(r => r.TrySetMajorityNotifiedAsync(It.IsAny<long>(), It.IsAny<int>()), Times.Never);
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
+    }
+
     [Fact]
     public async Task Act_MasterForANpc_KeepsTheOccurrence()
     {
