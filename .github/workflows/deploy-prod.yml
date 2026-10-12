@@ -70,6 +70,14 @@ jobs:
           sleep 10
           docker compose --env-file .env.prod -f docker-compose-prod.yml ps
 
+          # The shared nginx resolves roll6-api / roll6-mcp once, when its config loads; "down" + "up" gives the
+          # containers new IPs on emagine-network, so without a reload /api may land on another container (404)
+          # and /mcp on a dead one (502). Reload every nginx container attached to the shared network.
+          for n in $(docker ps --filter network=emagine-network --format '{{.Names}} {{.Image}}' | awk 'tolower($2) ~ /nginx/ { print $1 }'); do
+            echo "Reloading shared nginx: $n"
+            docker exec "$n" nginx -s reload || echo "WARNING: could not reload $n"
+          done
+
           # Drop dangling images left by the rebuild
           docker image prune -f
 

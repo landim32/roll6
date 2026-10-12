@@ -16,6 +16,7 @@ import type { SpriteSpec } from '../../lib/pieceDrawing';
 import { buildMaskGrid } from '../../lib/raycaster';
 import type { MapArea, MaskGrid } from '../../lib/raycaster';
 import { cameraBlocker } from '../../lib/storyCamera';
+import { QUALITY_PROFILES } from '../../lib/viewQuality';
 import { FollowCharacterIcon } from '../ui/icons';
 import { BubbleLayer } from './BubbleLayer';
 import { initialPixels, toPixels } from './imagePixels';
@@ -30,9 +31,8 @@ interface StoryViewProps {
   onUnsupported: () => void;
 }
 
-/** Longest side (px) the map image, the mask and the background are read at, and the figures' images. */
+/** Longest side (px) the map image, the mask and the background are read at. The figures' size comes from the quality level (053). */
 const MAP_MAX_SIDE = 2048;
-const SPRITE_MAX_SIDE = 256;
 /** Longest side (px) the wall texture is read at: it is sampled one pixel per screen pixel, so more would only cost memory. */
 const TEXTURE_MAX_SIDE = 1024;
 
@@ -47,10 +47,14 @@ const readImage = async (url: string, maxSide: number): Promise<PixelBuffer | nu
  * map image as the floor, the background as a panorama and every piece as a figure seen from a camera behind the chosen
  * character. The user only observes: nothing here changes a piece. It reads the editor, pieces and character contexts,
  * so real-time changes (017) show up the same way they do on the 2D map. Loaded lazily to keep it out of the main bundle.
+ * The quality level (053) decides the frame's width, the size the figures' images are read at and how they are drawn.
  */
 export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   const { t } = useTranslation();
-  const { draft, fov, setFov } = useMapEditor();
+  const { draft, fov, setFov, viewQuality } = useMapEditor();
+  const profile = QUALITY_PROFILES[viewQuality];
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
   const { mapTokens } = useMapToken();
   const { party, currentSelection } = useCharacter();
   const { entries } = useTurn();
@@ -63,9 +67,12 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   fovRef.current = fov;
   const unsupported = useRef(onUnsupported);
   unsupported.current = onUnsupported;
-  /** Figure images by URL, read once (a failed one is null and the figure shows its initial). */
+  /**
+   * Figure images by size and URL, read once (a failed one is null and the figure shows its initial). The size is the
+   * level's (053): "Padrão" keeps reading at 256 px and never pays for the larger copies the other levels read.
+   */
   const spriteImages = useRef(new Map<string, Promise<PixelBuffer | null>>());
-  /** The four sides of a token fitted to the same figure height (036), by their URLs: a piece that only moves reuses it. */
+  /** The four sides of a token fitted to the same figure height (036), by size and URLs: a piece that only moves reuses it. */
   const fittedImages = useRef(new Map<string, ReturnType<typeof fitSprites>>());
 
   const blocked = useMemo(() => cameraBlocker(mask, draft.gridWidth, draft.gridHeight), [mask, draft.gridWidth, draft.gridHeight]);
@@ -110,7 +117,7 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     try {
       renderer = createRaycastRenderer(canvas, (result) => {
         bubbleLayer.current?.update(result, { width: canvas.clientWidth, height: canvas.clientHeight });
-      });
+      }, profileRef.current);
     } catch (err) {
       if (err instanceof CanvasUnavailableError) unsupported.current();
       else throw err;
@@ -128,6 +135,11 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
       setReady(false);
     };
   }, []);
+
+  // A new level (053) redraws at once with the new frame width and sampling; the camera is not touched.
+  useEffect(() => {
+    if (ready) rendererRef.current?.setQuality(profile);
+  }, [ready, profile]);
 
   const camera = useStoryCamera({
     apply: (pose) => rendererRef.current?.setCamera(pose, fovRef.current),
@@ -211,23 +223,26 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   // The figures: each standing piece with the four "2,5D" images of its token (035), read once per URL — pieces of the
   // same token share the cache. A figure is handed to the renderer only after all its images finished; the ones that
   // are missing or failed stay null and the renderer uses the reserve, so a slow or broken image never stops the 3D.
+  // A new level (053) reads the images at its size; until they all arrive the renderer keeps the figures it has.
+  const spriteMaxSide = profile.spriteMaxSide;
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
     const pixelsOf = (url: string | null): Promise<PixelBuffer | null> => {
       if (!url) return Promise.resolve(null);
-      const cached = spriteImages.current.get(url);
+      const key = `${spriteMaxSide}|${url}`;
+      const cached = spriteImages.current.get(key);
       if (cached) return cached;
       // One image that cannot be read is a hole in the figure (the reserve takes it), never a frame without figures.
-      const pending = readImage(url, SPRITE_MAX_SIDE).catch(() => null);
-      spriteImages.current.set(url, pending);
+      const pending = readImage(url, spriteMaxSide).catch(() => null);
+      spriteImages.current.set(key, pending);
       return pending;
     };
     const figure = async (spec: SpriteSpec): Promise<RenderSprite> => {
       const [front, right, left, back] = await Promise.all(SPRITE_VIEWS.map((view) => pixelsOf(spec.views[view])));
       const standing = await pixelsOf(spec.fallbackUrl);
       // The same character is as tall from every side: the sides are fitted to one figure height once per token.
-      const key = SPRITE_VIEWS.map((view) => spec.views[view] ?? '').join('|');
+      const key = `${spriteMaxSide}|${SPRITE_VIEWS.map((view) => spec.views[view] ?? '').join('|')}`;
       let images = fittedImages.current.get(key);
       if (!images) {
         images = fitSprites({ front, right, left, back });
@@ -248,7 +263,7 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
       if (!cancelled) rendererRef.current?.setSprites(sprites);
     });
     return () => { cancelled = true; };
-  }, [ready, pieces]);
+  }, [ready, pieces, spriteMaxSide]);
 
   return (
     <div className="stm-story">
