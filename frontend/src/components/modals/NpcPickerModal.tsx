@@ -9,6 +9,7 @@ import type { ImageCrop } from '../ui/ImageCropper';
 import { NpcFormFields } from '../npcs/NpcFormFields';
 import type { NpcTokenChoice } from '../npcs/NpcFormFields';
 import { useNpc } from '../../hooks/useNpc';
+import { useMapEditor } from '../../hooks/useMapEditor';
 import { imageService } from '../../Services/imageService';
 import { cropToFile } from '../../lib/cropImage';
 import { emptyNpcForm, toNpcInsert, validateNpcForm } from '../../lib/npcForm';
@@ -24,10 +25,16 @@ interface NpcPickerModalProps {
 const PAGE_SIZE = 12;
 const SEARCH_DELAY_MS = 300;
 
-/** "Incluir NPC": pick one of the master's NPCs ("Meus NPCs") or create a new one ("Novo NPC"); both join the campaign. */
+/**
+ * "Incluir NPC": pick one of the master's NPCs ("Meus NPCs") or create a new one ("Novo NPC"); both join the campaign.
+ * An NPC already in the campaign (052) adds another instance to the open campaign map instead — the server picks a free
+ * hex near the middle — and is only unavailable while no campaign map is open.
+ */
 export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
   const { t } = useTranslation();
-  const { campaignNpcs, searchMyNpcs, createNpc, addToCampaign } = useNpc();
+  const { campaignNpcs, searchMyNpcs, createNpc, addToCampaign, placeOnMap } = useNpc();
+  const { draft } = useMapEditor();
+  const canPlace = draft.mapId !== null;
   const [tab, setTab] = useState('mine');
   const [pickingToken, setPickingToken] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -73,8 +80,13 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
   const add = async (npc: NpcInfo) => {
     setBusy(true);
     try {
-      await addToCampaign(npc.npcId);
-      toast.success(t('toast.npcAdded', { name: npc.name }));
+      if (inCampaign.has(npc.npcId)) {
+        const instance = await placeOnMap(npc.npcId);
+        toast.success(t('toast.npcPlaced', { name: instance.name }));
+      } else {
+        await addToCampaign(npc.npcId);
+        toast.success(t('toast.npcAdded', { name: npc.name }));
+      }
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
@@ -129,11 +141,13 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
               const added = inCampaign.has(npc.npcId);
               return (
                 <button key={npc.npcId} type="button" className="list-group-item list-group-item-action d-flex align-items-center gap-3"
-                  onClick={() => { void add(npc); }} disabled={busy || added}>
+                  onClick={() => { void add(npc); }} disabled={busy || (added && !canPlace)}
+                  title={added && canPlace ? t('npcs.addInstance', { name: npc.name }) : undefined}>
                   <CharacterAvatar name={npc.name} imageUrl={npc.imageUrl ?? npc.tokenImageUrl} size={36} />
                   <span className="flex-grow-1 text-start">
                     <span className="d-block fw-semibold">{npc.name}</span>
                     <small className="text-body-secondary">{t('npcs.stats', { life: npc.life, energy: npc.energy, move: npc.move })}</small>
+                    {added && canPlace && <small className="d-block text-body-secondary">{t('npcs.addInstanceHint')}</small>}
                   </span>
                   {added && <span className="badge text-bg-secondary">{t('npcs.inCampaign')}</span>}
                 </button>

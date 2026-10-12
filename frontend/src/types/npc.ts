@@ -102,7 +102,8 @@ export interface MapNpcUpdateInfo {
 export interface MapNpcInsertInfo {
   mapId: number;
   npcId: number;
-  x: number;
-  y: number;
+  /** Column/row of the piece; omit both (052) and the server takes the free hex nearest to the middle of the map. */
+  x?: number;
+  y?: number;
   look: number | null;
 }

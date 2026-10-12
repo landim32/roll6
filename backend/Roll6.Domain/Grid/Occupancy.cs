@@ -54,4 +54,27 @@ public class Occupancy
             return FitResult.OutsideGrid;
         return list.Any(h => IsBlocked(h.X, h.Y, exceptMapTokenId)) ? FitResult.Occupied : FitResult.Ok;
     }
+
+    /// <summary>
+    /// The free hex nearest to the middle of the grid where a shape of <paramref name="space"/> hexes facing
+    /// <paramref name="look"/> fits whole (052: "Incluir NPC" on an NPC already in the campaign places another instance
+    /// without asking where). Ties go to the upper rows, then the left columns; null when nothing fits.
+    /// </summary>
+    public (int X, int Y)? FirstFree(int look, int space, int columns, int rows)
+    {
+        var (cq, cr) = HexGrid.OffsetToAxial(columns / 2, rows / 2);
+        var candidates = new List<(int Distance, int X, int Y)>();
+        for (var y = 0; y < rows; y++)
+            for (var x = 0; x < columns; x++)
+            {
+                var (q, r) = HexGrid.OffsetToAxial(x, y);
+                var (dq, dr) = (q - cq, r - cr);
+                var distance = (Math.Abs(dq) + Math.Abs(dr) + Math.Abs(dq + dr)) / 2;
+                candidates.Add((distance, x, y));
+            }
+        foreach (var (_, x, y) in candidates.OrderBy(c => c.Distance).ThenBy(c => c.Y).ThenBy(c => c.X))
+            if (Fits(HexGrid.Footprint(x, y, look, space), columns, rows, null) == FitResult.Ok)
+                return (x, y);
+        return null;
+    }
 }

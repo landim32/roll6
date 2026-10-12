@@ -85,8 +85,19 @@ public class MapNpcService : IMapNpcService
         if (await _campaignNpcRepository.GetAsync(map.CampaignId, npc.NpcId) == null)
             throw new ConflictException("O NPC não está na campanha deste mapa.");
 
-        (await _occupancy.LoadAsync(map)).EnsureFits(info.X, info.Y, info.Look ?? 0,
-            await _occupancy.SpaceOfTokenAsync(npc.TokenId, npc.Posture), null);
+        // 052: without a position the server takes the free hex nearest to the middle of the map ("Incluir NPC" on
+        // an NPC already in the campaign adds another instance without asking where).
+        var look = info.Look ?? 0;
+        var layout = await _occupancy.LoadAsync(map);
+        var space = await _occupancy.SpaceOfTokenAsync(npc.TokenId, npc.Posture);
+        (int X, int Y) at;
+        if (info.X is int x && info.Y is int y)
+        {
+            layout.EnsureFits(x, y, look, space, null);
+            at = (x, y);
+        }
+        else
+            at = layout.FirstFree(look, space);
 
         // 051: "Guarda", then "Guarda 2", "Guarda 3"… among the active instances of this NPC on this map.
         var instance = MapNpc.FromNpc(map.MapId, npc);
@@ -97,7 +108,7 @@ public class MapNpcService : IMapNpcService
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             saved = await _repository.InsertAsync(instance);
-            await _mapTokenRepository.InsertAsync(MapToken.PlaceNpc(map.MapId, npc.TokenId, saved.MapNpcId, saved.Name, info.X, info.Y, info.Look));
+            await _mapTokenRepository.InsertAsync(MapToken.PlaceNpc(map.MapId, npc.TokenId, saved.MapNpcId, saved.Name, at.X, at.Y, info.Look));
         });
         await PublishPiecesChangedAsync(map, userId);
         return (await MapToDtoAsync(new List<MapNpc> { saved })).Single();

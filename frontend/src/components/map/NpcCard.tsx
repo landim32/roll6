@@ -3,7 +3,7 @@ import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { TurnStatusDot } from '../ui/TurnStatusDot';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
-import { npcStatus } from '../../lib/turnStatus';
+import { npcStatus, occurrenceStatus } from '../../lib/turnStatus';
 import { VitalBar } from './VitalBar';
 import { NPC_DRAG_TYPE } from '../../lib/mapTokens';
 import type { MapTokenInfo } from '../../types/mapToken';
@@ -25,8 +25,9 @@ interface NpcCardProps {
 
 /**
  * One campaign NPC: round picture (or its token) and name. Each occurrence on the open map is listed with its own
- * current/total life and energy and its status (026); without occurrences, the NPC's totals. The turn circle
- * aggregates the NPC's pieces on the open map (each occurrence has its own turn).
+ * current/total life and energy and its status (026); without occurrences, the NPC's totals. Each instance has its own
+ * turn, so each row carries its own turn circle (052); the circle on the NPC's name is only shown while it has no piece
+ * on the open map (entries recorded for the NPC as a whole).
  */
 export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstance }: NpcCardProps) => {
   const { t } = useTranslation();
@@ -50,7 +51,7 @@ export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstan
       </span>
       <div className="stm-party-info">
         <div className="stm-party-name">
-          {turnNo !== null && <TurnStatusDot status={npcStatus(entries, npc.npcId, occurrenceIds)} />}
+          {turnNo !== null && occurrences.length === 0 && <TurnStatusDot status={npcStatus(entries, npc.npcId, occurrenceIds)} />}
           <span title={npc.name}>{npc.name}</span>
           {onEdit && (
             <button type="button" className="btn btn-link btn-sm p-0 ms-auto" aria-label={t('npcs.edit', { name: npc.name })}
@@ -70,6 +71,7 @@ export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstan
               <li key={piece.mapTokenId} className="mt-1">
                 {/* 051: every instance has its own name; the master edits or removes it from here. */}
                 <small className="d-flex align-items-center gap-1" title={piece.name}>
+                  {turnNo !== null && <TurnStatusDot status={occurrenceStatus(entries, piece.mapNpcId!)} />}
                   <span className="text-truncate">{piece.name}</span>
                   <PostureBadge posture={piece.posture} />
                   {onEditInstance && (
