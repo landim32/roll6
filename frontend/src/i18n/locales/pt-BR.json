@@ -48,7 +48,8 @@
     "edit": "Editar",
     "changePassword": "Trocar senha",
     "logout": "Sair",
-    "apiKeys": "Chaves de API"
+    "apiKeys": "Chaves de API",
+    "viewQuality": "Qualidade do 3D"
   },
   "character": {
     "current": "Personagem atual",
@@ -445,6 +446,22 @@
     "loading": "Carregando cena 3D…",
     "bubbleLabel": "{{name}} diz: {{text}}",
     "joystick": "Andar"
+  },
+  "viewQuality": {
+    "title": "Qualidade do 3D",
+    "intro": "Escolha quanto o aparelho deve trabalhar para desenhar a vista 3D. Vale para este aparelho e muda na hora.",
+    "level": {
+      "standard": "Padrão",
+      "high": "Alta",
+      "ultra": "Ultra"
+    },
+    "levelHint": {
+      "standard": "A vista de sempre, leve em qualquer aparelho.",
+      "high": "Quadro mais fino e figuras mais nítidas. Custo moderado.",
+      "ultra": "Figuras no tamanho da tela, com bordas suaves. Só para aparelhos fortes."
+    },
+    "costHint": "Níveis mais altos exigem mais do processador.",
+    "batteryHint": "No celular, gastam mais bateria."
   },
   "raycast": {
     "tab": "3D",

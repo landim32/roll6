@@ -7,6 +7,7 @@ import {
 import { runBeforeLogout } from '../lib/beforeLogout';
 import { clearLayoutMode } from '../lib/layoutMode';
 import { clearViewModes } from '../lib/viewMode';
+import { clearViewQuality } from '../lib/viewQuality';
 import type { UserInfo, UserInsertInfo, UserLoginInfo, UserPasswordInfo, UserTokenInfo } from '../types/auth';
 
 interface AuthContextType {
@@ -66,6 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(TURN_STORAGE_KEY);
     localStorage.removeItem(MAP_STORAGE_KEY);
     clearViewModes();
+    clearViewQuality();
     clearLayoutMode();
     setSession(null);
   }, []);

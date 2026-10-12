@@ -21,6 +21,8 @@ import { sameRatio } from '../lib/maskImage';
 import { clampFov, FOV_DEFAULT } from '../lib/storyCamera';
 import { readViewMode, writeViewMode } from '../lib/viewMode';
 import type { ViewMode } from '../lib/viewMode';
+import { readViewQuality, writeViewQuality } from '../lib/viewQuality';
+import type { ViewQuality } from '../lib/viewQuality';
 import { MAP_STATUS_DELETED } from '../types/map';
 import type { MapInfo } from '../types/map';
 import type { CampaignInfo } from '../types/campaign';
@@ -107,6 +109,9 @@ interface MapEditorContextType {
   /** Field of view (degrees) of the 3D view: its zoom. Not saved. */
   fov: number;
   setFov: (fov: number) => void;
+  /** Quality level of the 3D view (053): per user and device, remembered in `roll6:3d-quality`, applied at once. */
+  viewQuality: ViewQuality;
+  setViewQuality: (level: ViewQuality) => void;
   // Map lifecycle
   newMap: () => void;
   /** `keepView` keeps zoom/pan (the same map reloaded because someone saved it, 017). */
@@ -263,6 +268,12 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const [viewMode, setViewModeState] = useState<ViewMode>('2d');
   const [fov, setFovState] = useState(FOV_DEFAULT);
   const setFov = useCallback((value: number) => setFovState(clampFov(value)), []);
+  // The quality level (053) is a preference of this device, not of a map: read once, written on every choice.
+  const [viewQuality, setViewQualityState] = useState<ViewQuality>(readViewQuality);
+  const setViewQuality = useCallback((level: ViewQuality) => {
+    setViewQualityState(level);
+    writeViewQuality(level);
+  }, []);
 
   const setMaskImage = useCallback((fileName: string | null, url: string | null) => {
     setDraft((prev) => ({ ...prev, maskImage: fileName, maskImageUrl: url }));
@@ -525,7 +536,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, loading, error,
     zoomAt, zoomIn, zoomOut, panBy, centerOn,
     setImage, setImageLayout, setGridSize, toggleResizeMode,
-    setMaskImage, setBackgroundImage, setWallTextureImage, viewMode, setViewMode, fov, setFov,
+    setMaskImage, setBackgroundImage, setWallTextureImage, viewMode, setViewMode, fov, setFov, viewQuality, setViewQuality,
     newMap, loadMapModel, openCampaignMapBySlug, discardChanges, saveMap, clearError,
   };
 

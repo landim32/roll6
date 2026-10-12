@@ -11,15 +11,17 @@ interface UserMenuProps {
   onApiKeys: () => void;
   /** "Notificações" (043). */
   onNotifications: () => void;
+  /** "Qualidade do 3D" (053). */
+  onViewQuality: () => void;
   onLogout: () => void;
 }
 
 /**
- * User name in the top menu opening "Editar / Trocar senha / Chaves de API / Sair". Radix handles Esc, outside
- * click and keyboard navigation (research R1); `modal={false}` keeps it from competing with the
- * Radix Dialog opened by the items, which run after the menu closes (onSelect).
+ * User name in the top menu opening "Editar / Trocar senha / Chaves de API / Notificações / Qualidade do 3D / Sair".
+ * Radix handles Esc, outside click and keyboard navigation (research R1); `modal={false}` keeps it from competing with
+ * the Radix Dialog opened by the items, which run after the menu closes (onSelect).
  */
-export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications, onLogout }: UserMenuProps) => {
+export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications, onViewQuality, onLogout }: UserMenuProps) => {
   const { t } = useTranslation();
   const { session } = useAuth();
   const { canInstall, install } = useInstall();
@@ -38,6 +40,7 @@ export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications,
           <DropdownMenu.Item className="dropdown-item" onSelect={onChangePassword}>{t('userMenu.changePassword')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onApiKeys}>{t('userMenu.apiKeys')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onNotifications}>{t('notifications.menu')}</DropdownMenu.Item>
+          <DropdownMenu.Item className="dropdown-item" onSelect={onViewQuality}>{t('userMenu.viewQuality')}</DropdownMenu.Item>
           {canInstall && (
             <DropdownMenu.Item className="dropdown-item d-flex align-items-center gap-2" onSelect={() => { void install(); }}>
               <DownloadIcon size={14} /> {t('install.menu')}

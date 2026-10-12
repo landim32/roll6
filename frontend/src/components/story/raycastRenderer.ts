@@ -1,18 +1,20 @@
+import { clearLayer, drawFigureLayer } from '../../lib/figureLayer';
 import { drawRaycastFrame, skyGradient } from '../../lib/raycastFrame';
 import type { FrameResult, PixelBuffer, RenderSprite } from '../../lib/raycastFrame';
 import type { CameraPose, MapArea, MaskGrid } from '../../lib/raycaster';
 import { skyRepeats } from '../../lib/raycaster';
+import { QUALITY_PROFILES } from '../../lib/viewQuality';
+import type { QualityProfile } from '../../lib/viewQuality';
 
 export type { RenderSprite } from '../../lib/raycastFrame';
 export type { FrameResult } from '../../lib/raycastFrame';
 
 /**
  * Puts the 3D view (034) on a canvas the way Wolfenstein 3D did: a small frame — one ray per column, at most
- * `MAX_COLUMNS` wide — drawn by `lib/raycastFrame` and blown up to the canvas without smoothing. Only redraws when
- * something changed.
+ * `profile.columns` wide (053: 480 on "Padrão", the value of before) — drawn by `lib/raycastFrame` and blown up to the
+ * canvas without smoothing. Only redraws when something changed. On "Ultra" the figures leave the frame for a
+ * transparent canvas the size of the screen (`lib/figureLayer`), composed over the blown-up frame.
  */
-
-const MAX_COLUMNS = 480;
 
 export interface RaycastRenderer {
   setMap: (pixels: PixelBuffer | null, area: MapArea | null) => void;
@@ -23,6 +25,8 @@ export interface RaycastRenderer {
   setSprites: (sprites: readonly RenderSprite[]) => void;
   setCamera: (pose: CameraPose, fov: number) => void;
   resize: (width: number, height: number) => void;
+  /** The quality level (053): the frame's width, how the figures are sampled and whether they get their own layer. */
+  setQuality: (profile: QualityProfile) => void;
   /** Draws again without anything changing (036: a new speech balloon must be placed at once). */
   refresh: () => void;
   dispose: () => void;
@@ -36,12 +40,17 @@ export class CanvasUnavailableError extends Error {
   }
 }
 
-export const createRaycastRenderer = (canvas: HTMLCanvasElement, onFrame?: (result: FrameResult) => void): RaycastRenderer => {
+export const createRaycastRenderer = (
+  canvas: HTMLCanvasElement,
+  onFrame?: (result: FrameResult) => void,
+  initialProfile: QualityProfile = QUALITY_PROFILES.standard,
+): RaycastRenderer => {
   const display = canvas.getContext('2d');
   const buffer = document.createElement('canvas');
   const bufferCtx = buffer.getContext('2d');
   if (!display || !bufferCtx) throw new CanvasUnavailableError();
 
+  let profile = initialProfile;
   let mask: MaskGrid | null = null;
   let map: { pixels: PixelBuffer; area: MapArea } | null = null;
   let background: { pixels: PixelBuffer; repeats: number } | null = null;
@@ -51,15 +60,51 @@ export const createRaycastRenderer = (canvas: HTMLCanvasElement, onFrame?: (resu
   let fov = 70;
   let image = bufferCtx.createImageData(1, 1);
   let sky = skyGradient(1);
+  let lastSize: { width: number; height: number } | null = null;
   let dirty = true;
   let disposed = false;
   let animation = 0;
 
+  /** The screen-size figure layer of "Ultra" (053), made the first time a profile asks for it and sized with the canvas. */
+  let figureCanvas: HTMLCanvasElement | null = null;
+  let figureCtx: CanvasRenderingContext2D | null = null;
+  let figureImage: ImageData | null = null;
+
+  const ensureFigureLayer = (): boolean => {
+    if (!profile.figureLayer || canvas.width <= 0 || canvas.height <= 0) return false;
+    if (!figureCanvas) {
+      figureCanvas = document.createElement('canvas');
+      figureCtx = figureCanvas.getContext('2d');
+      if (!figureCtx) {
+        figureCanvas = null;
+        return false;
+      }
+    }
+    if (!figureImage || figureCanvas.width !== canvas.width || figureCanvas.height !== canvas.height) {
+      figureCanvas.width = canvas.width;
+      figureCanvas.height = canvas.height;
+      figureImage = figureCtx!.createImageData(canvas.width, canvas.height);
+    }
+    return true;
+  };
+
   const draw = () => {
-    const result = drawRaycastFrame(image, { mask, map, background, sprites, wallTexture }, pose, fov, sky);
+    const layered = ensureFigureLayer();
+    const result = drawRaycastFrame(image, { mask, map, background, sprites, wallTexture }, pose, fov, sky, {
+      spriteSampling: profile.spriteSampling,
+      figures: layered ? 'layer' : 'frame',
+    });
     bufferCtx.putImageData(image, 0, 0);
     display.imageSmoothingEnabled = false;
     display.drawImage(buffer, 0, 0, canvas.width, canvas.height);
+
+    if (layered && result.layer && figureImage && figureCanvas && figureCtx) {
+      const target = { data: figureImage.data, width: figureImage.width, height: figureImage.height };
+      clearLayer(target);
+      drawFigureLayer(target, result.layer, result.frameWidth, result.frameHeight);
+      figureCtx.putImageData(figureImage, 0, 0);
+      display.drawImage(figureCanvas, 0, 0);
+    }
 
     // What the frame drew, for the things laid over it (the speech balloons, 036).
     onFrame?.(result);
@@ -72,6 +117,20 @@ export const createRaycastRenderer = (canvas: HTMLCanvasElement, onFrame?: (resu
     draw();
   };
   animation = requestAnimationFrame(loop);
+
+  const resize = (width: number, height: number) => {
+    if (width <= 0 || height <= 0) return;
+    lastSize = { width, height };
+    canvas.width = Math.round(width);
+    canvas.height = Math.round(height);
+    const columns = Math.max(1, Math.min(profile.columns, Math.round(width)));
+    const rows = Math.max(1, Math.round((columns * height) / width));
+    buffer.width = columns;
+    buffer.height = rows;
+    image = bufferCtx.createImageData(columns, rows);
+    sky = skyGradient(Math.round(rows / 2));
+    dirty = true;
+  };
 
   return {
     setMap: (pixels, area) => {
@@ -99,16 +158,11 @@ export const createRaycastRenderer = (canvas: HTMLCanvasElement, onFrame?: (resu
       fov = nextFov;
       dirty = true;
     },
-    resize: (width, height) => {
-      if (width <= 0 || height <= 0) return;
-      canvas.width = Math.round(width);
-      canvas.height = Math.round(height);
-      const columns = Math.max(1, Math.min(MAX_COLUMNS, Math.round(width)));
-      const rows = Math.max(1, Math.round((columns * height) / width));
-      buffer.width = columns;
-      buffer.height = rows;
-      image = bufferCtx.createImageData(columns, rows);
-      sky = skyGradient(Math.round(rows / 2));
+    resize,
+    setQuality: (next) => {
+      profile = next;
+      // A new width of the frame: measure again with the last size; the camera stays where it is.
+      if (lastSize) resize(lastSize.width, lastSize.height);
       dirty = true;
     },
     refresh: () => {

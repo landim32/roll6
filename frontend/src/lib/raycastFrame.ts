@@ -6,7 +6,10 @@ import {
 import type { CameraPose, MapArea, MaskGrid } from './raycaster';
 import { chooseSprite, viewSeen } from './spriteView';
 import { heightAtRow, textureColumn, textureOffset, textureRow } from './wallTexture';
+import { mipChainOf, mipLevelFor, sampleBilinear } from './mipmap';
 import type { ViewImages } from './spriteView';
+import type { SpriteProjection } from './raycaster';
+import type { SpriteSampling } from './viewQuality';
 
 /**
  * Draws one frame of the 3D view (034) the way Wolfenstein 3D did: column by column — sky, wall, floor — and then the
@@ -77,11 +80,39 @@ export interface FrameSprite {
   headVisible: boolean;
 }
 
+/**
+ * How the figures are drawn (053). Omitted, the frame is byte for byte the one of before 053: figures painted into the
+ * frame by the nearest texel. `smooth` samples them bilinearly over reduced copies (`lib/mipmap`), still in the frame;
+ * `figures: 'layer'` leaves them out of the frame (their shadows stay) and hands them back in `FrameResult.layer` for
+ * a screen-size layer (`lib/figureLayer`) to draw.
+ */
+export interface FrameOptions {
+  spriteSampling?: SpriteSampling;
+  figures?: 'frame' | 'layer';
+}
+
+/** A figure the frame did not paint (053, `figures: 'layer'`): the image seen, its projection in frame pixels and its fade. */
+export interface LayerSprite {
+  id: number;
+  pixels: PixelBuffer;
+  mirrored: boolean;
+  where: SpriteProjection;
+  fade: number;
+}
+
+/** What a screen-size figure layer needs: the walls of this frame (for the occlusion) and the figures, far to near. */
+export interface FrameLayer {
+  walls: ColumnWalls;
+  sprites: LayerSprite[];
+}
+
 /** What one frame drew. */
 export interface FrameResult {
   frameWidth: number;
   frameHeight: number;
   sprites: FrameSprite[];
+  /** Only with `figures: 'layer'` (053). */
+  layer?: FrameLayer;
 }
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
@@ -179,9 +210,12 @@ export const drawRaycastFrame = (
   pose: CameraPose,
   fov: number,
   sky: number[][] = skyGradient(Math.round(frame.height / 2)),
+  options: FrameOptions = {},
 ): FrameResult => {
   const { width, height, data } = frame;
   const { mask, map, background } = scene;
+  const sampling: SpriteSampling = options.spriteSampling ?? 'nearest';
+  const toLayer = options.figures === 'layer';
   const texture = scene.wallTexture ?? null;
   const projection = projectionOf(width, fov);
   const horizon = Math.round(height / 2);
@@ -352,6 +386,8 @@ export const drawRaycastFrame = (
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
     .sort((a, b) => b.where.depth - a.where.depth);
   const drawn: FrameSprite[] = [];
+  const layerSprites: LayerSprite[] = [];
+  const sample = new Float32Array(4);
   for (const { id, pixels, mirrored, where, radius } of projected) {
     const span = where.screenX1 - where.screenX0;
     const tall = where.bottom - where.top;
@@ -382,24 +418,56 @@ export const drawRaycastFrame = (
     const headColumn = Math.floor(screenX);
     const first = Math.max(0, Math.ceil(where.top));
     const last = Math.min(height - 1, Math.floor(where.bottom));
+    const firstColumn = Math.max(0, Math.ceil(where.screenX0));
+    const lastColumn = Math.min(width - 1, Math.floor(where.screenX1));
     let painted = false;
-    for (let x = Math.max(0, Math.ceil(where.screenX0)); x <= Math.min(width - 1, Math.floor(where.screenX1)); x++) {
-      // From the top of a nearer wall down the wall is what the eye keeps: the figure shows only above it (036).
-      const hiddenRow = hiddenFrom(walls, x, where.depth);
-      if (hiddenRow <= first) continue;
-      const column = Math.min(pixels.width - 1, Math.floor(((x + 0.5 - where.screenX0) / span) * pixels.width));
-      // Mirrored: the opposite side's drawing, so the character's other arm is the one showing.
-      const texX = mirrored ? pixels.width - 1 - column : column;
-      for (let y = first; y <= Math.min(last, hiddenRow - 1); y++) {
-        const texY = Math.min(pixels.height - 1, Math.floor(((y + 0.5 - where.top) / tall) * pixels.height));
-        const j = (texY * pixels.width + texX) * 4;
-        if (pixels.data[j + 3] < 128) continue;
-        const i = (y * width + x) * 4;
-        data[i] = pixels.data[j] * fade;
-        data[i + 1] = pixels.data[j + 1] * fade;
-        data[i + 2] = pixels.data[j + 2] * fade;
-        data[i + 3] = 255;
-        painted = true;
+    if (toLayer) {
+      // The layer paints the figure (053): here only whether any of it shows past the walls, for the balloon.
+      for (let x = firstColumn; x <= lastColumn && !painted; x++) painted = hiddenFrom(walls, x, where.depth) > first;
+      if (painted) layerSprites.push({ id, pixels, mirrored, where, fade });
+    } else if (sampling === 'smooth') {
+      // Bilinear over the reduced copy whose texels are about one per frame pixel (053, "Alta"), composed over what the
+      // column already has by the coverage — that is what softens the edge. Mirrored: read the image right to left.
+      const chain = mipChainOf(pixels);
+      const level = chain.levels[mipLevelFor(chain, pixels.width / span)];
+      for (let x = firstColumn; x <= lastColumn; x++) {
+        const hiddenRow = hiddenFrom(walls, x, where.depth);
+        if (hiddenRow <= first) continue;
+        const across = (x + 0.5 - where.screenX0) / span;
+        const u = mirrored ? 1 - across : across;
+        for (let y = first; y <= Math.min(last, hiddenRow - 1); y++) {
+          sampleBilinear(level, u, (y + 0.5 - where.top) / tall, sample);
+          const alpha = sample[3] / 255;
+          if (alpha <= 0) continue;
+          const i = (y * width + x) * 4;
+          const keep = 1 - alpha;
+          // `sample` is premultiplied, so color × alpha is already in it.
+          data[i] = data[i] * keep + sample[0] * fade;
+          data[i + 1] = data[i + 1] * keep + sample[1] * fade;
+          data[i + 2] = data[i + 2] * keep + sample[2] * fade;
+          data[i + 3] = 255;
+          painted = true;
+        }
+      }
+    } else {
+      for (let x = firstColumn; x <= lastColumn; x++) {
+        // From the top of a nearer wall down the wall is what the eye keeps: the figure shows only above it (036).
+        const hiddenRow = hiddenFrom(walls, x, where.depth);
+        if (hiddenRow <= first) continue;
+        const column = Math.min(pixels.width - 1, Math.floor(((x + 0.5 - where.screenX0) / span) * pixels.width));
+        // Mirrored: the opposite side's drawing, so the character's other arm is the one showing.
+        const texX = mirrored ? pixels.width - 1 - column : column;
+        for (let y = first; y <= Math.min(last, hiddenRow - 1); y++) {
+          const texY = Math.min(pixels.height - 1, Math.floor(((y + 0.5 - where.top) / tall) * pixels.height));
+          const j = (texY * pixels.width + texX) * 4;
+          if (pixels.data[j + 3] < 128) continue;
+          const i = (y * width + x) * 4;
+          data[i] = pixels.data[j] * fade;
+          data[i + 1] = pixels.data[j + 1] * fade;
+          data[i + 2] = pixels.data[j + 2] * fade;
+          data[i + 3] = 255;
+          painted = true;
+        }
       }
     }
     if (!painted) continue;
@@ -413,5 +481,7 @@ export const drawRaycastFrame = (
     });
   }
 
-  return { frameWidth: width, frameHeight: height, sprites: drawn };
+  return toLayer
+    ? { frameWidth: width, frameHeight: height, sprites: drawn, layer: { walls, sprites: layerSprites } }
+    : { frameWidth: width, frameHeight: height, sprites: drawn };
 };
