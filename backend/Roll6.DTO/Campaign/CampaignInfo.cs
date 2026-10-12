@@ -23,6 +23,10 @@ public class CampaignInfo
     [JsonPropertyName("currentTurn")]
     public int CurrentTurn { get; set; }
 
+    /// <summary>Free mode (054): several valid actions per actor, unlimited unrecorded moves, no pending list.</summary>
+    [JsonPropertyName("freeMode")]
+    public bool FreeMode { get; set; }
+
     /// <summary>Map the master opened last; players follow it (017).</summary>
     [JsonPropertyName("currentMapId")]
     public long? CurrentMapId { get; set; }

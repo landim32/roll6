@@ -21,6 +21,10 @@ public class CampaignTableInfo
     [JsonPropertyName("status")]
     public int Status { get; set; }
 
+    /// <summary>Free mode of the campaign (054).</summary>
+    [JsonPropertyName("freeMode")]
+    public bool FreeMode { get; set; }
+
     [JsonPropertyName("isMaster")]
     public bool IsMaster { get; set; }
 

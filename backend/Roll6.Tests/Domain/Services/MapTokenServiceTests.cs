@@ -593,6 +593,63 @@ public class MapTokenServiceTests
         _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
     }
 
+    // ---- 054: free mode ----
+
+    private void CampaignIsFree() =>
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentTurn = 3, FreeMode = true });
+
+    [Fact]
+    public async Task Move_InFreeMode_RecordsNothing()
+    {
+        AriaPiece();
+        CampaignIsFree();
+
+        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 });
+
+        (moved.X, moved.Y).Should().Be((2, 0));
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+        _turnRepository.Verify(r => r.ExistsMovementAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<long?>(), It.IsAny<long?>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_UPSERTED)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Never);
+    }
+
+    [Fact]
+    public async Task Move_InFreeMode_AcceptsSecondMoveAndAnyCost()
+    {
+        AriaPiece(currentMove: 0);
+        CampaignIsFree();
+        _turnRepository.Setup(r => r.ExistsMovementAsync(10, 3, ARIA, null)).ReturnsAsync(true);
+
+        // Turning around and walking 5 hexes down: far beyond a Deslocamento of 0, after a move already recorded.
+        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 7, Look = 3 });
+
+        (moved.X, moved.Y, moved.Look).Should().Be((2, 7, 3));
+    }
+
+    [Fact]
+    public async Task Move_InFreeMode_StillRefusesOccupiedHex()
+    {
+        var piece = AriaPiece();
+        CampaignIsFree();
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
+        {
+            piece, new() { MapTokenId = 99, MapId = 30, TokenId = 5, X = 2, Y = 0 }
+        });
+
+        await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 })).Should().ThrowAsync<ConflictException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Move_InFreeMode_StillRefusesAnotherPlayersPiece()
+    {
+        AriaPiece();
+        CampaignIsFree();
+
+        await _service.Invoking(s => s.MoveAsync(3, 42, new MapTokenPositionInfo { X = 2, Y = 1 })).Should().ThrowAsync<UnauthorizedAccessException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task Move_PlayerBeyondItsMove_Throws()
     {

@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useRealtime } from '../../hooks/useRealtime';
 import { useCampaign } from '../../hooks/useCampaign';
 import { statusNoticeKey } from '../../lib/campaignStatus';
+import { isFreeMode } from '../../lib/freeMode';
 import { REALTIME_STATUS } from '../../types/realtime';
 
 interface GridSizeFooterProps {
@@ -28,6 +29,9 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
   return (
     <footer className="stm-footer">
       {turnNo !== null && <span className="badge stm-turn-badge">{t('turn.label', { no: turnNo })}</span>}
+      {turnNo !== null && isFreeMode(currentCampaign) && (
+        <span className="badge text-bg-info" title={t('turn.freeModeTitle')}>{t('turn.freeBadge')}</span>
+      )}
       {statusNotice && <span className="badge text-bg-secondary" title={t('campaignStatus.blockedPlay')}>{t(statusNotice)}</span>}
       {offline && (
         <span className="badge stm-realtime-badge" title={t('realtime.offlineHint')}>

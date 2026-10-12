@@ -300,7 +300,8 @@
     "counter": "Movimento",
     "hint": "Escolha o destino e depois o sentido (no celular, toque duas vezes em cada). Esc ou botão direito cancela.",
     "overLimit": "O movimento passou do máximo.",
-    "unreachable": "Não há caminho até esse hex."
+    "unreachable": "Não há caminho até esse hex.",
+    "blocked": "Esse hex não está livre para a peça."
   },
   "mapTokens": {
     "hexOccupied": "O hex precisa estar livre.",
@@ -506,6 +507,8 @@
     "cancel": "Cancelar"
   },
   "toast": {
+    "freeModeOn": "Modo livre ligado",
+    "freeModeOff": "Modo livre desligado",
     "welcome": "Bem-vindo, {{name}}!",
     "accountCreated": "Conta criada. Bem-vindo, {{name}}!",
     "loggedOut": "Você saiu do sistema.",
@@ -570,6 +573,9 @@
   },
   "turn": {
     "label": "Turno {{no}}",
+    "freeMode": "Livre",
+    "freeModeTitle": "Modo livre: várias ações por personagem, movimento livre sem rastro e sem lista de pendentes",
+    "freeBadge": "Turno livre",
     "update": "Alteração",
     "narration": "Narração",
     "fields": {

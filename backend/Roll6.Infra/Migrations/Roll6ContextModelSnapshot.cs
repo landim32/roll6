@@ -109,6 +109,12 @@ namespace Roll6.Infra.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("current_turn");
 
+                    b.Property<bool>("FreeMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("free_mode");
+
                     b.Property<int?>("MajorityNotifiedTurn")
                         .HasColumnType("integer")
                         .HasColumnName("majority_notified_turn");

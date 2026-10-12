@@ -32,6 +32,13 @@ public class Campaign
 
     /// <summary>The turn in which "Falta apenas você…" was already sent (043), so it goes once per turn.</summary>
     public int? MajorityNotifiedTurn { get; set; }
+
+    /// <summary>
+    /// Free mode (054): while on, every action of an actor stays valid (the map shows the last one), character and
+    /// NPC pieces move any number of times without the Deslocamento limit and without a Movement entry, the turn
+    /// finishes without a pending list and no majority notice goes out. Switching it never touches the turn.
+    /// </summary>
+    public bool FreeMode { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -73,6 +80,13 @@ public class Campaign
     public void SetOpen(bool open)
     {
         Open = open;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Switches the free mode (054; master only, checked by the service, allowed in any status).</summary>
+    public void SetFreeMode(bool freeMode)
+    {
+        FreeMode = freeMode;
         UpdatedAt = DateTime.UtcNow;
     }
 

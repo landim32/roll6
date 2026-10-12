@@ -77,6 +77,7 @@ public class CampaignRepository : ICampaignRepository<Campaign>
                 Name = campaign.Name,
                 Slug = campaign.Slug,
                 Status = (int)campaign.Status,
+                FreeMode = campaign.FreeMode,
                 CurrentMapId = map != null ? map.MapId : null,
                 CurrentMapName = map != null ? map.Name : null,
                 CurrentMapSlug = map != null ? map.Slug : null

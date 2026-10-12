@@ -2357,6 +2357,18 @@ button.stm-chat-quote { cursor: pointer; }
   gap: 0.5rem;
 }
 
+/* 054: the "Livre" switch sits before "Finalizar turno"; no bottom margin inside the menu row. */
+.stm-free-mode-switch {
+  margin-bottom: 0;
+  min-height: 0;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+
+.stm-free-mode-switch .form-check-input {
+  cursor: pointer;
+}
+
 /* Phones: the lightning-only "Finalizar turno" is a 32 × 32 icon button like the gear. */
 @media (max-width: 767.98px) {
   .stm-turn-controls > .btn {

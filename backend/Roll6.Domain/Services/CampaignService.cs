@@ -96,6 +96,7 @@ public class CampaignService : ICampaignService
             Name = row.Name,
             Slug = row.Slug,
             Status = row.Status,
+            FreeMode = row.FreeMode,
             IsMaster = row.UserId == userId,
             CurrentMapId = row.CurrentMapId,
             CurrentMapName = row.CurrentMapName,
@@ -139,6 +140,21 @@ public class CampaignService : ICampaignService
         if ((int)campaign.Status == info.Status)
             return await MapToDtoAsync(campaign);
         campaign.SetStatus(info.Status);
+        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
+        return result;
+    }
+
+    /// <summary>
+    /// Switches the free mode (054, master only, any status). Nothing of the turn changes with it; the table learns
+    /// through <c>campaign.changed</c>.
+    /// </summary>
+    public async Task<CampaignInfo> SetFreeModeAsync(long userId, long campaignId, CampaignFreeModeInfo info)
+    {
+        var campaign = await GetOwnedAsync(userId, campaignId);
+        if (campaign.FreeMode == info.FreeMode)
+            return await MapToDtoAsync(campaign);
+        campaign.SetFreeMode(info.FreeMode);
         var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
         return result;
@@ -244,6 +260,7 @@ public class CampaignService : ICampaignService
         Slug = campaign.Slug,
         Open = campaign.Open,
         Status = (int)campaign.Status,
+        FreeMode = campaign.FreeMode,
         CurrentTurn = campaign.CurrentTurn,
         CurrentMapId = campaign.CurrentMapId,
         CreatedAt = campaign.CreatedAt,

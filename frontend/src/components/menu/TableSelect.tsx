@@ -6,6 +6,7 @@ import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { tableEntries, triggerLabels } from '../../lib/tableSelect';
 import { isPlayable, statusLabelKey } from '../../lib/campaignStatus';
+import { isFreeMode } from '../../lib/freeMode';
 
 interface TableSelectProps {
   onOpenCampaign: () => void;
@@ -31,6 +32,11 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
   const statusBadge = (status: number | undefined) => (isPlayable(status) ? null : (
     <span className="badge text-bg-secondary ms-auto flex-shrink-0">{t(statusLabelKey(status))}</span>
   ));
+  // 054: a campaign in free mode says so too.
+  const freeOf = new Map(tableCampaigns.map((campaign) => [String(campaign.campaignId), campaign.freeMode === true]));
+  const freeBadge = (freeMode: boolean) => (freeMode ? (
+    <span className="badge text-bg-info flex-shrink-0">{t('turn.freeMode')}</span>
+  ) : null);
 
   return (
     <DropdownMenu.Root modal={false} onOpenChange={(open) => { if (open) void refreshTableCampaigns(); }}>
@@ -44,6 +50,7 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
             <CampaignIcon size={11} />
             <span className="text-truncate">{labels.campaign ?? t('menu.chooseCampaign')}</span>
             {currentCampaign && statusBadge(currentCampaign.status)}
+            {currentCampaign && freeBadge(isFreeMode(currentCampaign))}
           </span>
         </button>
       </DropdownMenu.Trigger>
@@ -59,6 +66,7 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
                 <CampaignIcon size={13} />
                 <span className="text-truncate">{entry.campaignLabel}</span>
                 {statusBadge(statusOf.get(entry.key))}
+                {freeBadge(freeOf.get(entry.key) === true)}
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 className={`dropdown-item stm-table-item stm-table-map${entry.mapActive ? ' active' : ''}${entry.mapLabel ? '' : ' fst-italic'}`}

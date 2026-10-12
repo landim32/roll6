@@ -4,19 +4,38 @@ import { toast } from 'sonner';
 import { FinishTurnModal } from '../modals/FinishTurnModal';
 import { LightningIcon } from '../ui/icons';
 import { isPlayable } from '../../lib/campaignStatus';
+import { isFreeMode } from '../../lib/freeMode';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useTurn } from '../../hooks/useTurn';
 
-/** "Finalizar turno" for the master (016); the turn number itself is shown in the map footer. */
+/**
+ * The master's turn controls (016): the "Livre" switch (054, any status — switching never touches the turn) and
+ * "Finalizar turno" (only while the campaign plays). The turn number itself is shown in the map footer.
+ */
 export const TurnControls = () => {
   const { t } = useTranslation();
-  const { isMaster, currentCampaign } = useCampaign();
+  const { isMaster, currentCampaign, setFreeMode } = useCampaign();
   const { turnNo, finish } = useTurn();
   const [pending, setPending] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
-  // 049: the turn only ends while the campaign plays.
-  if (turnNo === null || !isMaster || !isPlayable(currentCampaign?.status)) return null;
+  if (turnNo === null || !isMaster) return null;
+
+  const freeMode = isFreeMode(currentCampaign);
+
+  const toggleFreeMode = async () => {
+    try {
+      setSwitching(true);
+      const next = !freeMode;
+      await setFreeMode(next);
+      toast.success(t(next ? 'toast.freeModeOn' : 'toast.freeModeOff'));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   const run = async (force: boolean) => {
     try {
@@ -37,13 +56,23 @@ export const TurnControls = () => {
 
   return (
     <div className="stm-turn-controls">
-      {/* Phones: only the lightning icon, so the button doesn't push the menu onto another line. */}
-      <button type="button" className="btn btn-sm btn-outline-warning" onClick={() => { void run(false); }} disabled={busy}
-        title={t('turn.finish')} aria-label={t('turn.finish')}>
-        <LightningIcon size={16} className="d-md-none" />
-        <span className="d-none d-md-inline">{t('turn.finish')}</span>
-      </button>
-      <FinishTurnModal pending={pending} onBack={() => setPending([])} onForce={() => run(true)} />
+      <div className="form-check form-switch stm-free-mode-switch" title={t('turn.freeModeTitle')}>
+        <input className="form-check-input" type="checkbox" role="switch" id="stm-free-mode" checked={freeMode}
+          disabled={switching} onChange={() => { void toggleFreeMode(); }} aria-label={t('turn.freeModeTitle')} />
+        <label className="form-check-label" htmlFor="stm-free-mode">{t('turn.freeMode')}</label>
+      </div>
+      {/* 049: the turn only ends while the campaign plays. */}
+      {isPlayable(currentCampaign?.status) && (
+        <>
+          {/* Phones: only the lightning icon, so the button doesn't push the menu onto another line. */}
+          <button type="button" className="btn btn-sm btn-outline-warning" onClick={() => { void run(false); }} disabled={busy}
+            title={t('turn.finish')} aria-label={t('turn.finish')}>
+            <LightningIcon size={16} className="d-md-none" />
+            <span className="d-none d-md-inline">{t('turn.finish')}</span>
+          </button>
+          <FinishTurnModal pending={pending} onBack={() => setPending([])} onForce={() => run(true)} />
+        </>
+      )}
     </div>
   );
 };
