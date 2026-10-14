@@ -200,6 +200,31 @@
     "upImage": "Imagem em pé",
     "tabToken": "Token",
     "tabSprites": "2,5D",
+    "tab3d": "3D",
+    "model": {
+      "help": "Um modelo 3D (.glb, até 20 MB) aparece na vista 3D no lugar das imagens 2,5D, em pé e animado. A frente do modelo deve olhar para a frente do arquivo.",
+      "pick": "Escolher arquivo .glb",
+      "change": "Trocar modelo",
+      "remove": "Remover modelo",
+      "walk": "Caminhar",
+      "stop": "Parar",
+      "none": "Este token não tem modelo 3D.",
+      "loading": "Carregando modelo…",
+      "previewLabel": "Prévia do modelo 3D de {{name}}",
+      "notGlb": "Escolha um arquivo .glb (glTF binário).",
+      "tooLarge": "O modelo deve ter no máximo 20 MB.",
+      "invalid": "Não foi possível abrir este modelo.",
+      "static": "Este modelo ficará parado: ele não tem animações e o esqueleto não segue os nomes do Mixamo.",
+      "state": {
+        "idle": "Parado",
+        "walk": "Caminhando"
+      },
+      "source": {
+        "file": "do arquivo",
+        "roll6": "animação do Roll6",
+        "static": "sem animação"
+      }
+    },
     "spritesHelp": "Os quatro lados usam a mesma silhueta. Lado sem imagem usa a oposta espelhada (laterais), a frente ou a imagem em pé.",
     "view": {
       "front": "Frente",
@@ -440,6 +465,7 @@
     "maskHint": "Preto = parede alta, branco = vazio, cinza = parede mais baixa. Mesma proporção da imagem. Só aparece na vista 3D."
   },
   "story": {
+    "walkHint": "Modo livre: ande com o seu personagem",
     "view2d": "Ver em 2D",
     "view3d": "Ver em 3D",
     "followCharacter": "Voltar ao personagem",

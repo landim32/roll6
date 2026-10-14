@@ -1106,6 +1106,11 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("left_image");
 
+                    b.Property<string>("ModelFile")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("model_file");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)

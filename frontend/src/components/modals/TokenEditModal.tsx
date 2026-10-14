@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import type { ImageCrop } from '../ui/ImageCropper';
 import { TokenFormFields } from '../tokens/TokenFormFields';
+import { useModelFile } from '../../hooks/useModelFile';
 import { useSpriteImages } from '../../hooks/useSpriteImages';
 import { useToken } from '../../hooks/useToken';
 import { imageService } from '../../Services/imageService';
@@ -35,6 +36,8 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
   const [keepDown, setKeepDown] = useState(token.downImage !== null);
   /** The four "2,5D" images of the 3D view (035): new crops and which saved ones are still kept. */
   const sprites = useSpriteImages(token, open);
+  /** The 3D model (055): a newly picked `.glb`, or the saved one kept or removed. */
+  const model = useModelFile(token, open);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -49,12 +52,13 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
     event.preventDefault();
     const error = validateTokenForm(form);
     if (error) return toast.error(t(`tokens.errors.${error}`));
+    if (model.invalid) return toast.error(t('tokens.model.invalid'));
     setSaving(true);
     try {
       const upImage = upCrop ? await uploadTokenImage(upCrop, Number(form.upSpace)) : token.upImage;
       const downImage = downCrop ? await uploadTokenImage(downCrop, downImageSpace(form.downSpace)) : keepDown ? token.downImage : null;
       // PUT replaces every field: each "2,5D" image is re-sent unless it was replaced or removed.
-      const saved = await update(token.tokenId, toTokenInsert(form, upImage, downImage, await sprites.resolve()));
+      const saved = await update(token.tokenId, toTokenInsert(form, upImage, downImage, await sprites.resolve(), await model.resolve()));
       toast.success(t('toast.tokenUpdated', { name: saved.name }));
       onClose(true);
     } catch (err) {
@@ -85,6 +89,7 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
           onUpCrop={setUpCrop}
           onDownCrop={setDownCrop}
           sprites={sprites}
+          model={model}
           current={{
             name: token.name,
             upUrl: token.upImageUrl,

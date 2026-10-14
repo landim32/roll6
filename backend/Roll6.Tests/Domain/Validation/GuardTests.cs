@@ -35,4 +35,34 @@ public class GuardTests
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("image");
     }
+
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef.glb")]
+    public void ModelFileName_AcceptsUploadedModelNames(string fileName)
+    {
+        Guard.ModelFileName(fileName, "modelFile").Should().Be(fileName);
+        Guard.IsModelFileName(fileName).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void ModelFileName_EmptyMeansNoModel(string? fileName)
+    {
+        Guard.ModelFileName(fileName, "modelFile").Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef.png")]
+    [InlineData("0123456789abcdef0123456789abcdef.gltf")]
+    [InlineData("../0123456789abcdef0123456789abcdef.glb")]
+    [InlineData("orc.glb")]
+    public void ModelFileName_RejectsAnythingElse(string fileName)
+    {
+        var act = () => Guard.ModelFileName(fileName, "modelFile");
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelFile");
+        Guard.IsModelFileName(fileName).Should().BeFalse();
+    }
 }

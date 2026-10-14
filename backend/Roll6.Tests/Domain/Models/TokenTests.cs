@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Roll6.Domain.Enums;
+using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 
 namespace Roll6.Tests.Domain.Models;
@@ -20,5 +21,36 @@ public class TokenTests
     public void SpaceFor_WithoutDownState_KeepsTheStandingSize()
     {
         new Token { UpSpace = 3, DownSpace = null }.SpaceFor(Posture.OutOfCombat).Should().Be(3);
+    }
+
+    [Fact]
+    public void UpdateModel_SavesAnUploadedModel()
+    {
+        var token = new Token();
+
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb");
+
+        token.ModelFile.Should().Be("0123456789abcdef0123456789abcdef.glb");
+        token.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public void UpdateModel_NullRemovesTheModel()
+    {
+        var token = new Token { ModelFile = "0123456789abcdef0123456789abcdef.glb" };
+
+        token.UpdateModel(null);
+
+        token.ModelFile.Should().BeNull();
+    }
+
+    [Fact]
+    public void UpdateModel_RefusesAnythingButAModelName()
+    {
+        var token = new Token();
+
+        var act = () => token.UpdateModel("0123456789abcdef0123456789abcdef.png");
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelFile");
     }
 }

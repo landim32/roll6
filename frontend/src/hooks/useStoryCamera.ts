@@ -4,6 +4,8 @@ import { HEX_SIZE } from '../lib/hexGrid';
 import type { Point } from '../lib/hexGrid';
 import { followPose, FOV_STEP, initialCamera, stepCamera } from '../lib/storyCamera';
 import type { CameraBlocked, CameraPose } from '../lib/storyCamera';
+import { startWalker, stepWalker, walkCamera, withDistance, zoomWalker } from '../lib/walker';
+import type { WalkerState } from '../lib/walker';
 
 /** Walking speed (map px per second) and turning speed (radians per second). */
 const WALK_SPEED = 5 * HEX_SIZE;
@@ -15,6 +17,21 @@ export interface FollowedPiece {
   mapTokenId: number;
   center: Point;
   look: number;
+}
+
+/**
+ * Walking the chosen character in free mode (055): while set, every movement input moves the character instead of the
+ * camera, which stays locked behind it. `key` says when to start again from the piece (the piece moved, turned or lay
+ * down, another map or character): a new key throws the walk away. Nothing here leaves the browser.
+ */
+export interface WalkOptions {
+  key: string;
+  center: Point;
+  look: number;
+  /** Where the character may not stand (walls, edge, other pieces). */
+  blocked: CameraBlocked;
+  /** Called with every new state of the walk, and with null when it ends. */
+  onWalker: (walker: WalkerState | null) => void;
 }
 
 interface UseStoryCameraOptions {
@@ -29,6 +46,8 @@ interface UseStoryCameraOptions {
   followed: FollowedPiece | null;
   fov: number;
   setFov: (fov: number) => void;
+  /** Free mode: walk the character (055); null = the camera of before. */
+  walk?: WalkOptions | null;
 }
 
 const isTyping = (target: EventTarget | null): boolean => {
@@ -52,7 +71,7 @@ const axes = (keys: Set<string>) => {
  * arrows), mouse drag (sideways) and the touch joystick walk and turn freely (letting go of the character); the wheel and a
  * pinch zoom through the field of view. Every rule lives in the pure `lib/storyCamera`.
  */
-export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed, fov, setFov }: UseStoryCameraOptions) => {
+export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed, fov, setFov, walk = null }: UseStoryCameraOptions) => {
   const poseRef = useRef<CameraPose | null>(null);
   const [attached, setAttached] = useState(false);
   const keys = useRef(new Set<string>());
@@ -60,8 +79,12 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   const drag = useRef<{ x: number; y: number } | null>(null);
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<number | null>(null);
-  const latest = useRef({ apply, blocked, fov, setFov });
-  latest.current = { apply, blocked, fov, setFov };
+  const latest = useRef({ apply, blocked, fov, setFov, walk });
+  latest.current = { apply, blocked, fov, setFov, walk };
+  /** The walk in progress (055), or null. */
+  const walkerRef = useRef<WalkerState | null>(null);
+  /** The camera distance chosen while walking, kept when the walk starts again from the piece. */
+  const walkDistance = useRef<number | undefined>(undefined);
 
   const setPose = useCallback((pose: CameraPose) => {
     poseRef.current = pose;
@@ -87,15 +110,54 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   const followedLook = followed?.look;
   useEffect(() => {
     const piece = followedRef.current;
-    if (!piece || !poseRef.current?.attached) return;
+    if (!piece || !poseRef.current?.attached || walkerRef.current) return;
     setPose(followPose(piece.center, piece.look, latest.current.blocked));
   }, [followedX, followedY, followedLook, setPose]);
 
   // Walls changed under the camera (map saved elsewhere): re-apply so nothing stands inside a wall.
   useEffect(() => {
+    if (walkerRef.current) {
+      setPose(walkCamera(walkerRef.current, blocked));
+      return;
+    }
     const piece = followedRef.current;
     if (piece && poseRef.current?.attached) setPose(followPose(piece.center, piece.look, blocked));
   }, [blocked, setPose]);
+
+  /** A new state of the walk: the camera goes behind it and the view hears about it. */
+  const setWalker = useCallback((walker: WalkerState) => {
+    walkerRef.current = walker;
+    walkDistance.current = walker.distance;
+    setPose(walkCamera(walker, latest.current.blocked));
+    latest.current.walk?.onWalker(walker);
+  }, [setPose]);
+
+  // The walk starts from the piece whenever its key changes, and ends (back to the camera of before) when it goes away.
+  const walkKey = walk?.key ?? null;
+  useEffect(() => {
+    const current = latest.current.walk;
+    if (current) {
+      setWalker(startWalker(current.center, current.look, walkDistance.current));
+      return;
+    }
+    if (!walkerRef.current) return;
+    walkerRef.current = null;
+    const piece = followedRef.current;
+    if (piece) setPose(followPose(piece.center, piece.look, latest.current.blocked));
+    else if (poseRef.current) setPose({ ...poseRef.current, attached: false });
+  }, [walkKey, setWalker, setPose]);
+
+  // Tell the view the walk ended, also when the component goes away.
+  useEffect(() => {
+    const ending = latest.current.walk;
+    return () => ending?.onWalker(null);
+  }, [walkKey]);
+
+  /** The zoom while walking: the camera comes closer (steps < 0) or goes farther (steps > 0). */
+  const zoomWalk = useCallback((steps: number) => {
+    const walker = walkerRef.current;
+    if (walker) setWalker(zoomWalker(walker, steps));
+  }, [setWalker]);
 
   const reattach = useCallback(() => {
     const piece = followedRef.current;
@@ -132,6 +194,18 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
       const pose = poseRef.current;
       if (!pose) return;
       const held = axes(keys.current);
+      const walker = walkerRef.current;
+      const walking = latest.current.walk;
+      if (walker && walking) {
+        // Walking (055): forward/back walk, the sides (and the joystick's horizontal axis) turn — no side steps.
+        const clamp = (value: number) => Math.max(-1, Math.min(1, value));
+        const next = stepWalker(walker, {
+          forward: clamp(held.forward - joystick.current.y),
+          turn: clamp(held.turn + held.strafe + joystick.current.x),
+        }, dt, walking.blocked);
+        if (next.x !== walker.x || next.z !== walker.z || next.yaw !== walker.yaw || next.moving !== walker.moving) setWalker(next);
+        return;
+      }
       const forward = (held.forward - joystick.current.y) * WALK_SPEED * dt;
       const strafe = (held.strafe + joystick.current.x) * WALK_SPEED * dt;
       const turn = held.turn * TURN_SPEED * dt;
@@ -145,7 +219,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [setPose]);
+  }, [setPose, setWalker]);
 
   // Mouse/finger drag turns sideways; two fingers pinch the zoom.
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -163,8 +237,14 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
       const [a, b] = [...touches.current.values()];
       const distance = Math.hypot(a.x - b.x, a.y - b.y);
       if (pinch.current !== null && distance > 0) {
-        const { fov: current, setFov: change } = latest.current;
-        change(current * (pinch.current / distance));
+        const walker = walkerRef.current;
+        if (walker) {
+          // Fingers apart bring the camera closer, like the zoom of the field of view.
+          setWalker(withDistance(walker, walker.distance * (pinch.current / distance)));
+        } else {
+          const { fov: current, setFov: change } = latest.current;
+          change(current * (pinch.current / distance));
+        }
       }
       pinch.current = distance;
       return;
@@ -175,8 +255,13 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     const dx = event.clientX - drag.current.x;
     drag.current = { x: event.clientX, y: event.clientY };
     if (dx === 0) return;
+    const walker = walkerRef.current;
+    if (walker) {
+      setWalker({ ...walker, yaw: walker.yaw + dx * DRAG_TURN });
+      return;
+    }
     setPose(stepCamera(pose, { turn: dx * DRAG_TURN }, latest.current.blocked));
-  }, [setPose]);
+  }, [setPose, setWalker]);
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {
     touches.current.delete(event.pointerId);
@@ -186,9 +271,13 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   }, []);
 
   const onWheel = useCallback((event: ReactWheelEvent<HTMLCanvasElement>) => {
+    if (walkerRef.current) {
+      zoomWalk(event.deltaY > 0 ? 0.5 : -0.5);
+      return;
+    }
     const { fov: current, setFov: change } = latest.current;
     change(current + (event.deltaY > 0 ? FOV_STEP / 2 : -FOV_STEP / 2));
-  }, []);
+  }, [zoomWalk]);
 
   const setJoystick = useCallback((x: number, y: number) => {
     joystick.current = { x, y };
@@ -197,6 +286,8 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   return {
     attached,
     reattach,
+    /** The zoom while walking (055): the map controls' +/− call it instead of changing the field of view. */
+    zoomWalk,
     setJoystick,
     pointerHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onWheel },
   };

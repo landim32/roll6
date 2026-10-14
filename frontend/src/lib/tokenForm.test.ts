@@ -32,10 +32,15 @@ describe('validateTokenForm', () => {
 });
 
 describe('toTokenInsert', () => {
+  it('sends the 3D model it is given (055)', () => {
+    expect(toTokenInsert(form(), 'a.png', null, undefined, 'm.glb').modelFile).toBe('m.glb');
+    expect(toTokenInsert(form(), 'a.png', null).modelFile).toBeNull();
+  });
+
   it('trims texts, converts spaces and keeps the images', () => {
     expect(toTokenInsert(form({ name: ' Goblin ', description: '  ', upSpace: '1', downSpace: '' }), 'a.png', null)).toEqual({
       name: 'Goblin', description: null, upSpace: 1, downSpace: null, upImage: 'a.png', downImage: null,
-      frontImage: null, rightImage: null, leftImage: null, backImage: null,
+      frontImage: null, rightImage: null, leftImage: null, backImage: null, modelFile: null,
     });
     expect(toTokenInsert(form({ downSpace: '2' }), null, 'b.png').downSpace).toBe(2);
   });

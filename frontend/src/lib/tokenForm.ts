@@ -59,6 +59,8 @@ export const toTokenInsert = (
   upImage: string | null,
   downImage: string | null,
   sprites: ViewImages<string> = EMPTY_VIEWS,
+  /** 3D model (055): the stored `{guid}.glb` to keep or the one just uploaded; null = none. */
+  modelFile: string | null = null,
 ): TokenInsertInfo => ({
   name: form.name.trim(),
   description: form.description.trim() || null,
@@ -70,4 +72,5 @@ export const toTokenInsert = (
   rightImage: sprites.right,
   leftImage: sprites.left,
   backImage: sprites.back,
+  modelFile,
 });

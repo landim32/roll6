@@ -389,6 +389,21 @@ describe('drawRaycastFrame', () => {
         expect(result.sprites[0].headVisible).toBe(true);
       });
 
+      it('a hidden figure (its 3D model is drawn over the frame, 055) is reported where it would be but paints nothing', () => {
+        const shown = render({ sprites: [figure(3, 250, 300)] });
+        const hidden = render({ sprites: [{ ...figure(3, 250, 300), hidden: true }] });
+        const empty = render({ sprites: [] });
+
+        expect(hidden.result.sprites).toEqual(shown.result.sprites);
+        expect(isRed(hidden.at(32, 22))).toBe(false);
+        // Only its shadow on the floor: above the horizon the frame is the same as without the figure.
+        for (let y = 0; y < HEIGHT / 2; y++) expect(hidden.at(32, y)).toEqual(empty.at(32, y));
+      });
+
+      it('a hidden figure the wall covers entirely gets no balloon either', () => {
+        expect(render({ mask: wallRowMask(), sprites: [{ ...figure(1, 250, 50), hidden: true }] }).result.sprites).toEqual([]);
+      });
+
       it('leaves out a figure behind the camera', () => {
         expect(render({ sprites: [figure(1, 250, 500)] }).result.sprites).toEqual([]);
       });

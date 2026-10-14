@@ -14,7 +14,8 @@ public static class ImageTools
         [".jpg"] = "image/jpeg",
         [".jpeg"] = "image/jpeg",
         [".webp"] = "image/webp",
-        [".pdf"] = "application/pdf"
+        [".pdf"] = "application/pdf",
+        [".glb"] = "model/gltf-binary"
     };
 
     [McpServerTool(Name = "upload_image", Title = "Upload image", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -53,6 +54,27 @@ public static class ImageTools
         [Description("File content encoded in base64 (a data: URL prefix is accepted). Up to 10 MB of binary content.")] string contentBase64,
         [Description("MIME type (image/png, image/jpeg, image/webp or application/pdf). Optional: inferred from fileName when omitted.")] string? contentType = null)
         => await UploadAsync(api, "/api/document", fileName, contentBase64, contentType, "document");
+
+    [McpServerTool(Name = "upload_token_model", Title = "Upload token 3D model", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
+    [ApiOperation("POST", "/api/model")]
+    [Description("""
+        What it does: stores a token's 3D model — a glTF binary file (.glb, glTF 2.0, textures embedded) — exactly as
+        sent and returns its file name, to be saved in the token's modelFile (create_token / update_token). The 3D view
+        of the web app then draws that model instead of the token's 2.5D figure, standing where the piece is, fitted to
+        the height of a figure of the piece's size, feet on the floor, facing the piece's look (the model's +Z is its
+        front). Animations: clips named like "idle"/"parado" and "walk"/"caminhar" in the file are used; when one is
+        missing and the skeleton uses Mixamo bone names (Hips, Spine, Head, LeftUpLeg… with or without "mixamorig:"),
+        Roll6's own idle and walk animations are used; otherwise the model stands still.
+        Who can use it: any authenticated user.
+        Returns: { fileName, url }. Save fileName (e.g. "3f2a…c9.glb"); url is temporary (expires) — never store it.
+        Common errors: 400 invalid base64, not a glTF 2.0 binary, or larger than 20 MB.
+        Related tools: create_token, update_token, get_token.
+        """)]
+    public static async Task<CallToolResult> UploadTokenModel(
+        Roll6ApiClient api,
+        [Description("Original file name, ending with .glb. Example: \"orc.glb\".")] string fileName,
+        [Description("File content encoded in base64 (a data: URL prefix is accepted). Up to 20 MB of binary content.")] string contentBase64)
+        => await UploadAsync(api, "/api/model", fileName, contentBase64, "model/gltf-binary", "model.glb");
 
     private static async Task<CallToolResult> UploadAsync(Roll6ApiClient api, string path, string? fileName,
         string contentBase64, string? contentType, string fallbackName)

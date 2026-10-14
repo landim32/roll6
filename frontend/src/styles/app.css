@@ -328,6 +328,74 @@ body,
   cursor: grabbing;
 }
 
+/* The "3D" tab of the token form (055): a square stage for the preview, like the 2,5D fields. */
+.stm-model-stage {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: var(--stm-radius-sm);
+  background: var(--stm-surface-2);
+  border: 1px solid var(--stm-border);
+  overflow: hidden;
+}
+
+.stm-model-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+.stm-model-preview:active {
+  cursor: grabbing;
+}
+
+.stm-model-stage-note {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+/* The 3D models (055): a WebGL canvas over the raycaster's, stretched like its frame and never in the way of the pointer. */
+.stm-story-models {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+.stm-story-models[hidden] {
+  display: none;
+}
+
+/* The free mode hint when the walk starts (055). */
+.stm-story-walk-hint {
+  position: absolute;
+  left: 50%;
+  top: 1rem;
+  transform: translateX(-50%);
+  z-index: 9;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--stm-radius-sm);
+  background: rgba(var(--stm-accent-rgb), 0.9);
+  color: var(--stm-on-accent);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .stm-story-loading {
   position: absolute;
   inset: 0;

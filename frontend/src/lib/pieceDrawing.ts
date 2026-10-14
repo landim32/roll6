@@ -96,8 +96,8 @@ export const OBJECT_BASE_COLOR = '#6c757d';
  * A piece that is down or out of combat is lying, and the 3D view only draws figures standing up, so it is left out
  * too (the 2D map still shows it lying). The camera can still follow its character.
  */
-export const isShownIn3d = (token: Pick<MapTokenInfo, 'posture' | 'frontImageUrl'>): boolean =>
-  !isLying(token) && !!token.frontImageUrl;
+export const isShownIn3d = (token: Pick<MapTokenInfo, 'posture' | 'frontImageUrl' | 'modelFileUrl'>): boolean =>
+  !isLying(token) && (!!token.frontImageUrl || !!token.modelFileUrl);
 
 /** How a piece shows in the 3D view (035): a standing figure that draws the side the camera sees. */
 export interface SpriteSpec {
@@ -115,6 +115,8 @@ export interface SpriteSpec {
   center: Point;
   /** Color of the placeholder shown when the piece has no image. */
   baseColor: string;
+  /** The token's 3D model (055), drawn instead of the figure once it is loaded; null when it has none. */
+  modelUrl: string | null;
 }
 
 /**
@@ -142,5 +144,6 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     width: geometry.box.width,
     center,
     baseColor: BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
+    modelUrl: token.modelFileUrl ?? null,
   };
 };

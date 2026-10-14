@@ -37,6 +37,11 @@ export interface RenderSprite {
   width: number;
   /** Hex side the piece faces, 0–5 clockwise from the top. */
   look: number;
+  /**
+   * Its 3D model is drawn over the frame (055): the figure is measured — its place, its depth, whether its head shows —
+   * and keeps its shadow on the floor, but is not painted. Its balloon follows it like any figure's.
+   */
+  hidden?: boolean;
 }
 
 /** Everything a frame shows besides the camera. */
@@ -379,7 +384,7 @@ export const drawRaycastFrame = (
     const { image: pixels, mirrored } = chooseSprite(sprite.images, sprite.fallback, viewSeen(sprite.look, sprite.center, { x: pose.x, y: pose.z }));
     const worldHeight = sprite.width * (pixels.height / pixels.width);
     const where = projectSprite(pose, sprite.center, sprite.width, worldHeight, width, height, projection);
-    return where ? { id: sprite.id, pixels, mirrored, where, radius: sprite.width * SHADOW_RADIUS_SHARE } : null;
+    return where ? { id: sprite.id, pixels, mirrored, where, radius: sprite.width * SHADOW_RADIUS_SHARE, hidden: sprite.hidden === true } : null;
   };
   const projected = scene.sprites
     .map(place)
@@ -388,7 +393,7 @@ export const drawRaycastFrame = (
   const drawn: FrameSprite[] = [];
   const layerSprites: LayerSprite[] = [];
   const sample = new Float32Array(4);
-  for (const { id, pixels, mirrored, where, radius } of projected) {
+  for (const { id, pixels, mirrored, where, radius, hidden } of projected) {
     const span = where.screenX1 - where.screenX0;
     const tall = where.bottom - where.top;
     if (span <= 0 || tall <= 0) continue;
@@ -421,7 +426,10 @@ export const drawRaycastFrame = (
     const firstColumn = Math.max(0, Math.ceil(where.screenX0));
     const lastColumn = Math.min(width - 1, Math.floor(where.screenX1));
     let painted = false;
-    if (toLayer) {
+    if (hidden) {
+      // Its model is drawn over the frame (055): only whether any of it shows past the walls, for the balloon.
+      for (let x = firstColumn; x <= lastColumn && !painted; x++) painted = hiddenFrom(walls, x, where.depth) > first;
+    } else if (toLayer) {
       // The layer paints the figure (053): here only whether any of it shows past the walls, for the balloon.
       for (let x = firstColumn; x <= lastColumn && !painted; x++) painted = hiddenFrom(walls, x, where.depth) > first;
       if (painted) layerSprites.push({ id, pixels, mirrored, where, fade });

@@ -1896,5 +1896,20 @@ BEGIN
     VALUES ('20261012190747_AddCampaignFreeMode', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014022830_AddTokenModelFile') THEN
+    ALTER TABLE tokens ADD model_file character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014022830_AddTokenModelFile') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261014022830_AddTokenModelFile', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 
