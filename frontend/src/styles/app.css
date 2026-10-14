@@ -593,14 +593,6 @@ body,
   line-height: 1;
 }
 
-.stm-layout-badge {
-  position: absolute;
-  top: -0.4rem;
-  right: -0.5rem;
-  font-size: 0.6rem;
-  z-index: 1;
-}
-
 /* Chat only: the chat between the character and NPC cards. */
 .stm-chat-body {
   position: relative;

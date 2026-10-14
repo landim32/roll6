@@ -828,8 +828,7 @@
     "label": "Mapa e chat",
     "map": "Só o mapa",
     "split": "Mapa e chat",
-    "chat": "Só o chat",
-    "unread": "{{count}} não lidas"
+    "chat": "Só o chat"
   },
   "install": {
     "menu": "Instalar o Roll6",
