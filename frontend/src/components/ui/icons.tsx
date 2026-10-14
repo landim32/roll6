@@ -353,6 +353,20 @@ export const CameraIcon = (props: IconProps) => (
   </Icon>
 );
 
+/** bi-play-fill — resume the animation of the 3D model preview (057). */
+export const PlayFillIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393" />
+  </Icon>
+);
+
+/** bi-pause-fill — pause the animation of the 3D model preview (057). */
+export const PauseFillIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5" />
+  </Icon>
+);
+
 /** bi-eye-slash — something hidden in the chat (041). */
 export const EyeSlashIcon = (props: IconProps) => (
   <Icon {...props}>

@@ -98,6 +98,7 @@ export const TokenEditModal = ({ open, token, onClose }: TokenEditModalProps) =>
             hasDown: keepDown,
           }}
           onRemoveDown={() => setKeepDown(false)}
+          canGenerate
         />
       </form>
     </Modal>

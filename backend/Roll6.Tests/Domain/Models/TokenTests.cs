@@ -56,6 +56,16 @@ public class TokenTests
     }
 
     [Fact]
+    public void UpdateModel_SavesTheGuardStance()
+    {
+        var token = new Token();
+
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "roll6-guard", null);
+
+        token.ModelIdleClip.Should().Be("roll6-guard");
+    }
+
+    [Fact]
     public void UpdateModel_WithoutAModelDropsTheChoices()
     {
         var token = new Token { ModelFile = "0123456789abcdef0123456789abcdef.glb", ModelIdleClip = "none", ModelWalkClip = "none" };

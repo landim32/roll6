@@ -69,7 +69,7 @@ public class TokenInfo
     [JsonPropertyName("modelFileUrl")]
     public string? ModelFileUrl { get; set; }
 
-    /// <summary>Animation chosen for standing still (056): null = automatic, "roll6", "none" or "clip:{name}".</summary>
+    /// <summary>Animation chosen for standing still (056): null = automatic, "roll6", "roll6-guard" (057), "none" or "clip:{name}".</summary>
     [JsonPropertyName("modelIdleClip")]
     public string? ModelIdleClip { get; set; }
 

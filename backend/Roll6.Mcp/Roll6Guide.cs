@@ -169,7 +169,8 @@ public static class Roll6Guide
           like "idle"/"parado" and "walk"/"caminhar" in the file are used; when one is missing and the skeleton uses the
           Mixamo bone names (Hips, Spine, Head, LeftUpLeg… with or without "mixamorig:"), Roll6's own idle and walk
           animations are used; otherwise the model stands still. That is the **automatic** choice; the token's
-          `modelIdleClip` / `modelWalkClip` override it per state with `"roll6"`, `"none"` or `"clip:{name}"` (a clip
+          `modelIdleClip` / `modelWalkClip` override it per state with `"roll6"`, `"roll6-guard"` (Roll6's guard stance:
+          legs bent apart, arms raised in front — for Mixamo skeletons), `"none"` or `"clip:{name}"` (a clip
           of the file, by its exact name) — the web form lists the file's clips and previews each choice.
         - In **free mode** a player walks his own character in the 3D view, in third person (camera locked behind it,
           zoom = distance). That walk is **local to his screen**: it never moves the piece, records nothing and no tool

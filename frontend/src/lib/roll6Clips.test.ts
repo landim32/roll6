@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MIXAMO_REQUIRED } from './modelAnimations';
-import { RELAXED_ARMS, ROLL6_CLIPS } from './roll6Clips';
+import { RELAXED_ARMS, ROLL6_CLIPS, ROLL6_CLIPS_BY_NAME, ROLL6_GUARD } from './roll6Clips';
 
 /** Every bone name of a Mixamo skeleton these clips may use. */
 const MIXAMO_BONES = new Set([
@@ -52,5 +52,43 @@ describe('Roll6 clips (055)', () => {
     expect(RELAXED_ARMS.RightArm[1]).toBeLessThan(0);
     expect(RELAXED_ARMS.LeftArm[0]).toBeGreaterThan(0);
     expect(RELAXED_ARMS.RightArm[0]).toBeLessThan(0);
+  });
+});
+
+describe('Roll6 guard stance (057)', () => {
+  const track = (bone: string) => ROLL6_GUARD.tracks.find((item) => item.bone === bone)!;
+
+  it('loops: every track ends where it starts, times ascending inside the duration', () => {
+    for (const item of [...ROLL6_GUARD.tracks, { bone: 'Hips', times: ROLL6_GUARD.hipsLift.times, degrees: ROLL6_GUARD.hipsLift.values.map((v) => [v, 0, 0]) }]) {
+      expect(item.times[0]).toBe(0);
+      expect(item.times[item.times.length - 1]).toBe(ROLL6_GUARD.duration);
+      for (let i = 1; i < item.times.length; i++) expect(item.times[i]).toBeGreaterThan(item.times[i - 1]);
+      expect(item.degrees).toHaveLength(item.times.length);
+      expect(item.degrees[0]).toEqual(item.degrees[item.degrees.length - 1]);
+    }
+  });
+
+  it('only uses Mixamo bones, each once, with turns within ±110°', () => {
+    const bones = ROLL6_GUARD.tracks.map((item) => item.bone);
+    expect(new Set(bones).size).toBe(bones.length);
+    for (const bone of bones) expect(MIXAMO_BONES.has(bone)).toBe(true);
+    for (const item of ROLL6_GUARD.tracks) for (const triple of item.degrees) for (const value of triple) expect(Math.abs(value)).toBeLessThanOrEqual(110);
+  });
+
+  it('is on guard: knees bent, thighs forward and apart, upper arms raised in front, elbows bent hard', () => {
+    for (const bone of ['LeftLeg', 'RightLeg']) for (const [x] of track(bone).degrees) expect(x).toBeGreaterThanOrEqual(25);
+    for (const [x] of track('LeftUpLeg').degrees) expect(x).toBeLessThan(0);
+    for (const [, , z] of track('LeftUpLeg').degrees) expect(z).toBeGreaterThan(0);
+    for (const [, , z] of track('RightUpLeg').degrees) expect(z).toBeLessThan(0);
+    for (const bone of ['LeftArm', 'RightArm']) for (const [x] of track(bone).degrees) expect(x).toBeLessThanOrEqual(-30);
+    for (const bone of ['LeftForeArm', 'RightForeArm']) for (const [x] of track(bone).degrees) expect(x).toBeLessThanOrEqual(-60);
+    // The body is lower than standing.
+    for (const value of ROLL6_GUARD.hipsLift.values) expect(value).toBeLessThan(0);
+  });
+
+  it('is found by name beside the two states', () => {
+    expect(ROLL6_CLIPS_BY_NAME.guard).toBe(ROLL6_GUARD);
+    expect(ROLL6_CLIPS_BY_NAME.idle).toBe(ROLL6_CLIPS.idle);
+    expect(ROLL6_CLIPS_BY_NAME.walk).toBe(ROLL6_CLIPS.walk);
   });
 });

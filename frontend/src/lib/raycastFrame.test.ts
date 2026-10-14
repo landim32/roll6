@@ -795,3 +795,89 @@ describe('reference frame (máscara só 0/255)', () => {
     expect(at(4, 27)).toEqual([76, 122, 114, 255]); // the floor, in perspective, below the wall
   });
 });
+
+describe('figure depth for the 3D models (057)', () => {
+  /** 8 × 8 red with a transparent border of 2 texels. */
+  const ringed = (): PixelBuffer => {
+    const size = 8;
+    const data = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const inside = x >= 2 && x < 6 && y >= 2 && y < 6;
+        data.set(inside ? [255, 0, 0, 255] : [0, 0, 0, 0], (y * size + x) * 4);
+      }
+    }
+    return { data, width: size, height: size };
+  };
+  const sprite = (id: number, x: number, y: number, pixels: PixelBuffer, extra: Partial<RenderSprite> = {}): RenderSprite => ({
+    id, center: { x, y }, width: 60, look: 0, images: { front: pixels, right: pixels, left: pixels, back: pixels }, fallback: pixels, ...extra,
+  });
+  const withDepth = (scene: Partial<FrameScene>, smooth = false) => {
+    const frame: PixelBuffer = { data: new Uint8ClampedArray(WIDTH * HEIGHT * 4), width: WIDTH, height: HEIGHT };
+    const figureDepth = new Float32Array(WIDTH * HEIGHT).fill(-1);
+    const result = drawRaycastFrame(frame, { mask: null, map: null, background: null, sprites: [], ...scene }, camera, 70, skyGradient(HEIGHT / 2), {
+      figureDepth, ...(smooth ? { spriteSampling: 'smooth' as const } : {}),
+    });
+    const depthAt = (x: number, y: number) => figureDepth[y * WIDTH + x];
+    return { frame, figureDepth, result, depthAt };
+  };
+  const center = (where: { screenX: number; top: number; bottom: number }) =>
+    [Math.round(where.screenX), Math.round((where.top + where.bottom) / 2)] as const;
+
+  it('writes the depth of a figure on the pixels it paints, and 0 everywhere else', () => {
+    const { result, depthAt, figureDepth } = withDepth({ sprites: [sprite(1, 250, 300, solid(255, 0, 0))] });
+    const [where] = result.sprites;
+    const [cx, cy] = center(where);
+    expect(depthAt(cx, cy)).toBeCloseTo(where.depth, 5);
+    expect(depthAt(0, 0)).toBe(0);
+    expect(depthAt(WIDTH - 1, HEIGHT - 1)).toBe(0);
+    expect(figureDepth.some((value) => value < 0)).toBe(false);
+  });
+
+  it('keeps the nearer depth where two figures overlap', () => {
+    const { result, depthAt } = withDepth({ sprites: [sprite(1, 250, 250, solid(255, 0, 0)), sprite(2, 250, 330, solid(0, 0, 255))] });
+    const near = result.sprites.find((item) => item.id === 2)!;
+    const far = result.sprites.find((item) => item.id === 1)!;
+    expect(near.depth).toBeLessThan(far.depth);
+    const [cx, cy] = center(near);
+    expect(depthAt(cx, cy)).toBeCloseTo(near.depth, 5);
+  });
+
+  it('transparent texels write nothing, on Padrão and on Alta', () => {
+    for (const smooth of [false, true]) {
+      const { result, frame, depthAt } = withDepth({ sprites: [sprite(1, 250, 330, ringed())] }, smooth);
+      const [where] = result.sprites;
+      // The outer quarter of the figure is the transparent ring: nothing painted there, so no depth either.
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let column = 0; column < WIDTH; column++) {
+          const red = frame.data[(y * WIDTH + column) * 4];
+          if (depthAt(column, y) > 0) expect(red).toBeGreaterThan(100);
+        }
+      }
+      const [cx, cy] = center(where);
+      expect(depthAt(cx, cy)).toBeCloseTo(where.depth, 5);
+    }
+  });
+
+  it('a hidden proxy (a piece drawn as a 3D model) writes nothing', () => {
+    const { depthAt, result } = withDepth({ sprites: [sprite(1, 250, 300, solid(255, 0, 0), { hidden: true })] });
+    const [where] = result.sprites;
+    const [cx, cy] = center(where);
+    expect(depthAt(cx, cy)).toBe(0);
+  });
+
+  it('rows hidden by a nearer wall write nothing', () => {
+    const { depthAt } = withDepth({ mask: wallRowMask(), sprites: [sprite(1, 250, 50, solid(255, 0, 0))] });
+    for (let y = 0; y < HEIGHT; y++) expect(depthAt(32, y)).toBe(0);
+  });
+
+  it('never changes a painted byte', () => {
+    const scene = { mask: wallRowMask(), sprites: [sprite(1, 250, 300, ringed()), sprite(2, 230, 330, solid(0, 0, 255))] };
+    for (const smooth of [false, true]) {
+      const plain: PixelBuffer = { data: new Uint8ClampedArray(WIDTH * HEIGHT * 4), width: WIDTH, height: HEIGHT };
+      drawRaycastFrame(plain, { map: null, background: null, ...scene }, camera, 70, skyGradient(HEIGHT / 2), smooth ? { spriteSampling: 'smooth' } : {});
+      const { frame } = withDepth(scene, smooth);
+      expect([...frame.data]).toEqual([...plain.data]);
+    }
+  });
+});

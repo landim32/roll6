@@ -223,7 +223,23 @@
         "auto": "Automático ({{resolved}})",
         "file": "{{name}} (do arquivo)",
         "roll6": "Animação do Roll6",
+        "guard": "Posição defensiva (Roll6)",
         "none": "Sem animação"
+      },
+      "timeline": {
+        "label": "Andamento da animação",
+        "value": "{{time}} s de {{total}} s",
+        "play": "Continuar",
+        "pause": "Pausar"
+      },
+      "generate": {
+        "button": "Gerar imagem",
+        "up": "Imagem em Pé",
+        "down": "Imagem Caído",
+        "doneUp": "Imagem em pé gerada — veja na aba Token.",
+        "doneDown": "Imagem caído gerada — veja na aba Token.",
+        "failed": "Não foi possível gerar a imagem.",
+        "pauseFirst": "Pause a animação para gerar a imagem."
       },
       "state": {
         "idle": "Parado",

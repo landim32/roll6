@@ -4,8 +4,8 @@ import {
 import type { Bone, KeyframeTrack, Object3D, SkinnedMesh } from 'three';
 import { clipChoicesKey, normalizeBoneName, resolveAnimation } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ModelClipChoices } from '../../lib/modelAnimations';
-import { RELAXED_ARMS, ROLL6_CLIPS } from '../../lib/roll6Clips';
-import type { Roll6Clip } from '../../lib/roll6Clips';
+import { RELAXED_ARMS, ROLL6_CLIPS_BY_NAME } from '../../lib/roll6Clips';
+import type { Roll6Clip, Roll6ClipName } from '../../lib/roll6Clips';
 
 /**
  * Turns Roll6's own animations (`lib/roll6Clips`, turns in the character's frame) into three.js clips for one skeleton
@@ -241,15 +241,17 @@ export type ModelClipBuilder = (choices: ModelClipChoices) => ModelClips;
 
 export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], boneNames: string[], height: number): ModelClipBuilder => {
   const names = fileClips.map((clip) => clip.name);
-  const own = new Map<AnimationState, { clip: AnimationClip | null; reduced: boolean }>();
+  // Roll6's own clips by name (057: the guard stance is not tied to a state), each fitted to the rig once.
+  const own = new Map<Roll6ClipName, { clip: AnimationClip | null; reduced: boolean }>();
   const built = new Map<string, ModelClips>();
 
-  const roll6Of = (state: AnimationState) => {
-    let entry = own.get(state);
+  const roll6Of = (name: Roll6ClipName) => {
+    let entry = own.get(name);
     if (!entry) {
-      const limits = fitToRig(ROLL6_CLIPS[state], root, height);
-      entry = { clip: buildRoll6Clip(ROLL6_CLIPS[state], root, height, limits), reduced: Object.values(limits).some((limit) => limit < 1) };
-      own.set(state, entry);
+      const clip = ROLL6_CLIPS_BY_NAME[name];
+      const limits = fitToRig(clip, root, height);
+      entry = { clip: buildRoll6Clip(clip, root, height, limits), reduced: Object.values(limits).some((limit) => limit < 1) };
+      own.set(name, entry);
     }
     return entry;
   };
@@ -265,7 +267,7 @@ export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], bo
       sources[state] = resolved.source;
       if (resolved.source === 'file') return fileClips[resolved.index];
       if (resolved.source === 'roll6') {
-        const entry = roll6Of(state);
+        const entry = roll6Of(resolved.clip);
         if (entry.reduced) reduced = true;
         return entry.clip;
       }

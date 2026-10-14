@@ -26,8 +26,17 @@ export const clearLayer = (target: LayerTarget): void => {
 const sample = new Float32Array(4);
 
 /** Draws `layer.sprites` (far to near) into `target`, scaled from a frame `frameWidth × frameHeight`. */
-export const drawFigureLayer = (target: LayerTarget, layer: FrameLayer, frameWidth: number, frameHeight: number): void => {
+export const drawFigureLayer = (
+  target: LayerTarget,
+  layer: FrameLayer,
+  frameWidth: number,
+  frameHeight: number,
+  /** Filled with the depth of the figures at the layer's size (057, for the 3D models): `0` where none covers a pixel. */
+  depth?: Float32Array,
+): void => {
   const { data, width, height } = target;
+  const figureDepth = depth && depth.length >= width * height ? depth : null;
+  figureDepth?.fill(0);
   if (width <= 0 || height <= 0 || frameWidth <= 0 || frameHeight <= 0) return;
   const scaleX = width / frameWidth;
   const scaleY = height / frameHeight;
@@ -64,6 +73,10 @@ export const drawFigureLayer = (target: LayerTarget, layer: FrameLayer, frameWid
         data[i + 1] = (sample[1] * fade + data[i + 1] * keep) / outAlpha;
         data[i + 2] = (sample[2] * fade + data[i + 2] * keep) / outAlpha;
         data[i + 3] = outAlpha * 255;
+        if (figureDepth && alpha >= 0.5) {
+          const at = y * width + x;
+          if (figureDepth[at] === 0 || where.depth < figureDepth[at]) figureDepth[at] = where.depth;
+        }
       }
     }
   }

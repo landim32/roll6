@@ -17,6 +17,7 @@ describe('parseClipChoice (056)', () => {
     expect(parseClipChoice(null)).toEqual({ kind: 'auto' });
     expect(parseClipChoice('')).toEqual({ kind: 'auto' });
     expect(parseClipChoice('roll6')).toEqual({ kind: 'roll6' });
+    expect(parseClipChoice('roll6-guard')).toEqual({ kind: 'guard' });
     expect(parseClipChoice('none')).toEqual({ kind: 'none' });
     expect(parseClipChoice('clip:Armature|Walk')).toEqual({ kind: 'file', name: 'Armature|Walk' });
     expect(fileClipChoice('Idle')).toBe('clip:Idle');
@@ -33,7 +34,7 @@ describe('resolveAnimation (056)', () => {
 
   it('automatic follows the names of the file, then Roll6, then nothing', () => {
     expect(resolveAnimation(null, clips, OTHER_BONES, 'walk')).toEqual({ source: 'file', index: 1 });
-    expect(resolveAnimation(null, ['Attack'], ORC_BONES, 'walk')).toEqual({ source: 'roll6' });
+    expect(resolveAnimation(null, ['Attack'], ORC_BONES, 'walk')).toEqual({ source: 'roll6', clip: 'walk' });
     expect(resolveAnimation(null, ['Attack'], OTHER_BONES, 'walk')).toEqual({ source: 'static' });
   });
 
@@ -47,7 +48,7 @@ describe('resolveAnimation (056)', () => {
   });
 
   it('"roll6" needs the Mixamo skeleton and "none" always stands still', () => {
-    expect(resolveAnimation('roll6', clips, ORC_BONES, 'idle')).toEqual({ source: 'roll6' });
+    expect(resolveAnimation('roll6', clips, ORC_BONES, 'idle')).toEqual({ source: 'roll6', clip: 'idle' });
     expect(resolveAnimation('roll6', clips, OTHER_BONES, 'idle')).toEqual({ source: 'static' });
     expect(resolveAnimation('none', clips, ORC_BONES, 'walk')).toEqual({ source: 'static' });
   });
@@ -61,7 +62,7 @@ describe('resolveAnimation (056)', () => {
 describe('clipChoiceOptions (056)', () => {
   it('lists automatic (saying what it picks), the clips of the file, Roll6 for a Mixamo skeleton and none', () => {
     const options = clipChoiceOptions(['Walk', 'Idle', 'Walk'], ORC_BONES, 'walk');
-    expect(options.map((option) => option.value)).toEqual(['', 'clip:Walk', 'clip:Idle', 'roll6', 'none']);
+    expect(options.map((option) => option.value)).toEqual(['', 'clip:Walk', 'clip:Idle', 'roll6', 'roll6-guard', 'none']);
     expect(options[0]).toMatchObject({ kind: 'auto', resolves: 'file', resolvesName: 'Walk' });
     expect(options[1]).toMatchObject({ kind: 'file', name: 'Walk' });
   });
@@ -84,5 +85,23 @@ describe('clip choice keys', () => {
     expect(sameClipChoices({ idle: null, walk: 'none' }, { idle: 'none', walk: null })).toBe(false);
     expect(clipChoicesKey({ idle: null, walk: 'none' })).not.toBe(clipChoicesKey({ idle: 'none', walk: null }));
     expect(clipChoicesKey(AUTO_CLIPS)).toBe(clipChoicesKey({ idle: null, walk: null }));
+  });
+});
+
+describe('guard stance choice (057)', () => {
+  it('"roll6-guard" plays Roll6\'s guard stance on a Mixamo skeleton, in either state', () => {
+    expect(resolveAnimation('roll6-guard', [], ORC_BONES, 'idle')).toEqual({ source: 'roll6', clip: 'guard' });
+    expect(resolveAnimation('roll6-guard', ['Walk'], ORC_BONES, 'walk')).toEqual({ source: 'roll6', clip: 'guard' });
+  });
+
+  it('stands still on another skeleton', () => {
+    expect(resolveAnimation('roll6-guard', [], OTHER_BONES, 'idle')).toEqual({ source: 'static' });
+  });
+
+  it('is offered right after Roll6\'s own animation, only for a Mixamo skeleton', () => {
+    const values = clipChoiceOptions([], ORC_BONES, 'idle').map((option) => option.value);
+    expect(values.indexOf('roll6-guard')).toBe(values.indexOf('roll6') + 1);
+    expect(clipChoiceOptions([], OTHER_BONES, 'idle').map((option) => option.value)).not.toContain('roll6-guard');
+    expect(clipChoiceOptions([], ORC_BONES, 'idle').find((option) => option.value === 'roll6-guard')?.kind).toBe('guard');
   });
 });

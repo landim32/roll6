@@ -94,6 +94,12 @@ export interface FrameSprite {
 export interface FrameOptions {
   spriteSampling?: SpriteSampling;
   figures?: 'frame' | 'layer';
+  /**
+   * Filled with the depth of the figures this frame paints (057), for the 3D models' layer: `width × height`, row 0 at
+   * the top, the perpendicular distance of the nearest figure painted at each pixel, `0` where none is. Only for figures
+   * painted into the frame (`figures: 'layer'` fills it through `drawFigureLayer`). The painted bytes never change.
+   */
+  figureDepth?: Float32Array;
 }
 
 /** A figure the frame did not paint (053, `figures: 'layer'`): the image seen, its projection in frame pixels and its fade. */
@@ -221,6 +227,14 @@ export const drawRaycastFrame = (
   const { mask, map, background } = scene;
   const sampling: SpriteSampling = options.spriteSampling ?? 'nearest';
   const toLayer = options.figures === 'layer';
+  const figureDepth = !toLayer && options.figureDepth && options.figureDepth.length >= width * height ? options.figureDepth : null;
+  figureDepth?.fill(0);
+  /** Remembers that a figure `depth` away covers pixel `i` (the nearer one stays). */
+  const coverAt = (i: number, depth: number) => {
+    if (!figureDepth) return;
+    const known = figureDepth[i];
+    if (known === 0 || depth < known) figureDepth[i] = depth;
+  };
   const texture = scene.wallTexture ?? null;
   const projection = projectionOf(width, fov);
   const horizon = Math.round(height / 2);
@@ -454,6 +468,7 @@ export const drawRaycastFrame = (
           data[i + 1] = data[i + 1] * keep + sample[1] * fade;
           data[i + 2] = data[i + 2] * keep + sample[2] * fade;
           data[i + 3] = 255;
+          if (alpha >= 0.5) coverAt(y * width + x, where.depth);
           painted = true;
         }
       }
@@ -474,6 +489,7 @@ export const drawRaycastFrame = (
           data[i + 1] = pixels.data[j + 1] * fade;
           data[i + 2] = pixels.data[j + 2] * fade;
           data[i + 3] = 255;
+          coverAt(y * width + x, where.depth);
           painted = true;
         }
       }

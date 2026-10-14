@@ -209,6 +209,7 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
             onDownCrop={setDownCrop}
             sprites={sprites}
             model={model}
+            canGenerate
           />
         </form>
       </Modal>
