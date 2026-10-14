@@ -1,0 +1,5 @@
+bin/
+obj/
+*.user
+viewer/node_modules/
+Roll6Anime/wwwroot/viewer/

@@ -161,6 +161,59 @@ public class AnimationServiceTests
     }
 
     [Fact]
+    public async Task ReplaceContent_ByTheOwner_StoresTheNewFileAndRemovesTheOld()
+    {
+        const string NEW_FILE = "fedcba9876543210fedcba9876543210.json";
+        _imageService.Setup(s => s.StoreAnimationAsync(It.IsAny<byte[]>())).ReturnsAsync(NEW_FILE);
+
+        var result = await _service.ReplaceContentAsync(1, 10, new AnimationContentInfo { Content = VALID });
+
+        result.AnimationId.Should().Be(10);
+        result.Name.Should().Be("Aceno");
+        result.Type.Should().Be(1);
+        result.Duration.Should().Be(1.2);
+        result.Loop.Should().BeFalse();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Animation>(a => a.FileName == NEW_FILE)), Times.Once);
+        _imageService.Verify(s => s.DeleteAnimationAsync(FILE), Times.Once);
+        _imageService.Verify(s => s.DeleteAnimationAsync(NEW_FILE), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReplaceContent_InvalidContent_StoresNothing()
+    {
+        var bad = JsonDocument.Parse("""{ "format": "roll6-animation", "version": 2 }""").RootElement;
+
+        var act = () => _service.ReplaceContentAsync(1, 10, new AnimationContentInfo { Content = bad });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("content.version");
+        _imageService.Verify(s => s.StoreAnimationAsync(It.IsAny<byte[]>()), Times.Never);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Animation>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReplaceContent_ByAnotherUser_IsForbidden()
+    {
+        var act = () => _service.ReplaceContentAsync(2, 10, new AnimationContentInfo { Content = VALID });
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        _imageService.Verify(s => s.StoreAnimationAsync(It.IsAny<byte[]>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReplaceContent_FailedUpdate_KeepsTheOldFileAndRemovesTheNew()
+    {
+        const string NEW_FILE = "fedcba9876543210fedcba9876543210.json";
+        _imageService.Setup(s => s.StoreAnimationAsync(It.IsAny<byte[]>())).ReturnsAsync(NEW_FILE);
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Animation>())).ThrowsAsync(new Exception("db"));
+
+        var act = () => _service.ReplaceContentAsync(1, 10, new AnimationContentInfo { Content = VALID });
+
+        await act.Should().ThrowAsync<Exception>();
+        _imageService.Verify(s => s.DeleteAnimationAsync(NEW_FILE), Times.Once);
+        _imageService.Verify(s => s.DeleteAnimationAsync(FILE), Times.Never);
+    }
+
+    [Fact]
     public async Task Delete_WhileInUse_Conflicts()
     {
         _tokenRepository.Setup(r => r.AnyUsesClipAsync("animation:10", true, true, true)).ReturnsAsync(true);
