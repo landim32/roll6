@@ -11,7 +11,8 @@ namespace Roll6.Domain.Services;
 
 /// <summary>
 /// The animation library (059). Uploading validates the <c>roll6-animation</c> file (<see cref="AnimationFormat"/>),
-/// stores it once in the bucket and inserts the row; the file never changes afterwards. An animation used by a token
+/// stores it in the bucket and inserts the row. A stored file is never overwritten: a new content is stored as a new file,
+/// the row points to it and the old file is removed (<see cref="ReplaceContentAsync"/>). An animation used by a token
 /// ("animation:{id}" in a state column) cannot be deleted, nor retyped away from the type that state needs (Q2).
 /// </summary>
 public class AnimationService : IAnimationService
@@ -93,6 +94,27 @@ public class AnimationService : IAnimationService
             && await IsUsedInAsync(animationId, field))
             throw new ConflictException(IN_USE);
         var saved = await _repository.UpdateAsync(animation);
+        return MapToDto(saved, await OwnerNamesAsync(new[] { saved.UserId }));
+    }
+
+    public async Task<AnimationInfo> ReplaceContentAsync(long userId, long animationId, AnimationContentInfo info)
+    {
+        var animation = await GetOwnedAsync(userId, animationId);
+        var file = AnimationFormat.Parse(info.Content);
+        var oldFileName = animation.FileName;
+        var fileName = await _imageService.StoreAnimationAsync(AnimationFormat.Serialize(info.Content));
+        Animation saved;
+        try
+        {
+            animation.ReplaceFile(fileName, file.Duration, file.Loop);
+            saved = await _repository.UpdateAsync(animation);
+        }
+        catch
+        {
+            await _imageService.DeleteAnimationAsync(fileName);
+            throw;
+        }
+        await _imageService.DeleteAnimationAsync(oldFileName);
         return MapToDto(saved, await OwnerNamesAsync(new[] { saved.UserId }));
     }
 

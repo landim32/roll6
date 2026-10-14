@@ -14,5 +14,7 @@ public interface IAnimationService
     Task<StoredImageInfo> OpenFileAsync(long animationId);
     Task<AnimationInfo> CreateAsync(long userId, AnimationInsertInfo info);
     Task<AnimationInfo> UpdateAsync(long userId, long animationId, AnimationUpdateInfo info);
+    /// <summary>Replaces the file (owner only): the new content is validated, stored as a new file and the old one removed.</summary>
+    Task<AnimationInfo> ReplaceContentAsync(long userId, long animationId, AnimationContentInfo info);
     Task DeleteAsync(long userId, long animationId);
 }

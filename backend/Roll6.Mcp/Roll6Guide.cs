@@ -192,9 +192,10 @@ public static class Roll6Guide
           5 Derrotado (defeated), 6 Atacando (attack), 7 Defendendo (defend) — and a file. For now each token state takes
           only its type: `modelIdleClip` ← 1, `modelWalkClip` ← 2, `modelDownClip` ← 5, as `"animation:{animationId}"`;
           the other types are stored for states to come. `create_animation` uploads, `list_animations` /
-          `get_animation` / `get_animation_content` read, `update_animation` renames or retypes and `delete_animation`
-          removes (owner only; refused with 409 while a token uses it, and so is a retype away from the type of a
-          state that uses it). A stored file never changes: a new version is a new animation.
+          `get_animation` / `get_animation_content` read, `update_animation` renames or retypes,
+          `update_animation_content` replaces the file and `delete_animation` removes (owner only; delete is refused with
+          409 while a token uses it, and so is a retype away from the type of a state that uses it). Replacing the content
+          keeps the id, so every token using `"animation:{id}"` plays the new version; the old file is gone for good.
         - The file is a JSON object in the **"roll6-animation" format, version 1** — the same data as Roll6's own
           animations (breathing, walk, guard, death):
           `{ "format": "roll6-animation", "version": 1, "duration": 1, "loop": true, "tracks": [ { "bone": "RightArm",
