@@ -27,6 +27,8 @@ public static class McpToolCatalog
         "DELETE /api/apikey/{id}",
         // 029: image bytes for the browser's map snapshot; assistants already get the presigned URLs.
         "GET /api/image/file/{fileName}",
+        // 055: model bytes for the browser's 3D view (same reason); assistants get the presigned URL.
+        "GET /api/model/file/{fileName}",
         // 041: the reader's mark (UI state) and the browser's audio recording upload.
         "PUT /api/campaign/{id}/chat/read",
         "POST /api/chat/audio",

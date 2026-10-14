@@ -162,8 +162,18 @@ public static class Roll6Guide
           the piece faces (`look`): its front within ±45° of that direction, its back within ±45° of the opposite one,
           the two sides in between. Where that image is missing it mirrors the opposite side (only sides mirror), then
           uses `frontImage`, then the standing `upImage`; the back is never mirrored.
+        - A token may also carry a **3D model** (`modelFile`, a `.glb` stored with `upload_token_model`, up to 20 MB).
+          The 3D view then draws the model instead of the 2.5D figure: standing on the piece's hex, as tall as the figure
+          of a piece of that size, facing the piece's `look` (the model's +Z is its front), hidden by walls like a figure,
+          with the same speech balloon. While it loads (or if it fails) the 2.5D figure shows. Animations: clips named
+          like "idle"/"parado" and "walk"/"caminhar" in the file are used; when one is missing and the skeleton uses the
+          Mixamo bone names (Hips, Spine, Head, LeftUpLeg… with or without "mixamorig:"), Roll6's own idle and walk
+          animations are used; otherwise the model stands still.
+        - In **free mode** a player walks his own character in the 3D view, in third person (camera locked behind it,
+          zoom = distance). That walk is **local to his screen**: it never moves the piece, records nothing and no tool
+          sees it — pieces still move only through `move_map_token`.
         - `update_map_model` and `update_token` replace every field: send `maskImage`, `backgroundImage`,
-          `wallTextureImage` and the four "2.5D" images back unchanged or they are removed.
+          `wallTextureImage`, the four "2.5D" images and `modelFile` back unchanged or they are removed.
 
         ## Chat
         - Each campaign has one **chat**, and it is the campaign's whole timeline: what the players and the master say

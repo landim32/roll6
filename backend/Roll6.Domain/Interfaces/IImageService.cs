@@ -14,4 +14,10 @@ public interface IImageService
     /// without depending on the bucket's CORS (029). Null for an invalid name or a missing file.
     /// </summary>
     Task<StoredImageInfo?> OpenAsync(string fileName);
+
+    /// <summary>Uploads a token's 3D model (055): a glTF binary (.glb, version 2) stored exactly as sent.</summary>
+    Task<ModelUploadInfo> UploadModelAsync(Stream content, long length);
+
+    /// <summary>Reads a stored 3D model ({guid}.glb) for the browser (the bucket sends no CORS headers). Null for an invalid name or a missing file.</summary>
+    Task<StoredImageInfo?> OpenModelAsync(string fileName);
 }

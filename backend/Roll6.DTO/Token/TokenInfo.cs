@@ -62,6 +62,13 @@ public class TokenInfo
     [JsonPropertyName("backImageUrl")]
     public string? BackImageUrl { get; set; }
 
+    /// <summary>3D model (055): a .glb drawn by the 3D view instead of the 2.5D figure.</summary>
+    [JsonPropertyName("modelFile")]
+    public string? ModelFile { get; set; }
+
+    [JsonPropertyName("modelFileUrl")]
+    public string? ModelFileUrl { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

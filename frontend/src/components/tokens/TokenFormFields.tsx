@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ModelField } from './ModelField';
 import { SpriteImageField } from './SpriteImageField';
 import { ImageCropper } from '../ui/ImageCropper';
 import { Tabs } from '../ui/Tabs';
 import type { ImageCrop } from '../ui/ImageCropper';
+import type { ModelFileState } from '../../hooks/useModelFile';
 import type { SpriteImagesState } from '../../hooks/useSpriteImages';
 import { tokenImageSize } from '../../lib/cropImage';
 import { SPRITE_VIEWS } from '../../lib/spriteView';
@@ -19,6 +21,8 @@ interface TokenFormFieldsProps {
   onDownCrop: (crop: ImageCrop | null) => void;
   /** The four "2,5D" images of the 3D view (035): crops, saved images and removals of the "2,5D" tab. */
   sprites: SpriteImagesState;
+  /** The token's 3D model (055): the "3D" tab. */
+  model: ModelFileState;
   /** Edit: the saved images, shown until new ones are chosen. */
   current?: {
     name: string; upUrl: string | null; hasUp: boolean; downUrl: string | null; hasDown: boolean;
@@ -30,11 +34,12 @@ interface TokenFormFieldsProps {
 /**
  * Fields of a library token, shared by "Incluir token" and "Editar token", in two tabs: "Token" (name, description,
  * standing and lying images — crop with zoom and rotation, saved at the footprint's pixel size — and the spaces) and
- * "2,5D" (the four images the 3D view draws, one per side of the character). Both panels stay mounted and the inactive
- * one is hidden, so nothing is lost when the user switches: texts, chosen files and open crops (FR-005).
+ * "2,5D" (the four images the 3D view draws, one per side of the character) and "3D" (a `.glb` model the 3D view draws
+ * instead, 055). The panels stay mounted and the inactive ones are hidden, so nothing is lost when the user switches:
+ * texts, chosen files and open crops (FR-005).
  */
 export const TokenFormFields = ({
-  idPrefix, form, onField, onUpCrop, onDownCrop, sprites, current, onRemoveDown,
+  idPrefix, form, onField, onUpCrop, onDownCrop, sprites, model, current, onRemoveDown,
 }: TokenFormFieldsProps) => {
   const { t } = useTranslation();
   const [tab, setTab] = useState('token');
@@ -48,6 +53,7 @@ export const TokenFormFields = ({
         tabs={[
           { key: 'token', label: t('tokens.tabToken') },
           { key: 'sprites', label: t('tokens.tabSprites') },
+          { key: 'model', label: t('tokens.tab3d') },
         ]}
         active={tab}
         onChange={setTab}
@@ -123,6 +129,9 @@ export const TokenFormFields = ({
             />
           ))}
         </div>
+      </div>
+      <div hidden={tab !== 'model'}>
+        <ModelField id={id('model')} state={model} name={current?.name ?? form.name} />
       </div>
     </>
   );

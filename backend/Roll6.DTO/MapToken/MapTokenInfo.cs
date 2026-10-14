@@ -38,6 +38,10 @@ public class MapTokenInfo
     [JsonPropertyName("backImageUrl")]
     public string? BackImageUrl { get; set; }
 
+    /// <summary>3D model of the piece's token (055): a .glb the 3D view draws instead of the 2.5D figure.</summary>
+    [JsonPropertyName("modelFileUrl")]
+    public string? ModelFileUrl { get; set; }
+
     /// <summary>Participation of a Character token (its name/vitals/status/sheet are shown).</summary>
     [JsonPropertyName("campaignCharacterId")]
     public long? CampaignCharacterId { get; set; }

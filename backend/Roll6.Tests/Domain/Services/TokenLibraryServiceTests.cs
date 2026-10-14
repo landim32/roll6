@@ -86,6 +86,59 @@ public class TokenLibraryServiceTests
         result.FrontImage.Should().BeNull();
     }
 
+    // ---- 055: 3D model ----
+
+    private const string MODEL_FILE = "0123456789abcdef0123456789abcdef.glb";
+
+    [Fact]
+    public async Task Create_WithModel_KeepsItAndItsUrl()
+    {
+        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Orc", ModelFile = MODEL_FILE });
+
+        result.ModelFile.Should().Be(MODEL_FILE);
+        result.ModelFileUrl.Should().Be("https://x/" + MODEL_FILE);
+    }
+
+    [Fact]
+    public async Task Create_WithoutModel_HasNone()
+    {
+        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Orc" });
+
+        result.ModelFile.Should().BeNull();
+        result.ModelFileUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Create_WithInvalidModel_Throws()
+    {
+        var act = () => _service.CreateAsync(1, new TokenInsertInfo { Name = "Orc", ModelFile = "orc.fbx" });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("modelFile");
+    }
+
+    [Fact]
+    public async Task Update_WithoutModel_RemovesIt()
+    {
+        _repository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(new Token { TokenId = 7, UserId = 1, Name = "Orc", ModelFile = MODEL_FILE });
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
+
+        var result = await _service.UpdateAsync(1, 7, new TokenInsertInfo { Name = "Orc" });
+
+        result.ModelFile.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_SendingTheModelBack_KeepsIt()
+    {
+        _repository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(new Token { TokenId = 7, UserId = 1, Name = "Orc", ModelFile = MODEL_FILE });
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
+
+        var result = await _service.UpdateAsync(1, 7, new TokenInsertInfo { Name = "Orc 2", ModelFile = MODEL_FILE });
+
+        result.ModelFile.Should().Be(MODEL_FILE);
+        result.Name.Should().Be("Orc 2");
+    }
+
     private const string RIGHT_IMAGE = "aaaa1111bbbb2222cccc3333dddd4444.png";
     private const string LEFT_IMAGE = "aaaa5555bbbb6666cccc7777dddd8888.png";
     private const string BACK_IMAGE = "aaaa9999bbbb0000cccc1111dddd2222.png";

@@ -20,7 +20,7 @@ interface MapControlsProps {
 export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   const { t } = useTranslation();
   const { currentCampaign, isMaster } = useCampaign();
-  const { view, zoomIn, zoomOut, resizeMode, toggleResizeMode, canEdit: canEditModel, draft, viewMode, setViewMode, fov, setFov } = useMapEditor();
+  const { view, zoomIn, zoomOut, resizeMode, toggleResizeMode, canEdit: canEditModel, draft, viewMode, setViewMode, fov, setFov, storyWalking, storyZoom } = useMapEditor();
   const { share, sharing } = useMapShare();
   const canShare = draft.mapId !== null && currentCampaign !== null;
   // 049: the open campaign map's picture stays as it is while the table is paused or finished.
@@ -44,11 +44,11 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   return (
     <div className="stm-controls">
       <button type="button" className="btn btn-secondary" title={t('map.zoomIn')} aria-label={t('map.zoomIn')}
-        disabled={in3d ? fov <= FOV_MIN : view.zoom >= MAX_ZOOM}
-        onClick={() => (in3d ? setFov(fov - FOV_STEP) : zoomIn(...center()))}><PlusIcon size={20} /></button>
+        disabled={in3d ? !storyWalking && fov <= FOV_MIN : view.zoom >= MAX_ZOOM}
+        onClick={() => (in3d && storyWalking ? storyZoom(-1) : in3d ? setFov(fov - FOV_STEP) : zoomIn(...center()))}><PlusIcon size={20} /></button>
       <button type="button" className="btn btn-secondary" title={t('map.zoomOut')} aria-label={t('map.zoomOut')}
-        disabled={in3d ? fov >= FOV_MAX : view.zoom <= MIN_ZOOM}
-        onClick={() => (in3d ? setFov(fov + FOV_STEP) : zoomOut(...center()))}><MinusIcon size={20} /></button>
+        disabled={in3d ? !storyWalking && fov >= FOV_MAX : view.zoom <= MIN_ZOOM}
+        onClick={() => (in3d && storyWalking ? storyZoom(1) : in3d ? setFov(fov + FOV_STEP) : zoomOut(...center()))}><MinusIcon size={20} /></button>
       {/* 3d6 on this screen only: it reads no campaign and stores nothing. */}
       {canShare && (
         <button type="button" className="btn btn-secondary" title={t('map.share')} aria-label={t('map.share')}

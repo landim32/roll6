@@ -1,7 +1,7 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
-import { DownloadIcon } from '../ui/icons';
+import { DownloadIcon, PersonFillIcon } from '../ui/icons';
 import { useInstall } from '../../hooks/useInstall';
 
 interface UserMenuProps {
@@ -17,7 +17,8 @@ interface UserMenuProps {
 }
 
 /**
- * User name in the top menu opening "Editar / Trocar senha / Chaves de API / Notificações / Qualidade do 3D / Sair".
+ * User name in the top menu (a person icon on phones, where the name broke the two-row menu) opening
+ * "Editar / Trocar senha / Chaves de API / Notificações / Qualidade do 3D / Sair".
  * Radix handles Esc, outside click and keyboard navigation (research R1); `modal={false}` keeps it from competing with
  * the Radix Dialog opened by the items, which run after the menu closes (onSelect).
  */
@@ -31,7 +32,8 @@ export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications,
       <DropdownMenu.Trigger asChild>
         <button type="button" className="btn btn-sm btn-outline-secondary dropdown-toggle stm-user-trigger"
           aria-label={t('userMenu.label')} title={session?.user.name}>
-          {session?.user.name}
+          <span className="d-none d-md-inline">{session?.user.name}</span>
+          <PersonFillIcon size={14} className="d-md-none" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

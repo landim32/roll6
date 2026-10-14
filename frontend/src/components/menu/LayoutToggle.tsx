@@ -10,12 +10,11 @@ const OPTIONS: { mode: LayoutMode; key: string }[] = [
   { mode: LAYOUT_MODE.chat, key: 'layout.chat' },
 ];
 
-/** Map only · map over chat · chat only (041); the unread badge shows while the chat is out of sight. */
+/** Map only · map over chat · chat only (041). */
 export const LayoutToggle = () => {
   const { t } = useTranslation();
-  const { canRead, layoutMode, setLayoutMode, unreadCount } = useChat();
+  const { canRead, layoutMode, setLayoutMode } = useChat();
   if (!canRead) return null;
-  const badge = layoutMode === LAYOUT_MODE.map && unreadCount > 0;
 
   return (
     <div className="btn-group stm-layout-toggle" role="group" aria-label={t('layout.label')}>
@@ -25,11 +24,6 @@ export const LayoutToggle = () => {
           {mode === LAYOUT_MODE.map && <MapIcon size={16} />}
           {mode === LAYOUT_MODE.split && <LayoutSplitIcon size={16} className="stm-rotate-90" />}
           {mode === LAYOUT_MODE.chat && <ChatDotsIcon size={16} />}
-          {mode === LAYOUT_MODE.chat && badge && (
-            <span className="badge rounded-pill text-bg-danger stm-layout-badge" aria-label={t('layout.unread', { count: unreadCount })}>
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
         </button>
       ))}
     </div>

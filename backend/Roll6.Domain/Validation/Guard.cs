@@ -14,6 +14,9 @@ public static class Guard
     // File names produced by the document upload (022): images or PDF, stored as sent.
     private static readonly Regex SHEET_FILE_NAME_REGEX = new(@"^[0-9a-f]{32}\.(png|jpg|webp|pdf)$", RegexOptions.Compiled);
 
+    // File names produced by the 3D model upload (055): a glTF binary, stored as sent.
+    private static readonly Regex MODEL_FILE_NAME_REGEX = new(@"^[0-9a-f]{32}\.glb$", RegexOptions.Compiled);
+
     public static string RequiredText(string? value, string field, int maxLength)
     {
         var trimmed = value?.Trim();
@@ -74,6 +77,18 @@ public static class Guard
             throw new DomainValidationException(field, "Arquivo inválido. Use o fileName retornado pelo upload.");
         return fileName;
     }
+
+    /// <summary>Accepts only file names returned by the 3D model upload (055): {guid:N}.glb.</summary>
+    public static string? ModelFileName(string? value, string field)
+    {
+        var fileName = OptionalText(value, field, 260);
+        if (fileName != null && !MODEL_FILE_NAME_REGEX.IsMatch(fileName))
+            throw new DomainValidationException(field, "Modelo inválido. Use o fileName retornado pelo upload.");
+        return fileName;
+    }
+
+    /// <summary>True for a name the model upload could have produced ({guid:N}.glb).</summary>
+    public static bool IsModelFileName(string? value) => value != null && MODEL_FILE_NAME_REGEX.IsMatch(value);
 
     public static string Email(string? value, string field)
     {

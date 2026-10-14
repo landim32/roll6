@@ -1,5 +1,6 @@
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
+using Roll6.Domain.Validation;
 using System.Text.RegularExpressions;
 using Roll6.DTO.Image;
 using Roll6.Infra.Interfaces.AppServices;
@@ -9,6 +10,13 @@ namespace Roll6.Domain.Services;
 public class ImageService : IImageService
 {
     public const long MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+    /// <summary>Largest 3D model a token may carry (055).</summary>
+    public const long MAX_MODEL_BYTES = 20 * 1024 * 1024;
+
+    public const string MODEL_CONTENT_TYPE = "model/gltf-binary";
+
+    private const string MODEL_INVALID = "Envie um arquivo .glb (glTF binário, versão 2).";
 
     private static readonly Dictionary<string, string> EXTENSIONS = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -62,6 +70,47 @@ public class ImageService : IImageService
         if (string.IsNullOrWhiteSpace(fileName) || !STORED_IMAGE_NAME.IsMatch(fileName))
             return null;
         return await _storage.OpenAsync(fileName);
+    }
+
+    /// <summary>
+    /// The bytes go to the storage untouched (055). Only the header is checked — magic "glTF", version 2, the declared
+    /// length equal to the file's and a JSON first chunk — the browser parses the rest.
+    /// </summary>
+    public async Task<ModelUploadInfo> UploadModelAsync(Stream content, long length)
+    {
+        if (length <= 0)
+            throw new DomainValidationException("file", "Nenhum arquivo enviado.");
+        if (length > MAX_MODEL_BYTES)
+            throw new DomainValidationException("file", "O modelo deve ter no máximo 20 MB.");
+
+        using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer);
+        if (buffer.Length > MAX_MODEL_BYTES)
+            throw new DomainValidationException("file", "O modelo deve ter no máximo 20 MB.");
+        if (!IsGlb(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)))
+            throw new DomainValidationException("file", MODEL_INVALID);
+
+        buffer.Position = 0;
+        var fileName = await _storage.UploadAsync(buffer, MODEL_CONTENT_TYPE, "glb");
+        return new ModelUploadInfo { FileName = fileName, Url = _storage.GetUrl(fileName) };
+    }
+
+    public async Task<StoredImageInfo?> OpenModelAsync(string fileName)
+    {
+        if (!Guard.IsModelFileName(fileName))
+            return null;
+        return await _storage.OpenAsync(fileName);
+    }
+
+    /// <summary>glTF 2.0 binary header (12 bytes) followed by the first chunk header, which must be JSON.</summary>
+    public static bool IsGlb(ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.Length < 20 || !bytes[..4].SequenceEqual("glTF"u8))
+            return false;
+        var version = BitConverter.ToUInt32(bytes.Slice(4, 4));
+        var declared = BitConverter.ToUInt32(bytes.Slice(8, 4));
+        var chunkType = BitConverter.ToUInt32(bytes.Slice(16, 4));
+        return version == 2 && declared == bytes.Length && chunkType == 0x4E4F534A;
     }
 
     private async Task<string> StoreAsync(Stream content, long length, string? contentType,

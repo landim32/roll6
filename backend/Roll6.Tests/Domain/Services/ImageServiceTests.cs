@@ -161,4 +161,90 @@ public class ImageServiceTests
         result.Should().BeNull();
         _storage.Verify(s => s.OpenAsync(It.IsAny<string>()), Times.Never);
     }
+
+    private const string MODEL_NAME = "0123456789abcdef0123456789abcdef.glb";
+
+    /// <summary>A minimal glTF binary: header (magic, version, length) + a JSON chunk "{}  ".</summary>
+    private static byte[] Glb(uint version = 2, uint? declaredLength = null, uint chunkType = 0x4E4F534A)
+    {
+        var json = Encoding.ASCII.GetBytes("{}  ");
+        var bytes = new byte[12 + 8 + json.Length];
+        Encoding.ASCII.GetBytes("glTF").CopyTo(bytes, 0);
+        BitConverter.GetBytes(version).CopyTo(bytes, 4);
+        BitConverter.GetBytes(declaredLength ?? (uint)bytes.Length).CopyTo(bytes, 8);
+        BitConverter.GetBytes((uint)json.Length).CopyTo(bytes, 12);
+        BitConverter.GetBytes(chunkType).CopyTo(bytes, 16);
+        json.CopyTo(bytes, 20);
+        return bytes;
+    }
+
+    [Fact]
+    public async Task UploadModel_ValidGlb_IsStoredAsIs()
+    {
+        _storage.Setup(s => s.UploadAsync(It.IsAny<Stream>(), "model/gltf-binary", "glb")).ReturnsAsync(MODEL_NAME);
+        _storage.Setup(s => s.GetUrl(MODEL_NAME)).Returns("https://bucket/roll6/" + MODEL_NAME);
+        var bytes = Glb();
+
+        var result = await _service.UploadModelAsync(new MemoryStream(bytes), bytes.Length);
+
+        result.FileName.Should().Be(MODEL_NAME);
+        result.Url.Should().Be("https://bucket/roll6/" + MODEL_NAME);
+        _storage.Verify(s => s.UploadAsync(It.IsAny<Stream>(), "model/gltf-binary", "glb"), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadModel_Empty_Throws()
+    {
+        var act = () => _service.UploadModelAsync(new MemoryStream(), 0);
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("file");
+    }
+
+    [Fact]
+    public async Task UploadModel_LargerThan20Mb_Throws()
+    {
+        var bytes = Glb();
+
+        var act = () => _service.UploadModelAsync(new MemoryStream(bytes), ImageService.MAX_MODEL_BYTES + 1);
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors["file"].Should().Contain("O modelo deve ter no máximo 20 MB.");
+    }
+
+    public static TheoryData<byte[]> InvalidModels() => new()
+    {
+        Encoding.ASCII.GetBytes("isto não é um modelo 3d qualquer"),
+        Glb(version: 1),
+        Glb(declaredLength: 999),
+        Glb(chunkType: 0x004E4942),
+        PNG_BYTES,
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidModels))]
+    public async Task UploadModel_NotAGlb2_Throws(byte[] bytes)
+    {
+        var act = () => _service.UploadModelAsync(new MemoryStream(bytes), bytes.Length);
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("file");
+        _storage.Verify(s => s.UploadAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef.png")]
+    [InlineData("../0123456789abcdef0123456789abcdef.glb")]
+    [InlineData("orc.glb")]
+    public async Task OpenModel_OnlyServesModelNames(string fileName)
+    {
+        (await _service.OpenModelAsync(fileName)).Should().BeNull();
+        _storage.Verify(s => s.OpenAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OpenModel_StoredName_OpensIt()
+    {
+        var stored = new StoredImageInfo { ContentType = "model/gltf-binary" };
+        _storage.Setup(s => s.OpenAsync(MODEL_NAME)).ReturnsAsync(stored);
+
+        (await _service.OpenModelAsync(MODEL_NAME)).Should().BeSameAs(stored);
+    }
 }

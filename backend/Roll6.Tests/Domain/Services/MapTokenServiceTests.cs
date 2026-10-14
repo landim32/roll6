@@ -940,6 +940,7 @@ public class MapTokenServiceTests
     private const string RIGHT_IMAGE = "aaaa1111bbbb2222cccc3333dddd4444.png";
     private const string LEFT_IMAGE = "aaaa5555bbbb6666cccc7777dddd8888.png";
     private const string BACK_IMAGE = "aaaa9999bbbb0000cccc1111dddd2222.png";
+    private const string MODEL_FILE = "bbbb9999bbbb0000cccc1111dddd2222.glb";
 
     [Fact]
     public async Task ListByMap_ReturnsTheFourSpriteImagesOfTheToken()
@@ -947,7 +948,7 @@ public class MapTokenServiceTests
         _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 41, MapId = 30, TokenId = 7, Name = "Guerreira" } });
         _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token>
         {
-            new() { TokenId = 7, Name = "Guerreira", UpImage = UP_IMAGE, FrontImage = FRONT_IMAGE, RightImage = RIGHT_IMAGE, LeftImage = LEFT_IMAGE, BackImage = BACK_IMAGE }
+            new() { TokenId = 7, Name = "Guerreira", UpImage = UP_IMAGE, FrontImage = FRONT_IMAGE, RightImage = RIGHT_IMAGE, LeftImage = LEFT_IMAGE, BackImage = BACK_IMAGE, ModelFile = MODEL_FILE }
         });
 
         var piece = (await _service.ListByMapAsync(1, 30)).Single();
@@ -957,6 +958,7 @@ public class MapTokenServiceTests
         piece.RightImageUrl.Should().Be("https://x/" + RIGHT_IMAGE);
         piece.LeftImageUrl.Should().Be("https://x/" + LEFT_IMAGE);
         piece.BackImageUrl.Should().Be("https://x/" + BACK_IMAGE);
+        piece.ModelFileUrl.Should().Be("https://x/" + MODEL_FILE);
     }
 
     [Fact]
@@ -971,6 +973,7 @@ public class MapTokenServiceTests
         piece.RightImageUrl.Should().BeNull();
         piece.LeftImageUrl.Should().BeNull();
         piece.BackImageUrl.Should().BeNull();
+        piece.ModelFileUrl.Should().BeNull();
     }
 
     // ---- 031 US3: the posture changes the size ----

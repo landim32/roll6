@@ -370,6 +370,13 @@ export const DownloadIcon = (props: IconProps) => (
   </Icon>
 );
 
+/** bi-person-fill */
+export const PersonFillIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
+  </Icon>
+);
+
 /** bi-box-arrow-up — Safari's "Compartilhar" button, in the iOS install guide (042). */
 export const ShareIosIcon = (props: IconProps) => (
   <Icon {...props}>

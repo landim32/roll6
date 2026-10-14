@@ -39,6 +39,8 @@ export interface MapTokenInfo {
   rightImageUrl: string | null;
   leftImageUrl: string | null;
   backImageUrl: string | null;
+  /** 3D model of the piece's token (055), drawn by the 3D view instead of the 2,5D figure. */
+  modelFileUrl?: string | null;
   downImageUrl: string | null;
   campaignCharacterId: number | null;
   characterId: number | null;

@@ -84,6 +84,13 @@ describe('3D view figures (034)', () => {
       expect(isShownIn3d(token({ frontImageUrl: null, rightImageUrl: 'r.png', leftImageUrl: 'l.png', backImageUrl: 'b.png' }))).toBe(false);
     });
 
+    it('shows a standing piece whose token has only a 3D model (055), never a lying one', () => {
+      expect(isShownIn3d({ posture: POSTURE.standing, frontImageUrl: null, modelFileUrl: 'https://files/orc.glb' })).toBe(true);
+      expect(isShownIn3d({ posture: null, frontImageUrl: null, modelFileUrl: 'https://files/orc.glb' })).toBe(true);
+      expect(isShownIn3d({ posture: POSTURE.down, frontImageUrl: null, modelFileUrl: 'https://files/orc.glb' })).toBe(false);
+      expect(isShownIn3d({ posture: POSTURE.standing, frontImageUrl: null, modelFileUrl: null })).toBe(false);
+    });
+
     it('shows a piece with only the front image: the other sides are optional', () => {
       expect(isShownIn3d(token({ frontImageUrl: FRONT, rightImageUrl: null, leftImageUrl: null, backImageUrl: null }))).toBe(true);
     });
@@ -106,6 +113,8 @@ describe('3D view figures (034)', () => {
         baseColor: BASE_COLORS[MAP_TOKEN_TYPE.character],
       });
       expect(spec.width).toBeCloseTo(pieceGeometry(1, 40).box.width);
+      expect(spec.modelUrl).toBeNull();
+      expect(spriteSpec(token({ modelFileUrl: 'https://files/orc.glb' }), 40).modelUrl).toBe('https://files/orc.glb');
       expect(spec.center.x).toBeCloseTo(hexCenter(3, 2, 40).x);
       expect(spec.center.y).toBeCloseTo(hexCenter(3, 2, 40).y);
     });

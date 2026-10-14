@@ -25,6 +25,8 @@ public class Token
     public string? LeftImage { get; set; }
     /// <summary>"2.5D back" (035): the figure seen from behind. Optional.</summary>
     public string? BackImage { get; set; }
+    /// <summary>3D model (055): a .glb drawn by the 3D view instead of the 2.5D figure. Optional.</summary>
+    public string? ModelFile { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -49,6 +51,13 @@ public class Token
         RightImage = Guard.ImageFileName(right, "rightImage");
         LeftImage = Guard.ImageFileName(left, "leftImage");
         BackImage = Guard.ImageFileName(back, "backImage");
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>The token's 3D model (055); null removes it (the PUT of a token replaces every field).</summary>
+    public void UpdateModel(string? modelFile)
+    {
+        ModelFile = Guard.ModelFileName(modelFile, "modelFile");
         UpdatedAt = DateTime.UtcNow;
     }
 

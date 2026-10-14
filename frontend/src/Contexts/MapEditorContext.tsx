@@ -112,6 +112,13 @@ interface MapEditorContextType {
   /** Quality level of the 3D view (053): per user and device, remembered in `roll6:3d-quality`, applied at once. */
   viewQuality: ViewQuality;
   setViewQuality: (level: ViewQuality) => void;
+  /**
+   * The player walks his character in the 3D view (055, free mode): while true the zoom buttons move the camera closer
+   * or farther (`storyZoom`) instead of changing the field of view. The 3D view registers the handler.
+   */
+  storyWalking: boolean;
+  storyZoom: (steps: number) => void;
+  registerStoryZoom: (handler: ((steps: number) => void) | null) => void;
   // Map lifecycle
   newMap: () => void;
   /** `keepView` keeps zoom/pan (the same map reloaded because someone saved it, 017). */
@@ -270,6 +277,14 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const setFov = useCallback((value: number) => setFovState(clampFov(value)), []);
   // The quality level (053) is a preference of this device, not of a map: read once, written on every choice.
   const [viewQuality, setViewQualityState] = useState<ViewQuality>(readViewQuality);
+  // Walking in the 3D view (055): the view hands its zoom here so the map controls can drive it.
+  const storyZoomRef = useRef<((steps: number) => void) | null>(null);
+  const [storyWalking, setStoryWalking] = useState(false);
+  const registerStoryZoom = useCallback((handler: ((steps: number) => void) | null) => {
+    storyZoomRef.current = handler;
+    setStoryWalking(handler !== null);
+  }, []);
+  const storyZoom = useCallback((steps: number) => storyZoomRef.current?.(steps), []);
   const setViewQuality = useCallback((level: ViewQuality) => {
     setViewQualityState(level);
     writeViewQuality(level);
@@ -537,6 +552,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     zoomAt, zoomIn, zoomOut, panBy, centerOn,
     setImage, setImageLayout, setGridSize, toggleResizeMode,
     setMaskImage, setBackgroundImage, setWallTextureImage, viewMode, setViewMode, fov, setFov, viewQuality, setViewQuality,
+    storyWalking, storyZoom, registerStoryZoom,
     newMap, loadMapModel, openCampaignMapBySlug, discardChanges, saveMap, clearError,
   };
 

@@ -146,6 +146,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.RightImage).HasColumnName("right_image").HasMaxLength(260);
             entity.Property(e => e.LeftImage).HasColumnName("left_image").HasMaxLength(260);
             entity.Property(e => e.BackImage).HasColumnName("back_image").HasMaxLength(260);
+            entity.Property(e => e.ModelFile).HasColumnName("model_file").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_token");

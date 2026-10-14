@@ -37,4 +37,8 @@ public class TokenInsertInfo
     /// <summary>"2.5D back" image (035): the figure seen from behind. Optional.</summary>
     [JsonPropertyName("backImage")]
     public string? BackImage { get; set; }
+
+    /// <summary>3D model (055): fileName returned by POST /api/model (a .glb). Optional; omitted on PUT = removed.</summary>
+    [JsonPropertyName("modelFile")]
+    public string? ModelFile { get; set; }
 }

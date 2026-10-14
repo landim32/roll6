@@ -9,6 +9,7 @@ import { TokenFormFields } from '../tokens/TokenFormFields';
 import { TokenGrid } from '../tokens/TokenGrid';
 import { TokenEditModal } from './TokenEditModal';
 import { useMapToken } from '../../hooks/useMapToken';
+import { useModelFile } from '../../hooks/useModelFile';
 import { useSpriteImages } from '../../hooks/useSpriteImages';
 import { useToken } from '../../hooks/useToken';
 import { imageService } from '../../Services/imageService';
@@ -90,6 +91,8 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
   const [downCrop, setDownCrop] = useState<ImageCrop | null>(null);
   /** The four "2,5D" images of the 3D view (035), edited in the form's own tab. */
   const sprites = useSpriteImages(null, open);
+  /** The 3D model of the new token (055). */
+  const model = useModelFile(null, open);
   /** Own token being edited: this modal hides while "Editar token" is open. */
   const [editing, setEditing] = useState<TokenInfo | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -127,12 +130,13 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
     event.preventDefault();
     const error = validateTokenForm(form);
     if (error) return toast.error(t(`tokens.errors.${error}`));
+    if (model.invalid) return toast.error(t('tokens.model.invalid'));
     setBusy(true);
     let token: TokenInfo;
     try {
       const upImage = upCrop ? await uploadTokenImage(upCrop, Number(form.upSpace)) : null;
       const downImage = downCrop ? await uploadTokenImage(downCrop, downImageSpace(form.downSpace)) : null;
-      token = await create(toTokenInsert(form, upImage, downImage, await sprites.resolve()));
+      token = await create(toTokenInsert(form, upImage, downImage, await sprites.resolve(), await model.resolve()));
       toast.success(t('toast.tokenCreated', { name: token.name }));
     } catch (err) {
       setBusy(false);
@@ -204,6 +208,7 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
             onUpCrop={setUpCrop}
             onDownCrop={setDownCrop}
             sprites={sprites}
+            model={model}
           />
         </form>
       </Modal>

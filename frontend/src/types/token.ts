@@ -27,6 +27,9 @@ export interface TokenInfo {
   rightImageUrl: string | null;
   leftImageUrl: string | null;
   backImageUrl: string | null;
+  /** 3D model (055): stored `{guid}.glb` and its presigned URL; missing/null = no model. */
+  modelFile?: string | null;
+  modelFileUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -43,4 +46,12 @@ export interface TokenInsertInfo {
   rightImage: string | null;
   leftImage: string | null;
   backImage: string | null;
+  /** 3D model (055); the PUT replaces every field, so null removes it. */
+  modelFile: string | null;
+}
+
+/** Result of POST /api/model (055): the stored `.glb` name and a temporary URL. */
+export interface ModelUploadInfo {
+  fileName: string;
+  url: string | null;
 }
