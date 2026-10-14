@@ -9,6 +9,7 @@ import type { ModelFileState } from '../../hooks/useModelFile';
 import { animationService } from '../../Services/animationService';
 import type { AnimationInfo } from '../../types/animation';
 import { checkModelFile } from '../../lib/modelFile';
+import { MODEL_SCALE, clampModelScale, formatModelScale, modelScaleFactor } from '../../lib/modelScale';
 import {
   ANIMATION_STATES, STATE_ANIMATION_TYPE, animationChoice, clipChoiceFromValue, clipChoiceOptions, isMixamoSkeleton, parseClipChoice,
 } from '../../lib/modelAnimations';
@@ -63,7 +64,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   /** The preview shows a still pose (paused, or a state without animation) — 057. */
   const [still, setStill] = useState(false);
   const previewRef = useRef<ModelPreviewHandle>(null);
-  const { previewUrl, clips, setClip, setInvalid } = state;
+  const { previewUrl, clips, setClip, setInvalid, scale, setScale } = state;
   const { byType, listForType, refreshType } = useAnimation();
   const [refreshing, setRefreshing] = useState(false);
   const { session } = useAuth();
@@ -269,6 +270,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 shown={shown}
                 animated={animating}
                 clips={clips}
+                scale={modelScaleFactor(scale)}
                 label={t('tokens.model.previewLabel', { name: name || '—' })}
                 onLoaded={(found) => { setLoading(false); setInfo(found); setInvalid(false); }}
                 onClips={(found, stretched) => { setSources(found); setDeforms(stretched); }}
@@ -313,6 +315,33 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
           </div>
         )}
       </div>
+      {!animating && previewUrl && (
+        <div className="stm-model-scale mt-3">
+          <label htmlFor={`${id}-scale`} className="form-label small mb-1 d-flex justify-content-between">
+            <span>{t('tokens.model.scale')}</span>
+            <output htmlFor={`${id}-scale`} className="fw-semibold">{formatModelScale(scale)}</output>
+          </label>
+          <input
+            id={`${id}-scale`}
+            type="range"
+            className="form-range"
+            min={MODEL_SCALE.min}
+            max={MODEL_SCALE.max}
+            step={MODEL_SCALE.step}
+            value={scale}
+            aria-valuetext={formatModelScale(scale)}
+            onChange={(e) => setScale(clampModelScale(Number(e.target.value)))}
+          />
+          <div className="d-flex justify-content-between align-items-center">
+            <div className="form-text mt-0">{t('tokens.model.scaleHint')}</div>
+            {scale !== MODEL_SCALE.standard && (
+              <button type="button" className="btn btn-link btn-sm p-0 flex-shrink-0" onClick={() => setScale(MODEL_SCALE.standard)}>
+                {t('tokens.model.scaleReset')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {animating && previewUrl && options && (
         <div className="stm-model-choice mt-3">
           <label htmlFor={`${id}-clip`} className="form-label small mb-1">

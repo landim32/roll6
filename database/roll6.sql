@@ -2018,5 +2018,20 @@ BEGIN
     VALUES ('20261014182056_RemoveRoll6Clips', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014220053_AddTokenModelScale') THEN
+    ALTER TABLE tokens ADD model_scale integer NOT NULL DEFAULT 100;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014220053_AddTokenModelScale') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261014220053_AddTokenModelScale', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

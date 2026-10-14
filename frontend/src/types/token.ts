@@ -35,6 +35,8 @@ export interface TokenInfo {
   modelWalkClip?: string | null;
   /** The death (058): played once when the piece is down or out of combat; null = automatic. */
   modelDownClip?: string | null;
+  /** Size of the model in the 3D view (063): percent of its automatic height, 25–400; missing = 100. */
+  modelScale?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +59,8 @@ export interface TokenInsertInfo {
   modelIdleClip: string | null;
   modelWalkClip: string | null;
   modelDownClip: string | null;
+  /** Size of the model (063), 25–400 in steps of 5; the PUT resets it to 100 when omitted. */
+  modelScale: number;
 }
 
 /** Result of POST /api/model (055): the stored `.glb` name and a temporary URL. */

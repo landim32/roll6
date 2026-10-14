@@ -81,6 +81,10 @@ public class TokenInfo
     [JsonPropertyName("modelDownClip")]
     public string? ModelDownClip { get; set; }
 
+    /// <summary>Size of the 3D model in the 3D view (063), percent of its automatic height; 100 without a model.</summary>
+    [JsonPropertyName("modelScale")]
+    public int ModelScale { get; set; } = 100;
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

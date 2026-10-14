@@ -59,4 +59,11 @@ public class TokenInsertInfo
     /// </summary>
     [JsonPropertyName("modelDownClip")]
     public string? ModelDownClip { get; set; }
+
+    /// <summary>
+    /// Size of the 3D model in the 3D view (063): percentage of its automatic height, 25–400 in steps of 5. Omitted = 100.
+    /// Ignored without modelFile.
+    /// </summary>
+    [JsonPropertyName("modelScale")]
+    public int? ModelScale { get; set; }
 }

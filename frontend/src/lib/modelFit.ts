@@ -34,10 +34,14 @@ export const figureHeight = (width: number): number => (SILHOUETTE_SHARE * width
  */
 export const rotationForYaw = (yaw: number): number => Math.PI - yaw;
 
-/** Scale, position and turn that stand a model of `bounds` on `center`, facing `yaw`, as tall as a figure `width` wide. */
-export const fitModel = (bounds: ModelBounds, width: number, center: Point, yaw: number): ModelPlacement => {
+/**
+ * Scale, position and turn that stand a model of `bounds` on `center`, facing `yaw`, as tall as a figure `width` wide
+ * times `size` (063: the token's model size as a factor, 1 = the automatic height). The feet stay on the floor and on
+ * the center whatever the size.
+ */
+export const fitModel = (bounds: ModelBounds, width: number, center: Point, yaw: number, size = 1): ModelPlacement => {
   const tall = bounds.max[1] - bounds.min[1];
-  const scale = tall > 1e-6 ? figureHeight(width) / tall : 1;
+  const scale = (tall > 1e-6 ? figureHeight(width) / tall : 1) * size;
   const rotationY = rotationForYaw(yaw);
   // The middle of the feet, in the model's own frame, scaled.
   const footX = ((bounds.min[0] + bounds.max[0]) / 2) * scale;
@@ -64,9 +68,11 @@ export const LYING_TILT = -Math.PI / 2;
  * about the vertical (three.js Euler order "YXZ"), the middle of the lying body lands on `center` and its lowest point
  * on the floor. Turned by the tilt, a point (x, y, z) of the file goes to (x, z, −y).
  */
-export const fitLyingModel = (bounds: ModelBounds, width: number, center: Point, yaw: number): ModelPlacement & { tilt: number } => {
+export const fitLyingModel = (
+  bounds: ModelBounds, width: number, center: Point, yaw: number, size = 1,
+): ModelPlacement & { tilt: number } => {
   const tall = bounds.max[1] - bounds.min[1];
-  const scale = tall > 1e-6 ? figureHeight(width) / tall : 1;
+  const scale = (tall > 1e-6 ? figureHeight(width) / tall : 1) * size;
   const rotationY = rotationForYaw(yaw);
   const middleX = ((bounds.min[0] + bounds.max[0]) / 2) * scale;
   const middleZ = (-(bounds.min[1] + bounds.max[1]) / 2) * scale;

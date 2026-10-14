@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Roll6.Domain.Enums;
 using Roll6.Domain.Models;
 using Roll6.Infra.Context;
 using Roll6.Infra.Interfaces.Repository;
@@ -54,6 +55,17 @@ public class MapTokenRepository : IMapTokenRepository<MapToken>
     public async Task<bool> ExistsByTokenAsync(long tokenId)
     {
         return await _context.MapTokens.AnyAsync(e => e.TokenId == tokenId);
+    }
+
+    public async Task<List<long>> ListCampaignIdsByTokenAsync(long tokenId)
+    {
+        return await (
+                from piece in _context.MapTokens.AsNoTracking()
+                join map in _context.Maps.AsNoTracking() on piece.MapId equals map.MapId
+                where piece.TokenId == tokenId && map.Status != MapStatus.Deleted
+                select map.CampaignId)
+            .Distinct()
+            .ToListAsync();
     }
 
     public async Task DeleteByMapIdsAsync(IEnumerable<long> mapIds)

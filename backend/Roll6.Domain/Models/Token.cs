@@ -37,6 +37,11 @@ public class Token
     public string? ModelWalkClip { get; set; }
     /// <summary>The death (058): played once when a piece of this token is down or out of combat; same values.</summary>
     public string? ModelDownClip { get; set; }
+    /// <summary>
+    /// Size of the 3D model in the 3D view (063): percentage of its automatic height, 25–400 in steps of 5; 100 without a
+    /// model.
+    /// </summary>
+    public int ModelScale { get; set; } = Guard.MODEL_SCALE_DEFAULT;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -66,14 +71,16 @@ public class Token
 
     /// <summary>
     /// The token's 3D model (055) and the animations chosen for it (056; the death since 058); null removes it (the PUT
-    /// of a token replaces every field). Without a model the choices are dropped: they only mean something for a file.
+    /// of a token replaces every field). Without a model the choices are dropped and the size goes back to 100: they only
+    /// mean something for a file. The size (063) is null = 100.
     /// </summary>
-    public void UpdateModel(string? modelFile, string? idleClip = null, string? walkClip = null, string? downClip = null)
+    public void UpdateModel(string? modelFile, string? idleClip = null, string? walkClip = null, string? downClip = null, int? scale = null)
     {
         ModelFile = Guard.ModelFileName(modelFile, "modelFile");
         ModelIdleClip = ModelFile == null ? null : Guard.ModelClip(idleClip, "modelIdleClip");
         ModelWalkClip = ModelFile == null ? null : Guard.ModelClip(walkClip, "modelWalkClip");
         ModelDownClip = ModelFile == null ? null : Guard.ModelClip(downClip, "modelDownClip");
+        ModelScale = ModelFile == null ? Guard.MODEL_SCALE_DEFAULT : Guard.ModelScale(scale, "modelScale");
         UpdatedAt = DateTime.UtcNow;
     }
 

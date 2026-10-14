@@ -8,6 +8,8 @@ public interface IMapTokenRepository<TModel> where TModel : class
     Task<TModel> UpdateAsync(TModel entity);
     Task DeleteAsync(long id);
     Task<bool> ExistsByTokenAsync(long tokenId);
+    /// <summary>The campaigns whose maps (not deleted) hold a piece of the token, each once (063: a token change reaches them).</summary>
+    Task<List<long>> ListCampaignIdsByTokenAsync(long tokenId);
     Task DeleteByMapIdsAsync(IEnumerable<long> mapIds);
     /// <summary>The piece of a campaign character on a map, if it is there.</summary>
     Task<TModel?> GetByMapAndCampaignCharacterAsync(long mapId, long campaignCharacterId);

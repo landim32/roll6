@@ -107,3 +107,28 @@ describe('fitLyingModel (058)', () => {
     expect(head.y).toBeCloseTo(0, 6);
   });
 });
+
+describe('model size (063)', () => {
+  const width = pieceGeometry(1, HEX_SIZE).box.width;
+  const center = { x: 300, y: 200 };
+
+  it('is the automatic fit with size 1', () => {
+    expect(fitModel(ORC, width, center, 0.7, 1)).toEqual(fitModel(ORC, width, center, 0.7));
+    expect(fitLyingModel(ORC, width, center, 0.7, 1)).toEqual(fitLyingModel(ORC, width, center, 0.7));
+  });
+
+  it('multiplies the height and keeps the feet on the floor, on the center', () => {
+    const fit = fitModel(ORC, width, center, 0, 2);
+    expect(fit.scale * 0.8975).toBeCloseTo(2 * figureHeight(width), 6);
+    expect(fit.position.y).toBeCloseTo(-ORC.min[1] * fit.scale, 6);
+    const feet = { x: 0, y: 0, z: 0 };
+    const cos = Math.cos(fit.rotationY);
+    const sin = Math.sin(fit.rotationY);
+    expect(fit.position.x + feet.x * cos + feet.z * sin).toBeCloseTo(center.x, 6);
+    expect(fit.position.z - feet.x * sin + feet.z * cos).toBeCloseTo(center.y, 6);
+  });
+
+  it('lies with the same size', () => {
+    expect(fitLyingModel(ORC, width, center, 0, 1.5).scale).toBeCloseTo(fitModel(ORC, width, center, 0, 1.5).scale, 9);
+  });
+});

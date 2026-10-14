@@ -46,6 +46,8 @@ export interface MapTokenInfo {
   modelWalkClip?: string | null;
   /** The death (058): played once when the piece is down or out of combat; null = automatic. */
   modelDownClip?: string | null;
+  /** Size of the token's model in the 3D view (063): percent of its automatic height; missing = 100. */
+  modelScale?: number;
   downImageUrl: string | null;
   campaignCharacterId: number | null;
   characterId: number | null;

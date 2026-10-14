@@ -365,7 +365,9 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
         images,
         fallback: standing ?? initialPixels(spec.name, spec.baseColor),
         center: spec.center,
-        width: spec.width,
+        // Hidden under its 3D model, the proxy takes the model's size (063): its top — where the balloon hangs — and its
+        // head follow the model's height. The 2,5D figure shown while the model loads keeps the piece's size.
+        width: drawnModels.has(spec.mapTokenId) ? spec.width * spec.modelScale : spec.width,
         look: spec.look,
         // Its 3D model is drawn over the frame (055): measured for the balloon and the shadow, not painted.
         hidden: drawnModels.has(spec.mapTokenId),
@@ -390,7 +392,7 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     return spec.modelUrl
       ? [{
         id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: lookToYaw(piece.look),
-        clips: spec.modelClips, lying: isLying(piece),
+        clips: spec.modelClips, lying: isLying(piece), scale: spec.modelScale,
       }]
       : [];
   }), [pieces]);

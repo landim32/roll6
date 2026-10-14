@@ -38,6 +38,8 @@ export interface ModelSpec {
   clips: ModelClipChoices;
   /** The piece is down or out of combat (058): the model lies at the end of its death. */
   lying: boolean;
+  /** Size of the token's model (063) as a factor of its automatic height; missing = 1. */
+  scale?: number;
 }
 
 export interface ModelLayer {
@@ -146,10 +148,10 @@ export const createModelLayer = (
   const place = (entry: Drawn) => {
     if (!entry.object || !entry.asset) return;
     const { bounds } = entry.asset;
-    const { width, center, yaw } = entry.spec;
+    const { width, center, yaw, scale = 1 } = entry.spec;
     // Lying without a death animation (058): the whole model laid on its back. With one, it stands where it falls.
-    const lying = entry.spec.lying && !entry.down ? fitLyingModel(bounds, width, center, yaw) : null;
-    const fit = lying ?? fitModel(bounds, width, center, yaw);
+    const lying = entry.spec.lying && !entry.down ? fitLyingModel(bounds, width, center, yaw, scale) : null;
+    const fit = lying ?? fitModel(bounds, width, center, yaw, scale);
     entry.object.scale.setScalar(fit.scale);
     entry.object.position.set(fit.position.x, fit.position.y, fit.position.z);
     entry.object.rotation.set(lying?.tilt ?? 0, fit.rotationY, 0, 'YXZ');

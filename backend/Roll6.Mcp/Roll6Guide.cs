@@ -177,6 +177,9 @@ public static class Roll6Guide
           deform a rig that binds arms and legs to the hips (the web form warns).
         - A state may also play a **library animation** (059, see "Animations" below): `"animation:{id}"` in
           `modelIdleClip` / `modelWalkClip` / `modelDownClip`, for Mixamo skeletons.
+        - The token's `modelScale` (063) sizes the model in the 3D view: percent of its automatic height (the 2.5D
+          figure's silhouette for the piece's hexes), 25–400 in steps of 5, 100 by default. Feet stay on the floor and
+          the balloon over the head; only the 3D view changes (hexes, movement and 2D images do not).
         - In **free mode** a player walks his own character in the 3D view, in third person (camera locked behind it,
           zoom = distance). That walk is **local to his screen**: it never moves the piece, records nothing and no tool
           sees it — pieces still move only through `move_map_token`.

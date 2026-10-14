@@ -115,6 +115,8 @@ describe('3D view figures (034)', () => {
       expect(spec.width).toBeCloseTo(pieceGeometry(1, 40).box.width);
       expect(spec.modelUrl).toBeNull();
       expect(spriteSpec(token({ modelFileUrl: 'https://files/orc.glb' }), 40).modelUrl).toBe('https://files/orc.glb');
+      expect(spec.modelScale).toBe(1);
+      expect(spriteSpec(token({ modelFileUrl: 'https://files/orc.glb', modelScale: 150 }), 40).modelScale).toBe(1.5);
       expect(spec.center.x).toBeCloseTo(hexCenter(3, 2, 40).x);
       expect(spec.center.y).toBeCloseTo(hexCenter(3, 2, 40).y);
     });

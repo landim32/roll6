@@ -1,4 +1,5 @@
 import { ALLOWED_SPACES } from './hexGrid';
+import { MODEL_SCALE } from './modelScale';
 import { EMPTY_VIEWS } from './spriteView';
 import type { ViewImages } from './spriteView';
 import type { TokenInfo, TokenInsertInfo } from '../types/token';
@@ -11,6 +12,8 @@ export interface ResolvedModel {
   modelWalkClip: string | null;
   /** The death (058): played once when a piece of the token is down or out of combat. */
   modelDownClip: string | null;
+  /** Size of the model in the 3D view (063), percent; missing = 100. */
+  modelScale?: number;
 }
 
 /** Same limits as the backend Token.Update. */
@@ -86,4 +89,5 @@ export const toTokenInsert = (
   modelIdleClip: model?.modelFile ? model.modelIdleClip : null,
   modelWalkClip: model?.modelFile ? model.modelWalkClip : null,
   modelDownClip: model?.modelFile ? model.modelDownClip : null,
+  modelScale: model?.modelFile ? model.modelScale ?? MODEL_SCALE.standard : MODEL_SCALE.standard,
 });

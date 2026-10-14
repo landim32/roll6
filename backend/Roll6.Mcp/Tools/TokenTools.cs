@@ -25,9 +25,10 @@ public static class TokenTools
         animated standing; the 2.5D images stay as the fallback while it loads. modelIdleClip / modelWalkClip /
         modelDownClip choose the animation of each state (omit = automatic; "none"; "clip:{name}" for a clip
         of the file; "animation:{id}" for a library animation of the state's type — see create_animation). A piece that is down or out of combat lies in the 3D view at the last frame of modelDownClip (the
-        death), or laid on its back when there is none.
+        death), or laid on its back when there is none. modelScale (25–400, steps of 5, default 100) makes the model
+        bigger or smaller in the 3D view, in percent of its automatic height.
         update_token replaces every field: a 2.5D image or a modelFile you do not send is removed, and an animation
-        choice you do not send goes back to automatic.
+        choice you do not send goes back to automatic, and a modelScale you do not send goes back to 100.
         """;
 
     [McpServerTool(Name = "list_tokens", Title = "List tokens", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -88,12 +89,14 @@ public static class TokenTools
         [Description("Optional 3D model: the fileName returned by upload_token_model (\"{32 hex}.glb\").")] string? modelFile = null,
         [Description("Animation the 3D view plays while the model stands still. " + McpDocs.MODEL_CLIP)] string? modelIdleClip = null,
         [Description("Animation the 3D view plays while the model walks. " + McpDocs.MODEL_CLIP)] string? modelWalkClip = null,
-        [Description("Animation the 3D view plays once when the piece is down or out of combat, holding its last frame (the death). " + McpDocs.MODEL_CLIP)] string? modelDownClip = null) =>
+        [Description("Animation the 3D view plays once when the piece is down or out of combat, holding its last frame (the death). " + McpDocs.MODEL_CLIP)] string? modelDownClip = null,
+        [Description(McpDocs.MODEL_SCALE)] int? modelScale = null) =>
         api.SendAsync(HttpMethod.Post, "/api/token", new TokenInsertInfo
         {
             Name = name, Description = description, UpSpace = upSpace, DownSpace = downSpace, UpImage = upImage, DownImage = downImage,
             FrontImage = frontImage, RightImage = rightImage, LeftImage = leftImage, BackImage = backImage, ModelFile = modelFile,
-            ModelIdleClip = modelIdleClip, ModelWalkClip = modelWalkClip, ModelDownClip = modelDownClip
+            ModelIdleClip = modelIdleClip, ModelWalkClip = modelWalkClip, ModelDownClip = modelDownClip,
+            ModelScale = modelScale
         });
 
     [McpServerTool(Name = "update_token", Title = "Update token", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -123,12 +126,14 @@ public static class TokenTools
         [Description("Optional 3D model: the fileName returned by upload_token_model (\"{32 hex}.glb\"); omitting it removes the saved one.")] string? modelFile = null,
         [Description("Animation the 3D view plays while the model stands still; omitting it goes back to automatic. " + McpDocs.MODEL_CLIP)] string? modelIdleClip = null,
         [Description("Animation the 3D view plays while the model walks; omitting it goes back to automatic. " + McpDocs.MODEL_CLIP)] string? modelWalkClip = null,
-        [Description("Animation the 3D view plays once when the piece is down or out of combat, holding its last frame (the death); omitting it goes back to automatic. " + McpDocs.MODEL_CLIP)] string? modelDownClip = null) =>
+        [Description("Animation the 3D view plays once when the piece is down or out of combat, holding its last frame (the death); omitting it goes back to automatic. " + McpDocs.MODEL_CLIP)] string? modelDownClip = null,
+        [Description(McpDocs.MODEL_SCALE)] int? modelScale = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/token/{tokenId}", new TokenInsertInfo
         {
             Name = name, Description = description, UpSpace = upSpace, DownSpace = downSpace, UpImage = upImage, DownImage = downImage,
             FrontImage = frontImage, RightImage = rightImage, LeftImage = leftImage, BackImage = backImage, ModelFile = modelFile,
-            ModelIdleClip = modelIdleClip, ModelWalkClip = modelWalkClip, ModelDownClip = modelDownClip
+            ModelIdleClip = modelIdleClip, ModelWalkClip = modelWalkClip, ModelDownClip = modelDownClip,
+            ModelScale = modelScale
         });
 
     [McpServerTool(Name = "delete_token", Title = "Delete token", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
