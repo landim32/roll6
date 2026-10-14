@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         xmlns:claude="clr-namespace:Roll6Anime.Core.Claude;assembly=Roll6Anime.Core"
+        xmlns:markup="clr-namespace:Roll6Anime.Core.Markup;assembly=Roll6Anime.Core"
         Title="roll6anime" Height="820" Width="1440" MinWidth="900" MinHeight="560"
         Background="{StaticResource Bg}" Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="13"
         WindowStartupLocation="CenterScreen">
@@ -92,9 +93,11 @@
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type claude:PromptImage}">
+                        <DataTemplate DataType="{x:Type markup:PrintAttachment}">
                             <Grid Margin="0,0,6,6" ToolTip="{Binding Caption}">
-                                <Border BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="4" Background="{StaticResource Bg}">
+                                <Border BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="4" Background="{StaticResource Bg}"
+                                        Cursor="Hand" MouseLeftButtonUp="OnOpenAttachment"
+                                        AutomationProperties.Name="Marcar este print">
                                     <Image Source="{Binding Png, Converter={StaticResource PngImage}}" Height="72" Stretch="Uniform" />
                                 </Border>
                                 <Button Content="×" Click="OnRemoveAttachment" HorizontalAlignment="Right" VerticalAlignment="Top"

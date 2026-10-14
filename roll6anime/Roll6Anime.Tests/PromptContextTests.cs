@@ -24,6 +24,7 @@ public class PromptContextTests
         text.Should().Contain(@"Modelo aberto na tela: C:\modelos\orc.glb");
         text.Should().Contain("Não envie a animação ao Roll6");
         text.Should().Contain("No Bash, rode só comandos python simples");
+        text.Should().Contain("Formas vermelhas nos prints");
     }
 
     [Fact]
