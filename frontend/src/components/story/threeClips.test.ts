@@ -112,6 +112,18 @@ describe('Roll6 clips on a Mixamo skeleton (055)', () => {
     expect(other).toMatchObject({ idle: null, walk: null, sources: { idle: 'static', walk: 'static' } });
   });
 
+  it('the builder builds Roll6\'s guard stance by name (057) and keeps it apart from idle and walk', () => {
+    const root = skeleton();
+    const build = createClipBuilder(root, [], BONES(root), 1.6);
+    const guard = build({ idle: 'roll6-guard', walk: null });
+    expect(guard.idle?.name).toBe('roll6-guard');
+    expect(guard.walk?.name).toBe('roll6-walk');
+    expect(guard.sources).toEqual({ idle: 'roll6', walk: 'roll6' });
+    // Fitted once: another pair using the guard gets the same clip.
+    expect(build({ idle: 'roll6-guard', walk: 'roll6-guard' }).walk).toBe(guard.idle);
+    expect(build({ idle: 'roll6', walk: null }).idle?.name).toBe('roll6-idle');
+  });
+
   it('the builder follows the chosen animations (056) and reuses what it built', () => {
     const root = skeleton();
     const attack = new AnimationClip('Attack', 1, []);

@@ -54,6 +54,12 @@ interface ImageCropperProps {
   stage?: boolean;
   /** Stage mode: label of the button in an empty stage (defaults to "choose an image"). */
   emptyLabel?: string;
+  /**
+   * A picture handed in by the form (057: a photo of the 3D model's pose). A new `key` opens the cropper on `url` as if
+   * the user had chosen that file. The cropper then owns the object URL and revokes it, like the ones it makes itself:
+   * the caller must not revoke it.
+   */
+  source?: { url: string; key: number };
 }
 
 /** Below 1 the image shrinks inside the frame; the uncovered part is saved transparent. */
@@ -76,7 +82,7 @@ const normalizeRotation = (degrees: number): number => {
  */
 export const ImageCropper = ({
   id, onChange, hasCurrent = false, currentUrl, currentName = '', onRemoveCurrent, shape = 'round', aspect = 1,
-  rotatable = false, hint, compact = false, onCroppingChange, cropAreaStyle, stage = false, emptyLabel,
+  rotatable = false, hint, compact = false, onCroppingChange, cropAreaStyle, stage = false, emptyLabel, source,
 }: ImageCropperProps) => {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
@@ -113,6 +119,20 @@ export const ImageCropper = ({
     setSrc(URL.createObjectURL(file));
     onCroppingChange?.(true);
   };
+
+  // A picture from the form (057) opens like a chosen file; each key once.
+  const sourceKey = source?.key;
+  const sourceUrl = source?.url;
+  const croppingChange = useRef(onCroppingChange);
+  croppingChange.current = onCroppingChange;
+  useEffect(() => {
+    if (sourceKey === undefined || !sourceUrl) return;
+    setCrop({ x: 0, y: 0 });
+    setZoom(START_ZOOM);
+    setRotation(0);
+    setSrc(sourceUrl);
+    croppingChange.current?.(true);
+  }, [sourceKey, sourceUrl]);
 
   const clear = () => {
     setSrc(null);

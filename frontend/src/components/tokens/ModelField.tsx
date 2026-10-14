@@ -1,3 +1,4 @@
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,15 +7,26 @@ import type { ModelFileState } from '../../hooks/useModelFile';
 import { checkModelFile } from '../../lib/modelFile';
 import { ANIMATION_STATES, clipChoiceFromValue, clipChoiceOptions } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ClipOption } from '../../lib/modelAnimations';
-import type { ModelPreviewInfo } from './ModelPreview';
+import { ModelTimeline } from './ModelTimeline';
+import { CameraIcon } from '../ui/icons';
+import type { ModelPreviewHandle, ModelPreviewInfo } from './ModelPreview';
 
 const ModelPreview = lazy(() => import('./ModelPreview'));
+
+/** "Gerar imagem" (057): the sizes of the two token images and where a photo goes. */
+export interface ModelFieldGenerate {
+  upSize: { width: number; height: number };
+  downSize: { width: number; height: number };
+  onGenerated: (kind: 'up' | 'down', blob: Blob) => void;
+}
 
 interface ModelFieldProps {
   id: string;
   state: ModelFileState;
   /** Name of the token, for the preview's label. */
   name: string;
+  /** Only in forms that save the token: the paused pose can become the standing or the lying image. */
+  generate?: ModelFieldGenerate;
 }
 
 /**
@@ -23,7 +35,7 @@ interface ModelFieldProps {
  * of the file, Roll6's own, none, or the automatic rule) and see that choice at once in the same preview, or remove
  * the saved model. The file is uploaded only when the token is saved.
  */
-export const ModelField = ({ id, state, name }: ModelFieldProps) => {
+export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +44,9 @@ export const ModelField = ({ id, state, name }: ModelFieldProps) => {
   const [sources, setSources] = useState<Record<AnimationState, AnimationSource> | null>(null);
   const [loading, setLoading] = useState(false);
   const [reduced, setReduced] = useState(false);
+  /** The preview shows a still pose (paused, or a state without animation) — 057. */
+  const [still, setStill] = useState(false);
+  const previewRef = useRef<ModelPreviewHandle>(null);
   const { previewUrl, clips, setClip, setInvalid } = state;
 
   // A new model to show: wait for the preview to say what it found.
@@ -73,6 +88,7 @@ export const ModelField = ({ id, state, name }: ModelFieldProps) => {
     switch (option.kind) {
       case 'file': return t('tokens.model.choice.file', { name: option.name });
       case 'roll6': return t('tokens.model.choice.roll6');
+      case 'guard': return t('tokens.model.choice.guard');
       case 'none': return t('tokens.model.choice.none');
       default: {
         const resolved = option.resolves === 'file' && option.resolvesName
@@ -84,6 +100,19 @@ export const ModelField = ({ id, state, name }: ModelFieldProps) => {
   };
 
   const isStatic = sources !== null && sources.idle === 'static' && sources.walk === 'static';
+
+  /** Photographs the paused pose for one of the token's images (057, FR-010…FR-014). */
+  const shoot = async (kind: 'up' | 'down') => {
+    if (!generate) return;
+    try {
+      const blob = await previewRef.current!.capture(kind === 'up' ? generate.upSize : generate.downSize);
+      generate.onGenerated(kind, blob);
+      toast.success(t(kind === 'up' ? 'tokens.model.generate.doneUp' : 'tokens.model.generate.doneDown'));
+    } catch {
+      toast.error(t('tokens.model.generate.failed'));
+    }
+  };
+  const canShoot = !!generate && !!previewUrl && !loading && !error && still;
 
   return (
     <div className="stm-model-field">
@@ -110,6 +139,7 @@ export const ModelField = ({ id, state, name }: ModelFieldProps) => {
         {previewUrl ? (
           <Suspense fallback={<div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}>
             <ModelPreview
+              ref={previewRef}
               url={previewUrl}
               walking={walking}
               clips={clips}
@@ -124,6 +154,38 @@ export const ModelField = ({ id, state, name }: ModelFieldProps) => {
         )}
         {previewUrl && loading && !error && <div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}
       </div>
+      {previewUrl && (
+        <ModelTimeline
+          preview={previewRef}
+          disabled={loading || !!error}
+          resetKey={`${previewUrl}|${walking}|${clips.idle ?? ''}|${clips.walk ?? ''}`}
+          onStillChange={setStill}
+        />
+      )}
+      {generate && previewUrl && (
+        <div className="stm-model-generate">
+          <DropdownMenu.Root modal={false}>
+            <DropdownMenu.Trigger asChild disabled={!canShoot}>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm dropdown-toggle d-inline-flex align-items-center gap-2"
+                disabled={!canShoot}
+                title={canShoot ? undefined : t('tokens.model.generate.pauseFirst')}
+              >
+                <CameraIcon size={14} /> {t('tokens.model.generate.button')}
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content className="dropdown-menu show" align="center" sideOffset={4}>
+              <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('up'); }}>
+                {t('tokens.model.generate.up')}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('down'); }}>
+                {t('tokens.model.generate.down')}
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        </div>
+      )}
       {previewUrl && options && (
         <fieldset className="mt-3">
           <legend className="form-label small fw-semibold mb-1">{t('tokens.model.animations')}</legend>

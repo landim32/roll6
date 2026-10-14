@@ -55,6 +55,8 @@ export interface ModelClipChoices {
 }
 
 export const CLIP_CHOICE_ROLL6 = 'roll6';
+/** Roll6's guard stance (057, "Posição defensiva"). */
+export const CLIP_CHOICE_ROLL6_GUARD = 'roll6-guard';
 export const CLIP_CHOICE_NONE = 'none';
 export const CLIP_CHOICE_PREFIX = 'clip:';
 export const AUTO_CLIPS: ModelClipChoices = { idle: null, walk: null };
@@ -65,6 +67,7 @@ export const fileClipChoice = (name: string): string => `${CLIP_CHOICE_PREFIX}${
 export type ParsedClipChoice =
   | { kind: 'auto' }
   | { kind: 'roll6' }
+  | { kind: 'guard' }
   | { kind: 'none' }
   | { kind: 'file'; name: string };
 
@@ -72,6 +75,7 @@ export type ParsedClipChoice =
 export const parseClipChoice = (choice: ModelClipChoice): ParsedClipChoice => {
   if (!choice) return { kind: 'auto' };
   if (choice === CLIP_CHOICE_ROLL6) return { kind: 'roll6' };
+  if (choice === CLIP_CHOICE_ROLL6_GUARD) return { kind: 'guard' };
   if (choice === CLIP_CHOICE_NONE) return { kind: 'none' };
   if (choice.startsWith(CLIP_CHOICE_PREFIX) && choice.length > CLIP_CHOICE_PREFIX.length) {
     return { kind: 'file', name: choice.slice(CLIP_CHOICE_PREFIX.length) };
@@ -82,7 +86,8 @@ export const parseClipChoice = (choice: ModelClipChoice): ParsedClipChoice => {
 /** What the 3D view ends up playing for a state: a clip of the file (by index), Roll6's own, or nothing. */
 export type ResolvedAnimation =
   | { source: 'file'; index: number }
-  | { source: 'roll6' }
+  /** `clip`: which of Roll6's own animations — the state's own, or the guard stance (057). */
+  | { source: 'roll6'; clip: 'idle' | 'walk' | 'guard' }
   | { source: 'static' };
 
 /**
@@ -95,14 +100,15 @@ export const resolveAnimation = (
 ): ResolvedAnimation => {
   const parsed = parseClipChoice(choice);
   if (parsed.kind === 'none') return { source: 'static' };
-  if (parsed.kind === 'roll6') return isMixamoSkeleton(boneNames) ? { source: 'roll6' } : { source: 'static' };
+  if (parsed.kind === 'roll6') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: state } : { source: 'static' };
+  if (parsed.kind === 'guard') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: 'guard' } : { source: 'static' };
   if (parsed.kind === 'file') {
     const index = clipNames.indexOf(parsed.name);
     if (index >= 0) return { source: 'file', index };
   }
   const auto = pickClip(clipNames, state);
   if (auto !== null) return { source: 'file', index: auto };
-  return isMixamoSkeleton(boneNames) ? { source: 'roll6' } : { source: 'static' };
+  return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: state } : { source: 'static' };
 };
 
 /** The sources of both states for the chosen animations (what the form lists under the preview). */
@@ -139,7 +145,10 @@ export const clipChoiceOptions = (clipNames: readonly string[], boneNames: reado
     seen.add(name);
     options.push({ value: fileClipChoice(name), kind: 'file', name });
   }
-  if (isMixamoSkeleton(boneNames)) options.push({ value: CLIP_CHOICE_ROLL6, kind: 'roll6' });
+  if (isMixamoSkeleton(boneNames)) {
+    options.push({ value: CLIP_CHOICE_ROLL6, kind: 'roll6' });
+    options.push({ value: CLIP_CHOICE_ROLL6_GUARD, kind: 'guard' });
+  }
   options.push({ value: CLIP_CHOICE_NONE, kind: 'none' });
   return options;
 };

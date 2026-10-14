@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModelField } from './ModelField';
 import { SpriteImageField } from './SpriteImageField';
@@ -29,6 +29,14 @@ interface TokenFormFieldsProps {
   };
   /** Edit: removes the saved lying image (the standing image can only be replaced). */
   onRemoveDown?: () => void;
+  /** The images can be filled from a photo of the 3D model's pose (057): only in forms that save the token. */
+  canGenerate?: boolean;
+}
+
+/** A photo of the model handed to an image field (057); `key` grows with every new photo. */
+interface GeneratedImage {
+  url: string;
+  key: number;
 }
 
 /**
@@ -39,13 +47,19 @@ interface TokenFormFieldsProps {
  * texts, chosen files and open crops (FR-005).
  */
 export const TokenFormFields = ({
-  idPrefix, form, onField, onUpCrop, onDownCrop, sprites, model, current, onRemoveDown,
+  idPrefix, form, onField, onUpCrop, onDownCrop, sprites, model, current, onRemoveDown, canGenerate = false,
 }: TokenFormFieldsProps) => {
   const { t } = useTranslation();
   const [tab, setTab] = useState('token');
   const id = (name: string) => `${idPrefix}-${name}`;
   const upSize = tokenImageSize(Number(form.upSpace));
   const downSize = tokenImageSize(downImageSpace(form.downSpace));
+  // Photos of the model's pose (057). The cropper that receives one owns its object URL (and revokes it).
+  const [generated, setGenerated] = useState<{ up?: GeneratedImage; down?: GeneratedImage }>({});
+  const onGenerated = useCallback((kind: 'up' | 'down', blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    setGenerated((prev) => ({ ...prev, [kind]: { url, key: (prev[kind]?.key ?? 0) + 1 } }));
+  }, []);
 
   return (
     <>
@@ -81,6 +95,7 @@ export const TokenFormFields = ({
               hasCurrent={current?.hasUp}
               currentUrl={current?.upUrl}
               currentName={current?.name}
+              source={generated.up}
             />
           </div>
           <div className="col-md-6">
@@ -96,6 +111,7 @@ export const TokenFormFields = ({
               currentUrl={current?.downUrl}
               currentName={current?.name}
               onRemoveCurrent={onRemoveDown}
+              source={generated.down}
             />
           </div>
           <div className="col-6">
@@ -131,7 +147,12 @@ export const TokenFormFields = ({
         </div>
       </div>
       <div hidden={tab !== 'model'}>
-        <ModelField id={id('model')} state={model} name={current?.name ?? form.name} />
+        <ModelField
+          id={id('model')}
+          state={model}
+          name={current?.name ?? form.name}
+          generate={canGenerate ? { upSize, downSize, onGenerated } : undefined}
+        />
       </div>
     </>
   );

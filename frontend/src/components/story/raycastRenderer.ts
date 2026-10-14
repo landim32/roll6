@@ -29,8 +29,22 @@ export interface RaycastRenderer {
   setQuality: (profile: QualityProfile) => void;
   /** Draws again without anything changing (036: a new speech balloon must be placed at once). */
   refresh: () => void;
+  /**
+   * Receives, after every frame, the depth of the figures it painted (057) — for the 3D models' layer, so a model behind
+   * a nearer figure is hidden. The frame's size on Padrão/Alta, the screen's on Ultra; null stops it (no buffer kept).
+   */
+  setFigureDepthSink: (sink: FigureDepthSink | null) => void;
   dispose: () => void;
 }
+
+/** The figure depth of one frame (057): `width × height` distances, row 0 at the top, `0` where no figure is. */
+export interface FigureDepthMap {
+  data: Float32Array;
+  width: number;
+  height: number;
+}
+
+export type FigureDepthSink = (map: FigureDepthMap) => void;
 
 /** Thrown when the device has no 2D canvas (FR-017): the page goes back to the 2D map. */
 export class CanvasUnavailableError extends Error {
@@ -63,6 +77,13 @@ export const createRaycastRenderer = (
   let lastSize: { width: number; height: number } | null = null;
   let dirty = true;
   let disposed = false;
+  let depthSink: FigureDepthSink | null = null;
+  /** Reused frame to frame; re-made only when the size it must cover changes. */
+  let depthBuffer: Float32Array | null = null;
+  const depthFor = (width: number, height: number): Float32Array => {
+    if (!depthBuffer || depthBuffer.length !== width * height) depthBuffer = new Float32Array(width * height);
+    return depthBuffer;
+  };
   let animation = 0;
 
   /** The screen-size figure layer of "Ultra" (053), made the first time a profile asks for it and sized with the canvas. */
@@ -90,9 +111,11 @@ export const createRaycastRenderer = (
 
   const draw = () => {
     const layered = ensureFigureLayer();
+    const frameDepth = depthSink && !layered ? depthFor(image.width, image.height) : undefined;
     const result = drawRaycastFrame(image, { mask, map, background, sprites, wallTexture }, pose, fov, sky, {
       spriteSampling: profile.spriteSampling,
       figures: layered ? 'layer' : 'frame',
+      figureDepth: frameDepth,
     });
     bufferCtx.putImageData(image, 0, 0);
     display.imageSmoothingEnabled = false;
@@ -101,10 +124,14 @@ export const createRaycastRenderer = (
     if (layered && result.layer && figureImage && figureCanvas && figureCtx) {
       const target = { data: figureImage.data, width: figureImage.width, height: figureImage.height };
       clearLayer(target);
-      drawFigureLayer(target, result.layer, result.frameWidth, result.frameHeight);
+      const layerDepth = depthSink ? depthFor(target.width, target.height) : undefined;
+      drawFigureLayer(target, result.layer, result.frameWidth, result.frameHeight, layerDepth);
+      if (depthSink && layerDepth) depthSink({ data: layerDepth, width: target.width, height: target.height });
       figureCtx.putImageData(figureImage, 0, 0);
       display.drawImage(figureCanvas, 0, 0);
     }
+
+    if (depthSink && frameDepth) depthSink({ data: frameDepth, width: image.width, height: image.height });
 
     // What the frame drew, for the things laid over it (the speech balloons, 036).
     onFrame?.(result);
@@ -166,6 +193,11 @@ export const createRaycastRenderer = (
       dirty = true;
     },
     refresh: () => {
+      dirty = true;
+    },
+    setFigureDepthSink: (sink) => {
+      depthSink = sink;
+      if (!sink) depthBuffer = null;
       dirty = true;
     },
     dispose: () => {

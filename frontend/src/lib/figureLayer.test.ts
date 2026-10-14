@@ -109,3 +109,36 @@ describe('figure layer (053, Ultra)', () => {
     expect(t.data.every((v) => v === 0)).toBe(true);
   });
 });
+
+describe('figure layer depth (057)', () => {
+  const depthTarget = () => new Float32Array(WIDTH * SCALE * HEIGHT * SCALE).fill(-1);
+
+  it('writes each figure\'s depth where it covers the screen, nearer wins, and paints the same bytes', () => {
+    const scene = { sprites: [{ ...figure(ringed(), 250, 250), id: 1 }, { ...figure(solid(0, 0, 255), 250, 330), id: 2 }] };
+    const { layer, sprites } = layerOf(scene);
+    const plain = target();
+    drawFigureLayer(plain, layer, WIDTH, HEIGHT);
+    const painted = target();
+    const depth = depthTarget();
+    drawFigureLayer(painted, layer, WIDTH, HEIGHT, depth);
+
+    expect([...painted.data]).toEqual([...plain.data]);
+    expect(depth.some((value) => value < 0)).toBe(false);
+    const near = sprites.find((item) => item.id === 2)!;
+    const cx = Math.round(near.screenX * SCALE);
+    const cy = Math.round(((near.top + near.bottom) / 2) * SCALE);
+    expect(depth[cy * WIDTH * SCALE + cx]).toBeCloseTo(near.depth, 5);
+    expect(depth[0]).toBe(0);
+    // Wherever a depth was written the layer is mostly opaque there.
+    for (let i = 0; i < depth.length; i++) if (depth[i] > 0) expect(painted.data[i * 4 + 3]).toBeGreaterThanOrEqual(127);
+  });
+
+  it('writes nothing behind a nearer wall', () => {
+    // One wall row at y 100–200, between the camera (z 450) and the figure (y 50).
+    const wall = buildMaskGrid(new Uint8ClampedArray(Array.from({ length: 25 }, (_, i) => (Math.floor(i / 5) === 1 ? [0, 0, 0, 255] : [255, 255, 255, 255])).flat()), 5, 5, AREA);
+    const { layer } = layerOf({ mask: wall, sprites: [figure(solid(255, 0, 0), 250, 50)] });
+    const depth = depthTarget();
+    drawFigureLayer(target(), layer, WIDTH, HEIGHT, depth);
+    for (let y = 0; y < HEIGHT * SCALE; y++) expect(depth[y * WIDTH * SCALE + 32 * SCALE]).toBe(0);
+  });
+});

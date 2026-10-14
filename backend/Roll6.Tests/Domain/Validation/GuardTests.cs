@@ -68,6 +68,7 @@ public class GuardTests
 
     [Theory]
     [InlineData("roll6")]
+    [InlineData("roll6-guard")]
     [InlineData("none")]
     [InlineData("clip:Walk")]
     [InlineData("clip:Armature|mixamo.com|Layer0")]
@@ -88,6 +89,8 @@ public class GuardTests
     [Theory]
     [InlineData("auto")]
     [InlineData("Roll6")]
+    [InlineData("Roll6-Guard")]
+    [InlineData("guard")]
     [InlineData("clip:")]
     [InlineData("Walk")]
     public void ModelClip_RejectsAnythingElse(string choice)

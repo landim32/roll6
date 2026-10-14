@@ -355,6 +355,27 @@ body,
   cursor: grabbing;
 }
 
+/* Timeline of the 3D model preview (057): play/pause + the bar, under the stage. */
+.stm-model-timeline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 320px;
+  margin: 0.5rem auto 0;
+}
+
+.stm-model-timeline .form-range {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stm-model-generate {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
 .stm-model-stage-note {
   position: absolute;
   inset: 0;

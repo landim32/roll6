@@ -1,10 +1,12 @@
 import {
-  AnimationMixer, BoxGeometry, Clock, DirectionalLight, Fog, HemisphereLight, InstancedMesh, Matrix4, MeshBasicMaterial,
-  PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer,
+  AlwaysDepth, AnimationMixer, BoxGeometry, Clock, DataTexture, DirectionalLight, FloatType, Fog, HemisphereLight, InstancedMesh, Matrix4,
+  Mesh, MeshBasicMaterial, NearestFilter, PerspectiveCamera, PlaneGeometry, Quaternion, RedFormat, Scene, ShaderMaterial, Vector3,
+  WebGLRenderer,
 } from 'three';
 import type { AnimationAction, Object3D } from 'three';
 import type { Point } from '../../lib/hexGrid';
 import { cameraSetup } from '../../lib/modelCamera';
+import { FIGURE_DEPTH_BIAS, FIGURE_DEPTH_GLSL } from '../../lib/modelDepth';
 import { fitModel } from '../../lib/modelFit';
 import { occluderBoxes } from '../../lib/occluders';
 import { SHADE_FALLOFF } from '../../lib/raycaster';
@@ -13,6 +15,7 @@ import { sameClipChoices } from '../../lib/modelAnimations';
 import type { ModelClipChoices } from '../../lib/modelAnimations';
 import { instantiate, loadModel } from './loadModel';
 import type { ModelAsset } from './loadModel';
+import type { FigureDepthMap } from './raycastRenderer';
 
 /**
  * The 3D models of the 3D view (055): a transparent WebGL canvas over the raycaster's, drawn with the same camera
@@ -40,8 +43,38 @@ export interface ModelLayer {
   /** Moves one model (the character the player walks) without reloading it. */
   setPose: (id: number, center: Point, yaw: number) => void;
   setWalking: (id: number, walking: boolean) => void;
+  /**
+   * The depth of the 2,5D figures the raycaster painted under this layer (057): written into the depth buffer before
+   * the models, so a model behind a nearer figure is hidden there and the figure shows. Renders at once, with the pose
+   * of the frame that produced it. Null forgets it.
+   */
+  setFigureDepth: (map: FigureDepthMap | null) => void;
   dispose: () => void;
 }
+
+const FIGURE_DEPTH_VERTEX = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`;
+
+const FIGURE_DEPTH_FRAGMENT = `
+uniform sampler2D figureDepth;
+uniform float near;
+uniform float far;
+uniform float bias;
+varying vec2 vUv;
+${FIGURE_DEPTH_GLSL}
+void main() {
+  // Row 0 of the map is the top of the screen.
+  float d = texture2D(figureDepth, vec2(vUv.x, 1.0 - vUv.y)).r;
+  if (d <= 0.0) discard;
+  gl_FragDepth = depthBufferValue(d * (1.0 - bias), near, far);
+  gl_FragColor = vec4(0.0);
+}
+`;
 
 interface Drawn {
   spec: ModelSpec;
@@ -76,6 +109,24 @@ export const createModelLayer = (
   let fov = 70;
   let size = { width: 1, height: 1 };
   let occluders: InstancedMesh | null = null;
+
+  // The figures' depth (057): a full-screen quad drawn first, writing only depth, nothing where no figure is.
+  let depthTexture: DataTexture | null = null;
+  const depthMaterial = new ShaderMaterial({
+    vertexShader: FIGURE_DEPTH_VERTEX,
+    fragmentShader: FIGURE_DEPTH_FRAGMENT,
+    uniforms: { figureDepth: { value: null }, near: { value: 1 }, far: { value: 2 }, bias: { value: FIGURE_DEPTH_BIAS } },
+    // WebGL writes no depth while the depth test is off: keep it on, and let every fragment pass.
+    depthTest: true,
+    depthFunc: AlwaysDepth,
+    depthWrite: true,
+    colorWrite: false,
+  });
+  const depthQuad = new Mesh(new PlaneGeometry(2, 2), depthMaterial);
+  depthQuad.frustumCulled = false;
+  depthQuad.renderOrder = -1;
+  depthQuad.visible = false;
+  scene.add(depthQuad);
   const drawn = new Map<number, Drawn>();
   const clock = new Clock();
   let dirty = true;
@@ -133,6 +184,8 @@ export const createModelLayer = (
     camera.position.set(setup.position.x, setup.position.y, setup.position.z);
     camera.lookAt(setup.target.x, setup.target.y, setup.target.z);
     camera.updateProjectionMatrix();
+    depthMaterial.uniforms.near.value = camera.near;
+    depthMaterial.uniforms.far.value = camera.far;
     renderer.render(scene, camera);
   };
 
@@ -225,6 +278,28 @@ export const createModelLayer = (
       entry.spec = { ...entry.spec, center, yaw };
       place(entry);
     },
+    setFigureDepth: (map) => {
+      if (!map) {
+        depthQuad.visible = false;
+        dirty = true;
+        return;
+      }
+      const { width, height } = map;
+      if (!depthTexture || depthTexture.image.width !== width || depthTexture.image.height !== height) {
+        depthTexture?.dispose();
+        depthTexture = new DataTexture(new Float32Array(width * height), width, height, RedFormat, FloatType);
+        depthTexture.minFilter = NearestFilter;
+        depthTexture.magFilter = NearestFilter;
+        depthTexture.generateMipmaps = false;
+        depthMaterial.uniforms.figureDepth.value = depthTexture;
+      }
+      (depthTexture.image.data as Float32Array).set(map.data.subarray(0, width * height));
+      depthTexture.needsUpdate = true;
+      depthQuad.visible = true;
+      // Drawn now, with the pose of the frame that produced this map (research R4).
+      if (!disposed) render();
+      dirty = false;
+    },
     setWalking: (id, walking) => {
       const entry = drawn.get(id);
       if (!entry || entry.walking === walking) return;
@@ -246,6 +321,9 @@ export const createModelLayer = (
       for (const entry of drawn.values()) remove(entry);
       drawn.clear();
       occluders?.geometry.dispose();
+      depthQuad.geometry.dispose();
+      depthMaterial.dispose();
+      depthTexture?.dispose();
       renderer.dispose();
     },
   };

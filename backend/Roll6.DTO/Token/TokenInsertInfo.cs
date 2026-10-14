@@ -43,7 +43,8 @@ public class TokenInsertInfo
     public string? ModelFile { get; set; }
 
     /// <summary>
-    /// Animation played while the model stands still (056): omitted = automatic, "roll6" (Roll6's own), "none" or
+    /// Animation played while the model stands still (056): omitted = automatic, "roll6" (Roll6's own), "roll6-guard"
+    /// (Roll6's guard stance, 057), "none" or
     /// "clip:{name}" (a clip of the file, by its exact name). Ignored without modelFile.
     /// </summary>
     [JsonPropertyName("modelIdleClip")]

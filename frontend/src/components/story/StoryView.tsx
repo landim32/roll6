@@ -425,6 +425,20 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     modelLayerRef.current = null;
   }, []);
 
+  // The figures' depth reaches the model layer after every frame (057), so a nearer 2,5D figure hides a model behind it;
+  // without models (or without the layer) the raycaster keeps no depth at all.
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!ready || !renderer) return;
+    if (!modelLayerReady || !hasModels) {
+      renderer.setFigureDepthSink(null);
+      modelLayerRef.current?.setFigureDepth(null);
+      return;
+    }
+    renderer.setFigureDepthSink((map) => modelLayerRef.current?.setFigureDepth(map));
+    return () => renderer.setFigureDepthSink(null);
+  }, [ready, modelLayerReady, hasModels]);
+
   // The mask and the camera reach a layer created after them.
   useEffect(() => {
     if (!modelLayerReady) return;
