@@ -100,6 +100,13 @@ export const OBJECT_BASE_COLOR = '#6c757d';
 export const isShownIn3d = (token: Pick<MapTokenInfo, 'posture' | 'frontImageUrl' | 'modelFileUrl'>): boolean =>
   !isLying(token) && (!!token.frontImageUrl || !!token.modelFileUrl);
 
+/**
+ * Whether the 3D view draws the piece's 3D model (058): any piece whose token has one, standing or not — a piece that is
+ * down or out of combat lies at the last frame of its death animation. Figures, their proxies and the balloons keep
+ * `isShownIn3d`, so a piece lying down still has none of them.
+ */
+export const isModelShownIn3d = (token: Pick<MapTokenInfo, 'modelFileUrl'>): boolean => !!token.modelFileUrl;
+
 /** How a piece shows in the 3D view (035): a standing figure that draws the side the camera sees. */
 export interface SpriteSpec {
   mapTokenId: number;
@@ -148,6 +155,6 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     center,
     baseColor: BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
     modelUrl: token.modelFileUrl ?? null,
-    modelClips: { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null },
+    modelClips: { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null, down: token.modelDownClip ?? null },
   };
 };

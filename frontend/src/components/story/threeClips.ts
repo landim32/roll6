@@ -1,5 +1,5 @@
 import {
-  AnimationClip, AnimationMixer, Euler, MathUtils, Matrix4, Quaternion, QuaternionKeyframeTrack, Vector3, VectorKeyframeTrack,
+  AnimationClip, AnimationMixer, Box3, Euler, MathUtils, Matrix4, Quaternion, QuaternionKeyframeTrack, Vector3, VectorKeyframeTrack,
 } from 'three';
 import type { Bone, KeyframeTrack, Object3D, SkinnedMesh } from 'three';
 import { clipChoicesKey, normalizeBoneName, resolveAnimation } from '../../lib/modelAnimations';
@@ -16,9 +16,13 @@ import type { Roll6Clip, Roll6ClipName } from '../../lib/roll6Clips';
 export interface ModelClips {
   idle: AnimationClip | null;
   walk: AnimationClip | null;
+  /** The death (058): played once by the players, which rest on its last frame. */
+  down: AnimationClip | null;
   sources: Record<AnimationState, AnimationSource>;
   /** Roll6's motion had to be reduced for this rig (some limbs held still so the mesh doesn't tear). */
   reduced: boolean;
+  /** A chosen Roll6 clip played in full (guard, death — 058, Q1 = A) stretches this model's mesh. */
+  deforms: boolean;
 }
 
 const bonesByName = (root: Object3D): Map<string, Bone> => {
@@ -93,19 +97,37 @@ export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number, 
   // The hips rise and fall: a vertical offset in the model's frame, moved into the hips' parent space.
   const hips = bones.get('Hips');
   if (hips) {
+    // The unit of the lift: the model's height, or (058, a motion that ends on the floor) the hips' own height above the
+    // model's lowest point.
+    const unit = clip.hipsLift.of === 'hips' ? hipsHeight(root, hips, bones) : height;
     const parentMatrix = new Matrix4();
     if (hips.parent) parentMatrix.copy(hips.parent.matrixWorld);
     const inverse = parentMatrix.clone().invert();
     const origin = new Vector3().applyMatrix4(inverse);
     const values: number[] = [];
     for (const share of clip.hipsLift.values) {
-      const offset = new Vector3(0, share * height, 0).applyMatrix4(inverse).sub(origin);
+      const offset = new Vector3(0, share * unit, 0).applyMatrix4(inverse).sub(origin);
       values.push(hips.position.x + offset.x, hips.position.y + offset.y, hips.position.z + offset.z);
     }
     tracks.push(new VectorKeyframeTrack(`${hips.name}.position`, clip.hipsLift.times, values));
   }
 
   return tracks.length > 0 ? new AnimationClip(`roll6-${clip.name}`, clip.duration, tracks) : null;
+};
+
+/**
+ * How high the hips rest above the model's lowest point (058): the skinned mesh's bounds when it has one, else the
+ * lowest joint. In the root's frame, like the model's height.
+ */
+export const hipsHeight = (root: Object3D, hips: Bone, bones: Map<string, Bone>): number => {
+  root.updateMatrixWorld(true);
+  const rootInverse = root.matrixWorld.clone().invert();
+  const local = (node: Object3D) => new Vector3().setFromMatrixPosition(node.matrixWorld).applyMatrix4(rootInverse);
+  let lowest = Infinity;
+  const box = new Box3().setFromObject(root, true);
+  if (!box.isEmpty()) lowest = box.clone().applyMatrix4(rootInverse).min.y;
+  if (!Number.isFinite(lowest)) for (const bone of bones.values()) lowest = Math.min(lowest, local(bone).y);
+  return Math.max(0, local(hips).y - lowest);
 };
 
 /** Bones that move together: a pair is limited as one, so a model never limps on one side only. */
@@ -207,6 +229,18 @@ const tornEdges = (root: Object3D, probe: TearProbe, clip: AnimationClip, times:
  * full motion down to none, and keeps the largest amplitude that tears (almost) nothing — a well rigged model keeps
  * everything, a poor one keeps what it can and never breaks.
  */
+/**
+ * Whether a Roll6 clip played in full tears this model's mesh (058): the same test as `fitToRig`, once, on the whole
+ * built clip at its keyframes. Used for the clips that are never reduced (guard, death) to warn in the preview.
+ */
+export const deformsAtFull = (clip: Roll6Clip, built: AnimationClip | null, root: Object3D, height: number): boolean => {
+  if (!built) return false;
+  const probe = tearProbe(root);
+  if (probe.total === 0) return false;
+  const allowed = Math.max(12, probe.total * TEAR_SHARE);
+  return tornEdges(root, probe, built, clip.tracks[0]?.times ?? [0], height) > allowed;
+};
+
 export const fitToRig = (clip: Roll6Clip, root: Object3D, height: number): Record<string, number> => {
   const probe = tearProbe(root);
   const limits: Record<string, number> = {};
@@ -232,25 +266,31 @@ export const fitToRig = (clip: Roll6Clip, root: Object3D, height: number): Recor
 };
 
 /**
- * The animations of one model for a pair of choices (056; `ModelClipBuilder`): for each state the clip
- * `resolveAnimation` points at — a clip of the file, Roll6's own (fitted to the rig once per state, then reused:
- * `fitToRig` poses the whole mesh and is the expensive part) or none. Results are kept per pair of choices, so the
- * preview switching selects and every piece of the same token share the work.
+ * The animations of one model for its choices (056; `ModelClipBuilder`): for each state — idle, walk and, since 058,
+ * down — the clip `resolveAnimation` points at: a clip of the file, Roll6's own (fitted to the rig, or tested for
+ * deformation, once per clip name, then reused: posing the whole mesh is the expensive part) or none. Results are kept
+ * per set of choices, so the preview switching selects and every piece of the same token share the work.
  */
 export type ModelClipBuilder = (choices: ModelClipChoices) => ModelClips;
 
 export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], boneNames: string[], height: number): ModelClipBuilder => {
   const names = fileClips.map((clip) => clip.name);
-  // Roll6's own clips by name (057: the guard stance is not tied to a state), each fitted to the rig once.
-  const own = new Map<Roll6ClipName, { clip: AnimationClip | null; reduced: boolean }>();
+  // Roll6's own clips by name (057: the guard stance is not tied to a state), each fitted to the rig — or, for the
+  // clips played in full (058: guard, death), tested for deformation — once.
+  const own = new Map<Roll6ClipName, { clip: AnimationClip | null; reduced: boolean; deforms: boolean }>();
   const built = new Map<string, ModelClips>();
 
   const roll6Of = (name: Roll6ClipName) => {
     let entry = own.get(name);
     if (!entry) {
       const clip = ROLL6_CLIPS_BY_NAME[name];
-      const limits = fitToRig(clip, root, height);
-      entry = { clip: buildRoll6Clip(clip, root, height, limits), reduced: Object.values(limits).some((limit) => limit < 1) };
+      if (clip.protect) {
+        const limits = fitToRig(clip, root, height);
+        entry = { clip: buildRoll6Clip(clip, root, height, limits), reduced: Object.values(limits).some((limit) => limit < 1), deforms: false };
+      } else {
+        const built = buildRoll6Clip(clip, root, height);
+        entry = { clip: built, reduced: false, deforms: deformsAtFull(clip, built, root, height) };
+      }
       own.set(name, entry);
     }
     return entry;
@@ -261,7 +301,8 @@ export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], bo
     let clips = built.get(key);
     if (clips) return clips;
     let reduced = false;
-    const sources = { idle: 'static', walk: 'static' } as Record<AnimationState, AnimationSource>;
+    let deforms = false;
+    const sources = { idle: 'static', walk: 'static', down: 'static' } as Record<AnimationState, AnimationSource>;
     const clipOf = (state: AnimationState): AnimationClip | null => {
       const resolved = resolveAnimation(choices[state], names, boneNames, state);
       sources[state] = resolved.source;
@@ -269,13 +310,15 @@ export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], bo
       if (resolved.source === 'roll6') {
         const entry = roll6Of(resolved.clip);
         if (entry.reduced) reduced = true;
+        if (entry.deforms) deforms = true;
         return entry.clip;
       }
       return null;
     };
     const idle = clipOf('idle');
     const walk = clipOf('walk');
-    clips = { idle, walk, sources, reduced };
+    const down = clipOf('down');
+    clips = { idle, walk, down, sources, reduced, deforms };
     built.set(key, clips);
     return clips;
   };

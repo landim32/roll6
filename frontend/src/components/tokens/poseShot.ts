@@ -8,7 +8,7 @@ const CAMERA_LIFT = 4;
 interface PoseShotInput {
   /** The posed model as the preview shows it. */
   model: Object3D;
-  /** The preview's turntable (the model's parent): its manual rotation never reaches the photo. */
+  /** The preview's turntable (the model's ancestor): its manual rotation never reaches the photo. */
   turntable: Object3D;
   /** Size of the picture, the token image it fills (`tokenImageSize`). */
   size: { width: number; height: number };

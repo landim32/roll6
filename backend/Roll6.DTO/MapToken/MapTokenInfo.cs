@@ -49,6 +49,10 @@ public class MapTokenInfo
     [JsonPropertyName("modelWalkClip")]
     public string? ModelWalkClip { get; set; }
 
+    /// <summary>The death (058): what the 3D view shows, at its last frame, while the piece is down or out of combat.</summary>
+    [JsonPropertyName("modelDownClip")]
+    public string? ModelDownClip { get; set; }
+
     /// <summary>Participation of a Character token (its name/vitals/status/sheet are shown).</summary>
     [JsonPropertyName("campaignCharacterId")]
     public long? CampaignCharacterId { get; set; }

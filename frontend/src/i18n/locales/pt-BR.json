@@ -206,8 +206,6 @@
       "pick": "Escolher arquivo .glb",
       "change": "Trocar modelo",
       "remove": "Remover modelo",
-      "walk": "Caminhar",
-      "stop": "Parar",
       "none": "Este token não tem modelo 3D.",
       "loading": "Carregando modelo…",
       "previewLabel": "Prévia do modelo 3D de {{name}}",
@@ -217,13 +215,14 @@
       "static": "Este modelo ficará parado: ele não tem animações e o esqueleto não segue os nomes do Mixamo.",
       "reduced": "O rig deste modelo prende boa parte da malha ao quadril, então braços e/ou pernas ficam parados para a malha não rasgar. Para animação completa, refaça o rig (por exemplo no Mixamo) e envie de novo.",
       "animations": "Animações",
-      "animationsHelp": "Escolha a animação de cada estado; a prévia acima mostra a escolha na hora. \"Automático\" usa o clip do arquivo com o nome do estado, senão a animação do Roll6 (esqueleto Mixamo), senão nenhuma.",
+      "animationsHelp": "Escolha a animação de cada estado; a prévia acima mostra a escolha na hora. \"Automático\" usa o clip do arquivo com o nome do estado, senão a animação do Roll6 (esqueleto Mixamo), senão nenhuma. \"Caído\" toca uma vez e fica no último quadro: é assim que a peça caída ou fora de combate aparece na vista 3D.",
       "playing": "Tocando: {{source}}",
       "choice": {
         "auto": "Automático ({{resolved}})",
         "file": "{{name}} (do arquivo)",
         "roll6": "Animação do Roll6",
         "guard": "Posição defensiva (Roll6)",
+        "death": "Morte (Roll6)",
         "none": "Sem animação"
       },
       "timeline": {
@@ -243,13 +242,18 @@
       },
       "state": {
         "idle": "Parado",
-        "walk": "Caminhando"
+        "walk": "Caminhando",
+        "down": "Caído"
       },
+      "showState": "Estado mostrado na prévia",
       "source": {
         "file": "do arquivo",
         "roll6": "animação do Roll6",
-        "static": "sem animação"
-      }
+        "static": "sem animação",
+        "death": "morte do Roll6",
+        "lying": "sem animação (deitado)"
+      },
+      "deforms": "Esta animação pode deformar este modelo: o esqueleto dele prende braços e pernas ao quadril."
     },
     "spritesHelp": "Os quatro lados usam a mesma silhueta. Lado sem imagem usa a oposta espelhada (laterais), a frente ou a imagem em pé.",
     "view": {

@@ -21,15 +21,25 @@ export interface Roll6Track {
   degrees: [number, number, number][];
 }
 
-/** Roll6's own animations: standing still, walking and, since 057, the guard stance. */
-export type Roll6ClipName = 'idle' | 'walk' | 'guard';
+/** Roll6's own animations: standing still, walking, the guard stance (057) and the death (058). */
+export type Roll6ClipName = 'idle' | 'walk' | 'guard' | 'death';
 
 export interface Roll6Clip {
   name: Roll6ClipName;
   duration: number;
   tracks: Roll6Track[];
-  /** How much the hips rise, as a share of the model's height, per time of `times`. */
-  hipsLift: { times: number[]; values: number[] };
+  /**
+   * How much the hips rise per time of `times`: a share of the model's height (`of: 'height'`, the default) or, for a
+   * motion that ends on the floor, of the hips' own rest height above the model's lowest point (`of: 'hips'`, 058).
+   */
+  hipsLift: { times: number[]; values: number[]; of?: 'height' | 'hips' };
+  /** True for a cycle (first key = last key); false for a motion played once that rests on its last frame (death). */
+  loop: boolean;
+  /**
+   * True = fitted to the rig (`threeClips.fitToRig`: limbs held still where they would tear the mesh). False = always
+   * played in full, accepting some deformation (058, clarification Q1 = A) — the guard and the death are their limbs.
+   */
+  protect: boolean;
 }
 
 /** Direction the upper arms hang while animated, in the character's frame (normalized by the converter). */
@@ -41,6 +51,7 @@ export const RELAXED_ARMS: Record<'LeftArm' | 'RightArm', [number, number, numbe
 const IDLE_TIMES = [0, 0.75, 1.5, 2.25, 3];
 const WALK_TIMES = [0, 0.25, 0.5, 0.75, 1];
 const GUARD_TIMES = [0, 0.5, 1, 1.5, 2];
+const DEATH_TIMES = [0, 0.35, 0.8, 1.15, 1.4];
 
 /** The same turn on every key except the ones given. */
 const around = (axis: 0 | 1 | 2, values: number[]): [number, number, number][] =>
@@ -69,6 +80,8 @@ export const ROLL6_IDLE: Roll6Clip = {
     { bone: 'RightForeArm', times: IDLE_TIMES, degrees: around(0, [-8, -9, -10, -9, -8]) },
   ],
   hipsLift: { times: IDLE_TIMES, values: [0, -0.002, -0.004, -0.002, 0] },
+  loop: true,
+  protect: true,
 };
 
 export const ROLL6_WALK: Roll6Clip = {
@@ -95,6 +108,8 @@ export const ROLL6_WALK: Roll6Clip = {
   ],
   // The body is highest when a leg passes under it.
   hipsLift: { times: WALK_TIMES, values: [0, 0.015, 0, 0.015, 0] },
+  loop: true,
+  protect: true,
 };
 
 /**
@@ -129,9 +144,48 @@ export const ROLL6_GUARD: Roll6Clip = {
   ],
   // Lower than standing, bobbing a little with the breath.
   hipsLift: { times: GUARD_TIMES, values: [-0.04, -0.043, -0.046, -0.043, -0.04] },
+  loop: true,
+  protect: false,
+};
+
+/**
+ * The death (058): the knees give way, the body falls on its back and comes to rest lying, arms open on the floor and
+ * the head turned a little to one side. Played once; the 3D view keeps its last frame for a piece that is down or out of
+ * combat. The hips turn −90° about X (a turn about −X takes "up" to the back), so the legs end along the floor ahead of
+ * them and the trunk behind; the hips go down to the floor by a share of their own height (`of: 'hips'`), whatever the
+ * model's proportions.
+ */
+export const ROLL6_DEATH: Roll6Clip = {
+  name: 'death',
+  duration: 1.4,
+  tracks: [
+    // The fall: a little back as the knees give way, then on the back.
+    { bone: 'Hips', times: DEATH_TIMES, degrees: around(0, [0, -8, -45, -85, -90]) },
+    // Knees forward and bent while the body sinks; the legs lie straight at the end.
+    { bone: 'LeftUpLeg', times: DEATH_TIMES, degrees: around(0, [0, -25, -15, 0, 0]) },
+    { bone: 'RightUpLeg', times: DEATH_TIMES, degrees: around(0, [0, -25, -15, 0, 0]) },
+    { bone: 'LeftLeg', times: DEATH_TIMES, degrees: around(0, [0, 50, 30, 5, 0]) },
+    { bone: 'RightLeg', times: DEATH_TIMES, degrees: around(0, [0, 50, 30, 5, 0]) },
+    // The trunk curls a little while falling and straightens on the floor.
+    { bone: 'Spine', times: DEATH_TIMES, degrees: around(0, [0, 6, 10, 2, 0]) },
+    { bone: 'Spine1', times: DEATH_TIMES, degrees: around(0, [0, 4, 6, 1, 0]) },
+    // The head goes back on the impact and rests turned to one side.
+    { bone: 'Neck', times: DEATH_TIMES, degrees: around(0, [0, 0, -10, -15, -5]) },
+    { bone: 'Head', times: DEATH_TIMES, degrees: around(1, [0, 0, 0, 5, 10]) },
+    // The arms fly up in front, then open on the floor.
+    { bone: 'LeftArm', times: DEATH_TIMES, degrees: [[0, 0, 0], [-30, 0, 10], [-20, 0, 40], [0, 0, 65], [0, 0, 70]] },
+    { bone: 'RightArm', times: DEATH_TIMES, degrees: [[0, 0, 0], [-30, 0, -10], [-20, 0, -40], [0, 0, -65], [0, 0, -70]] },
+    { bone: 'LeftForeArm', times: DEATH_TIMES, degrees: around(0, [0, -20, -15, -10, -10]) },
+    { bone: 'RightForeArm', times: DEATH_TIMES, degrees: around(0, [0, -20, -15, -10, -10]) },
+  ],
+  hipsLift: { times: DEATH_TIMES, values: [0, -0.25, -0.55, -0.8, -0.82], of: 'hips' },
+  loop: false,
+  protect: false,
 };
 
 export const ROLL6_CLIPS = { idle: ROLL6_IDLE, walk: ROLL6_WALK } as const;
 
-/** Every Roll6 animation by its name (057): the two states and the guard stance. */
-export const ROLL6_CLIPS_BY_NAME: Record<Roll6ClipName, Roll6Clip> = { idle: ROLL6_IDLE, walk: ROLL6_WALK, guard: ROLL6_GUARD };
+/** Every Roll6 animation by its name: the two states, the guard stance (057) and the death (058). */
+export const ROLL6_CLIPS_BY_NAME: Record<Roll6ClipName, Roll6Clip> = {
+  idle: ROLL6_IDLE, walk: ROLL6_WALK, guard: ROLL6_GUARD, death: ROLL6_DEATH,
+};

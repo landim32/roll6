@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MIXAMO_REQUIRED } from './modelAnimations';
-import { RELAXED_ARMS, ROLL6_CLIPS, ROLL6_CLIPS_BY_NAME, ROLL6_GUARD } from './roll6Clips';
+import { RELAXED_ARMS, ROLL6_CLIPS, ROLL6_CLIPS_BY_NAME, ROLL6_DEATH, ROLL6_GUARD } from './roll6Clips';
 
 /** Every bone name of a Mixamo skeleton these clips may use. */
 const MIXAMO_BONES = new Set([
@@ -90,5 +90,62 @@ describe('Roll6 guard stance (057)', () => {
     expect(ROLL6_CLIPS_BY_NAME.guard).toBe(ROLL6_GUARD);
     expect(ROLL6_CLIPS_BY_NAME.idle).toBe(ROLL6_CLIPS.idle);
     expect(ROLL6_CLIPS_BY_NAME.walk).toBe(ROLL6_CLIPS.walk);
+  });
+});
+
+describe('Roll6 clip flags (058)', () => {
+  it('fits idle and walk to the rig and plays the guard and the death in full (Q1 = A)', () => {
+    expect(ROLL6_CLIPS_BY_NAME.idle.protect).toBe(true);
+    expect(ROLL6_CLIPS_BY_NAME.walk.protect).toBe(true);
+    expect(ROLL6_CLIPS_BY_NAME.guard.protect).toBe(false);
+    expect(ROLL6_CLIPS_BY_NAME.death.protect).toBe(false);
+  });
+
+  it('loops every clip but the death', () => {
+    expect(ROLL6_CLIPS_BY_NAME.idle.loop).toBe(true);
+    expect(ROLL6_CLIPS_BY_NAME.walk.loop).toBe(true);
+    expect(ROLL6_CLIPS_BY_NAME.guard.loop).toBe(true);
+    expect(ROLL6_CLIPS_BY_NAME.death.loop).toBe(false);
+  });
+});
+
+describe('Roll6 death (058)', () => {
+  const track = (bone: string) => ROLL6_DEATH.tracks.find((item) => item.bone === bone)!;
+
+  it('lasts at most 2 s, with times ascending from 0 to the duration', () => {
+    expect(ROLL6_DEATH.duration).toBeLessThanOrEqual(2);
+    for (const item of [...ROLL6_DEATH.tracks, { bone: 'Hips', times: ROLL6_DEATH.hipsLift.times, degrees: [] }]) {
+      expect(item.times[0]).toBe(0);
+      expect(item.times[item.times.length - 1]).toBe(ROLL6_DEATH.duration);
+      for (let i = 1; i < item.times.length; i++) expect(item.times[i]).toBeGreaterThan(item.times[i - 1]);
+    }
+  });
+
+  it('only uses Mixamo bones, each once', () => {
+    const bones = ROLL6_DEATH.tracks.map((item) => item.bone);
+    expect(new Set(bones).size).toBe(bones.length);
+    for (const bone of bones) expect(MIXAMO_BONES.has(bone)).toBe(true);
+  });
+
+  it('starts standing: every turn and the hips lift begin at 0', () => {
+    for (const item of ROLL6_DEATH.tracks) expect(item.degrees[0]).toEqual([0, 0, 0]);
+    expect(ROLL6_DEATH.hipsLift.values[0]).toBe(0);
+  });
+
+  it('ends on the back: hips turned −90° about X, legs straight, arms open on their own side', () => {
+    const last = (bone: string) => track(bone).degrees[track(bone).degrees.length - 1];
+    expect(last('Hips')).toEqual([-90, 0, 0]);
+    expect(last('LeftLeg')[0]).toBe(0);
+    expect(last('RightLeg')[0]).toBe(0);
+    expect(last('LeftArm')[2]).toBeGreaterThan(45);
+    expect(last('RightArm')[2]).toBeLessThan(-45);
+  });
+
+  it('brings the hips down to the floor by a share of their own height', () => {
+    expect(ROLL6_DEATH.hipsLift.of).toBe('hips');
+    expect(ROLL6_DEATH.hipsLift.values[ROLL6_DEATH.hipsLift.values.length - 1]).toBeCloseTo(-0.82);
+    for (let i = 1; i < ROLL6_DEATH.hipsLift.values.length; i++) {
+      expect(ROLL6_DEATH.hipsLift.values[i]).toBeLessThanOrEqual(ROLL6_DEATH.hipsLift.values[i - 1]);
+    }
   });
 });

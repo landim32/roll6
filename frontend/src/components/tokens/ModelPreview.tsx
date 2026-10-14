@@ -1,11 +1,12 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
-  AnimationMixer, CircleGeometry, Clock, DirectionalLight, Group, HemisphereLight, Mesh, MeshBasicMaterial, PerspectiveCamera,
+  AnimationMixer, CircleGeometry, Clock, DirectionalLight, Group, HemisphereLight, LoopOnce, Mesh, MeshBasicMaterial, PerspectiveCamera,
   Scene, WebGLRenderer,
 } from 'three';
 import type { AnimationAction, Object3D } from 'three';
 import type { AnimationSource, AnimationState, ModelClipChoices } from '../../lib/modelAnimations';
+import { LYING_TILT } from '../../lib/modelFit';
 import { instantiate, loadModel } from '../story/loadModel';
 import type { ModelAsset } from '../story/loadModel';
 
@@ -39,14 +40,14 @@ export interface ModelPreviewHandle {
 
 interface ModelPreviewProps {
   url: string;
-  /** Show the walk instead of standing still. */
-  walking: boolean;
+  /** The state shown (058): standing still, walking, or down — the death played once, resting on its last frame. */
+  shown: AnimationState;
   /** The animation chosen for each state (056); the preview rebuilds its actions when it changes. */
   clips: ModelClipChoices;
   /** The model opened: the clips and bones it has. */
   onLoaded: (info: ModelPreviewInfo) => void;
   /** After the model opens and after every change of `clips`: where each animation comes from now. */
-  onClips: (sources: Record<AnimationState, AnimationSource>, reduced: boolean) => void;
+  onClips: (sources: Record<AnimationState, AnimationSource>, reduced: boolean, deforms: boolean) => void;
   /** The file could not be opened (or the device has no WebGL). */
   onError: () => void;
   label: string;
@@ -60,55 +61,112 @@ const FADE_SECONDS = 0.25;
 
 /**
  * Preview of a token's 3D model (055) in the "3D" tab of the token form: the model standing on a disc, facing the viewer,
- * turning slowly by itself (a drag turns it by hand), playing its idle or its walk — the ones chosen in the form (056),
- * so the user sees each choice at once. Its own small three.js scene, loaded lazily with the tab, released when it closes.
+ * turning slowly by itself (a drag turns it by hand), playing its idle, its walk or (058) its death — the ones chosen in
+ * the form (056), so the user sees each choice at once. Without a death the down state shows the model laid on its back,
+ * as the 3D view does. Its own small three.js scene, loaded lazily with the tab, released when it closes.
  */
-export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, walking, clips, onLoaded, onClips, onError, label }, ref) => {
+export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, clips, onLoaded, onClips, onError, label }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** The action the preview shows now (057): the timeline's subject; null when that state has no animation. */
   const current = useRef<AnimationAction | null>(null);
   const pausedRef = useRef(false);
   const modelRef = useRef<Object3D | null>(null);
-  const actions = useRef<{ idle: AnimationAction | null; walk: AnimationAction | null }>({ idle: null, walk: null });
+  const actions = useRef<Record<AnimationState, AnimationAction | null>>({ idle: null, walk: null, down: null });
+  /** Between the turntable and the model (058): laid on its back for a down state without a death. */
+  const holderRef = useRef<Group | null>(null);
+  /** Depth and height of the model in the preview, to lay it down centered on the disc. */
+  const sizeRef = useRef({ depth: 0, height: PREVIEW_HEIGHT });
   const mixerRef = useRef<AnimationMixer | null>(null);
   const assetRef = useRef<ModelAsset | null>(null);
-  const walkingRef = useRef(walking);
+  const shownRef = useRef(shown);
   const clipsRef = useRef(clips);
   const drag = useRef<number | null>(null);
   const stage = useRef<Group | null>(null);
   const callbacks = useRef({ onLoaded, onClips, onError });
   callbacks.current = { onLoaded, onClips, onError };
 
-  /** Builds the two actions for the current choices and plays the current state; tells the form what they are. */
+  /** Builds the actions for the current choices and plays the current state; tells the form what they are. */
   const applyClips = (choices: ModelClipChoices) => {
     const asset = assetRef.current;
     const mixer = mixerRef.current;
     if (!asset || !mixer) return;
     mixer.stopAllAction();
     const built = asset.clips(choices);
+    const down = built.down ? mixer.clipAction(built.down) : null;
+    if (down) {
+      // The death plays once and rests on its last frame (058).
+      down.setLoop(LoopOnce, 1);
+      down.clampWhenFinished = true;
+    }
     actions.current = {
       idle: built.idle ? mixer.clipAction(built.idle) : null,
       walk: built.walk ? mixer.clipAction(built.walk) : null,
+      down,
     };
-    show(walkingRef.current ? actions.current.walk ?? actions.current.idle : actions.current.idle);
-    callbacks.current.onClips(built.sources, built.reduced);
+    show(actionOf(shownRef.current));
+    callbacks.current.onClips(built.sources, built.reduced, built.deforms);
   };
 
-  // The effects below call the latest applyClips through this ref (it only reads refs).
+  /** The action of a state: the walk falls back to standing still, the down state has only its death. */
+  function actionOf(state: AnimationState): AnimationAction | null {
+    if (state === 'walk') return actions.current.walk ?? actions.current.idle;
+    return actions.current[state];
+  }
+
+  /** Lays the model on its back (down without a death, 058) or stands it up, centered on the disc. */
+  function layDown(lying: boolean) {
+    const holder = holderRef.current;
+    if (!holder) return;
+    const { depth, height } = sizeRef.current;
+    holder.rotation.x = lying ? LYING_TILT : 0;
+    // Turned, the model's depth becomes its height above the disc and its height its length along the disc.
+    holder.position.set(0, lying ? depth / 2 : 0, lying ? height / 2 : 0);
+  }
+
+  /** Another state shown: standing still ↔ walking with a short cross-fade; the down state (058) starts its death over. */
+  const switchState = (previous: AnimationState, next: AnimationState) => {
+    if (next === 'down' || previous === 'down') {
+      mixerRef.current?.stopAllAction();
+      show(actionOf(next));
+      return;
+    }
+    const to = actionOf(next);
+    const from = actionOf(previous);
+    pausedRef.current = false;
+    if (from) from.paused = false;
+    current.current = to;
+    if (to && from && to !== from) {
+      to.reset().play();
+      from.crossFadeTo(to, FADE_SECONDS, false);
+    } else if (to && to !== from) {
+      to.reset().fadeIn(FADE_SECONDS).play();
+    } else if (from && to !== from) {
+      from.fadeOut(FADE_SECONDS);
+    }
+  };
+
+  // The effects below call the latest applyClips / switchState through these refs (they only read refs).
   const applyRef = useRef(applyClips);
   applyRef.current = applyClips;
+  const switchRef = useRef(switchState);
+  switchRef.current = switchState;
 
   /** Starts `action` from the beginning, playing, as the one the timeline follows (FR-008). */
   function show(action: AnimationAction | null) {
     pausedRef.current = false;
     current.current = action;
+    layDown(shownRef.current === 'down' && action === null);
     action?.reset().play();
   }
 
   useImperativeHandle(ref, () => ({
     play: () => {
       pausedRef.current = false;
-      if (current.current) current.current.paused = false;
+      const action = current.current;
+      if (!action) return;
+      // The death at its end (058): playing again starts it over.
+      if (action.loop === LoopOnce && action.time >= action.getClip().duration) action.reset().play();
+      else action.paused = false;
     },
     pause: () => {
       pausedRef.current = true;
@@ -131,7 +189,8 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
         // A looping action keeps its time inside [0, duration).
         time: action ? Math.min(Math.max(0, action.time), duration) : 0,
         duration,
-        paused: pausedRef.current,
+        // A death that reached its last frame rests there, paused (058).
+        paused: pausedRef.current || (action?.paused ?? false),
         hasAnimation: action !== null && duration > 0,
       };
     },
@@ -191,7 +250,11 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       const scale = PREVIEW_HEIGHT / Math.max(1e-6, maxY - minY);
       model.scale.setScalar(scale);
       model.position.set(-((minX + maxX) / 2) * scale, -minY * scale, -((minZ + maxZ) / 2) * scale);
-      turntable.add(model);
+      const holder = new Group();
+      holder.add(model);
+      turntable.add(holder);
+      holderRef.current = holder;
+      sizeRef.current = { depth: (maxZ - minZ) * scale, height: PREVIEW_HEIGHT };
       modelRef.current = model;
       assetRef.current = asset;
       mixerRef.current = new AnimationMixer(model);
@@ -220,9 +283,10 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       mixerRef.current?.stopAllAction();
       mixerRef.current = null;
       assetRef.current = null;
-      actions.current = { idle: null, walk: null };
+      actions.current = { idle: null, walk: null, down: null };
       current.current = null;
       modelRef.current = null;
+      holderRef.current = null;
       stage.current = null;
       ground.geometry.dispose();
       (ground.material as MeshBasicMaterial).dispose();
@@ -237,25 +301,13 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     applyRef.current(clips);
   }, [clips]);
 
-  // Standing still ↔ walking, with a short cross-fade.
+  // Another state shown (058: Parado, Caminhando or Caído).
   useEffect(() => {
-    if (walkingRef.current === walking) return;
-    walkingRef.current = walking;
-    const { idle, walk } = actions.current;
-    const to = walking ? walk : idle;
-    const from = walking ? idle : walk;
-    pausedRef.current = false;
-    if (from) from.paused = false;
-    current.current = to;
-    if (to && from) {
-      to.reset().play();
-      from.crossFadeTo(to, FADE_SECONDS, false);
-    } else if (to) {
-      to.reset().fadeIn(FADE_SECONDS).play();
-    } else if (from) {
-      from.fadeOut(FADE_SECONDS);
-    }
-  }, [walking]);
+    const previous = shownRef.current;
+    if (previous === shown) return;
+    shownRef.current = shown;
+    switchRef.current(previous, shown);
+  }, [shown]);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);

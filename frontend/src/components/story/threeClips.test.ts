@@ -4,7 +4,7 @@ import type { Object3D } from 'three';
 import { AnimationClip } from 'three';
 import { buildRoll6Clip, createClipBuilder } from './threeClips';
 import { AUTO_CLIPS } from '../../lib/modelAnimations';
-import { ROLL6_CLIPS } from '../../lib/roll6Clips';
+import { ROLL6_CLIPS, ROLL6_DEATH } from '../../lib/roll6Clips';
 
 /**
  * A small Mixamo skeleton in a T pose (055), as three.js names the example orc's bones ("mixamorig:" loses its colon).
@@ -105,38 +105,69 @@ describe('Roll6 clips on a Mixamo skeleton (055)', () => {
   it('the builder picks Roll6\'s clips for a Mixamo skeleton without clips, and none for another skeleton', () => {
     const root = skeleton();
     const mixamo = createClipBuilder(root, [], BONES(root), 1.6)(AUTO_CLIPS);
-    expect(mixamo.sources).toEqual({ idle: 'roll6', walk: 'roll6' });
+    expect(mixamo.sources).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
     expect(mixamo.idle).not.toBeNull();
     expect(mixamo.walk).not.toBeNull();
     const other = createClipBuilder(new Group(), [], ['pelvis'], 1.6)(AUTO_CLIPS);
-    expect(other).toMatchObject({ idle: null, walk: null, sources: { idle: 'static', walk: 'static' } });
+    expect(other).toMatchObject({ idle: null, walk: null, down: null, sources: { idle: 'static', walk: 'static', down: 'static' } });
   });
 
   it('the builder builds Roll6\'s guard stance by name (057) and keeps it apart from idle and walk', () => {
     const root = skeleton();
     const build = createClipBuilder(root, [], BONES(root), 1.6);
-    const guard = build({ idle: 'roll6-guard', walk: null });
+    const guard = build({ idle: 'roll6-guard', walk: null, down: null });
     expect(guard.idle?.name).toBe('roll6-guard');
     expect(guard.walk?.name).toBe('roll6-walk');
-    expect(guard.sources).toEqual({ idle: 'roll6', walk: 'roll6' });
+    expect(guard.sources).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
     // Fitted once: another pair using the guard gets the same clip.
-    expect(build({ idle: 'roll6-guard', walk: 'roll6-guard' }).walk).toBe(guard.idle);
-    expect(build({ idle: 'roll6', walk: null }).idle?.name).toBe('roll6-idle');
+    expect(build({ idle: 'roll6-guard', walk: 'roll6-guard', down: null }).walk).toBe(guard.idle);
+    expect(build({ idle: 'roll6', walk: null, down: null }).idle?.name).toBe('roll6-idle');
   });
 
   it('the builder follows the chosen animations (056) and reuses what it built', () => {
     const root = skeleton();
     const attack = new AnimationClip('Attack', 1, []);
     const build = createClipBuilder(root, [attack], BONES(root), 1.6);
-    const chosen = build({ idle: 'clip:Attack', walk: 'none' });
-    expect(chosen.sources).toEqual({ idle: 'file', walk: 'static' });
+    const chosen = build({ idle: 'clip:Attack', walk: 'none', down: null });
+    expect(chosen.sources).toEqual({ idle: 'file', walk: 'static', down: 'roll6' });
     expect(chosen.idle).toBe(attack);
     expect(chosen.walk).toBeNull();
-    expect(build({ idle: 'clip:Attack', walk: 'none' })).toBe(chosen);
-    const own = build({ idle: 'roll6', walk: null });
-    expect(own.sources).toEqual({ idle: 'roll6', walk: 'roll6' });
+    expect(build({ idle: 'clip:Attack', walk: 'none', down: null })).toBe(chosen);
+    const own = build({ idle: 'roll6', walk: null, down: null });
+    expect(own.sources).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
     expect(own.idle?.name).toBe('roll6-idle');
     // Roll6's clip of a state is fitted once: the same object comes back for another pair of choices.
     expect(build(AUTO_CLIPS).walk).toBe(own.walk);
+  });
+});
+
+describe('the death on a Mixamo skeleton (058)', () => {
+  it("the builder gives the down state Roll6's death, built once", () => {
+    const root = skeleton();
+    const build = createClipBuilder(root, [], BONES(root), 1.6);
+    const clips = build(AUTO_CLIPS);
+    expect(clips.down?.name).toBe('roll6-death');
+    expect(clips.down?.duration).toBeCloseTo(ROLL6_DEATH.duration);
+    expect(build({ idle: 'none', walk: 'none', down: 'roll6' }).down).toBe(clips.down);
+    expect(build({ idle: null, walk: null, down: 'none' }).down).toBeNull();
+  });
+
+  it("a file's death clip wins over Roll6's", () => {
+    const root = skeleton();
+    const death = new AnimationClip('Death', 2, []);
+    expect(createClipBuilder(root, [death], BONES(root), 1.6)(AUTO_CLIPS).down).toBe(death);
+  });
+
+  it('brings the hips down by a share of their own height and lays the body on its back', () => {
+    const root = skeleton();
+    const hips = root.getObjectByName('mixamorigHips')!;
+    const restY = new Vector3().setFromMatrixPosition(hips.matrixWorld).y;
+    // Just before the end: the test mixer loops, so the duration itself would wrap to the first frame.
+    const end = sample(root, buildRoll6Clip(ROLL6_DEATH, root, 1.6), ROLL6_DEATH.duration - 1e-4);
+    // The lowest joint of the skeleton is the feet, 0.95 under the hips (rest at y 1): the hips end 0.82 × 0.95 lower.
+    expect(end.at('Hips').y).toBeCloseTo(restY - 0.82 * 0.95, 2);
+    // On the back: the head behind the hips (−Z), at about their height.
+    expect(end.at('Head').z).toBeLessThan(end.at('Hips').z - 0.3);
+    expect(Math.abs(end.at('Head').y - end.at('Hips').y)).toBeLessThan(0.15);
   });
 });

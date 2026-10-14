@@ -33,6 +33,8 @@ export interface TokenInfo {
   /** Animation chosen for each state of the model (056): null = automatic, "roll6", "none" or "clip:{name}". */
   modelIdleClip?: string | null;
   modelWalkClip?: string | null;
+  /** The death (058): played once when the piece is down or out of combat; null = automatic. */
+  modelDownClip?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +56,7 @@ export interface TokenInsertInfo {
   /** Animations chosen for the model (056; `lib/modelAnimations`): null = automatic; the PUT resets what it doesn't get. */
   modelIdleClip: string | null;
   modelWalkClip: string | null;
+  modelDownClip: string | null;
 }
 
 /** Result of POST /api/model (055): the stored `.glb` name and a temporary URL. */

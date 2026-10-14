@@ -68,12 +68,16 @@ public class TokenTests
     [Fact]
     public void UpdateModel_WithoutAModelDropsTheChoices()
     {
-        var token = new Token { ModelFile = "0123456789abcdef0123456789abcdef.glb", ModelIdleClip = "none", ModelWalkClip = "none" };
+        var token = new Token
+        {
+            ModelFile = "0123456789abcdef0123456789abcdef.glb", ModelIdleClip = "none", ModelWalkClip = "none", ModelDownClip = "none",
+        };
 
-        token.UpdateModel(null, "none", "none");
+        token.UpdateModel(null, "none", "none", "none");
 
         token.ModelIdleClip.Should().BeNull();
         token.ModelWalkClip.Should().BeNull();
+        token.ModelDownClip.Should().BeNull();
     }
 
     [Fact]
@@ -94,5 +98,40 @@ public class TokenTests
         var act = () => token.UpdateModel("0123456789abcdef0123456789abcdef.png");
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelFile");
+    }
+
+    [Theory]
+    [InlineData("roll6")]
+    [InlineData("none")]
+    [InlineData("clip:Armature|Death")]
+    public void UpdateModel_SavesTheDeathChoice(string choice)
+    {
+        var token = new Token();
+
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", null, null, choice);
+
+        token.ModelDownClip.Should().Be(choice);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void UpdateModel_DeathIsAutomaticWhenNotChosen(string? choice)
+    {
+        var token = new Token { ModelDownClip = "none" };
+
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "roll6", "roll6", choice);
+
+        token.ModelDownClip.Should().BeNull();
+    }
+
+    [Fact]
+    public void UpdateModel_RefusesAnUnknownDeathChoice()
+    {
+        var token = new Token();
+
+        var act = () => token.UpdateModel("0123456789abcdef0123456789abcdef.glb", null, null, "Roll6");
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelDownClip");
     }
 }

@@ -49,19 +49,33 @@ describe('pickClip', () => {
 
 describe('animationSources', () => {
   it('the orc (no clips, Mixamo skeleton) gets Roll6\'s idle and walk', () => {
-    expect(animationSources([], ORC_BONES)).toEqual({ idle: 'roll6', walk: 'roll6' });
+    expect(animationSources([], ORC_BONES)).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
   });
 
   it('a file with both clips uses its own, whatever the skeleton', () => {
-    expect(animationSources(['Idle', 'Walk'], ['root'])).toEqual({ idle: 'file', walk: 'file' });
+    expect(animationSources(['Idle', 'Walk'], ['root'])).toEqual({ idle: 'file', walk: 'file', down: 'static' });
   });
 
   it('a file with only the idle clip walks with Roll6\'s walk', () => {
-    expect(animationSources(['Idle'], ORC_BONES)).toEqual({ idle: 'file', walk: 'roll6' });
+    expect(animationSources(['Idle'], ORC_BONES)).toEqual({ idle: 'file', walk: 'roll6', down: 'roll6' });
   });
 
   it('no clips and another skeleton (or none): it stands still', () => {
-    expect(animationSources([], ['pelvis', 'thigh_l'])).toEqual({ idle: 'static', walk: 'static' });
-    expect(animationSources(['Idle'], [])).toEqual({ idle: 'file', walk: 'static' });
+    expect(animationSources([], ['pelvis', 'thigh_l'])).toEqual({ idle: 'static', walk: 'static', down: 'static' });
+    expect(animationSources(['Idle'], [])).toEqual({ idle: 'file', walk: 'static', down: 'static' });
+  });
+});
+
+describe('the down state (058)', () => {
+  it('finds a death clip by name, ignoring case and the armature prefix', () => {
+    expect(pickClip(['Idle', 'Death'], 'down')).toBe(1);
+    expect(pickClip(['Armature|Dying'], 'down')).toBe(0);
+    expect(pickClip(['die'], 'down')).toBe(0);
+    expect(pickClip(['Morte'], 'down')).toBe(0);
+    expect(pickClip(['Dead_Pose'], 'down')).toBe(0);
+  });
+
+  it('does not take other clips for a death', () => {
+    expect(pickClip(['Soldier_Idle', 'Walk', 'Diet'], 'down')).toBeNull();
   });
 });

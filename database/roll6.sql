@@ -1933,5 +1933,20 @@ BEGIN
     VALUES ('20261014082757_AddTokenModelClips', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014124930_AddTokenModelDownClip') THEN
+    ALTER TABLE tokens ADD model_down_clip character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014124930_AddTokenModelDownClip') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261014124930_AddTokenModelDownClip', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

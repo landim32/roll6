@@ -53,3 +53,31 @@ export const fitModel = (bounds: ModelBounds, width: number, center: Point, yaw:
     rotationY,
   };
 };
+
+/** Turn about the model's own X that lays it on its back (058): "up" goes to the back (−Z), the feet to the front. */
+export const LYING_TILT = -Math.PI / 2;
+
+/**
+ * Scale, position and turns that lay a model of `bounds` on its back on `center`, the feet toward `yaw` (058): what a
+ * piece that is down or out of combat shows in the 3D view when its token has no death animation. The scale is the
+ * standing one (the same character, lying), the tilt `LYING_TILT` is applied in the model's frame before the turn
+ * about the vertical (three.js Euler order "YXZ"), the middle of the lying body lands on `center` and its lowest point
+ * on the floor. Turned by the tilt, a point (x, y, z) of the file goes to (x, z, −y).
+ */
+export const fitLyingModel = (bounds: ModelBounds, width: number, center: Point, yaw: number): ModelPlacement & { tilt: number } => {
+  const tall = bounds.max[1] - bounds.min[1];
+  const scale = tall > 1e-6 ? figureHeight(width) / tall : 1;
+  const rotationY = rotationForYaw(yaw);
+  const middleX = ((bounds.min[0] + bounds.max[0]) / 2) * scale;
+  const middleZ = (-(bounds.min[1] + bounds.max[1]) / 2) * scale;
+  const cos = Math.cos(rotationY);
+  const sin = Math.sin(rotationY);
+  const turnedX = middleX * cos + middleZ * sin;
+  const turnedZ = -middleX * sin + middleZ * cos;
+  return {
+    scale,
+    position: { x: center.x - turnedX, y: -bounds.min[2] * scale, z: center.y - turnedZ },
+    rotationY,
+    tilt: LYING_TILT,
+  };
+};

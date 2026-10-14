@@ -54,8 +54,8 @@ describe('resolveAnimation (056)', () => {
   });
 
   it('resolvedSources gives both states', () => {
-    expect(resolvedSources({ idle: 'none', walk: null }, clips, ORC_BONES)).toEqual({ idle: 'static', walk: 'file' });
-    expect(resolvedSources(AUTO_CLIPS, [], ORC_BONES)).toEqual({ idle: 'roll6', walk: 'roll6' });
+    expect(resolvedSources({ idle: 'none', walk: null, down: 'none' }, clips, ORC_BONES)).toEqual({ idle: 'static', walk: 'file', down: 'static' });
+    expect(resolvedSources(AUTO_CLIPS, [], ORC_BONES)).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
   });
 });
 
@@ -81,10 +81,10 @@ describe('clipChoiceOptions (056)', () => {
 
 describe('clip choice keys', () => {
   it('compares and keys pairs of choices', () => {
-    expect(sameClipChoices({ idle: null, walk: 'none' }, { idle: null, walk: 'none' })).toBe(true);
-    expect(sameClipChoices({ idle: null, walk: 'none' }, { idle: 'none', walk: null })).toBe(false);
-    expect(clipChoicesKey({ idle: null, walk: 'none' })).not.toBe(clipChoicesKey({ idle: 'none', walk: null }));
-    expect(clipChoicesKey(AUTO_CLIPS)).toBe(clipChoicesKey({ idle: null, walk: null }));
+    expect(sameClipChoices({ idle: null, walk: 'none', down: null }, { idle: null, walk: 'none', down: null })).toBe(true);
+    expect(sameClipChoices({ idle: null, walk: 'none', down: null }, { idle: 'none', walk: null, down: null })).toBe(false);
+    expect(clipChoicesKey({ idle: null, walk: 'none', down: null })).not.toBe(clipChoicesKey({ idle: 'none', walk: null, down: null }));
+    expect(clipChoicesKey(AUTO_CLIPS)).toBe(clipChoicesKey({ idle: null, walk: null, down: null }));
   });
 });
 
@@ -103,5 +103,29 @@ describe('guard stance choice (057)', () => {
     expect(values.indexOf('roll6-guard')).toBe(values.indexOf('roll6') + 1);
     expect(clipChoiceOptions([], OTHER_BONES, 'idle').map((option) => option.value)).not.toContain('roll6-guard');
     expect(clipChoiceOptions([], ORC_BONES, 'idle').find((option) => option.value === 'roll6-guard')?.kind).toBe('guard');
+  });
+});
+
+describe('the down state choices (058)', () => {
+  it("automatic: the file's death clip, else Roll6's death on a Mixamo skeleton, else nothing", () => {
+    expect(resolveAnimation(null, ['Idle', 'Death'], OTHER_BONES, 'down')).toEqual({ source: 'file', index: 1 });
+    expect(resolveAnimation(null, ['Idle'], ORC_BONES, 'down')).toEqual({ source: 'roll6', clip: 'death' });
+    expect(resolveAnimation(null, ['Idle'], OTHER_BONES, 'down')).toEqual({ source: 'static' });
+  });
+
+  it("'roll6' is Roll6's death; 'none' lies still; a chosen file clip plays", () => {
+    expect(resolveAnimation('roll6', [], ORC_BONES, 'down')).toEqual({ source: 'roll6', clip: 'death' });
+    expect(resolveAnimation('none', ['Death'], ORC_BONES, 'down')).toEqual({ source: 'static' });
+    expect(resolveAnimation('clip:Fall', ['Fall', 'Death'], ORC_BONES, 'down')).toEqual({ source: 'file', index: 0 });
+  });
+
+  it('offers no guard stance for the down state', () => {
+    const values = clipChoiceOptions(['Death'], ORC_BONES, 'down').map((option) => option.value);
+    expect(values).toEqual(['', 'clip:Death', 'roll6', 'none']);
+  });
+
+  it('a different down choice is another key', () => {
+    expect(sameClipChoices({ idle: null, walk: null, down: 'none' }, AUTO_CLIPS)).toBe(false);
+    expect(clipChoicesKey({ idle: null, walk: null, down: 'none' })).not.toBe(clipChoicesKey(AUTO_CLIPS));
   });
 });

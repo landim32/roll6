@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { figureHeight, fitModel, rotationForYaw } from './modelFit';
+import { Box3, Euler, Matrix4, Quaternion, Vector3 } from 'three';
+import { figureHeight, fitLyingModel, fitModel, LYING_TILT, rotationForYaw } from './modelFit';
 import type { ModelBounds } from './modelFit';
 import { pieceGeometry } from './pieceDrawing';
 import { HEX_SIZE } from './hexGrid';
@@ -59,5 +60,50 @@ describe('fitModel', () => {
   it('is the three.js turn π − yaw', () => {
     expect(rotationForYaw(0)).toBeCloseTo(Math.PI);
     expect(rotationForYaw(Math.PI)).toBeCloseTo(0);
+  });
+});
+
+describe('fitLyingModel (058)', () => {
+  const BODY: ModelBounds = { min: [-0.4, 0, -0.25], max: [0.4, 1.8, 0.35] };
+  const WIDTH = pieceGeometry(2, HEX_SIZE).box.width;
+
+  /** The eight corners of the bounds placed by three.js with the returned scale, turns (order "YXZ") and position. */
+  const placed = (yaw: number, center = { x: 300, y: 200 }) => {
+    const fit = fitLyingModel(BODY, WIDTH, center, yaw);
+    const matrix = new Matrix4().compose(
+      new Vector3(fit.position.x, fit.position.y, fit.position.z),
+      new Quaternion().setFromEuler(new Euler(fit.tilt, fit.rotationY, 0, 'YXZ')),
+      new Vector3(fit.scale, fit.scale, fit.scale),
+    );
+    const corners: Vector3[] = [];
+    for (const x of [BODY.min[0], BODY.max[0]]) for (const y of [BODY.min[1], BODY.max[1]]) for (const z of [BODY.min[2], BODY.max[2]]) {
+      corners.push(new Vector3(x, y, z).applyMatrix4(matrix));
+    }
+    return { fit, box: new Box3().setFromPoints(corners) };
+  };
+
+  it('keeps the standing scale: the same character, lying', () => {
+    expect(fitLyingModel(BODY, WIDTH, { x: 0, y: 0 }, 0).scale).toBeCloseTo(fitModel(BODY, WIDTH, { x: 0, y: 0 }, 0).scale);
+    expect(fitLyingModel(BODY, WIDTH, { x: 0, y: 0 }, 0).tilt).toBe(LYING_TILT);
+  });
+
+  for (const look of [0, 1, 3, 5]) {
+    it(`lies on the floor, centered on the piece (look ${look})`, () => {
+      const { fit, box } = placed(lookToYaw(look));
+      expect(box.min.y).toBeCloseTo(0, 6);
+      // As tall as the body is deep, as long as it is tall.
+      expect(box.max.y).toBeCloseTo(0.6 * fit.scale, 6);
+      expect((box.min.x + box.max.x) / 2).toBeCloseTo(300, 6);
+      expect((box.min.z + box.max.z) / 2).toBeCloseTo(200, 6);
+    });
+  }
+
+  it('lies along the facing, the feet ahead and the head behind', () => {
+    const fit = fitLyingModel(BODY, WIDTH, { x: 0, y: 0 }, lookToYaw(0));
+    const rotation = new Quaternion().setFromEuler(new Euler(fit.tilt, fit.rotationY, 0, 'YXZ'));
+    // Look 0 is north, the top of the map: −z in the 3D view. The head (+Y of the file) ends to the south.
+    const head = new Vector3(0, 1, 0).applyQuaternion(rotation);
+    expect(head.z).toBeCloseTo(1, 6);
+    expect(head.y).toBeCloseTo(0, 6);
   });
 });

@@ -5,10 +5,11 @@
  * Pure: only names go in.
  */
 
-export type AnimationState = 'idle' | 'walk';
+/** Standing still, walking and, since 058, down (the death: played once, resting on its last frame). */
+export type AnimationState = 'idle' | 'walk' | 'down';
 export type AnimationSource = 'file' | 'roll6' | 'static';
 
-export const ANIMATION_STATES: readonly AnimationState[] = ['idle', 'walk'];
+export const ANIMATION_STATES: readonly AnimationState[] = ['idle', 'walk', 'down'];
 
 /** The bones a skeleton needs, by their Mixamo names, for Roll6's own animations. */
 export const MIXAMO_REQUIRED = ['Hips', 'Spine', 'Head', 'LeftUpLeg', 'LeftLeg', 'RightUpLeg', 'RightLeg', 'LeftArm', 'RightArm'];
@@ -27,6 +28,8 @@ export const isMixamoSkeleton = (boneNames: readonly string[]): boolean => {
 const CLIP_PATTERNS: Record<AnimationState, RegExp> = {
   idle: /idle|parad|stand|breath|respir/,
   walk: /walk|caminh|andar|andando/,
+  // "die" only as a word: "Soldier_Idle" must not be a death.
+  down: /death|dying|\bdie\b|dead|morte|morr/,
 };
 
 /** Index of the file's clip for a state (by name, ignoring case and any "Armature|" prefix), or null. */
@@ -39,7 +42,7 @@ export const animationSources = (clipNames: readonly string[], boneNames: readon
   const mixamo = isMixamoSkeleton(boneNames);
   const sourceOf = (state: AnimationState): AnimationSource =>
     pickClip(clipNames, state) !== null ? 'file' : mixamo ? 'roll6' : 'static';
-  return { idle: sourceOf('idle'), walk: sourceOf('walk') };
+  return { idle: sourceOf('idle'), walk: sourceOf('walk'), down: sourceOf('down') };
 };
 
 // ---------- Chosen animations (056) ----------
@@ -52,6 +55,8 @@ export type ModelClipChoice = string | null;
 export interface ModelClipChoices {
   idle: ModelClipChoice;
   walk: ModelClipChoice;
+  /** The death (058): what a piece that is down or out of combat plays once in the 3D view. */
+  down: ModelClipChoice;
 }
 
 export const CLIP_CHOICE_ROLL6 = 'roll6';
@@ -59,7 +64,7 @@ export const CLIP_CHOICE_ROLL6 = 'roll6';
 export const CLIP_CHOICE_ROLL6_GUARD = 'roll6-guard';
 export const CLIP_CHOICE_NONE = 'none';
 export const CLIP_CHOICE_PREFIX = 'clip:';
-export const AUTO_CLIPS: ModelClipChoices = { idle: null, walk: null };
+export const AUTO_CLIPS: ModelClipChoices = { idle: null, walk: null, down: null };
 
 /** The stored choice for a clip of the file. */
 export const fileClipChoice = (name: string): string => `${CLIP_CHOICE_PREFIX}${name}`;
@@ -86,9 +91,12 @@ export const parseClipChoice = (choice: ModelClipChoice): ParsedClipChoice => {
 /** What the 3D view ends up playing for a state: a clip of the file (by index), Roll6's own, or nothing. */
 export type ResolvedAnimation =
   | { source: 'file'; index: number }
-  /** `clip`: which of Roll6's own animations — the state's own, or the guard stance (057). */
-  | { source: 'roll6'; clip: 'idle' | 'walk' | 'guard' }
+  /** `clip`: which of Roll6's own animations — the state's own (the death for `down`), or the guard stance (057). */
+  | { source: 'roll6'; clip: 'idle' | 'walk' | 'guard' | 'death' }
   | { source: 'static' };
+
+/** Roll6's own animation of each state (058: the death is the down state's). */
+export const ROLL6_CLIP_OF_STATE: Record<AnimationState, 'idle' | 'walk' | 'death'> = { idle: 'idle', walk: 'walk', down: 'death' };
 
 /**
  * The animation of one state, given the choice and what the model offers: automatic follows `animationSources`; a
@@ -100,7 +108,8 @@ export const resolveAnimation = (
 ): ResolvedAnimation => {
   const parsed = parseClipChoice(choice);
   if (parsed.kind === 'none') return { source: 'static' };
-  if (parsed.kind === 'roll6') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: state } : { source: 'static' };
+  const own = ROLL6_CLIP_OF_STATE[state];
+  if (parsed.kind === 'roll6') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: own } : { source: 'static' };
   if (parsed.kind === 'guard') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: 'guard' } : { source: 'static' };
   if (parsed.kind === 'file') {
     const index = clipNames.indexOf(parsed.name);
@@ -108,15 +117,16 @@ export const resolveAnimation = (
   }
   const auto = pickClip(clipNames, state);
   if (auto !== null) return { source: 'file', index: auto };
-  return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: state } : { source: 'static' };
+  return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: own } : { source: 'static' };
 };
 
-/** The sources of both states for the chosen animations (what the form lists under the preview). */
+/** The sources of the three states for the chosen animations (what the form lists under the preview). */
 export const resolvedSources = (
   choices: ModelClipChoices, clipNames: readonly string[], boneNames: readonly string[],
 ): Record<AnimationState, AnimationSource> => ({
   idle: resolveAnimation(choices.idle, clipNames, boneNames, 'idle').source,
   walk: resolveAnimation(choices.walk, clipNames, boneNames, 'walk').source,
+  down: resolveAnimation(choices.down, clipNames, boneNames, 'down').source,
 });
 
 export interface ClipOption {
@@ -147,7 +157,8 @@ export const clipChoiceOptions = (clipNames: readonly string[], boneNames: reado
   }
   if (isMixamoSkeleton(boneNames)) {
     options.push({ value: CLIP_CHOICE_ROLL6, kind: 'roll6' });
-    options.push({ value: CLIP_CHOICE_ROLL6_GUARD, kind: 'guard' });
+    // The guard stance is a way of standing: not offered for the death (058).
+    if (state !== 'down') options.push({ value: CLIP_CHOICE_ROLL6_GUARD, kind: 'guard' });
   }
   options.push({ value: CLIP_CHOICE_NONE, kind: 'none' });
   return options;
@@ -156,7 +167,9 @@ export const clipChoiceOptions = (clipNames: readonly string[], boneNames: reado
 /** The select's value back to the stored choice ("" = automatic = null). */
 export const clipChoiceFromValue = (value: string): ModelClipChoice => (value === '' ? null : value);
 
-/** A key for caches: the pair of choices as one string. */
-export const clipChoicesKey = (choices: ModelClipChoices): string => `${choices.idle ?? ''}\u0000${choices.walk ?? ''}`;
+/** A key for caches: the choices as one string. */
+export const clipChoicesKey = (choices: ModelClipChoices): string =>
+  `${choices.idle ?? ''}\u0000${choices.walk ?? ''}\u0000${choices.down ?? ''}`;
 
-export const sameClipChoices = (a: ModelClipChoices, b: ModelClipChoices): boolean => a.idle === b.idle && a.walk === b.walk;
+export const sameClipChoices = (a: ModelClipChoices, b: ModelClipChoices): boolean =>
+  a.idle === b.idle && a.walk === b.walk && a.down === b.down;
