@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { hexCenter, HEX_SIZE } from './hexGrid';
 import { buildOccupancy } from './occupancy';
 import { POSTURE } from '../types/mapToken';
-import { FOLLOW_DISTANCE } from './storyCamera';
 import type { CameraBlocked } from './storyCamera';
 import {
-  canWalk, startWalker, stepWalker, WALK_DISTANCE_MAX, WALK_DISTANCE_MIN, walkCamera, walkerBlocker, walkerLook, WALKER_SPEED,
+  canWalk, startWalker, stepWalker, WALK_DISTANCE_DEFAULT, WALK_DISTANCE_MAX, WALK_DISTANCE_MIN, walkCamera, walkerBlocker, walkerLook, WALKER_SPEED,
   WALKER_TURN_SPEED, zoomWalker,
 } from './walker';
 
@@ -13,9 +12,9 @@ const open: CameraBlocked = () => false;
 const FORWARD = { forward: 1, turn: 0 };
 
 describe('startWalker', () => {
-  it('starts on the piece, facing where it looks, with the camera at the usual distance', () => {
+  it('starts on the piece, facing where it looks, with the camera close behind', () => {
     const walker = startWalker({ x: 100, y: 200 }, 2);
-    expect(walker).toMatchObject({ x: 100, z: 200, moving: false, distance: FOLLOW_DISTANCE });
+    expect(walker).toMatchObject({ x: 100, z: 200, moving: false, distance: WALK_DISTANCE_DEFAULT });
     expect(walker.yaw).toBeCloseTo((2 * Math.PI) / 3);
   });
 });
@@ -81,15 +80,15 @@ describe('the camera behind the character', () => {
   it('stands behind it at its distance, looking the same way, always attached', () => {
     const pose = walkCamera(startWalker({ x: 300, y: 300 }, 0), open);
     expect(pose).toMatchObject({ x: 300, attached: true });
-    expect(pose.z).toBeCloseTo(300 + FOLLOW_DISTANCE);
+    expect(pose.z).toBeCloseTo(300 + WALK_DISTANCE_DEFAULT);
     expect(pose.yaw).toBeCloseTo(0);
   });
 
   it('comes closer in front of a wall behind the character', () => {
-    // A wall from z = 350 on: the camera stops at its face instead of 300 + FOLLOW_DISTANCE.
-    const wall: CameraBlocked = (_x, z) => z > 350;
+    // A wall from z = 340 on: the camera stops at its face instead of 300 + WALK_DISTANCE_DEFAULT.
+    const wall: CameraBlocked = (_x, z) => z > 340;
     const pose = walkCamera(startWalker({ x: 300, y: 300 }, 0), wall);
-    expect(pose.z).toBeLessThanOrEqual(350);
+    expect(pose.z).toBeLessThanOrEqual(340);
     expect(pose.z).toBeGreaterThanOrEqual(300);
   });
 
@@ -98,6 +97,8 @@ describe('the camera behind the character', () => {
     expect(zoomWalker(walker, -100).distance).toBe(WALK_DISTANCE_MIN);
     expect(zoomWalker(walker, 100).distance).toBe(WALK_DISTANCE_MAX);
     expect(zoomWalker(walker, 1).distance).toBeGreaterThan(walker.distance);
+    expect(WALK_DISTANCE_MIN).toBeLessThan(WALK_DISTANCE_DEFAULT);
+    expect(WALK_DISTANCE_DEFAULT).toBeLessThan(WALK_DISTANCE_MAX);
   });
 });
 

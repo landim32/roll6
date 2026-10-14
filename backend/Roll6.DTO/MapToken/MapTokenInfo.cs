@@ -42,6 +42,13 @@ public class MapTokenInfo
     [JsonPropertyName("modelFileUrl")]
     public string? ModelFileUrl { get; set; }
 
+    /// <summary>Animations chosen for the token's model (056): null = automatic, "roll6", "none" or "clip:{name}".</summary>
+    [JsonPropertyName("modelIdleClip")]
+    public string? ModelIdleClip { get; set; }
+
+    [JsonPropertyName("modelWalkClip")]
+    public string? ModelWalkClip { get; set; }
+
     /// <summary>Participation of a Character token (its name/vitals/status/sheet are shown).</summary>
     [JsonPropertyName("campaignCharacterId")]
     public long? CampaignCharacterId { get; set; }

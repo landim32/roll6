@@ -1,6 +1,7 @@
 import { footprintLocal, hexCenter, hexCorners } from './hexGrid';
 import type { Point } from './hexGrid';
 import { tokenSpriteUrls } from './spriteView';
+import type { ModelClipChoices } from './modelAnimations';
 import type { ViewImages } from './spriteView';
 import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
 import type { MapTokenInfo } from '../types/mapToken';
@@ -117,6 +118,8 @@ export interface SpriteSpec {
   baseColor: string;
   /** The token's 3D model (055), drawn instead of the figure once it is loaded; null when it has none. */
   modelUrl: string | null;
+  /** The animation chosen for each state of that model (056; null = automatic). */
+  modelClips: ModelClipChoices;
 }
 
 /**
@@ -145,5 +148,6 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     center,
     baseColor: BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
     modelUrl: token.modelFileUrl ?? null,
+    modelClips: { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null },
   };
 };

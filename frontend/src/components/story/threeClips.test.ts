@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { AnimationMixer, Bone, Group, Quaternion, Vector3 } from 'three';
 import type { Object3D } from 'three';
-import { buildRoll6Clip, clipsFor } from './threeClips';
+import { AnimationClip } from 'three';
+import { buildRoll6Clip, createClipBuilder } from './threeClips';
+import { AUTO_CLIPS } from '../../lib/modelAnimations';
 import { ROLL6_CLIPS } from '../../lib/roll6Clips';
 
 /**
@@ -100,13 +102,29 @@ describe('Roll6 clips on a Mixamo skeleton (055)', () => {
     }
   });
 
-  it('clipsFor picks Roll6\'s clips for a Mixamo skeleton without clips, and none for another skeleton', () => {
+  it('the builder picks Roll6\'s clips for a Mixamo skeleton without clips, and none for another skeleton', () => {
     const root = skeleton();
-    const mixamo = clipsFor(root, [], BONES(root), 1.6);
+    const mixamo = createClipBuilder(root, [], BONES(root), 1.6)(AUTO_CLIPS);
     expect(mixamo.sources).toEqual({ idle: 'roll6', walk: 'roll6' });
     expect(mixamo.idle).not.toBeNull();
     expect(mixamo.walk).not.toBeNull();
-    const other = clipsFor(new Group(), [], ['pelvis'], 1.6);
+    const other = createClipBuilder(new Group(), [], ['pelvis'], 1.6)(AUTO_CLIPS);
     expect(other).toMatchObject({ idle: null, walk: null, sources: { idle: 'static', walk: 'static' } });
+  });
+
+  it('the builder follows the chosen animations (056) and reuses what it built', () => {
+    const root = skeleton();
+    const attack = new AnimationClip('Attack', 1, []);
+    const build = createClipBuilder(root, [attack], BONES(root), 1.6);
+    const chosen = build({ idle: 'clip:Attack', walk: 'none' });
+    expect(chosen.sources).toEqual({ idle: 'file', walk: 'static' });
+    expect(chosen.idle).toBe(attack);
+    expect(chosen.walk).toBeNull();
+    expect(build({ idle: 'clip:Attack', walk: 'none' })).toBe(chosen);
+    const own = build({ idle: 'roll6', walk: null });
+    expect(own.sources).toEqual({ idle: 'roll6', walk: 'roll6' });
+    expect(own.idle?.name).toBe('roll6-idle');
+    // Roll6's clip of a state is fitted once: the same object comes back for another pair of choices.
+    expect(build(AUTO_CLIPS).walk).toBe(own.walk);
   });
 });

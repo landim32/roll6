@@ -215,6 +215,16 @@
       "tooLarge": "O modelo deve ter no máximo 20 MB.",
       "invalid": "Não foi possível abrir este modelo.",
       "static": "Este modelo ficará parado: ele não tem animações e o esqueleto não segue os nomes do Mixamo.",
+      "reduced": "O rig deste modelo prende boa parte da malha ao quadril, então braços e/ou pernas ficam parados para a malha não rasgar. Para animação completa, refaça o rig (por exemplo no Mixamo) e envie de novo.",
+      "animations": "Animações",
+      "animationsHelp": "Escolha a animação de cada estado; a prévia acima mostra a escolha na hora. \"Automático\" usa o clip do arquivo com o nome do estado, senão a animação do Roll6 (esqueleto Mixamo), senão nenhuma.",
+      "playing": "Tocando: {{source}}",
+      "choice": {
+        "auto": "Automático ({{resolved}})",
+        "file": "{{name}} (do arquivo)",
+        "roll6": "Animação do Roll6",
+        "none": "Sem animação"
+      },
       "state": {
         "idle": "Parado",
         "walk": "Caminhando"

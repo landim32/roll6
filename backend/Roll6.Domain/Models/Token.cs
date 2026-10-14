@@ -27,6 +27,14 @@ public class Token
     public string? BackImage { get; set; }
     /// <summary>3D model (055): a .glb drawn by the 3D view instead of the 2.5D figure. Optional.</summary>
     public string? ModelFile { get; set; }
+    /// <summary>
+    /// Which animation the 3D view plays while the model stands still (056): null = automatic (a clip of the file
+    /// named for it, else Roll6's own for a Mixamo skeleton, else none), "roll6", "none" or "clip:{name}" (a clip of
+    /// the file, by its exact name). Only with a model.
+    /// </summary>
+    public string? ModelIdleClip { get; set; }
+    /// <summary>Which animation the 3D view plays while the model walks (056); same values as ModelIdleClip.</summary>
+    public string? ModelWalkClip { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -54,10 +62,15 @@ public class Token
         UpdatedAt = DateTime.UtcNow;
     }
 
-    /// <summary>The token's 3D model (055); null removes it (the PUT of a token replaces every field).</summary>
-    public void UpdateModel(string? modelFile)
+    /// <summary>
+    /// The token's 3D model (055) and the animations chosen for it (056); null removes it (the PUT of a token
+    /// replaces every field). Without a model the choices are dropped: they only mean something for a file.
+    /// </summary>
+    public void UpdateModel(string? modelFile, string? idleClip = null, string? walkClip = null)
     {
         ModelFile = Guard.ModelFileName(modelFile, "modelFile");
+        ModelIdleClip = ModelFile == null ? null : Guard.ModelClip(idleClip, "modelIdleClip");
+        ModelWalkClip = ModelFile == null ? null : Guard.ModelClip(walkClip, "modelWalkClip");
         UpdatedAt = DateTime.UtcNow;
     }
 

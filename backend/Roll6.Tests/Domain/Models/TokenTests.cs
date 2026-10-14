@@ -45,6 +45,38 @@ public class TokenTests
     }
 
     [Fact]
+    public void UpdateModel_SavesTheChosenAnimations()
+    {
+        var token = new Token();
+
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "clip:Armature|Walk", "roll6");
+
+        token.ModelIdleClip.Should().Be("clip:Armature|Walk");
+        token.ModelWalkClip.Should().Be("roll6");
+    }
+
+    [Fact]
+    public void UpdateModel_WithoutAModelDropsTheChoices()
+    {
+        var token = new Token { ModelFile = "0123456789abcdef0123456789abcdef.glb", ModelIdleClip = "none", ModelWalkClip = "none" };
+
+        token.UpdateModel(null, "none", "none");
+
+        token.ModelIdleClip.Should().BeNull();
+        token.ModelWalkClip.Should().BeNull();
+    }
+
+    [Fact]
+    public void UpdateModel_RefusesAnUnknownAnimationChoice()
+    {
+        var token = new Token();
+
+        var act = () => token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "walk", null);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelIdleClip");
+    }
+
+    [Fact]
     public void UpdateModel_RefusesAnythingButAModelName()
     {
         var token = new Token();

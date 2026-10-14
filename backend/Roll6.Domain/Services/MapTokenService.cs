@@ -347,6 +347,8 @@ public partial class MapTokenService : IMapTokenService
                 LeftImageUrl = _imageStorage.GetUrl(token?.LeftImage),
                 BackImageUrl = _imageStorage.GetUrl(token?.BackImage),
                 ModelFileUrl = _imageStorage.GetUrl(token?.ModelFile),
+                ModelIdleClip = token?.ModelIdleClip,
+                ModelWalkClip = token?.ModelWalkClip,
                 CampaignCharacterId = mapToken.CampaignCharacterId,
                 Name = mapToken.Name,
                 TokenType = (int)mapToken.TokenType,

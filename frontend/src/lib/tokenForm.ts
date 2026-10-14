@@ -3,6 +3,14 @@ import { EMPTY_VIEWS } from './spriteView';
 import type { ViewImages } from './spriteView';
 import type { TokenInfo, TokenInsertInfo } from '../types/token';
 
+/** The 3D model the form resolved on save (055/056): the stored `.glb` and the animation chosen for each state. */
+export interface ResolvedModel {
+  modelFile: string | null;
+  /** `lib/modelAnimations` choices: null = automatic, "roll6", "none" or "clip:{name}". */
+  modelIdleClip: string | null;
+  modelWalkClip: string | null;
+}
+
 /** Same limits as the backend Token.Update. */
 export const MAX_TOKEN_NAME = 260;
 export const MAX_TOKEN_DESCRIPTION = 2000;
@@ -59,8 +67,8 @@ export const toTokenInsert = (
   upImage: string | null,
   downImage: string | null,
   sprites: ViewImages<string> = EMPTY_VIEWS,
-  /** 3D model (055): the stored `{guid}.glb` to keep or the one just uploaded; null = none. */
-  modelFile: string | null = null,
+  /** 3D model (055): the stored `{guid}.glb` to keep or the one just uploaded, with its chosen animations (056); null = none. */
+  model: ResolvedModel | null = null,
 ): TokenInsertInfo => ({
   name: form.name.trim(),
   description: form.description.trim() || null,
@@ -72,5 +80,7 @@ export const toTokenInsert = (
   rightImage: sprites.right,
   leftImage: sprites.left,
   backImage: sprites.back,
-  modelFile,
+  modelFile: model?.modelFile ?? null,
+  modelIdleClip: model?.modelFile ? model.modelIdleClip : null,
+  modelWalkClip: model?.modelFile ? model.modelWalkClip : null,
 });

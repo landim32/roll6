@@ -41,4 +41,15 @@ public class TokenInsertInfo
     /// <summary>3D model (055): fileName returned by POST /api/model (a .glb). Optional; omitted on PUT = removed.</summary>
     [JsonPropertyName("modelFile")]
     public string? ModelFile { get; set; }
+
+    /// <summary>
+    /// Animation played while the model stands still (056): omitted = automatic, "roll6" (Roll6's own), "none" or
+    /// "clip:{name}" (a clip of the file, by its exact name). Ignored without modelFile.
+    /// </summary>
+    [JsonPropertyName("modelIdleClip")]
+    public string? ModelIdleClip { get; set; }
+
+    /// <summary>Animation played while the model walks (056); same values as modelIdleClip.</summary>
+    [JsonPropertyName("modelWalkClip")]
+    public string? ModelWalkClip { get; set; }
 }

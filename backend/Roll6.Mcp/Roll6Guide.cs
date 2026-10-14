@@ -168,7 +168,9 @@ public static class Roll6Guide
           with the same speech balloon. While it loads (or if it fails) the 2.5D figure shows. Animations: clips named
           like "idle"/"parado" and "walk"/"caminhar" in the file are used; when one is missing and the skeleton uses the
           Mixamo bone names (Hips, Spine, Head, LeftUpLeg… with or without "mixamorig:"), Roll6's own idle and walk
-          animations are used; otherwise the model stands still.
+          animations are used; otherwise the model stands still. That is the **automatic** choice; the token's
+          `modelIdleClip` / `modelWalkClip` override it per state with `"roll6"`, `"none"` or `"clip:{name}"` (a clip
+          of the file, by its exact name) — the web form lists the file's clips and previews each choice.
         - In **free mode** a player walks his own character in the 3D view, in third person (camera locked behind it,
           zoom = distance). That walk is **local to his screen**: it never moves the piece, records nothing and no tool
           sees it — pieces still move only through `move_map_token`.

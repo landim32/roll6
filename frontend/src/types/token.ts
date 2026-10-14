@@ -30,6 +30,9 @@ export interface TokenInfo {
   /** 3D model (055): stored `{guid}.glb` and its presigned URL; missing/null = no model. */
   modelFile?: string | null;
   modelFileUrl?: string | null;
+  /** Animation chosen for each state of the model (056): null = automatic, "roll6", "none" or "clip:{name}". */
+  modelIdleClip?: string | null;
+  modelWalkClip?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +51,9 @@ export interface TokenInsertInfo {
   backImage: string | null;
   /** 3D model (055); the PUT replaces every field, so null removes it. */
   modelFile: string | null;
+  /** Animations chosen for the model (056; `lib/modelAnimations`): null = automatic; the PUT resets what it doesn't get. */
+  modelIdleClip: string | null;
+  modelWalkClip: string | null;
 }
 
 /** Result of POST /api/model (055): the stored `.glb` name and a temporary URL. */

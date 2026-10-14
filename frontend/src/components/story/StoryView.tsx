@@ -386,7 +386,9 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   // The pieces standing whose token has a model, as the model layer wants them.
   const modelSpecs = useMemo((): ModelSpec[] => pieces.filter(isShownIn3d).flatMap((piece) => {
     const spec = spriteSpec(piece, HEX_SIZE);
-    return spec.modelUrl ? [{ id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: lookToYaw(piece.look) }] : [];
+    return spec.modelUrl
+      ? [{ id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: lookToYaw(piece.look), clips: spec.modelClips }]
+      : [];
   }), [pieces]);
   const hasModels = modelSpecs.length > 0;
 

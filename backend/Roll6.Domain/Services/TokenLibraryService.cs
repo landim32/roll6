@@ -52,7 +52,7 @@ public class TokenLibraryService : ITokenLibraryService
         var token = new Token { UserId = userId };
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
-        token.UpdateModel(info.ModelFile);
+        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip);
         token.CreatedAt = token.UpdatedAt;
         return MapToDto(await _repository.InsertAsync(token));
     }
@@ -62,7 +62,7 @@ public class TokenLibraryService : ITokenLibraryService
         var token = await GetOwnedAsync(userId, tokenId);
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
-        token.UpdateModel(info.ModelFile);
+        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip);
         return MapToDto(await _repository.UpdateAsync(token));
     }
 
@@ -114,6 +114,8 @@ public class TokenLibraryService : ITokenLibraryService
         BackImageUrl = _imageStorage.GetUrl(token.BackImage),
         ModelFile = token.ModelFile,
         ModelFileUrl = _imageStorage.GetUrl(token.ModelFile),
+        ModelIdleClip = token.ModelIdleClip,
+        ModelWalkClip = token.ModelWalkClip,
         CreatedAt = token.CreatedAt,
         UpdatedAt = token.UpdatedAt
     };

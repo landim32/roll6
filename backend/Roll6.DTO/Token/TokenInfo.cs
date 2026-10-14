@@ -69,6 +69,14 @@ public class TokenInfo
     [JsonPropertyName("modelFileUrl")]
     public string? ModelFileUrl { get; set; }
 
+    /// <summary>Animation chosen for standing still (056): null = automatic, "roll6", "none" or "clip:{name}".</summary>
+    [JsonPropertyName("modelIdleClip")]
+    public string? ModelIdleClip { get; set; }
+
+    /// <summary>Animation chosen for walking (056); same values as modelIdleClip.</summary>
+    [JsonPropertyName("modelWalkClip")]
+    public string? ModelWalkClip { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 
