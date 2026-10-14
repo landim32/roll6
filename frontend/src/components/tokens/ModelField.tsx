@@ -45,7 +45,7 @@ interface ModelFieldProps {
  * The token's 3D model, in two tabs of the token form (060). "3D" (055): pick a `.glb` (checked here — extension, size,
  * glTF 2.0 header — before anything is sent) or remove the saved one, seen in its rest pose. "Animação": choose the
  * state (Parado, Caminhando, Caído — 058), watch it in the preview card (timeline, "Gerar imagem" — 057) and choose the
- * animation of that state (056: a clip of the file, Roll6's own, a library animation of the state's type from every
+ * animation of that state (056: a clip of the file, a library animation of the state's type from every
  * user (059), none, or the automatic rule), refreshing the library list with "Atualizar". The file is uploaded only
  * when the token is saved.
  */
@@ -58,8 +58,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   const [info, setInfo] = useState<ModelPreviewInfo | null>(null);
   const [sources, setSources] = useState<Record<AnimationState, AnimationSource> | null>(null);
   const [loading, setLoading] = useState(false);
-  const [reduced, setReduced] = useState(false);
-  /** A chosen guard or death plays in full and stretches this model (058, Q1 = A). */
+  /** A chosen library animation plays in full and stretches this model (058, Q1 = A). */
   const [deforms, setDeforms] = useState(false);
   /** The preview shows a still pose (paused, or a state without animation) — 057. */
   const [still, setStill] = useState(false);
@@ -77,7 +76,6 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   useEffect(() => {
     setInfo(null);
     setSources(null);
-    setReduced(false);
     setDeforms(false);
     setShown('idle');
     setLoading(previewUrl !== null);
@@ -144,9 +142,8 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
     setError(t('tokens.model.invalid'));
   };
 
-  /** How a source reads for a state: Roll6's own is the death and nothing is "lying" for the down state (058). */
+  /** How a source reads for a state: nothing is "lying" for the down state (058). */
   const sourceLabel = (source: AnimationSource, animation: AnimationState): string => {
-    if (animation === 'down' && source === 'roll6') return t('tokens.model.source.death');
     if (animation === 'down' && source === 'static') return t('tokens.model.source.lying');
     if (source === 'library') {
       const parsed = parseClipChoice(clips[animation]);
@@ -158,8 +155,6 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   const optionLabel = (option: ClipOption, animation: AnimationState): string => {
     switch (option.kind) {
       case 'file': return t('tokens.model.choice.file', { name: option.name });
-      case 'roll6': return t(animation === 'down' ? 'tokens.model.choice.death' : 'tokens.model.choice.roll6');
-      case 'guard': return t('tokens.model.choice.guard');
       case 'none': return t('tokens.model.choice.none');
       default: {
         const resolved = option.resolves === 'file' && option.resolvesName
@@ -276,7 +271,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 clips={clips}
                 label={t('tokens.model.previewLabel', { name: name || '—' })}
                 onLoaded={(found) => { setLoading(false); setInfo(found); setInvalid(false); }}
-                onClips={(found, limited, stretched) => { setSources(found); setReduced(limited); setDeforms(stretched); }}
+                onClips={(found, stretched) => { setSources(found); setDeforms(stretched); }}
                 onError={onError}
               />
             </Suspense>
@@ -353,7 +348,6 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
         </div>
       )}
       {animating && isStatic && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.static')}</div>}
-      {animating && reduced && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.reduced')}</div>}
       {animating && deforms && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.deforms')}</div>}
     </div>
   );

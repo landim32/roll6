@@ -8,7 +8,7 @@ namespace Roll6.Domain.Animations;
 public record AnimationFile(double Duration, bool Loop, string? Name, AnimationType? Type);
 
 /// <summary>
-/// The animation file format (059, <c>roll6-animation</c> version 1): Roll6's own clips (frontend
+/// The animation file format (059, <c>roll6-animation</c> version 1): the library clips (frontend
 /// <c>lib/roll6Clips</c>) as a JSON file uploaded to the library. Pure. Mirror of the frontend's
 /// <c>lib/animationFormat.ts</c> and of the <c>criar-animacao</c> skill's <c>validar.py</c> — same rules, same order,
 /// same error keys and messages; the shared cases are in <c>specs/059-token-animation-library/fixtures/</c>.

@@ -166,18 +166,15 @@ public static class Roll6Guide
           The 3D view then draws the model instead of the 2.5D figure: standing on the piece's hex, as tall as the figure
           of a piece of that size, facing the piece's `look` (the model's +Z is its front), hidden by walls like a figure,
           with the same speech balloon. While it loads (or if it fails) the 2.5D figure shows. Animations: clips named
-          like "idle"/"parado" and "walk"/"caminhar" in the file are used; when one is missing and the skeleton uses the
-          Mixamo bone names (Hips, Spine, Head, LeftUpLeg… with or without "mixamorig:"), Roll6's own idle and walk
-          animations are used; otherwise the model stands still. That is the **automatic** choice; the token's
-          `modelIdleClip` / `modelWalkClip` override it per state with `"roll6"`, `"roll6-guard"` (Roll6's guard stance:
-          legs bent apart, arms raised in front — for Mixamo skeletons), `"none"` or `"clip:{name}"` (a clip
-          of the file, by its exact name) — the web form lists the file's clips and previews each choice.
+          like "idle"/"parado" and "walk"/"caminhar" in the file are used; when one is missing the model stands still —
+          Roll6 has no animation of its own. That is the **automatic** choice; the token's `modelIdleClip` /
+          `modelWalkClip` override it per state with `"none"`, `"clip:{name}"` (a clip of the file, by its exact name) or
+          a library animation (below) — the web form lists the choices and previews each one.
         - A piece with a model that is **down or out of combat** lies in the 3D view (058): at the last frame of the
-          token's `modelDownClip` — automatic = the file's clip named "death"/"die"/"dead"/"morte", else Roll6's
-          death (falling on the back) for Mixamo skeletons — played once for whoever is watching when it falls; with
-          no death (`"none"`, or no clip and another skeleton) the model is laid on its back. Pieces without a model
-          that are down stay out of the 3D view. The guard stance and the death play in full even on rigs that hold
-          arms and legs still (Roll6's idle and walk are reduced there), so they may deform such a model.
+          token's `modelDownClip` — automatic = the file's clip named "death"/"die"/"dead"/"morte" — played once for
+          whoever is watching when it falls; with no death (`"none"`, or no such clip) the model is laid on its back.
+          Pieces without a model that are down stay out of the 3D view. Library animations play in full, so they may
+          deform a rig that binds arms and legs to the hips (the web form warns).
         - A state may also play a **library animation** (059, see "Animations" below): `"animation:{id}"` in
           `modelIdleClip` / `modelWalkClip` / `modelDownClip`, for Mixamo skeletons.
         - In **free mode** a player walks his own character in the 3D view, in third person (camera locked behind it,
@@ -196,8 +193,7 @@ public static class Roll6Guide
           `update_animation_content` replaces the file and `delete_animation` removes (owner only; delete is refused with
           409 while a token uses it, and so is a retype away from the type of a state that uses it). Replacing the content
           keeps the id, so every token using `"animation:{id}"` plays the new version; the old file is gone for good.
-        - The file is a JSON object in the **"roll6-animation" format, version 1** — the same data as Roll6's own
-          animations (breathing, walk, guard, death):
+        - The file is a JSON object in the **"roll6-animation" format, version 1**:
           `{ "format": "roll6-animation", "version": 1, "duration": 1, "loop": true, "tracks": [ { "bone": "RightArm",
           "times": [0, 0.5, 1], "degrees": [[0, 0, -150], [0, 0, -150], [0, 0, -150]] }, { "bone": "RightForeArm",
           "times": [0, 0.25, 0.5, 0.75, 1], "degrees": [[0, 0, 0], [0, 0, 30], [0, 0, 0], [0, 0, -30], [0, 0, 0]] } ],

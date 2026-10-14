@@ -34,15 +34,15 @@ describe('validateTokenForm', () => {
 describe('toTokenInsert', () => {
   it('sends the 3D model it is given (055) with its chosen animations (056)', () => {
     const sent = toTokenInsert(form(), 'a.png', null, undefined, {
-      modelFile: 'm.glb', modelIdleClip: 'clip:Idle', modelWalkClip: null, modelDownClip: 'roll6',
+      modelFile: 'm.glb', modelIdleClip: 'clip:Idle', modelWalkClip: null, modelDownClip: 'animation:4',
     });
-    expect(sent).toMatchObject({ modelFile: 'm.glb', modelIdleClip: 'clip:Idle', modelWalkClip: null, modelDownClip: 'roll6' });
+    expect(sent).toMatchObject({ modelFile: 'm.glb', modelIdleClip: 'clip:Idle', modelWalkClip: null, modelDownClip: 'animation:4' });
     expect(toTokenInsert(form(), 'a.png', null).modelFile).toBeNull();
   });
 
   it('drops the animation choices when there is no model', () => {
     const sent = toTokenInsert(form(), 'a.png', null, undefined, {
-      modelFile: null, modelIdleClip: 'none', modelWalkClip: 'roll6', modelDownClip: 'none',
+      modelFile: null, modelIdleClip: 'none', modelWalkClip: 'animation:4', modelDownClip: 'none',
     });
     expect(sent).toMatchObject({ modelFile: null, modelIdleClip: null, modelWalkClip: null, modelDownClip: null });
   });

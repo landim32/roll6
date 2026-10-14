@@ -30,7 +30,7 @@ export interface TokenInfo {
   /** 3D model (055): stored `{guid}.glb` and its presigned URL; missing/null = no model. */
   modelFile?: string | null;
   modelFileUrl?: string | null;
-  /** Animation chosen for each state of the model (056): null = automatic, "roll6", "none" or "clip:{name}". */
+  /** Animation chosen for each state of the model (056): null = automatic, "none", "clip:{name}" or "animation:{id}". */
   modelIdleClip?: string | null;
   modelWalkClip?: string | null;
   /** The death (058): played once when the piece is down or out of combat; null = automatic. */

@@ -1989,5 +1989,34 @@ BEGIN
     VALUES ('20261014154414_AddAnimations', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014182056_RemoveRoll6Clips') THEN
+    UPDATE tokens SET model_idle_clip = NULL WHERE model_idle_clip IN ('roll6', 'roll6-guard');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014182056_RemoveRoll6Clips') THEN
+    UPDATE tokens SET model_walk_clip = NULL WHERE model_walk_clip IN ('roll6', 'roll6-guard');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014182056_RemoveRoll6Clips') THEN
+    UPDATE tokens SET model_down_clip = NULL WHERE model_down_clip IN ('roll6', 'roll6-guard');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261014182056_RemoveRoll6Clips') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261014182056_RemoveRoll6Clips', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

@@ -4,8 +4,8 @@ import {
   Vector3,
 } from 'three';
 import { alignSkeletonToMesh, restoreBindPose } from './loadModel';
-import { createClipBuilder, fitToRig } from './threeClips';
-import { ROLL6_CLIPS } from '../../lib/roll6Clips';
+import { createClipBuilder } from './threeClips';
+import { SAMPLE_GUARD } from '../../test/sampleClips';
 
 /**
  * A tiny skinned "character" (055): a vertical body bound to the hips and a left arm along +X — spine part, upper arm
@@ -120,56 +120,29 @@ describe('alignSkeletonToMesh (055)', () => {
   });
 });
 
-describe('fitToRig (055)', () => {
-  it('keeps the whole motion of a sound rig', () => {
-    const { root } = character();
-    const limits = fitToRig(ROLL6_CLIPS.walk, root, 1);
-    expect(limits.LeftArm).toBe(1);
-    expect(limits.LeftForeArm).toBe(1);
-  });
-
-  it('holds the arm still when much of the limb is bound to the hips, so the mesh never tears', () => {
-    const { root } = character({ handOnHips: true });
-    const limits = fitToRig(ROLL6_CLIPS.idle, root, 1);
-    expect(limits.LeftArm).toBeLessThan(1);
-  });
-
-  it('puts the bones back at rest after trying the motions', () => {
-    const { root, bones } = character({ handOnHips: true });
-    const before = worldOf(bones.hand);
-    fitToRig(ROLL6_CLIPS.walk, root, 1);
-    expect(worldOf(bones.hand).distanceTo(before)).toBeLessThan(1e-9);
-  });
-});
-
-describe('clips played in full (058, Q1 = A)', () => {
-  // Every name a Mixamo skeleton needs, so the builder offers Roll6's clips; the tiny character has only some of them.
+describe('library clips played in full (058, Q1 = A; 059)', () => {
+  // Every name a Mixamo skeleton needs, so the builder plays library animations; the tiny character has only some of them.
   const MIXAMO_NAMES = ['Hips', 'Spine', 'Head', 'LeftUpLeg', 'LeftLeg', 'RightUpLeg', 'RightLeg', 'LeftArm', 'RightArm']
     .map((name) => `mixamorig${name}`);
+  const guard = new Map([[3, SAMPLE_GUARD]]);
+  const CHOICES = { idle: 'animation:3', walk: 'none', down: 'none' };
 
-  it('the guard is never reduced: on a rig that tears it plays in full and says it deforms', () => {
+  it('a rig that tears plays the animation in full and says it deforms', () => {
     const { root } = character({ handOnHips: true });
-    const build = createClipBuilder(root, [], MIXAMO_NAMES, 1);
-    const guard = build({ idle: 'roll6-guard', walk: 'none', down: 'none' });
-    expect(guard.idle?.name).toBe('roll6-guard');
-    expect(guard.reduced).toBe(false);
-    expect(guard.deforms).toBe(true);
-    // Roll6's idle on the same rig is still fitted (reduced) and never reported as deforming.
-    const idle = build({ idle: 'roll6', walk: 'none', down: 'none' });
-    expect(idle.reduced).toBe(true);
-    expect(idle.deforms).toBe(false);
+    const clips = createClipBuilder(root, [], MIXAMO_NAMES, 1)(CHOICES, guard);
+    expect(clips.idle?.name).toBe('roll6-animation:3');
+    expect(clips.deforms).toBe(true);
   });
 
-  it('a sound rig takes the guard without deforming', () => {
+  it('a sound rig takes it without deforming', () => {
     const { root } = character();
-    const guard = createClipBuilder(root, [], MIXAMO_NAMES, 1)({ idle: 'roll6-guard', walk: 'none', down: 'none' });
-    expect(guard.deforms).toBe(false);
+    expect(createClipBuilder(root, [], MIXAMO_NAMES, 1)(CHOICES, guard).deforms).toBe(false);
   });
 
   it('puts the bones back at rest after testing a clip in full', () => {
     const { root, bones } = character({ handOnHips: true });
     const before = worldOf(bones.hand);
-    createClipBuilder(root, [], MIXAMO_NAMES, 1)({ idle: 'roll6-guard', walk: 'none', down: 'roll6' });
+    createClipBuilder(root, [], MIXAMO_NAMES, 1)(CHOICES, guard);
     expect(worldOf(bones.hand).distanceTo(before)).toBeLessThan(1e-9);
   });
 });

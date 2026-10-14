@@ -43,9 +43,8 @@ public class TokenInsertInfo
     public string? ModelFile { get; set; }
 
     /// <summary>
-    /// Animation played while the model stands still (056): omitted = automatic, "roll6" (Roll6's own), "roll6-guard"
-    /// (Roll6's guard stance, 057), "none" or
-    /// "clip:{name}" (a clip of the file, by its exact name). Ignored without modelFile.
+    /// Animation played while the model stands still (056): omitted = automatic, "none", "clip:{name}" (a clip of the
+    /// file, by its exact name) or "animation:{id}" (a library animation, 059). Ignored without modelFile.
     /// </summary>
     [JsonPropertyName("modelIdleClip")]
     public string? ModelIdleClip { get; set; }
@@ -56,7 +55,7 @@ public class TokenInsertInfo
 
     /// <summary>
     /// Animation played once when a piece of this token is down or out of combat, resting on its last frame (058);
-    /// same values as modelIdleClip ("roll6" = Roll6's death). Omitted = automatic.
+    /// same values as modelIdleClip. Omitted = automatic.
     /// </summary>
     [JsonPropertyName("modelDownClip")]
     public string? ModelDownClip { get; set; }

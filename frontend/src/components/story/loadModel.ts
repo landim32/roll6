@@ -12,7 +12,7 @@ import type { ModelClipBuilder } from './threeClips';
  * Reads a token's 3D model (055) with three.js — only ever imported dynamically, so no screen without models pays for
  * three.js. A stored model is read through the API (`modelService.fetchStored`: the bucket sends no CORS headers);
  * any other URL (a file just picked, as a blob URL) is fetched as it is. Each model is parsed once per URL and its
- * animations (from the file, or Roll6's own for a Mixamo skeleton — as chosen for the token, 056) are built once per
+ * animations (from the file or the library — as chosen for the token, 056, 059) are built once per
  * choice; every piece draws a clone.
  */
 export interface ModelAsset {

@@ -49,20 +49,22 @@ public class TokenTests
     {
         var token = new Token();
 
-        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "clip:Armature|Walk", "roll6");
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "clip:Armature|Walk", "animation:4");
 
         token.ModelIdleClip.Should().Be("clip:Armature|Walk");
-        token.ModelWalkClip.Should().Be("roll6");
+        token.ModelWalkClip.Should().Be("animation:4");
     }
 
-    [Fact]
-    public void UpdateModel_SavesTheGuardStance()
+    [Theory]
+    [InlineData("roll6")]
+    [InlineData("roll6-guard")]
+    public void UpdateModel_RefusesRoll6sFormerOwnAnimations(string choice)
     {
         var token = new Token();
 
-        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "roll6-guard", null);
+        var act = () => token.UpdateModel("0123456789abcdef0123456789abcdef.glb", choice, null);
 
-        token.ModelIdleClip.Should().Be("roll6-guard");
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelIdleClip");
     }
 
     [Fact]
@@ -101,7 +103,7 @@ public class TokenTests
     }
 
     [Theory]
-    [InlineData("roll6")]
+    [InlineData("animation:5")]
     [InlineData("none")]
     [InlineData("clip:Armature|Death")]
     public void UpdateModel_SavesTheDeathChoice(string choice)
@@ -120,7 +122,7 @@ public class TokenTests
     {
         var token = new Token { ModelDownClip = "none" };
 
-        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "roll6", "roll6", choice);
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", "none", "none", choice);
 
         token.ModelDownClip.Should().BeNull();
     }

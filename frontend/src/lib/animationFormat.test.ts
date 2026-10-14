@@ -3,7 +3,6 @@ import {
   ANIMATION_BONES, ANIMATION_MAX_BYTES, fromRoll6Clip, parseAnimationText, suggestedType, toRoll6Clip, validateAnimation,
 } from './animationFormat';
 import type { AnimationFile } from './animationFormat';
-import { ROLL6_DEATH, ROLL6_GUARD, ROLL6_IDLE, ROLL6_WALK } from './roll6Clips';
 
 /** The cases shared with `AnimationFormatTests` (C#) and the skill's `validar.py` (059). */
 const FIXTURES = import.meta.glob('../../../specs/059-token-animation-library/fixtures/*.json', { eager: true, import: 'default' });
@@ -47,20 +46,11 @@ describe('animation file format (059)', () => {
     expect(suggestedType({ type: 'dance' })).toBeNull();
   });
 
-  const BUILT_IN = [
-    { clip: ROLL6_IDLE, file: 'roll6-parado.json', name: 'Parado (Roll6)', type: 'idle' },
-    { clip: ROLL6_WALK, file: 'roll6-caminhada.json', name: 'Caminhada (Roll6)', type: 'walk' },
-    { clip: ROLL6_GUARD, file: 'roll6-guarda.json', name: 'Posição defensiva (Roll6)', type: 'idle' },
-    { clip: ROLL6_DEATH, file: 'roll6-morte.json', name: 'Morte (Roll6)', type: 'defeated' },
-  ];
-
-  for (const { clip, file, name, type } of BUILT_IN) {
-    it(`writes Roll6's ${clip.name} without loss (FR-002)`, () => {
-      expect(toRoll6Clip(fromRoll6Clip(clip), clip.name)).toEqual({ ...clip, protect: false });
-    });
-
-    it(`pins ${file} to the code`, () => {
-      expect(fixture(file)).toEqual(fromRoll6Clip(clip, { name, type }));
+  for (const file of ['roll6-parado.json', 'roll6-caminhada.json', 'roll6-guarda.json', 'roll6-morte.json']) {
+    it(`reads ${file} as a clip and writes it back without loss (FR-002)`, () => {
+      const read = fixture(file) as AnimationFile;
+      const { name, type, ...rest } = read;
+      expect(fromRoll6Clip(toRoll6Clip(read, 'animation:1'), { name, type })).toEqual({ ...rest, name, type });
     });
   }
 

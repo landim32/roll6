@@ -16,7 +16,7 @@ describe('animation cache (059)', () => {
 
     expect(fetchText).toHaveBeenCalledTimes(1);
     expect(a).toBe(b);
-    expect(a).toMatchObject({ name: 'animation:4', duration: 1, loop: true, protect: false });
+    expect(a).toMatchObject({ name: 'animation:4', duration: 1, loop: true });
   });
 
   it('resolves null on a failed read or an invalid file, never rejects', async () => {
