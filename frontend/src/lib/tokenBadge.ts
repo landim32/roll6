@@ -40,3 +40,6 @@ export const tokenBadge = (token: TokenArt): TokenBadge | null => {
   if (hasDown) return { kind: TOKEN_BADGE.down, variant: 'warning' };
   return null;
 };
+
+/** Whether the token has a 3D model (`.glb`, 055): its card gets a green "3D" badge next to the art one. */
+export const hasModelBadge = (token: Pick<TokenInfo, 'modelFile'>): boolean => !!token.modelFile;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TOKEN_BADGE, tokenBadge } from './tokenBadge';
+import { TOKEN_BADGE, hasModelBadge, tokenBadge } from './tokenBadge';
 
 const art = (over: Partial<Parameters<typeof tokenBadge>[0]> = {}) => ({
   downImage: null, frontImage: null, rightImage: null, leftImage: null, backImage: null, ...over,
@@ -44,5 +44,16 @@ describe('tokenBadge', () => {
 
   it('treats an empty name as missing', () => {
     expect(tokenBadge(art({ downImage: '', frontImage: '' }))).toBeNull();
+  });
+});
+
+describe('hasModelBadge', () => {
+  it('shows with a 3D model', () => {
+    expect(hasModelBadge({ modelFile: '0123456789abcdef0123456789abcdef.glb' })).toBe(true);
+  });
+
+  it('hides without one', () => {
+    expect(hasModelBadge({ modelFile: null })).toBe(false);
+    expect(hasModelBadge({})).toBe(false);
   });
 });
