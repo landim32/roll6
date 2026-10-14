@@ -3,7 +3,7 @@ import type { Point } from './hexGrid';
 import { isBlocked } from './occupancy';
 import type { Occupancy } from './occupancy';
 import { isLying } from './pieceDrawing';
-import { CAMERA_RADIUS, FOLLOW_DISTANCE, forwardOf, lookToYaw, segmentHitsWall } from './storyCamera';
+import { CAMERA_RADIUS, forwardOf, lookToYaw, segmentHitsWall } from './storyCamera';
 import type { CameraBlocked, CameraPose } from './storyCamera';
 import type { MapTokenInfo } from '../types/mapToken';
 
@@ -20,10 +20,15 @@ const HEX_STEP = Math.sqrt(3) * HEX_SIZE;
 export const WALKER_SPEED = 1.5 * HEX_STEP;
 /** Turning speed (radians per second), the camera's. */
 export const WALKER_TURN_SPEED = 1.8;
-/** How close and how far the camera may be behind the character, and one step of the zoom. */
-export const WALK_DISTANCE_MIN = 1.5 * HEX_STEP;
-export const WALK_DISTANCE_MAX = 8 * HEX_STEP;
-export const WALK_DISTANCE_STEP = HEX_STEP;
+/**
+ * How close and how far the camera may be behind the character, where it starts and one step of the zoom. Close by
+ * default: on a phone held upright the horizontal field of view makes the vertical one very wide, so the character
+ * shrinks quickly with distance (the observer camera's `FOLLOW_DISTANCE`, about 2.3 hex, felt far away).
+ */
+export const WALK_DISTANCE_MIN = 0.75 * HEX_STEP;
+export const WALK_DISTANCE_DEFAULT = 1.1 * HEX_STEP;
+export const WALK_DISTANCE_MAX = 6 * HEX_STEP;
+export const WALK_DISTANCE_STEP = 0.5 * HEX_STEP;
 /** Steps along the segment from the character to the camera when looking for walls. */
 const SEGMENT_STEP = HEX_SIZE / 4;
 
@@ -44,7 +49,7 @@ export interface WalkerInput {
   turn: number;
 }
 
-export const startWalker = (center: Point, look: number, distance = FOLLOW_DISTANCE): WalkerState => ({
+export const startWalker = (center: Point, look: number, distance = WALK_DISTANCE_DEFAULT): WalkerState => ({
   x: center.x,
   z: center.y,
   yaw: lookToYaw(look),

@@ -1111,6 +1111,16 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("model_file");
 
+                    b.Property<string>("ModelIdleClip")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("model_idle_clip");
+
+                    b.Property<string>("ModelWalkClip")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("model_walk_clip");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)

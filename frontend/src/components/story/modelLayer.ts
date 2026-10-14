@@ -9,6 +9,8 @@ import { fitModel } from '../../lib/modelFit';
 import { occluderBoxes } from '../../lib/occluders';
 import { SHADE_FALLOFF } from '../../lib/raycaster';
 import type { CameraPose, MaskGrid } from '../../lib/raycaster';
+import { sameClipChoices } from '../../lib/modelAnimations';
+import type { ModelClipChoices } from '../../lib/modelAnimations';
 import { instantiate, loadModel } from './loadModel';
 import type { ModelAsset } from './loadModel';
 
@@ -25,6 +27,8 @@ export interface ModelSpec {
   width: number;
   center: Point;
   yaw: number;
+  /** The animation chosen for each state on the token (056). */
+  clips: ModelClipChoices;
 }
 
 export interface ModelLayer {
@@ -92,6 +96,17 @@ export const createModelLayer = (
     if (entry.object) scene.remove(entry.object);
   };
 
+  /** Builds the two actions for the entry's choices and plays the state it is in. */
+  const animate = (entry: Drawn) => {
+    if (!entry.asset || !entry.mixer) return;
+    entry.mixer.stopAllAction();
+    const built = entry.asset.clips(entry.spec.clips);
+    entry.idle = built.idle ? entry.mixer.clipAction(built.idle) : null;
+    entry.walk = built.walk ? entry.mixer.clipAction(built.walk) : null;
+    (entry.walking && entry.walk ? entry.walk : entry.idle)?.reset().play();
+    dirty = true;
+  };
+
   const load = (entry: Drawn) => {
     const url = entry.spec.url;
     loadModel(url).then((asset) => {
@@ -101,9 +116,7 @@ export const createModelLayer = (
       entry.asset = asset;
       entry.object = object;
       entry.mixer = mixer;
-      entry.idle = asset.clips.idle ? mixer.clipAction(asset.clips.idle) : null;
-      entry.walk = asset.clips.walk ? mixer.clipAction(asset.clips.walk) : null;
-      (entry.walking && entry.walk ? entry.walk : entry.idle)?.play();
+      animate(entry);
       scene.add(object);
       place(entry);
       events.onReady(entry.spec.id);
@@ -198,8 +211,10 @@ export const createModelLayer = (
           drawn.set(spec.id, fresh);
           load(fresh);
         } else {
+          const changed = !sameClipChoices(entry.spec.clips, spec.clips);
           entry.spec = spec;
           place(entry);
+          if (changed) animate(entry);
         }
       }
       dirty = true;

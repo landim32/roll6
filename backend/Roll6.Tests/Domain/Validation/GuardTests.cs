@@ -65,4 +65,35 @@ public class GuardTests
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelFile");
         Guard.IsModelFileName(fileName).Should().BeFalse();
     }
+
+    [Theory]
+    [InlineData("roll6")]
+    [InlineData("none")]
+    [InlineData("clip:Walk")]
+    [InlineData("clip:Armature|mixamo.com|Layer0")]
+    public void ModelClip_AcceptsTheKnownChoices(string choice)
+    {
+        Guard.ModelClip(choice, "modelIdleClip").Should().Be(choice);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void ModelClip_EmptyMeansAutomatic(string? choice)
+    {
+        Guard.ModelClip(choice, "modelIdleClip").Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("Roll6")]
+    [InlineData("clip:")]
+    [InlineData("Walk")]
+    public void ModelClip_RejectsAnythingElse(string choice)
+    {
+        var act = () => Guard.ModelClip(choice, "modelWalkClip");
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelWalkClip");
+    }
 }

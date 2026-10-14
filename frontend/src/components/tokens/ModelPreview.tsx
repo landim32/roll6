@@ -5,15 +5,26 @@ import {
   Scene, WebGLRenderer,
 } from 'three';
 import type { AnimationAction } from 'three';
-import type { AnimationSource, AnimationState } from '../../lib/modelAnimations';
+import type { AnimationSource, AnimationState, ModelClipChoices } from '../../lib/modelAnimations';
 import { instantiate, loadModel } from '../story/loadModel';
+import type { ModelAsset } from '../story/loadModel';
+
+/** What the preview found in the file, for the animation selects of the form (056). */
+export interface ModelPreviewInfo {
+  clipNames: string[];
+  boneNames: string[];
+}
 
 interface ModelPreviewProps {
   url: string;
   /** Show the walk instead of standing still. */
   walking: boolean;
-  /** The model opened: where each animation comes from. */
-  onLoaded: (sources: Record<AnimationState, AnimationSource>) => void;
+  /** The animation chosen for each state (056); the preview rebuilds its actions when it changes. */
+  clips: ModelClipChoices;
+  /** The model opened: the clips and bones it has. */
+  onLoaded: (info: ModelPreviewInfo) => void;
+  /** After the model opens and after every change of `clips`: where each animation comes from now. */
+  onClips: (sources: Record<AnimationState, AnimationSource>, reduced: boolean) => void;
   /** The file could not be opened (or the device has no WebGL). */
   onError: () => void;
   label: string;
@@ -27,17 +38,35 @@ const FADE_SECONDS = 0.25;
 
 /**
  * Preview of a token's 3D model (055) in the "3D" tab of the token form: the model standing on a disc, facing the viewer,
- * turning slowly by itself (a drag turns it by hand), playing its idle or its walk. Its own small three.js scene, loaded
- * lazily with the tab, released when it closes.
+ * turning slowly by itself (a drag turns it by hand), playing its idle or its walk — the ones chosen in the form (056),
+ * so the user sees each choice at once. Its own small three.js scene, loaded lazily with the tab, released when it closes.
  */
-export const ModelPreview = ({ url, walking, onLoaded, onError, label }: ModelPreviewProps) => {
+export const ModelPreview = ({ url, walking, clips, onLoaded, onClips, onError, label }: ModelPreviewProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const actions = useRef<{ idle: AnimationAction | null; walk: AnimationAction | null }>({ idle: null, walk: null });
+  const mixerRef = useRef<AnimationMixer | null>(null);
+  const assetRef = useRef<ModelAsset | null>(null);
   const walkingRef = useRef(walking);
+  const clipsRef = useRef(clips);
   const drag = useRef<number | null>(null);
   const stage = useRef<Group | null>(null);
-  const callbacks = useRef({ onLoaded, onError });
-  callbacks.current = { onLoaded, onError };
+  const callbacks = useRef({ onLoaded, onClips, onError });
+  callbacks.current = { onLoaded, onClips, onError };
+
+  /** Builds the two actions for the current choices and plays the current state; tells the form what they are. */
+  const applyClips = (choices: ModelClipChoices) => {
+    const asset = assetRef.current;
+    const mixer = mixerRef.current;
+    if (!asset || !mixer) return;
+    mixer.stopAllAction();
+    const built = asset.clips(choices);
+    actions.current = {
+      idle: built.idle ? mixer.clipAction(built.idle) : null,
+      walk: built.walk ? mixer.clipAction(built.walk) : null,
+    };
+    (walkingRef.current ? actions.current.walk ?? actions.current.idle : actions.current.idle)?.reset().play();
+    callbacks.current.onClips(built.sources, built.reduced);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -77,7 +106,6 @@ export const ModelPreview = ({ url, walking, onLoaded, onError, label }: ModelPr
     observer.observe(canvas);
     resize();
 
-    let mixer: AnimationMixer | null = null;
     let cancelled = false;
     loadModel(url).then((asset) => {
       if (cancelled) return;
@@ -88,13 +116,10 @@ export const ModelPreview = ({ url, walking, onLoaded, onError, label }: ModelPr
       model.scale.setScalar(scale);
       model.position.set(-((minX + maxX) / 2) * scale, -minY * scale, -((minZ + maxZ) / 2) * scale);
       turntable.add(model);
-      mixer = new AnimationMixer(model);
-      actions.current = {
-        idle: asset.clips.idle ? mixer.clipAction(asset.clips.idle) : null,
-        walk: asset.clips.walk ? mixer.clipAction(asset.clips.walk) : null,
-      };
-      (walkingRef.current ? actions.current.walk ?? actions.current.idle : actions.current.idle)?.play();
-      callbacks.current.onLoaded(asset.clips.sources);
+      assetRef.current = asset;
+      mixerRef.current = new AnimationMixer(model);
+      callbacks.current.onLoaded({ clipNames: asset.clipNames, boneNames: asset.boneNames });
+      applyClips(clipsRef.current);
     }).catch(() => {
       if (!cancelled) callbacks.current.onError();
     });
@@ -105,7 +130,7 @@ export const ModelPreview = ({ url, walking, onLoaded, onError, label }: ModelPr
       frame = requestAnimationFrame(loop);
       const delta = clock.getDelta();
       if (drag.current === null) turntable.rotation.y += TURN_SPEED * delta;
-      mixer?.update(delta);
+      mixerRef.current?.update(delta);
       renderer.render(scene, camera);
     };
     frame = requestAnimationFrame(loop);
@@ -114,7 +139,9 @@ export const ModelPreview = ({ url, walking, onLoaded, onError, label }: ModelPr
       cancelled = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
-      mixer?.stopAllAction();
+      mixerRef.current?.stopAllAction();
+      mixerRef.current = null;
+      assetRef.current = null;
       actions.current = { idle: null, walk: null };
       stage.current = null;
       ground.geometry.dispose();
@@ -122,6 +149,13 @@ export const ModelPreview = ({ url, walking, onLoaded, onError, label }: ModelPr
       renderer.dispose();
     };
   }, [url]);
+
+  // Another animation chosen for a state: the actions are built again (the model stays where it is).
+  useEffect(() => {
+    if (clipsRef.current === clips) return;
+    clipsRef.current = clips;
+    applyClips(clips);
+  }, [clips]);
 
   // Standing still ↔ walking, with a short cross-fade.
   useEffect(() => {

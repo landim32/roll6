@@ -41,3 +41,113 @@ export const animationSources = (clipNames: readonly string[], boneNames: readon
     pickClip(clipNames, state) !== null ? 'file' : mixamo ? 'roll6' : 'static';
   return { idle: sourceOf('idle'), walk: sourceOf('walk') };
 };
+
+// ---------- Chosen animations (056) ----------
+
+/**
+ * What the token stores for one state (`modelIdleClip` / `modelWalkClip`): null = automatic (the rule above), "roll6",
+ * "none" or "clip:{name}" — a clip of the file by its exact name. Mirrors `Guard.ModelClip` on the server.
+ */
+export type ModelClipChoice = string | null;
+export interface ModelClipChoices {
+  idle: ModelClipChoice;
+  walk: ModelClipChoice;
+}
+
+export const CLIP_CHOICE_ROLL6 = 'roll6';
+export const CLIP_CHOICE_NONE = 'none';
+export const CLIP_CHOICE_PREFIX = 'clip:';
+export const AUTO_CLIPS: ModelClipChoices = { idle: null, walk: null };
+
+/** The stored choice for a clip of the file. */
+export const fileClipChoice = (name: string): string => `${CLIP_CHOICE_PREFIX}${name}`;
+
+export type ParsedClipChoice =
+  | { kind: 'auto' }
+  | { kind: 'roll6' }
+  | { kind: 'none' }
+  | { kind: 'file'; name: string };
+
+/** Reads a stored choice; anything unknown counts as automatic (the server refuses it, but be lenient). */
+export const parseClipChoice = (choice: ModelClipChoice): ParsedClipChoice => {
+  if (!choice) return { kind: 'auto' };
+  if (choice === CLIP_CHOICE_ROLL6) return { kind: 'roll6' };
+  if (choice === CLIP_CHOICE_NONE) return { kind: 'none' };
+  if (choice.startsWith(CLIP_CHOICE_PREFIX) && choice.length > CLIP_CHOICE_PREFIX.length) {
+    return { kind: 'file', name: choice.slice(CLIP_CHOICE_PREFIX.length) };
+  }
+  return { kind: 'auto' };
+};
+
+/** What the 3D view ends up playing for a state: a clip of the file (by index), Roll6's own, or nothing. */
+export type ResolvedAnimation =
+  | { source: 'file'; index: number }
+  | { source: 'roll6' }
+  | { source: 'static' };
+
+/**
+ * The animation of one state, given the choice and what the model offers: automatic follows `animationSources`; a
+ * chosen file clip the file lacks (the file was replaced) also falls back to automatic; "roll6" without a Mixamo
+ * skeleton is nothing.
+ */
+export const resolveAnimation = (
+  choice: ModelClipChoice, clipNames: readonly string[], boneNames: readonly string[], state: AnimationState,
+): ResolvedAnimation => {
+  const parsed = parseClipChoice(choice);
+  if (parsed.kind === 'none') return { source: 'static' };
+  if (parsed.kind === 'roll6') return isMixamoSkeleton(boneNames) ? { source: 'roll6' } : { source: 'static' };
+  if (parsed.kind === 'file') {
+    const index = clipNames.indexOf(parsed.name);
+    if (index >= 0) return { source: 'file', index };
+  }
+  const auto = pickClip(clipNames, state);
+  if (auto !== null) return { source: 'file', index: auto };
+  return isMixamoSkeleton(boneNames) ? { source: 'roll6' } : { source: 'static' };
+};
+
+/** The sources of both states for the chosen animations (what the form lists under the preview). */
+export const resolvedSources = (
+  choices: ModelClipChoices, clipNames: readonly string[], boneNames: readonly string[],
+): Record<AnimationState, AnimationSource> => ({
+  idle: resolveAnimation(choices.idle, clipNames, boneNames, 'idle').source,
+  walk: resolveAnimation(choices.walk, clipNames, boneNames, 'walk').source,
+});
+
+export interface ClipOption {
+  /** The stored value: "" for automatic (a `<select>` has no null). */
+  value: string;
+  kind: ParsedClipChoice['kind'];
+  /** The clip's name, for file clips. */
+  name?: string;
+  /** Automatic only: what it resolves to, so the option can say "Automático (do arquivo: Walk)". */
+  resolves?: AnimationSource;
+  resolvesName?: string;
+}
+
+/**
+ * The options of the state's select: automatic (saying what it picks), every clip of the file in the file's order,
+ * Roll6's own (only when the skeleton can take it) and none.
+ */
+export const clipChoiceOptions = (clipNames: readonly string[], boneNames: readonly string[], state: AnimationState): ClipOption[] => {
+  const auto = resolveAnimation(null, clipNames, boneNames, state);
+  const options: ClipOption[] = [{
+    value: '', kind: 'auto', resolves: auto.source, resolvesName: auto.source === 'file' ? clipNames[auto.index] : undefined,
+  }];
+  const seen = new Set<string>();
+  for (const name of clipNames) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    options.push({ value: fileClipChoice(name), kind: 'file', name });
+  }
+  if (isMixamoSkeleton(boneNames)) options.push({ value: CLIP_CHOICE_ROLL6, kind: 'roll6' });
+  options.push({ value: CLIP_CHOICE_NONE, kind: 'none' });
+  return options;
+};
+
+/** The select's value back to the stored choice ("" = automatic = null). */
+export const clipChoiceFromValue = (value: string): ModelClipChoice => (value === '' ? null : value);
+
+/** A key for caches: the pair of choices as one string. */
+export const clipChoicesKey = (choices: ModelClipChoices): string => `${choices.idle ?? ''}\u0000${choices.walk ?? ''}`;
+
+export const sameClipChoices = (a: ModelClipChoices, b: ModelClipChoices): boolean => a.idle === b.idle && a.walk === b.walk;

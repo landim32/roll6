@@ -1,7 +1,9 @@
-import { AnimationClip, Euler, MathUtils, Matrix4, Quaternion, QuaternionKeyframeTrack, Vector3, VectorKeyframeTrack } from 'three';
-import type { Bone, KeyframeTrack, Object3D } from 'three';
-import { animationSources, normalizeBoneName, pickClip } from '../../lib/modelAnimations';
-import type { AnimationSource, AnimationState } from '../../lib/modelAnimations';
+import {
+  AnimationClip, AnimationMixer, Euler, MathUtils, Matrix4, Quaternion, QuaternionKeyframeTrack, Vector3, VectorKeyframeTrack,
+} from 'three';
+import type { Bone, KeyframeTrack, Object3D, SkinnedMesh } from 'three';
+import { clipChoicesKey, normalizeBoneName, resolveAnimation } from '../../lib/modelAnimations';
+import type { AnimationSource, AnimationState, ModelClipChoices } from '../../lib/modelAnimations';
 import { RELAXED_ARMS, ROLL6_CLIPS } from '../../lib/roll6Clips';
 import type { Roll6Clip } from '../../lib/roll6Clips';
 
@@ -15,6 +17,8 @@ export interface ModelClips {
   idle: AnimationClip | null;
   walk: AnimationClip | null;
   sources: Record<AnimationState, AnimationSource>;
+  /** Roll6's motion had to be reduced for this rig (some limbs held still so the mesh doesn't tear). */
+  reduced: boolean;
 }
 
 const bonesByName = (root: Object3D): Map<string, Bone> => {
@@ -28,6 +32,17 @@ const bonesByName = (root: Object3D): Map<string, Bone> => {
   return bones;
 };
 
+/** The first joint below a bone, looking through plain nodes in between (some rigs put one between two joints). */
+export const childJoint = (bone: Object3D): Bone | null => {
+  const queue = [...bone.children];
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    if ((node as Bone).isBone) return node as Bone;
+    queue.push(...node.children);
+  }
+  return null;
+};
+
 const worldQuaternion = (node: Object3D | null): Quaternion => {
   const q = new Quaternion();
   if (node) node.getWorldQuaternion(q);
@@ -35,17 +50,22 @@ const worldQuaternion = (node: Object3D | null): Quaternion => {
 };
 
 /** The turn that takes an upper arm from its rest direction to the relaxed one (identity for any other bone). */
-const armCorrection = (bone: Bone, name: string): Quaternion => {
+const armCorrection = (bone: Bone, name: string, share = 1): Quaternion => {
   const relaxed = RELAXED_ARMS[name as keyof typeof RELAXED_ARMS];
-  const child = bone.children.find((node) => (node as Bone).isBone);
+  const child = childJoint(bone);
   if (!relaxed || !child) return new Quaternion();
   const from = new Vector3().setFromMatrixPosition(child.matrixWorld).sub(new Vector3().setFromMatrixPosition(bone.matrixWorld));
   if (from.lengthSq() < 1e-12) return new Quaternion();
-  return new Quaternion().setFromUnitVectors(from.normalize(), new Vector3(...relaxed).normalize());
+  const full = new Quaternion().setFromUnitVectors(from.normalize(), new Vector3(...relaxed).normalize());
+  return new Quaternion().slerp(full, share);
 };
 
-/** A Roll6 clip for this skeleton, or null when it has none of the clip's bones. `height` is in the model's units. */
-export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number): AnimationClip | null => {
+/**
+ * A Roll6 clip for this skeleton, or null when it has none of the clip's bones. `height` is in the model's units.
+ * `limits` scales each bone's turns (0–1, missing = 1); for the upper arms it also scales how far they come down from
+ * the T pose — see `fitToRig`.
+ */
+export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number, limits: Record<string, number> = {}): AnimationClip | null => {
   root.updateMatrixWorld(true);
   const bones = bonesByName(root);
   const rootInverse = worldQuaternion(root).invert();
@@ -58,9 +78,11 @@ export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number):
     const parent = rootInverse.clone().multiply(worldQuaternion(bone.parent));
     const parentInverse = parent.clone().invert();
     const rest = bone.quaternion.clone();
-    const correction = armCorrection(bone, track.bone);
+    const limit = limits[track.bone] ?? 1;
+    const correction = armCorrection(bone, track.bone, limit);
     const values: number[] = [];
-    for (const [x, y, z] of track.degrees) {
+    for (const [rx, ry, rz] of track.degrees) {
+      const [x, y, z] = [rx * limit, ry * limit, rz * limit];
       const turn = new Quaternion().setFromEuler(new Euler(MathUtils.degToRad(x), MathUtils.degToRad(y), MathUtils.degToRad(z), 'XYZ'));
       const local = parentInverse.clone().multiply(turn.multiply(correction)).multiply(parent).multiply(rest);
       values.push(local.x, local.y, local.z, local.w);
@@ -86,14 +108,173 @@ export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number):
   return tracks.length > 0 ? new AnimationClip(`roll6-${clip.name}`, clip.duration, tracks) : null;
 };
 
-/** The two animations of a model: the file's clip when named for the state, else Roll6's for a Mixamo skeleton, else none. */
-export const clipsFor = (root: Object3D, fileClips: AnimationClip[], boneNames: string[], height: number): ModelClips => {
+/** Bones that move together: a pair is limited as one, so a model never limps on one side only. */
+const LIMB_GROUPS: string[][] = [
+  ['LeftArm', 'RightArm'], ['LeftForeArm', 'RightForeArm'], ['LeftUpLeg', 'RightUpLeg'], ['LeftLeg', 'RightLeg'],
+  ['LeftFoot', 'RightFoot'], ['LeftShoulder', 'RightShoulder'], ['Spine'], ['Spine1'], ['Spine2'], ['Neck'], ['Head'], ['Hips'],
+];
+/** Amplitudes tried, from the full motion down to none. */
+const LIMIT_STEPS = [1, 0.6, 0.3, 0];
+/** An edge is torn when it grows more than this share of the model's height and to more than 1.5 times its length… */
+const TEAR_GROWTH = 0.03;
+/** …and a motion is refused when more than this share of the edges (or 12, whichever is more) is torn. */
+const TEAR_SHARE = 0.003;
+
+interface TearProbe {
+  meshes: SkinnedMesh[];
+  /** Per mesh: pairs of vertex indexes (each triangle's three edges) and their rest lengths. */
+  edges: { pairs: Uint32Array; rest: Float32Array }[];
+  total: number;
+}
+
+const tearProbe = (root: Object3D): TearProbe => {
+  const meshes: SkinnedMesh[] = [];
+  root.traverse((node) => { if ((node as SkinnedMesh).isSkinnedMesh) meshes.push(node as SkinnedMesh); });
+  let total = 0;
+  const edges = meshes.map((mesh) => {
+    const position = mesh.geometry.getAttribute('position');
+    const index = mesh.geometry.index;
+    const triangles = index ? index.count / 3 : position.count / 3;
+    const pairs = new Uint32Array(triangles * 6);
+    const rest = new Float32Array(triangles * 3);
+    const a = new Vector3();
+    const b = new Vector3();
+    for (let t = 0; t < triangles; t++) {
+      const v = [0, 1, 2].map((k) => (index ? index.getX(t * 3 + k) : t * 3 + k));
+      for (let e = 0; e < 3; e++) {
+        const i = v[e];
+        const j = v[(e + 1) % 3];
+        pairs[(t * 3 + e) * 2] = i;
+        pairs[(t * 3 + e) * 2 + 1] = j;
+        rest[t * 3 + e] = a.fromBufferAttribute(position, i).distanceTo(b.fromBufferAttribute(position, j));
+      }
+    }
+    total += triangles * 3;
+    return { pairs, rest };
+  });
+  return { meshes, edges, total };
+};
+
+/** Torn edges of the model posed by `clip` at its worst keyframe. The bones are put back at rest afterwards. */
+const tornEdges = (root: Object3D, probe: TearProbe, clip: AnimationClip, times: number[], height: number): number => {
+  const saved: { node: Object3D; position: Vector3; quaternion: Quaternion; scale: Vector3 }[] = [];
+  root.traverse((node) => saved.push({ node, position: node.position.clone(), quaternion: node.quaternion.clone(), scale: node.scale.clone() }));
+  const mixer = new AnimationMixer(root);
+  const action = mixer.clipAction(clip);
+  action.play();
+  const point = new Vector3();
+  let worst = 0;
+  for (const time of times) {
+    action.time = time;
+    mixer.update(0);
+    root.updateMatrixWorld(true);
+    let torn = 0;
+    probe.meshes.forEach((mesh, m) => {
+      mesh.skeleton.update();
+      const count = mesh.geometry.getAttribute('position').count;
+      const skinned = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        mesh.getVertexPosition(i, point);
+        skinned[i * 3] = point.x;
+        skinned[i * 3 + 1] = point.y;
+        skinned[i * 3 + 2] = point.z;
+      }
+      const { pairs, rest } = probe.edges[m];
+      for (let e = 0; e < rest.length; e++) {
+        const i = pairs[e * 2] * 3;
+        const j = pairs[e * 2 + 1] * 3;
+        const now = Math.hypot(skinned[i] - skinned[j], skinned[i + 1] - skinned[j + 1], skinned[i + 2] - skinned[j + 2]);
+        if (now - rest[e] > TEAR_GROWTH * height && now > rest[e] * 1.5) torn++;
+      }
+    });
+    worst = Math.max(worst, torn);
+  }
+  mixer.stopAllAction();
+  mixer.uncacheRoot(root);
+  for (const { node, position, quaternion, scale } of saved) {
+    node.position.copy(position);
+    node.quaternion.copy(quaternion);
+    node.scale.copy(scale);
+  }
+  root.updateMatrixWorld(true);
+  return worst;
+};
+
+/**
+ * How much of each Roll6 motion this model's skinning can take (055). Automatic rigs often bind most of the mesh to the
+ * hips (the example orc: two thirds of its vertices, feet and hands included): turning a limb then stretches the
+ * triangles between it and what stayed behind. Each group of bones is tried alone on the model at its keyframes, from the
+ * full motion down to none, and keeps the largest amplitude that tears (almost) nothing — a well rigged model keeps
+ * everything, a poor one keeps what it can and never breaks.
+ */
+export const fitToRig = (clip: Roll6Clip, root: Object3D, height: number): Record<string, number> => {
+  const probe = tearProbe(root);
+  const limits: Record<string, number> = {};
+  if (probe.total === 0) return limits;
+  const allowed = Math.max(12, probe.total * TEAR_SHARE);
+  const times = clip.tracks[0]?.times ?? [0];
+  for (const group of LIMB_GROUPS) {
+    const tracks = clip.tracks.filter((track) => group.includes(track.bone));
+    if (tracks.length === 0) continue;
+    const alone: Roll6Clip = { ...clip, tracks, hipsLift: { times: [0, clip.duration], values: [0, 0] } };
+    let chosen = 0;
+    for (const step of LIMIT_STEPS) {
+      const stepLimits = Object.fromEntries(group.map((bone) => [bone, step]));
+      const built = buildRoll6Clip(alone, root, height, stepLimits);
+      if (!built || tornEdges(root, probe, built, times, height) <= allowed) {
+        chosen = step;
+        break;
+      }
+    }
+    for (const bone of group) limits[bone] = chosen;
+  }
+  return limits;
+};
+
+/**
+ * The animations of one model for a pair of choices (056; `ModelClipBuilder`): for each state the clip
+ * `resolveAnimation` points at — a clip of the file, Roll6's own (fitted to the rig once per state, then reused:
+ * `fitToRig` poses the whole mesh and is the expensive part) or none. Results are kept per pair of choices, so the
+ * preview switching selects and every piece of the same token share the work.
+ */
+export type ModelClipBuilder = (choices: ModelClipChoices) => ModelClips;
+
+export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], boneNames: string[], height: number): ModelClipBuilder => {
   const names = fileClips.map((clip) => clip.name);
-  const sources = animationSources(names, boneNames);
-  const clipOf = (state: AnimationState): AnimationClip | null => {
-    if (sources[state] === 'file') return fileClips[pickClip(names, state)!];
-    if (sources[state] === 'roll6') return buildRoll6Clip(ROLL6_CLIPS[state], root, height);
-    return null;
+  const own = new Map<AnimationState, { clip: AnimationClip | null; reduced: boolean }>();
+  const built = new Map<string, ModelClips>();
+
+  const roll6Of = (state: AnimationState) => {
+    let entry = own.get(state);
+    if (!entry) {
+      const limits = fitToRig(ROLL6_CLIPS[state], root, height);
+      entry = { clip: buildRoll6Clip(ROLL6_CLIPS[state], root, height, limits), reduced: Object.values(limits).some((limit) => limit < 1) };
+      own.set(state, entry);
+    }
+    return entry;
   };
-  return { idle: clipOf('idle'), walk: clipOf('walk'), sources };
+
+  return (choices) => {
+    const key = clipChoicesKey(choices);
+    let clips = built.get(key);
+    if (clips) return clips;
+    let reduced = false;
+    const sources = { idle: 'static', walk: 'static' } as Record<AnimationState, AnimationSource>;
+    const clipOf = (state: AnimationState): AnimationClip | null => {
+      const resolved = resolveAnimation(choices[state], names, boneNames, state);
+      sources[state] = resolved.source;
+      if (resolved.source === 'file') return fileClips[resolved.index];
+      if (resolved.source === 'roll6') {
+        const entry = roll6Of(state);
+        if (entry.reduced) reduced = true;
+        return entry.clip;
+      }
+      return null;
+    };
+    const idle = clipOf('idle');
+    const walk = clipOf('walk');
+    clips = { idle, walk, sources, reduced };
+    built.set(key, clips);
+    return clips;
+  };
 };

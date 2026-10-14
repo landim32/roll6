@@ -41,6 +41,9 @@ export interface MapTokenInfo {
   backImageUrl: string | null;
   /** 3D model of the piece's token (055), drawn by the 3D view instead of the 2,5D figure. */
   modelFileUrl?: string | null;
+  /** Animations chosen for that model (056): null = automatic, "roll6", "none" or "clip:{name}". */
+  modelIdleClip?: string | null;
+  modelWalkClip?: string | null;
   downImageUrl: string | null;
   campaignCharacterId: number | null;
   characterId: number | null;
