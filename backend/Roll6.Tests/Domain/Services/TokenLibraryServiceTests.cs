@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Moq;
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
@@ -16,6 +17,7 @@ public class TokenLibraryServiceTests
     private readonly Mock<ICharacterRepository<Character>> _characterRepository = new();
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
+    private readonly Mock<IAnimationRepository<Animation>> _animationRepository = new();
     private readonly TokenLibraryService _service;
 
     public TokenLibraryServiceTests()
@@ -23,7 +25,8 @@ public class TokenLibraryServiceTests
         _repository.Setup(r => r.InsertAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
         _repository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, UserId = 1, Name = "Goblin" });
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string>())).Returns((string? name) => name == null ? null : "https://x/" + name);
-        _service = new TokenLibraryService(_repository.Object, _mapTokenRepository.Object, _characterRepository.Object, _npcRepository.Object, _imageStorage.Object);
+        _service = new TokenLibraryService(_repository.Object, _mapTokenRepository.Object, _characterRepository.Object, _npcRepository.Object, _imageStorage.Object,
+            _animationRepository.Object);
     }
 
     private const string DOWN_IMAGE = "0123456789abcdef0123456789abcdef.png";
@@ -351,5 +354,60 @@ public class TokenLibraryServiceTests
 
         await act.Should().ThrowAsync<ConflictException>().WithMessage("*NPCs*");
         _repository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
+    }
+
+    private void GivenAnimations(params Animation[] animations) =>
+        _animationRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync((IEnumerable<long> ids) => animations.Where(a => ids.Contains(a.AnimationId)).ToList());
+
+    [Fact]
+    public async Task Create_WithLibraryAnimationsOfTheStatesTypes_KeepsThem()
+    {
+        GivenAnimations(
+            new Animation { AnimationId = 7, AnimationType = AnimationType.Idle },
+            new Animation { AnimationId = 8, AnimationType = AnimationType.Walk },
+            new Animation { AnimationId = 9, AnimationType = AnimationType.Defeated });
+
+        var result = await _service.CreateAsync(1, new TokenInsertInfo
+        {
+            Name = "Orc", ModelFile = MODEL_FILE,
+            ModelIdleClip = "animation:7", ModelWalkClip = "animation:8", ModelDownClip = "animation:9"
+        });
+
+        result.ModelIdleClip.Should().Be("animation:7");
+        result.ModelWalkClip.Should().Be("animation:8");
+        result.ModelDownClip.Should().Be("animation:9");
+    }
+
+    [Fact]
+    public async Task Create_WithALibraryAnimationOfAnotherType_ThrowsOnThatState()
+    {
+        GivenAnimations(new Animation { AnimationId = 7, AnimationType = AnimationType.Attack });
+
+        var act = () => _service.CreateAsync(1, new TokenInsertInfo { Name = "Orc", ModelFile = MODEL_FILE, ModelIdleClip = "animation:7" });
+
+        (await act.Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors["modelIdleClip"].Single().Should().Contain("Atacando").And.Contain("Parado");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<Token>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_WithAMissingLibraryAnimation_ThrowsOnThatState()
+    {
+        GivenAnimations();
+
+        var act = () => _service.UpdateAsync(1, 5, new TokenInsertInfo { Name = "Orc", ModelFile = MODEL_FILE, ModelDownClip = "animation:99" });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("modelDownClip");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Token>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_WithoutAModel_DropsLibraryChoicesWithoutReadingThem()
+    {
+        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Orc", ModelIdleClip = "animation:7" });
+
+        result.ModelIdleClip.Should().BeNull();
+        _animationRepository.Verify(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
     }
 }

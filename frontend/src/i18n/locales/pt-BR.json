@@ -49,7 +49,52 @@
     "changePassword": "Trocar senha",
     "logout": "Sair",
     "apiKeys": "Chaves de API",
-    "viewQuality": "Qualidade do 3D"
+    "viewQuality": "Qualidade do 3D",
+    "animations": "Animações"
+  },
+  "animations": {
+    "title": "Animações",
+    "tab": {
+      "mine": "Minhas",
+      "search": "Buscar",
+      "upload": "Enviar"
+    },
+    "type": {
+      "1": "Parado",
+      "2": "Andando",
+      "3": "Correndo",
+      "4": "Agachado",
+      "5": "Derrotado",
+      "6": "Atacando",
+      "7": "Defendendo"
+    },
+    "allTypes": "Todos os tipos",
+    "typeFilter": "Filtrar por tipo",
+    "searchPlaceholder": "Buscar pelo nome",
+    "loop": "repete",
+    "once": "uma vez",
+    "duration": "{{seconds}} s",
+    "owner": "de {{name}}",
+    "typeNote": "Por enquanto, só animações dos tipos Parado, Andando e Derrotado podem ser escolhidas nos tokens.",
+    "file": "Arquivo de animação (.json)",
+    "fileHelp": "Um arquivo no formato roll6-animation, para modelos com esqueleto Mixamo.",
+    "name": "Nome",
+    "typeLabel": "Tipo",
+    "send": "Enviar animação",
+    "uploaded": "Animação enviada.",
+    "updated": "Animação alterada.",
+    "deleted": "Animação apagada.",
+    "copy": "Copiar JSON",
+    "copied": "JSON copiado.",
+    "copyFailed": "Não foi possível copiar o JSON.",
+    "edit": "Editar animação",
+    "editLabel": "Editar {{name}}",
+    "deleteLabel": "Apagar {{name}}",
+    "confirmDeleteTitle": "Apagar animação",
+    "confirmDelete": "Apagar a animação \"{{name}}\"?",
+    "delete": "Apagar",
+    "empty": "Nenhuma animação.",
+    "chooseFile": "Escolha um arquivo de animação."
   },
   "character": {
     "current": "Personagem atual",
@@ -223,7 +268,10 @@
         "roll6": "Animação do Roll6",
         "guard": "Posição defensiva (Roll6)",
         "death": "Morte (Roll6)",
-        "none": "Sem animação"
+        "none": "Sem animação",
+        "library": "{{name}}",
+        "libraryOther": "{{name}} — {{owner}}",
+        "libraryLoading": "Animação #{{id}}"
       },
       "timeline": {
         "label": "Andamento da animação",
@@ -251,9 +299,11 @@
         "roll6": "animação do Roll6",
         "static": "sem animação",
         "death": "morte do Roll6",
-        "lying": "sem animação (deitado)"
+        "lying": "sem animação (deitado)",
+        "library": "biblioteca: {{name}}"
       },
-      "deforms": "Esta animação pode deformar este modelo: o esqueleto dele prende braços e pernas ao quadril."
+      "deforms": "Esta animação pode deformar este modelo: o esqueleto dele prende braços e pernas ao quadril.",
+      "libraryGroup": "Biblioteca"
     },
     "spritesHelp": "Os quatro lados usam a mesma silhueta. Lado sem imagem usa a oposta espelhada (laterais), a frente ou a imagem em pé.",
     "view": {

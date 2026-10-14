@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Roll6.Domain.Animations;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 
@@ -16,6 +17,9 @@ public static class Guard
 
     // File names produced by the 3D model upload (055): a glTF binary, stored as sent.
     private static readonly Regex MODEL_FILE_NAME_REGEX = new(@"^[0-9a-f]{32}\.glb$", RegexOptions.Compiled);
+
+    // File names of the animation library (059): the validated JSON, written by the server itself.
+    private static readonly Regex ANIMATION_FILE_NAME_REGEX = new(@"^[0-9a-f]{32}\.json$", RegexOptions.Compiled);
 
     public static string RequiredText(string? value, string field, int maxLength)
     {
@@ -87,6 +91,18 @@ public static class Guard
         return fileName;
     }
 
+    /// <summary>Accepts only file names of the animation library (059): {guid:N}.json.</summary>
+    public static string AnimationFileName(string? value, string field)
+    {
+        var fileName = RequiredText(value, field, 260);
+        if (!ANIMATION_FILE_NAME_REGEX.IsMatch(fileName))
+            throw new DomainValidationException(field, "Arquivo de animação inválido.");
+        return fileName;
+    }
+
+    /// <summary>True for a name the animation library could have stored ({guid:N}.json).</summary>
+    public static bool IsAnimationFileName(string? value) => value != null && ANIMATION_FILE_NAME_REGEX.IsMatch(value);
+
     /// <summary>True for a name the model upload could have produced ({guid:N}.glb).</summary>
     public static bool IsModelFileName(string? value) => value != null && MODEL_FILE_NAME_REGEX.IsMatch(value);
 
@@ -101,7 +117,8 @@ public static class Guard
 
     /// <summary>
     /// The animation chosen for one state of a 3D model (056): null/empty = automatic, "roll6", "roll6-guard" (057), "none" or
-    /// "clip:{name}" with a non-empty name (the clip's name is kept as it is — the file decides its case and spaces).
+    /// "clip:{name}" with a non-empty name (the clip's name is kept as it is — the file decides its case and spaces), or
+    /// "animation:{id}" (059, a library animation — its existence and type are checked by the token service).
     /// </summary>
     public static string? ModelClip(string? value, string field)
     {
@@ -110,7 +127,10 @@ public static class Guard
             return choice;
         if (choice.StartsWith(MODEL_CLIP_PREFIX, StringComparison.Ordinal) && choice.Length > MODEL_CLIP_PREFIX.Length)
             return choice;
-        throw new DomainValidationException(field, "Animação inválida. Use \"roll6\", \"roll6-guard\", \"none\" ou \"clip:{nome}\".");
+        if (AnimationStates.ParseChoice(choice) != null)
+            return choice;
+        throw new DomainValidationException(field,
+            "Animação inválida. Use \"roll6\", \"roll6-guard\", \"none\", \"clip:{nome}\" ou \"animation:{id}\".");
     }
 
     public static string Email(string? value, string field)

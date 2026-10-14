@@ -6,6 +6,7 @@ import './styles/theme.css';
 import './styles/app.css';
 import './i18n';
 import { App } from './App';
+import { AnimationProvider } from './Contexts/AnimationContext';
 import { AuthProvider } from './Contexts/AuthContext';
 import { CampaignProvider } from './Contexts/CampaignContext';
 import { ChatProvider } from './Contexts/ChatContext';
@@ -22,7 +23,8 @@ import { TurnProvider } from './Contexts/TurnContext';
 
 // Provider chain: Auth → Install (the installable app, 042) → Push (Web Push on this device, 043) → Campaign (needs the session) → Realtime (table events
 // of the current campaign; every provider below reacts to them) → Character (needs the campaign) → MapEditor →
-// Token (library) → MapToken (pieces of the open map: needs the editor, the campaign and the characters) →
+// Token (library) → Animation (the animation library, 059) → MapToken (pieces of the open map: needs the editor,
+// the campaign and the characters) →
 // Npc (library and campaign NPCs; places pieces, so it needs MapToken) → Turn (turn of the current campaign;
 // resetting reloads the pieces) → Chat (the campaign's timeline: conversation + turn records, 041) → App.
 createRoot(document.getElementById('root')!).render(
@@ -36,15 +38,17 @@ createRoot(document.getElementById('root')!).render(
                 <CharacterProvider>
                   <MapEditorProvider>
                     <TokenProvider>
-                      <MapTokenProvider>
-                        <NpcProvider>
-                          <TurnProvider>
-                            <ChatProvider>
-                              <App />
-                            </ChatProvider>
-                          </TurnProvider>
-                        </NpcProvider>
-                      </MapTokenProvider>
+                      <AnimationProvider>
+                        <MapTokenProvider>
+                          <NpcProvider>
+                            <TurnProvider>
+                              <ChatProvider>
+                                <App />
+                              </ChatProvider>
+                            </TurnProvider>
+                          </NpcProvider>
+                        </MapTokenProvider>
+                      </AnimationProvider>
                     </TokenProvider>
                   </MapEditorProvider>
                 </CharacterProvider>

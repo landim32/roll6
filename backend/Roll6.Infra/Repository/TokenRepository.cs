@@ -58,6 +58,12 @@ public class TokenRepository : ITokenRepository<Token>
         return existing;
     }
 
+    public async Task<bool> AnyUsesClipAsync(string choice, bool idle, bool walk, bool down)
+    {
+        return await _context.Tokens.AnyAsync(e =>
+            (idle && e.ModelIdleClip == choice) || (walk && e.ModelWalkClip == choice) || (down && e.ModelDownClip == choice));
+    }
+
     public async Task DeleteAsync(long id)
     {
         var entity = await _context.Tokens.FindAsync(id)

@@ -1,0 +1,20 @@
+{
+  "invalid-not-object.json": "content",
+  "invalid-format.json": "content.format",
+  "invalid-version.json": "content.version",
+  "invalid-duration-zero.json": "content.duration",
+  "invalid-duration-long.json": "content.duration",
+  "invalid-loop-missing.json": "content.loop",
+  "invalid-tracks-empty.json": "content.tracks",
+  "invalid-tracks-too-many.json": "content.tracks",
+  "invalid-bone-unknown.json": "content.tracks[2].bone",
+  "invalid-bone-repeated.json": "content.tracks[2].bone",
+  "invalid-times-start.json": "content.tracks[0].times",
+  "invalid-times-descending.json": "content.tracks[1].times",
+  "invalid-times-past-duration.json": "content.tracks[0].times",
+  "invalid-degrees-length.json": "content.tracks[0].degrees",
+  "invalid-degrees-pair.json": "content.tracks[1].degrees",
+  "invalid-degrees-range.json": "content.tracks[2].degrees",
+  "invalid-lift-values.json": "content.hipsLift.values",
+  "invalid-lift-of.json": "content.hipsLift.of"
+}

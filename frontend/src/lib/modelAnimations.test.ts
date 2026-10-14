@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { animationSources, isMixamoSkeleton, normalizeBoneName, pickClip } from './modelAnimations';
+import {
+  animationChoice, animationSources, clipChoiceIds, isMixamoSkeleton, normalizeBoneName, parseClipChoice, pickClip, resolveAnimation,
+  resolvedSources, STATE_ANIMATION_TYPE,
+} from './modelAnimations';
+import type { Roll6Clip } from './roll6Clips';
 
 /** The example orc's skeleton (055), as named in the file. */
 const ORC_BONES = [
@@ -77,5 +81,40 @@ describe('the down state (058)', () => {
 
   it('does not take other clips for a death', () => {
     expect(pickClip(['Soldier_Idle', 'Walk', 'Diet'], 'down')).toBeNull();
+  });
+});
+
+describe('library animations (059)', () => {
+  const clip = { name: 'animation:7' } as Roll6Clip;
+
+  it('reads "animation:{id}" choices with a positive id only', () => {
+    expect(parseClipChoice('animation:7')).toEqual({ kind: 'animation', id: 7 });
+    expect(parseClipChoice(animationChoice(12))).toEqual({ kind: 'animation', id: 12 });
+    expect(parseClipChoice('animation:0')).toEqual({ kind: 'auto' });
+    expect(parseClipChoice('animation:x')).toEqual({ kind: 'auto' });
+  });
+
+  it('plays a loaded animation on a Mixamo skeleton', () => {
+    expect(resolveAnimation('animation:7', [], ORC_BONES, 'idle', new Map([[7, clip]]))).toEqual({ source: 'library', id: 7 });
+  });
+
+  it('falls back to automatic while loading or when the file failed', () => {
+    expect(resolveAnimation('animation:7', ['Idle'], ORC_BONES, 'idle')).toEqual({ source: 'file', index: 0 });
+    expect(resolveAnimation('animation:7', [], ORC_BONES, 'down', new Map([[7, null]]))).toEqual({ source: 'roll6', clip: 'death' });
+  });
+
+  it('is nothing on a skeleton that is not Mixamo', () => {
+    expect(resolveAnimation('animation:7', ['Idle'], ['pelvis'], 'idle', new Map([[7, clip]]))).toEqual({ source: 'static' });
+  });
+
+  it('tells the sources and the ids to load', () => {
+    const choices = { idle: 'animation:7', walk: 'animation:7', down: 'animation:9' };
+    expect(resolvedSources(choices, [], ORC_BONES, new Map([[7, clip]]))).toEqual({ idle: 'library', walk: 'library', down: 'roll6' });
+    expect(clipChoiceIds(choices)).toEqual([7, 9]);
+    expect(clipChoiceIds({ idle: 'roll6', walk: null, down: 'clip:Death' })).toEqual([]);
+  });
+
+  it('takes one library type per state (Q2)', () => {
+    expect(STATE_ANIMATION_TYPE).toEqual({ idle: 1, walk: 2, down: 5 });
   });
 });

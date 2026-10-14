@@ -1,3 +1,7 @@
+import { ANIMATION_TYPE } from '../types/animation';
+import type { AnimationType } from '../types/animation';
+import type { Roll6Clip } from './roll6Clips';
+
 /**
  * Where a 3D model's animations come from (055, clarification Q2 = A): for each state — standing still and walking —
  * the file's own clip when one is named for it; else, when the skeleton uses the Mixamo bone names (the convention of
@@ -7,7 +11,8 @@
 
 /** Standing still, walking and, since 058, down (the death: played once, resting on its last frame). */
 export type AnimationState = 'idle' | 'walk' | 'down';
-export type AnimationSource = 'file' | 'roll6' | 'static';
+/** Where a state's animation comes from: the file, Roll6's own, the animation library (059) or nothing. */
+export type AnimationSource = 'file' | 'roll6' | 'library' | 'static';
 
 export const ANIMATION_STATES: readonly AnimationState[] = ['idle', 'walk', 'down'];
 
@@ -64,17 +69,34 @@ export const CLIP_CHOICE_ROLL6 = 'roll6';
 export const CLIP_CHOICE_ROLL6_GUARD = 'roll6-guard';
 export const CLIP_CHOICE_NONE = 'none';
 export const CLIP_CHOICE_PREFIX = 'clip:';
+/** A library animation (059): "animation:{id}". */
+export const CLIP_CHOICE_ANIMATION_PREFIX = 'animation:';
 export const AUTO_CLIPS: ModelClipChoices = { idle: null, walk: null, down: null };
 
 /** The stored choice for a clip of the file. */
 export const fileClipChoice = (name: string): string => `${CLIP_CHOICE_PREFIX}${name}`;
+
+/** The stored choice for a library animation (059). */
+export const animationChoice = (animationId: number): string => `${CLIP_CHOICE_ANIMATION_PREFIX}${animationId}`;
+
+/**
+ * The library type each state accepts for now (059, Q2): Parado ← Parado (1), Caminhando ← Andando (2), Caído ←
+ * Derrotado (5). Mirrors `AnimationStates.TypeFor` on the server.
+ */
+export const STATE_ANIMATION_TYPE: Record<AnimationState, AnimationType> = {
+  idle: ANIMATION_TYPE.idle, walk: ANIMATION_TYPE.walk, down: ANIMATION_TYPE.defeated,
+};
+
+/** Library animations (059) loaded for a model: id → its clip, or null when it could not be read. */
+export type LibraryClips = ReadonlyMap<number, Roll6Clip | null>;
 
 export type ParsedClipChoice =
   | { kind: 'auto' }
   | { kind: 'roll6' }
   | { kind: 'guard' }
   | { kind: 'none' }
-  | { kind: 'file'; name: string };
+  | { kind: 'file'; name: string }
+  | { kind: 'animation'; id: number };
 
 /** Reads a stored choice; anything unknown counts as automatic (the server refuses it, but be lenient). */
 export const parseClipChoice = (choice: ModelClipChoice): ParsedClipChoice => {
@@ -85,6 +107,11 @@ export const parseClipChoice = (choice: ModelClipChoice): ParsedClipChoice => {
   if (choice.startsWith(CLIP_CHOICE_PREFIX) && choice.length > CLIP_CHOICE_PREFIX.length) {
     return { kind: 'file', name: choice.slice(CLIP_CHOICE_PREFIX.length) };
   }
+  if (choice.startsWith(CLIP_CHOICE_ANIMATION_PREFIX)) {
+    const digits = choice.slice(CLIP_CHOICE_ANIMATION_PREFIX.length);
+    const id = /^\d+$/.test(digits) ? Number(digits) : 0;
+    if (id > 0) return { kind: 'animation', id };
+  }
   return { kind: 'auto' };
 };
 
@@ -93,6 +120,8 @@ export type ResolvedAnimation =
   | { source: 'file'; index: number }
   /** `clip`: which of Roll6's own animations — the state's own (the death for `down`), or the guard stance (057). */
   | { source: 'roll6'; clip: 'idle' | 'walk' | 'guard' | 'death' }
+  /** A library animation (059), by id: its clip is in the `LibraryClips` handed to `resolveAnimation`. */
+  | { source: 'library'; id: number }
   | { source: 'static' };
 
 /** Roll6's own animation of each state (058: the death is the down state's). */
@@ -101,13 +130,19 @@ export const ROLL6_CLIP_OF_STATE: Record<AnimationState, 'idle' | 'walk' | 'deat
 /**
  * The animation of one state, given the choice and what the model offers: automatic follows `animationSources`; a
  * chosen file clip the file lacks (the file was replaced) also falls back to automatic; "roll6" without a Mixamo
- * skeleton is nothing.
+ * skeleton is nothing. A library animation (059) plays on a Mixamo skeleton once its file is loaded (`library`); while
+ * it loads, or when it failed or was removed, the state plays its automatic animation — the model never waits on it.
  */
 export const resolveAnimation = (
   choice: ModelClipChoice, clipNames: readonly string[], boneNames: readonly string[], state: AnimationState,
+  library?: LibraryClips,
 ): ResolvedAnimation => {
   const parsed = parseClipChoice(choice);
   if (parsed.kind === 'none') return { source: 'static' };
+  if (parsed.kind === 'animation') {
+    if (!isMixamoSkeleton(boneNames)) return { source: 'static' };
+    if (library?.get(parsed.id)) return { source: 'library', id: parsed.id };
+  }
   const own = ROLL6_CLIP_OF_STATE[state];
   if (parsed.kind === 'roll6') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: own } : { source: 'static' };
   if (parsed.kind === 'guard') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: 'guard' } : { source: 'static' };
@@ -122,12 +157,22 @@ export const resolveAnimation = (
 
 /** The sources of the three states for the chosen animations (what the form lists under the preview). */
 export const resolvedSources = (
-  choices: ModelClipChoices, clipNames: readonly string[], boneNames: readonly string[],
+  choices: ModelClipChoices, clipNames: readonly string[], boneNames: readonly string[], library?: LibraryClips,
 ): Record<AnimationState, AnimationSource> => ({
-  idle: resolveAnimation(choices.idle, clipNames, boneNames, 'idle').source,
-  walk: resolveAnimation(choices.walk, clipNames, boneNames, 'walk').source,
-  down: resolveAnimation(choices.down, clipNames, boneNames, 'down').source,
+  idle: resolveAnimation(choices.idle, clipNames, boneNames, 'idle', library).source,
+  walk: resolveAnimation(choices.walk, clipNames, boneNames, 'walk', library).source,
+  down: resolveAnimation(choices.down, clipNames, boneNames, 'down', library).source,
 });
+
+/** The library animations (059) the choices name, each once — what must be loaded before building the clips. */
+export const clipChoiceIds = (choices: ModelClipChoices): number[] => {
+  const ids = new Set<number>();
+  for (const choice of [choices.idle, choices.walk, choices.down]) {
+    const parsed = parseClipChoice(choice);
+    if (parsed.kind === 'animation') ids.add(parsed.id);
+  }
+  return [...ids];
+};
 
 export interface ClipOption {
   /** The stored value: "" for automatic (a `<select>` has no null). */

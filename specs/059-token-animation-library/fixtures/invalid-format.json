@@ -1,0 +1,111 @@
+{
+  "format": "roll6",
+  "version": 1,
+  "name": "Aceno",
+  "type": "idle",
+  "description": "Acena com a mão direita acima da cabeça.",
+  "duration": 1,
+  "loop": true,
+  "tracks": [
+    {
+      "bone": "RightArm",
+      "times": [
+        0,
+        0.5,
+        1
+      ],
+      "degrees": [
+        [
+          0,
+          0,
+          -150
+        ],
+        [
+          0,
+          0,
+          -150
+        ],
+        [
+          0,
+          0,
+          -150
+        ]
+      ]
+    },
+    {
+      "bone": "RightForeArm",
+      "times": [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1
+      ],
+      "degrees": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          30
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          -30
+        ],
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "bone": "Spine",
+      "times": [
+        0,
+        0.5,
+        1
+      ],
+      "degrees": [
+        [
+          0,
+          0,
+          -3
+        ],
+        [
+          0,
+          0,
+          -5
+        ],
+        [
+          0,
+          0,
+          -3
+        ]
+      ]
+    }
+  ],
+  "hipsLift": {
+    "times": [
+      0,
+      0.5,
+      1
+    ],
+    "values": [
+      0,
+      0.003,
+      0
+    ],
+    "of": "height"
+  }
+}

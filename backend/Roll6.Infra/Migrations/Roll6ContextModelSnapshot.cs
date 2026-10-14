@@ -22,6 +22,67 @@ namespace Roll6.Infra.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Roll6.Domain.Models.Animation", b =>
+                {
+                    b.Property<long>("AnimationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("animation_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("AnimationId"));
+
+                    b.Property<int>("AnimationType")
+                        .HasColumnType("integer")
+                        .HasColumnName("animation_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<double>("Duration")
+                        .HasColumnType("double precision")
+                        .HasColumnName("duration");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("file_name");
+
+                    b.Property<bool>("Loop")
+                        .HasColumnType("boolean")
+                        .HasColumnName("loop");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("AnimationId")
+                        .HasName("animations_pkey");
+
+                    b.HasIndex("AnimationType")
+                        .HasDatabaseName("ix_animations_type");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_animations_user");
+
+                    b.ToTable("animations", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.ApiKey", b =>
                 {
                     b.Property<long>("ApiKeyId")
@@ -1467,6 +1528,15 @@ namespace Roll6.Infra.Migrations
                         .HasDatabaseName("ix_user_notifications_user_created");
 
                     b.ToTable("user_notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.Animation", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_animation_user");
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.ApiKey", b =>

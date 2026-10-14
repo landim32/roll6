@@ -22,6 +22,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- The animation file cases shared with the frontend and the criar-animacao skill (059). -->
+  <ItemGroup>
+    <None Include="..\..\specs\059-token-animation-library\fixtures\*.json" LinkBase="Fixtures\Animations" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Roll6.API\Roll6.API.csproj" />
     <ProjectReference Include="..\Roll6.Application\Roll6.Application.csproj" />

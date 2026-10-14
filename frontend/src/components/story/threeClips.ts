@@ -2,8 +2,8 @@ import {
   AnimationClip, AnimationMixer, Box3, Euler, MathUtils, Matrix4, Quaternion, QuaternionKeyframeTrack, Vector3, VectorKeyframeTrack,
 } from 'three';
 import type { Bone, KeyframeTrack, Object3D, SkinnedMesh } from 'three';
-import { clipChoicesKey, normalizeBoneName, resolveAnimation } from '../../lib/modelAnimations';
-import type { AnimationSource, AnimationState, ModelClipChoices } from '../../lib/modelAnimations';
+import { clipChoiceIds, clipChoicesKey, normalizeBoneName, resolveAnimation } from '../../lib/modelAnimations';
+import type { AnimationSource, AnimationState, LibraryClips, ModelClipChoices } from '../../lib/modelAnimations';
 import { RELAXED_ARMS, ROLL6_CLIPS_BY_NAME } from '../../lib/roll6Clips';
 import type { Roll6Clip, Roll6ClipName } from '../../lib/roll6Clips';
 
@@ -271,13 +271,15 @@ export const fitToRig = (clip: Roll6Clip, root: Object3D, height: number): Recor
  * deformation, once per clip name, then reused: posing the whole mesh is the expensive part) or none. Results are kept
  * per set of choices, so the preview switching selects and every piece of the same token share the work.
  */
-export type ModelClipBuilder = (choices: ModelClipChoices) => ModelClips;
+export type ModelClipBuilder = (choices: ModelClipChoices, library?: LibraryClips) => ModelClips;
 
 export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], boneNames: string[], height: number): ModelClipBuilder => {
   const names = fileClips.map((clip) => clip.name);
   // Roll6's own clips by name (057: the guard stance is not tied to a state), each fitted to the rig — or, for the
   // clips played in full (058: guard, death), tested for deformation — once.
   const own = new Map<Roll6ClipName, { clip: AnimationClip | null; reduced: boolean; deforms: boolean }>();
+  // Library animations (059) by id: played in full like the guard and the death, tested for deformation once.
+  const fromLibrary = new Map<number, { clip: AnimationClip | null; deforms: boolean }>();
   const built = new Map<string, ModelClips>();
 
   const roll6Of = (name: Roll6ClipName) => {
@@ -296,17 +298,34 @@ export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], bo
     return entry;
   };
 
-  return (choices) => {
-    const key = clipChoicesKey(choices);
+  const libraryOf = (id: number, clip: Roll6Clip) => {
+    let entry = fromLibrary.get(id);
+    if (!entry) {
+      const built = buildRoll6Clip(clip, root, height);
+      entry = { clip: built, deforms: deformsAtFull(clip, built, root, height) };
+      fromLibrary.set(id, entry);
+    }
+    return entry;
+  };
+
+  return (choices, library) => {
+    // The library ids that resolved are part of the key: when their files arrive, the clips are built again.
+    const loaded = clipChoiceIds(choices).filter((id) => Boolean(library?.get(id)));
+    const key = `${clipChoicesKey(choices)}|${loaded.join(',')}`;
     let clips = built.get(key);
     if (clips) return clips;
     let reduced = false;
     let deforms = false;
     const sources = { idle: 'static', walk: 'static', down: 'static' } as Record<AnimationState, AnimationSource>;
     const clipOf = (state: AnimationState): AnimationClip | null => {
-      const resolved = resolveAnimation(choices[state], names, boneNames, state);
+      const resolved = resolveAnimation(choices[state], names, boneNames, state, library);
       sources[state] = resolved.source;
       if (resolved.source === 'file') return fileClips[resolved.index];
+      if (resolved.source === 'library') {
+        const entry = libraryOf(resolved.id, library!.get(resolved.id)!);
+        if (entry.deforms) deforms = true;
+        return entry.clip;
+      }
       if (resolved.source === 'roll6') {
         const entry = roll6Of(resolved.clip);
         if (entry.reduced) reduced = true;

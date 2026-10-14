@@ -49,6 +49,7 @@ public class McpRouteParityTests
             if (type == typeof(bool)) return true;
             if (type == typeof(string)) return p.Name == "contentBase64" ? Convert.ToBase64String(new byte[] { 1, 2, 3 }) : p.Name == "fileName" ? "sample.png" : "sample";
             if (type == typeof(List<string>)) return new List<string> { "sample", "other" };
+            if (type == typeof(System.Text.Json.JsonElement)) return System.Text.Json.JsonDocument.Parse("{\"format\":\"roll6-animation\"}").RootElement;
             throw new InvalidOperationException($"No sample for {p.ParameterType} {p.Name}");
         }).ToArray();
         return await (Task<CallToolResult>)method.Invoke(null, args)!;

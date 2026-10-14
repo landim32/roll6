@@ -1,0 +1,23 @@
+{
+  "format": "roll6-animation",
+  "version": 1,
+  "name": "Aceno",
+  "type": "idle",
+  "description": "Acena com a mão direita acima da cabeça.",
+  "duration": 1,
+  "loop": true,
+  "tracks": [],
+  "hipsLift": {
+    "times": [
+      0,
+      0.5,
+      1
+    ],
+    "values": [
+      0,
+      0.003,
+      0
+    ],
+    "of": "height"
+  }
+}
