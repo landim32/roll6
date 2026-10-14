@@ -17,15 +17,19 @@ public class ConversationMessage : INotifyPropertyChanged
 {
     private string _text;
 
-    public ConversationMessage(ConversationRole role, string text)
+    public ConversationMessage(ConversationRole role, string text, IReadOnlyList<byte[]>? images = null)
     {
         Role = role;
         _text = text;
+        Images = images ?? Array.Empty<byte[]>();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ConversationRole Role { get; }
+
+    /// <summary>The prints of the 3D view sent with a user line (PNG), shown as thumbnails.</summary>
+    public IReadOnlyList<byte[]> Images { get; }
 
     public string Text
     {

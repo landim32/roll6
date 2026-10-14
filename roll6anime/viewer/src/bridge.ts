@@ -4,14 +4,23 @@ import type { AnimationFile } from '@roll6/lib/animationFormat';
 export type HostMessage =
   | { type: 'model'; url: string; name: string }
   | { type: 'animation'; fileName: string; file: AnimationFile; keepTime: boolean }
-  | { type: 'clear' };
+  | { type: 'clear' }
+  /** A print of the view as it is on screen, for the request to the Claude. */
+  | { type: 'capture'; id: number };
 
 /** Messages to the WPF window. */
 export type ViewerMessage =
   | { type: 'ready' }
   | { type: 'modelLoaded'; mixamo: boolean; bones: number }
   | { type: 'modelError'; message: string }
-  | { type: 'animationError'; message: string };
+  | { type: 'animationError'; message: string }
+  /**
+   * The print asked by `capture`: the PNG (base64, no `data:` prefix), the instant (null without an animation) and the
+   * camera around the character (`azimuth` 0° = in front, positive toward its left; `elevation` above its middle),
+   * or why it failed.
+   */
+  | { type: 'captured'; id: number; png: string; time: number | null; duration: number | null; paused: boolean; azimuth: number; elevation: number }
+  | { type: 'captureFailed'; id: number; message: string };
 
 /** The part of WebView2's `window.chrome.webview` the view uses. */
 interface WebViewHost {

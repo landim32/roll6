@@ -15,6 +15,7 @@ Todas as mensagens são objetos JSON com `type`.
 | `model` | `url` (string, `https://model.roll6anime/<arquivo>?v=<n>`, respondida pela casca via `WebResourceRequested` com CORS), `name` (string) | Carrega o `.glb` com `loadModel(url)`, mostra-o de frente, inteiro, sobre um disco, e enquadra a câmera. Se já houver uma animação, monta-a nesse modelo. |
 | `animation` | `fileName` (string), `file` (o documento `roll6-animation` **já validado**), `keepTime` (bool) | Monta o clip com `toRoll6Clip(file, "animation:" + fileName)` + `buildRoll6Clip(clip, model, height)` e toca. Com `keepTime` (o mesmo arquivo mudou), continua do mesmo instante, limitado à nova duração, e mantém tocando/pausado. Sem `keepTime` (outro arquivo), começa do 0, tocando. A câmera nunca muda. |
 | `clear` | — | Para a animação e deixa o modelo na pose de descanso; a barra fica desativada. |
+| `capture` | `id` (number) | Desenha a cena de novo e lê o canvas na hora (PNG): o print da vista como está, para anexar ao pedido. |
 
 ## Vista → casca
 
@@ -24,6 +25,8 @@ Todas as mensagens são objetos JSON com `type`.
 | `modelLoaded` | `mixamo` (bool), `bones` (number) | O modelo abriu. `mixamo` = `isMixamoSkeleton(boneNames)`; false → a janela mostra o aviso de FR-004. |
 | `modelError` | `message` (string) | O `.glb` não abriu (inválido, sem WebGL). |
 | `animationError` | `message` (string) | O clip não pôde ser montado, por exemplo porque o modelo não tem nenhum osso da animação. |
+| `captured` | `id`, `png` (base64 sem `data:`), `time`/`duration` (null sem animação), `paused`, `azimuth`, `elevation` (graus: 0 = de frente, positivo para a esquerda do personagem; acima do centro) | Resposta a `capture`. A casca monta a legenda (`ViewCapture.Caption`). |
+| `captureFailed` | `id`, `message` | Sem modelo aberto. A casca desiste após 5 s sem resposta. |
 
 ## Barra de tempo (dentro da vista)
 

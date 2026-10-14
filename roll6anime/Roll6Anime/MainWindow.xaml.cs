@@ -63,6 +63,18 @@ public partial class MainWindow : Window
 
     private void OnStop(object sender, RoutedEventArgs e) => _model.Stop();
 
+    private async void OnCapture(object sender, RoutedEventArgs e)
+    {
+        await _model.CaptureAsync();
+        PromptBox.Focus();
+    }
+
+    private void OnRemoveAttachment(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is PromptImage image)
+            _model.RemoveAttachment(image);
+    }
+
     /// <summary>Enter sends, Shift+Enter breaks the line.</summary>
     private async void OnPromptKey(object sender, KeyEventArgs e)
     {

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Roll6Anime.Core.Animations;
+using Roll6Anime.Core.Claude;
 using Roll6Anime.Core.Settings;
 
 namespace Roll6Anime;
@@ -21,7 +22,12 @@ public sealed class ViewerBridge
 
     private readonly WebView2 _view;
     private readonly Queue<string> _pending = new();
+    /// <summary>How long a print may take before the view is given up on.</summary>
+    private static readonly TimeSpan CAPTURE_TIMEOUT = TimeSpan.FromSeconds(5);
+
     private bool _ready;
+    private int _lastCapture;
+    private readonly Dictionary<int, TaskCompletionSource<ViewCapture>> _captures = new();
     /// <summary>The model the view may read: the only file <c>model.roll6anime</c> answers.</summary>
     private string? _modelPath;
 
@@ -69,6 +75,30 @@ public sealed class ViewerBridge
     /// <summary>No animation: the model at rest.</summary>
     public void Clear() => Post(new { type = "clear" });
 
+    /// <summary>
+    /// A print of the view as it is on screen (the pose of this instant, from this camera), with the instant and the
+    /// camera's angles. Throws <see cref="InvalidOperationException"/> with the reason in Portuguese.
+    /// </summary>
+    public async Task<ViewCapture> CaptureAsync()
+    {
+        if (!_ready || _view.CoreWebView2 == null)
+            throw new InvalidOperationException("A vista 3D ainda não abriu.");
+        var id = ++_lastCapture;
+        var pending = new TaskCompletionSource<ViewCapture>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _captures[id] = pending;
+        try
+        {
+            Post(new { type = "capture", id });
+            if (await Task.WhenAny(pending.Task, Task.Delay(CAPTURE_TIMEOUT)) != pending.Task)
+                throw new InvalidOperationException("A vista 3D não respondeu.");
+            return await pending.Task;
+        }
+        finally
+        {
+            _captures.Remove(id);
+        }
+    }
+
     private void Post(object message)
     {
         var json = JsonSerializer.Serialize(message, JSON);
@@ -99,8 +129,24 @@ public sealed class ViewerBridge
             case "animationError":
                 AnimationError?.Invoke(root.TryGetProperty("message", out var animationMessage) ? animationMessage.GetString() ?? string.Empty : string.Empty);
                 break;
+            case "captured":
+                if (_captures.TryGetValue(root.GetProperty("id").GetInt32(), out var captured))
+                    captured.TrySetResult(new ViewCapture(
+                        Convert.FromBase64String(root.GetProperty("png").GetString() ?? string.Empty),
+                        Number(root, "time"), Number(root, "duration"),
+                        root.TryGetProperty("paused", out var paused) && paused.ValueKind == JsonValueKind.True,
+                        Number(root, "azimuth") ?? 0, Number(root, "elevation") ?? 0));
+                break;
+            case "captureFailed":
+                if (_captures.TryGetValue(root.GetProperty("id").GetInt32(), out var failed))
+                    failed.TrySetException(new InvalidOperationException(
+                        root.TryGetProperty("message", out var reason) ? reason.GetString() : "A vista 3D não conseguiu gerar a imagem."));
+                break;
         }
     }
+
+    private static double? Number(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : null;
 
     private void OnResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
     {

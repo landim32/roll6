@@ -48,7 +48,7 @@ public class PromptContextTests
 
         var first = PromptContext.ClaudeArguments(SETTINGS, conversation, "contexto");
 
-        first.Should().ContainInOrder("-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages");
+        first.Should().ContainInOrder("-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages");
         first.Should().ContainInOrder("--session-id", conversation.SessionId.ToString());
         first.Should().ContainInOrder("--permission-mode", "acceptEdits");
         first.Should().ContainInOrder("--allowedTools", "Bash(python:*)");

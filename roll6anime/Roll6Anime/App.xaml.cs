@@ -39,6 +39,26 @@ public partial class App : Application
 }
 
 /// <summary>Visible when the bound value is a non-empty string or any other non-null value; collapsed otherwise.</summary>
+/// <summary>A PNG (bytes) as an image for the screen, decoded at the height asked in the parameter (default 160).</summary>
+public class PngImageConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not byte[] png || png.Length == 0)
+            return null;
+        var image = new System.Windows.Media.Imaging.BitmapImage();
+        image.BeginInit();
+        image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+        image.DecodePixelHeight = int.TryParse(parameter as string, out var height) ? height : 160;
+        image.StreamSource = new System.IO.MemoryStream(png);
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
 public class VisibleWhenSetConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>

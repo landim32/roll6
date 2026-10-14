@@ -69,7 +69,7 @@ public sealed class ClaudeRunnerTests : IDisposable
     }
 
     private static Task<ClaudeOutcome> Run(AnimeSettings settings, Conversation conversation, List<ClaudeEvent> events) =>
-        ClaudeRunner.RunAsync(settings, conversation, "contexto", "pedido", new SyncProgress(events), CancellationToken.None);
+        ClaudeRunner.RunAsync(settings, conversation, "contexto", "pedido", Array.Empty<PromptImage>(), new SyncProgress(events), CancellationToken.None);
 
     /// <summary>Collects the events on the calling thread (Progress&lt;T&gt; would post them later).</summary>
     private sealed class SyncProgress : IProgress<ClaudeEvent>

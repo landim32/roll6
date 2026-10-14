@@ -25,6 +25,7 @@ public static class PromptContext
             lines.Add($"Modelo aberto na tela: {modelPath} (só para referência; não o altere).");
         lines.Add("Grave e altere arquivos com as ferramentas Write/Edit. No Bash, rode só comandos python simples, como o validar.py (sem heredoc, \"&&\", \";\" ou \"|\"): o resto não tem permissão.");
         lines.Add("Não envie a animação ao Roll6 a menos que o usuário peça.");
+        lines.Add("Imagens anexadas ao pedido são prints da vista 3D desta ferramenta, cada uma com a legenda do instante da animação e de onde a câmera olha: use-as para ver a pose que o usuário está comentando.");
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -35,6 +36,7 @@ public static class PromptContext
     public static List<string> ClaudeArguments(AnimeSettings settings, Conversation conversation, string context) => new()
     {
         "-p",
+        "--input-format", "stream-json",
         "--output-format", "stream-json",
         "--verbose",
         "--include-partial-messages",

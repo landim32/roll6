@@ -82,6 +82,28 @@
                            TextTrimming="CharacterEllipsis" />
             </DockPanel>
             <StackPanel DockPanel.Dock="Bottom" Margin="12">
+                <!-- Prints of the 3D view that go with the next request -->
+                <ItemsControl ItemsSource="{Binding Attachments}" Margin="0,0,0,6"
+                              Visibility="{Binding HasAttachments, Converter={StaticResource VisibleWhenTrue}}"
+                              AutomationProperties.Name="Prints anexados">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type claude:PromptImage}">
+                            <Grid Margin="0,0,6,6" ToolTip="{Binding Caption}">
+                                <Border BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="4" Background="{StaticResource Bg}">
+                                    <Image Source="{Binding Png, Converter={StaticResource PngImage}}" Height="72" Stretch="Uniform" />
+                                </Border>
+                                <Button Content="×" Click="OnRemoveAttachment" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Margin="2" Padding="6,0" ToolTip="Remover este print" AutomationProperties.Name="Remover print"
+                                        IsEnabled="{Binding DataContext.CanEditPrompt, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <TextBox x:Name="PromptBox" Text="{Binding Prompt, UpdateSourceTrigger=PropertyChanged}" Height="84"
                          AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                          IsEnabled="{Binding CanEditPrompt}" PreviewKeyDown="OnPromptKey"
@@ -92,6 +114,9 @@
                             ToolTipService.ShowOnDisabled="True" />
                     <Button DockPanel.Dock="Right" Content="Parar" Click="OnStop"
                             Visibility="{Binding IsRunning, Converter={StaticResource VisibleWhenTrue}}" />
+                    <Button DockPanel.Dock="Left" Content="Anexar print" Click="OnCapture" IsEnabled="{Binding CanCapture}" Margin="0,0,6,0"
+                            ToolTip="Anexa ao pedido uma imagem da vista 3D como está agora: a pose deste instante, vista desta câmera"
+                            ToolTipService.ShowOnDisabled="True" />
                     <TextBlock Text="O Claude está trabalhando…" Foreground="{StaticResource Muted}" VerticalAlignment="Center"
                                Visibility="{Binding IsRunning, Converter={StaticResource VisibleWhenTrue}}" />
                 </DockPanel>
@@ -102,8 +127,23 @@
                         <DataTemplate DataType="{x:Type claude:ConversationMessage}">
                             <Border x:Name="Bubble" Margin="0,4" Padding="10,6" CornerRadius="8" Background="{StaticResource Surface2}"
                                     HorizontalAlignment="Left" MaxWidth="360">
-                                <TextBox x:Name="Body" Text="{Binding Text, Mode=OneWay}" TextWrapping="Wrap" IsReadOnly="True"
-                                         Background="Transparent" BorderThickness="0" Foreground="{StaticResource Text}" Padding="0" />
+                                <StackPanel>
+                                    <ItemsControl ItemsSource="{Binding Images}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Image Source="{Binding Converter={StaticResource PngImage}}" Height="96" Stretch="Uniform"
+                                                       Margin="0,0,6,6" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBox x:Name="Body" Text="{Binding Text, Mode=OneWay}" TextWrapping="Wrap" IsReadOnly="True"
+                                             Background="Transparent" BorderThickness="0" Foreground="{StaticResource Text}" Padding="0" />
+                                </StackPanel>
                             </Border>
                             <DataTemplate.Triggers>
                                 <DataTrigger Binding="{Binding Role}" Value="{x:Static claude:ConversationRole.User}">

@@ -58,7 +58,11 @@ As variáveis de ambiente `Roll6Anime__AnimationsFolder` etc. também valem. O �
    metade"). Trocar de animação troca de conversa. **Nova conversa** recomeça a da animação aberta.
 6. **Nova animação** deixa nada selecionado. O próximo pedido cria um arquivo, que entra na lista, fica selecionado
    e herda a conversa.
-7. **Parar** interrompe o Claude.
+7. **Anexar print** junta ao próximo pedido uma imagem da vista 3D como está na tela: a pose do instante atual,
+   vista da câmera onde você a deixou. A miniatura fica sobre o campo do pedido (o X remove), até 5 por pedido. A
+   imagem vai ao Claude como imagem, com uma legenda que diz a animação, o instante e de onde a câmera olha ("122° da
+   frente, para o lado esquerdo do personagem"). Dá para enviar só o print, sem texto.
+8. **Parar** interrompe o Claude.
 
 ## Como é feito
 
@@ -69,7 +73,8 @@ As variáveis de ambiente `Roll6Anime__AnimationsFolder` etc. também valem. O �
 - `Roll6Anime`: a janela WPF.
 - `viewer`: a vista 3D (Vite + TypeScript) dentro de um WebView2. Ela importa o `loadModel`, o `threeClips` e o
   `animationFormat` do site, então uma animação toca aqui exatamente como no Roll6.
-- O Claude é chamado assim: `claude -p --output-format stream-json --verbose --include-partial-messages`, com
-  `--session-id`/`--resume` por animação, `--permission-mode acceptEdits` e o contexto em `--append-system-prompt`.
+- O Claude é chamado assim: `claude -p --input-format stream-json --output-format stream-json --verbose
+  --include-partial-messages`, com `--session-id`/`--resume` por animação, `--permission-mode acceptEdits` e o contexto
+  em `--append-system-prompt`. O pedido entra pelo stdin como uma mensagem de usuário em JSON, com os prints em base64.
 
 Especificação e decisões: `specs/062-roll6anime-editor/`.
