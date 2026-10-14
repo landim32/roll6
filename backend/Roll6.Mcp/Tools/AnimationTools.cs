@@ -16,6 +16,7 @@ public static class AnimationTools
     private const string TYPE = "Type of the animation: 1 Parado (idle), 2 Andando (walk), 3 Correndo (run), 4 Agachado (crouch), 5 Derrotado (defeated), 6 Atacando (attack), 7 Defendendo (defend). For now only 1, 2 and 5 can be chosen on tokens (Parado ← 1, Caminhando ← 2, Caído ← 5); the others are stored for states to come.";
     private const string ANIMATION_ID = "Id of the animation (animationId from list_animations or create_animation).";
     private const string ITEM = "{ animationId, userId, ownerName, name, type, duration, loop, fileUrl, createdAt, updatedAt }";
+    private const string CONTENT = "The animation file: the \"roll6-animation\" JSON object (or its text, which is parsed first).";
 
     [McpServerTool(Name = "create_animation", Title = "Create animation", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/animation")]
@@ -25,34 +26,24 @@ public static class AnimationTools
         held on its last frame), tracks: [{ bone (Mixamo name without prefix, e.g. "RightArm"), times: [0, …, ≤ duration],
         degrees: [[x, y, z] per time] }], hipsLift?: { times, values, of?: "height" | "hips" } } — turns in degrees in the
         character's frame (+X its left, +Y up, +Z forward) on top of the rest pose. Full rules, bones, signs and an example:
-        get_roll6_guide, section "Animations". The file is validated and stored once; it never changes afterwards.
+        get_roll6_guide, section "Animations". The file is validated before it is stored; the owner may replace it later
+        with update_animation_content.
         Who can use it: any authenticated user (the uploader becomes the owner).
         Returns: the animation {{ITEM}}. To use it on a token, send modelIdleClip / modelWalkClip / modelDownClip =
         "animation:{animationId}" in create_token / update_token (the type must match the state: 1 / 2 / 5).
         Common errors: 400 with the problem's key — content (not an object, over 1 MB), content.format, content.version,
         content.duration, content.loop, content.tracks, content.tracks[i].bone (unknown or repeated bone), .times, .degrees,
         content.hipsLift…; name (required, ≤ 100 characters); type (1–7).
-        Related tools: list_animations, get_animation_content, update_token, get_roll6_guide.
+        Related tools: list_animations, get_animation_content, update_animation_content, update_token, get_roll6_guide.
         """)]
     public static async Task<CallToolResult> CreateAnimation(
         Roll6ApiClient api,
         [Description("Name shown in the library and in the token form (required, up to 100 characters). Example: \"Golpe de machado\".")] string name,
         [Description(TYPE)] int type,
-        [Description("The animation file: the \"roll6-animation\" JSON object (or its text, which is parsed first).")] JsonElement content)
+        [Description(CONTENT)] JsonElement content)
     {
-        var document = content;
-        if (content.ValueKind == JsonValueKind.String)
-        {
-            try
-            {
-                document = JsonDocument.Parse(content.GetString() ?? string.Empty).RootElement.Clone();
-            }
-            catch (JsonException ex)
-            {
-                return McpToolRunner.Failure(400, "Bad Request", $"content is not valid JSON: {ex.Message}",
-                    new Dictionary<string, string[]> { ["content"] = new[] { "O arquivo não é um JSON válido." } });
-            }
-        }
+        if (!TryReadContent(content, out var document, out var failure))
+            return failure!;
         return await api.SendAsync(HttpMethod.Post, "/api/animation", new AnimationInsertInfo { Name = name, Type = type, Content = document });
     }
 
@@ -94,11 +85,11 @@ public static class AnimationTools
     [ApiOperation("GET", "/api/animation/{id}/file")]
     [Description("""
         What it does: returns the animation's file — the "roll6-animation" JSON — so it can be read, studied or adapted
-        into a new animation (upload the changed copy with create_animation; a stored file never changes).
+        into a new animation (create_animation) or changed and sent back (update_animation_content, owner only).
         Who can use it: any authenticated user.
         Returns: the JSON document { format, version, duration, loop, tracks, hipsLift? … }.
         Common errors: 404 animation (or its file) not found.
-        Related tools: get_animation, create_animation.
+        Related tools: get_animation, create_animation, update_animation_content.
         """)]
     public static Task<CallToolResult> GetAnimationContent(
         Roll6ApiClient api,
@@ -108,12 +99,12 @@ public static class AnimationTools
     [McpServerTool(Name = "update_animation", Title = "Update animation", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/animation/{id}")]
     [Description($$"""
-        What it does: renames or retypes an animation (send both; the file never changes).
+        What it does: renames or retypes an animation (send both; the file stays — see update_animation_content).
         Who can use it: only the owner.
         Returns: the animation {{ITEM}}.
         Common errors: 400 name/type, 403 not the owner, 404 not found, 409 the type cannot change while a token uses the
         animation in the state of its current type.
-        Related tools: get_animation, list_animations.
+        Related tools: get_animation, list_animations, update_animation_content.
         """)]
     public static Task<CallToolResult> UpdateAnimation(
         Roll6ApiClient api,
@@ -121,6 +112,31 @@ public static class AnimationTools
         [Description("Name (required, up to 100 characters).")] string name,
         [Description(TYPE)] int type) =>
         api.SendAsync(HttpMethod.Put, $"/api/animation/{animationId}", new AnimationUpdateInfo { Name = name, Type = type });
+
+    [McpServerTool(Name = "update_animation_content", Title = "Update animation content", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/animation/{id}/content")]
+    [Description($$"""
+        What it does: replaces the file of an animation with a new "roll6-animation" content (same rules as
+        create_animation), keeping its id, name, type and owner — so every token that uses "animation:{id}" plays the new
+        version. Duration and loop are read again from the new file; the previous file is removed and cannot be recovered
+        (read it first with get_animation_content to keep a copy). {{McpDocs.DESTRUCTIVE}} To change the name or the type use
+        update_animation.
+        Who can use it: only the owner.
+        Returns: the animation {{ITEM}}.
+        Common errors: 400 with the problem's key — content (not an object, over 1 MB), content.format, content.version,
+        content.duration, content.loop, content.tracks, content.tracks[i].bone, .times, .degrees, content.hipsLift…;
+        403 not the owner, 404 not found.
+        Related tools: get_animation_content, update_animation, create_animation, get_roll6_guide.
+        """)]
+    public static async Task<CallToolResult> UpdateAnimationContent(
+        Roll6ApiClient api,
+        [Description(ANIMATION_ID)] long animationId,
+        [Description(CONTENT)] JsonElement content)
+    {
+        if (!TryReadContent(content, out var document, out var failure))
+            return failure!;
+        return await api.SendAsync(HttpMethod.Put, $"/api/animation/{animationId}/content", new AnimationContentInfo { Content = document });
+    }
 
     [McpServerTool(Name = "delete_animation", Title = "Delete animation", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/animation/{id}")]
@@ -135,4 +151,24 @@ public static class AnimationTools
         Roll6ApiClient api,
         [Description(ANIMATION_ID)] long animationId) =>
         api.SendAsync(HttpMethod.Delete, $"/api/animation/{animationId}");
+
+    /// <summary>The content as a JSON document: an object as is, a string parsed first (assistants often send the text).</summary>
+    private static bool TryReadContent(JsonElement content, out JsonElement document, out CallToolResult? failure)
+    {
+        document = content;
+        failure = null;
+        if (content.ValueKind != JsonValueKind.String)
+            return true;
+        try
+        {
+            document = JsonDocument.Parse(content.GetString() ?? string.Empty).RootElement.Clone();
+            return true;
+        }
+        catch (JsonException ex)
+        {
+            failure = McpToolRunner.Failure(400, "Bad Request", $"content is not valid JSON: {ex.Message}",
+                new Dictionary<string, string[]> { ["content"] = new[] { "O arquivo não é um JSON válido." } });
+            return false;
+        }
+    }
 }

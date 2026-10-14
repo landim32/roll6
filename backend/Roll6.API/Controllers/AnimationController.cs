@@ -8,7 +8,8 @@ namespace Roll6.API.Controllers;
 
 /// <summary>
 /// The animation library (059): <c>roll6-animation</c> JSON files moving a Mixamo skeleton, shared like tokens and
-/// chosen for a token's animation states as <c>animation:{id}</c>. Only the owner renames, retypes or deletes.
+/// chosen for a token's animation states as <c>animation:{id}</c>. Only the owner renames, retypes, replaces the content
+/// or deletes.
 /// </summary>
 [Authorize]
 public class AnimationController : ApiControllerBase
@@ -50,8 +51,9 @@ public class AnimationController : ApiControllerBase
     }
 
     /// <summary>
-    /// The animation file, served by the API (the bucket sends no CORS headers and its URLs expire). It never changes, so
-    /// it may be cached for good; <c>nosniff</c> keeps browsers from reading it as anything but JSON.
+    /// The animation file, served by the API (the bucket sends no CORS headers and its URLs expire). The owner may replace
+    /// the content under the same id, so browsers revalidate it; <c>nosniff</c> keeps them from reading it as anything but
+    /// JSON.
     /// </summary>
     [HttpGet("{id:long}/file")]
     [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
@@ -61,7 +63,7 @@ public class AnimationController : ApiControllerBase
         try
         {
             var file = await _animationService.OpenFileAsync(id);
-            Response.Headers.CacheControl = "private, max-age=31536000, immutable";
+            Response.Headers.CacheControl = "private, no-cache";
             Response.Headers.XContentTypeOptions = "nosniff";
             return File(file.Content, "application/json");
         }
@@ -94,6 +96,22 @@ public class AnimationController : ApiControllerBase
         try
         {
             return Ok(await _animationService.UpdateAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Replaces the animation's file with a new <c>roll6-animation</c> content (owner only).</summary>
+    [HttpPut("{id:long}/content")]
+    [RequestSizeLimit(1_100_000)]
+    [ProducesResponseType(typeof(AnimationInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReplaceContent(long id, [FromBody] AnimationContentInfo info)
+    {
+        try
+        {
+            return Ok(await _animationService.ReplaceContentAsync(CurrentUserId, id, info));
         }
         catch (Exception ex)
         {

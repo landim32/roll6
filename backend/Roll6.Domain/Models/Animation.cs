@@ -6,7 +6,8 @@ namespace Roll6.Domain.Models;
 
 /// <summary>
 /// A library animation (059): a <c>roll6-animation</c> JSON file uploaded by a user, stored in the bucket as
-/// <c>{guid}.json</c> and shared like tokens. Its duration and loop are read from the file; the file never changes.
+/// <c>{guid}.json</c> and shared like tokens. Its duration and loop are read from the file. A stored file is never
+/// overwritten: changing the content stores a new file and points the animation to it (<see cref="ReplaceFile"/>).
 /// Tokens use it through the choice <c>animation:{id}</c> of an animation state.
 /// </summary>
 public class Animation
@@ -37,6 +38,15 @@ public class Animation
     public void AttachFile(string fileName)
     {
         FileName = Guard.AnimationFileName(fileName, "fileName");
+    }
+
+    /// <summary>A new version of the content: the new stored file and the duration and loop read from it.</summary>
+    public void ReplaceFile(string fileName, double duration, bool loop)
+    {
+        FileName = Guard.AnimationFileName(fileName, "fileName");
+        Duration = duration;
+        Loop = loop;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void Rename(string? name)
