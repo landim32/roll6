@@ -350,6 +350,7 @@ public partial class MapTokenService : IMapTokenService
                 ModelIdleClip = token?.ModelIdleClip,
                 ModelWalkClip = token?.ModelWalkClip,
                 ModelDownClip = token?.ModelDownClip,
+                ModelScale = token?.ModelScale ?? Validation.Guard.MODEL_SCALE_DEFAULT,
                 CampaignCharacterId = mapToken.CampaignCharacterId,
                 Name = mapToken.Name,
                 TokenType = (int)mapToken.TokenType,

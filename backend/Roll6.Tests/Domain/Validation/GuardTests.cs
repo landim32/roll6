@@ -118,4 +118,32 @@ public class GuardTests
         else
             act.Should().Throw<DomainValidationException>();
     }
+
+    [Theory]
+    [InlineData(25)]
+    [InlineData(100)]
+    [InlineData(135)]
+    [InlineData(400)]
+    public void ModelScale_AcceptsPercentagesInStepsOfFive(int scale)
+    {
+        Guard.ModelScale(scale, "modelScale").Should().Be(scale);
+    }
+
+    [Fact]
+    public void ModelScale_NullIsTheDefault()
+    {
+        Guard.ModelScale(null, "modelScale").Should().Be(100);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(20)]
+    [InlineData(42)]
+    [InlineData(405)]
+    public void ModelScale_RefusesOutsideTheRangeOrTheStep(int scale)
+    {
+        var act = () => Guard.ModelScale(scale, "modelScale");
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelScale");
+    }
 }

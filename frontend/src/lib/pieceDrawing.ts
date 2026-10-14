@@ -1,6 +1,7 @@
 import { footprintLocal, hexCenter, hexCorners } from './hexGrid';
 import type { Point } from './hexGrid';
 import { tokenSpriteUrls } from './spriteView';
+import { modelScaleFactor } from './modelScale';
 import type { ModelClipChoices } from './modelAnimations';
 import type { ViewImages } from './spriteView';
 import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
@@ -127,6 +128,8 @@ export interface SpriteSpec {
   modelUrl: string | null;
   /** The animation chosen for each state of that model (056; null = automatic). */
   modelClips: ModelClipChoices;
+  /** Size of that model (063) as a factor of its automatic height; 1 = as before. */
+  modelScale: number;
 }
 
 /**
@@ -156,5 +159,6 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     baseColor: BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
     modelUrl: token.modelFileUrl ?? null,
     modelClips: { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null, down: token.modelDownClip ?? null },
+    modelScale: modelScaleFactor(token.modelScale),
   };
 };

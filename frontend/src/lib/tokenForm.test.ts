@@ -40,6 +40,13 @@ describe('toTokenInsert', () => {
     expect(toTokenInsert(form(), 'a.png', null).modelFile).toBeNull();
   });
 
+  it('sends the model size (063), 100 without a model or when not given', () => {
+    const model = { modelFile: 'm.glb', modelIdleClip: null, modelWalkClip: null, modelDownClip: null };
+    expect(toTokenInsert(form(), 'a.png', null, undefined, { ...model, modelScale: 150 }).modelScale).toBe(150);
+    expect(toTokenInsert(form(), 'a.png', null, undefined, model).modelScale).toBe(100);
+    expect(toTokenInsert(form(), 'a.png', null, undefined, { ...model, modelFile: null, modelScale: 150 }).modelScale).toBe(100);
+  });
+
   it('drops the animation choices when there is no model', () => {
     const sent = toTokenInsert(form(), 'a.png', null, undefined, {
       modelFile: null, modelIdleClip: 'none', modelWalkClip: 'animation:4', modelDownClip: 'none',
@@ -51,6 +58,7 @@ describe('toTokenInsert', () => {
     expect(toTokenInsert(form({ name: ' Goblin ', description: '  ', upSpace: '1', downSpace: '' }), 'a.png', null)).toEqual({
       name: 'Goblin', description: null, upSpace: 1, downSpace: null, upImage: 'a.png', downImage: null,
       frontImage: null, rightImage: null, leftImage: null, backImage: null, modelFile: null, modelIdleClip: null, modelWalkClip: null, modelDownClip: null,
+      modelScale: 100,
     });
     expect(toTokenInsert(form({ downSpace: '2' }), null, 'b.png').downSpace).toBe(2);
   });

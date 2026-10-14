@@ -136,4 +136,42 @@ public class TokenTests
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelDownClip");
     }
+
+    [Fact]
+    public void UpdateModel_KeepsTheSizeOfAModel()
+    {
+        var token = new Token();
+
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", scale: 150);
+
+        token.ModelScale.Should().Be(150);
+    }
+
+    [Fact]
+    public void UpdateModel_WithoutAModel_TheSizeIsTheDefault()
+    {
+        var token = new Token { ModelFile = "0123456789abcdef0123456789abcdef.glb", ModelScale = 200 };
+
+        token.UpdateModel(null, scale: 250);
+
+        token.ModelScale.Should().Be(100);
+    }
+
+    [Fact]
+    public void UpdateModel_OmittedSize_IsTheDefault()
+    {
+        var token = new Token { ModelScale = 200 };
+
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb");
+
+        token.ModelScale.Should().Be(100);
+    }
+
+    [Fact]
+    public void UpdateModel_InvalidSize_IsRefused()
+    {
+        var act = () => new Token().UpdateModel("0123456789abcdef0123456789abcdef.glb", scale: 42);
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelScale");
+    }
 }

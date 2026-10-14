@@ -10,6 +10,7 @@ import { clipChoiceIds } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ModelClipChoices } from '../../lib/modelAnimations';
 import type { Roll6Clip } from '../../lib/roll6Clips';
 import { LYING_TILT } from '../../lib/modelFit';
+import { previewFraming } from '../../lib/modelScale';
 import { instantiate, loadModel } from '../story/loadModel';
 import type { ModelAsset } from '../story/loadModel';
 
@@ -56,6 +57,11 @@ interface ModelPreviewProps {
   /** The file could not be opened (or the device has no WebGL). */
   onError: () => void;
   label: string;
+  /**
+   * Size of the model (063) as a factor of its automatic height: the disc stays as the reference of the piece's base,
+   * the model grows or shrinks on it and the camera moves back for a bigger one to fit. Default 1.
+   */
+  scale?: number;
 }
 
 /** Height of the model in the preview's units, and how fast the stage turns by itself (radians per second). */
@@ -63,6 +69,9 @@ const PREVIEW_HEIGHT = 2;
 const TURN_SPEED = 0.5;
 const DRAG_TURN = 0.01;
 const FADE_SECONDS = 0.25;
+/** Where the camera stands and looks at for a model of the automatic height (scaled by `previewFraming`). */
+const CAMERA_POSITION = { y: 1.4, z: 5.4 };
+const CAMERA_TARGET_Y = 0.95;
 
 /**
  * Preview of a token's 3D model (055) in the "3D" tab of the token form: the model standing on a disc, facing the viewer,
@@ -70,7 +79,7 @@ const FADE_SECONDS = 0.25;
  * the form (056), so the user sees each choice at once. Without a death the down state shows the model laid on its back,
  * as the 3D view does. Its own small three.js scene, loaded lazily with the tab, released when it closes.
  */
-export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips }, ref) => {
+export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** The action the preview shows now (057): the timeline's subject; null when that state has no animation. */
   const current = useRef<AnimationAction | null>(null);
@@ -92,6 +101,10 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const libraryRef = useRef(new Map<number, Roll6Clip | null>());
   const drag = useRef<number | null>(null);
   const stage = useRef<Group | null>(null);
+  /** Between the turntable and the holder (063): the size of the model, scaled about the middle of the disc. */
+  const sizerRef = useRef<Group | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const scaleRef = useRef(scale);
   const callbacks = useRef({ onLoaded, onClips, onError });
   callbacks.current = { onLoaded, onClips, onError };
 
@@ -170,6 +183,16 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   applyRef.current = applyClips;
   const switchRef = useRef(switchState);
   switchRef.current = switchState;
+
+  /** The model's size (063) on the fixed disc, and the camera pulled back so a bigger one still fits. */
+  function applySize(factor: number) {
+    sizerRef.current?.scale.setScalar(factor);
+    const camera = cameraRef.current;
+    if (!camera) return;
+    const framing = previewFraming(factor);
+    camera.position.set(0, CAMERA_POSITION.y * framing, CAMERA_POSITION.z * framing);
+    camera.lookAt(0, CAMERA_TARGET_Y * framing, 0);
+  }
 
   /** Starts `action` from the beginning, playing, as the one the timeline follows (FR-008). */
   function show(action: AnimationAction | null) {
@@ -257,9 +280,12 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     const turntable = new Group();
     scene.add(turntable);
     stage.current = turntable;
+    const sizer = new Group();
+    turntable.add(sizer);
+    sizerRef.current = sizer;
     const camera = new PerspectiveCamera(32, 1, 0.1, 100);
-    camera.position.set(0, 1.4, 5.4);
-    camera.lookAt(0, 0.95, 0);
+    cameraRef.current = camera;
+    applySize(scaleRef.current);
 
     const resize = () => {
       const width = Math.max(1, canvas.clientWidth);
@@ -288,7 +314,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       model.position.set(-((minX + maxX) / 2) * scale, -minY * scale, -((minZ + maxZ) / 2) * scale);
       const holder = new Group();
       holder.add(model);
-      turntable.add(holder);
+      sizer.add(holder);
       holderRef.current = holder;
       sizeRef.current = { depth: (maxZ - minZ) * scale, height: PREVIEW_HEIGHT };
       modelRef.current = model;
@@ -325,11 +351,20 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       holderRef.current = null;
       restRef.current = [];
       stage.current = null;
+      sizerRef.current = null;
+      cameraRef.current = null;
       ground.geometry.dispose();
       (ground.material as MeshBasicMaterial).dispose();
       renderer.dispose();
     };
   }, [url]);
+
+  // Another size (063): the loaded model grows or shrinks on the disc at once, without loading again.
+  useEffect(() => {
+    if (scaleRef.current === scale) return;
+    scaleRef.current = scale;
+    applySize(scale);
+  }, [scale]);
 
   // Another animation chosen for a state: the actions are built again (the model stays where it is).
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { modelService } from '../Services/modelService';
 import { AUTO_CLIPS, parseClipChoice } from '../lib/modelAnimations';
+import { MODEL_SCALE } from '../lib/modelScale';
 import type { AnimationState, ModelClipChoice, ModelClipChoices } from '../lib/modelAnimations';
 import type { ResolvedModel } from '../lib/tokenForm';
 import type { TokenInfo } from '../types/token';
@@ -17,11 +18,14 @@ export interface ModelFileState {
   invalid: boolean;
   /** The animation chosen for each state (null = automatic), saved with the token. */
   clips: ModelClipChoices;
+  /** Size of the model in the 3D view (063), percent: kept when the file is swapped, 100 when it is removed. */
+  scale: number;
   pick: (file: File) => void;
   /** Removes the model: the picked file and the saved one. */
   remove: () => void;
   setInvalid: (invalid: boolean) => void;
   setClip: (state: AnimationState, choice: ModelClipChoice) => void;
+  setScale: (scale: number) => void;
   /** What to send: uploads the picked file, keeps the saved one, or null — with the chosen animations. */
   resolve: () => Promise<ResolvedModel>;
 }
@@ -35,6 +39,8 @@ const savedClips = (token: TokenInfo | null): ModelClipChoices =>
     ? { idle: known(token.modelIdleClip), walk: known(token.modelWalkClip), down: known(token.modelDownClip) }
     : AUTO_CLIPS;
 
+const savedScale = (token: TokenInfo | null): number => (token?.modelFile ? token.modelScale ?? MODEL_SCALE.standard : MODEL_SCALE.standard);
+
 /**
  * State of the token's 3D model in the form, for "Incluir token" and "Editar token". `active` is the modal's open flag:
  * the state starts again when it opens or the token changes. The saved model starts kept, because the token PUT replaces
@@ -46,6 +52,7 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
   const [invalid, setInvalid] = useState(false);
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
   const [clips, setClips] = useState<ModelClipChoices>(() => savedClips(token));
+  const [scale, setScale] = useState(() => savedScale(token));
 
   useEffect(() => {
     if (!active) return;
@@ -53,6 +60,7 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
     setKeepsSaved(!!token?.modelFile);
     setInvalid(false);
     setClips(savedClips(token));
+    setScale(savedScale(token));
   }, [active, token]);
 
   // The picked file as a URL for the preview, released when another is picked or the form goes away.
@@ -77,6 +85,7 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
     setKeepsSaved(false);
     setInvalid(false);
     setClips(AUTO_CLIPS);
+    setScale(MODEL_SCALE.standard);
   }, []);
 
   const setClip = useCallback((state: AnimationState, choice: ModelClipChoice) => {
@@ -85,11 +94,11 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
 
   const resolve = useCallback(async (): Promise<ResolvedModel> => {
     const modelFile = picked ? (await modelService.upload(picked)).fileName : keepsSaved ? token?.modelFile ?? null : null;
-    return { modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down };
-  }, [picked, keepsSaved, token, clips]);
+    return { modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down, modelScale: scale };
+  }, [picked, keepsSaved, token, clips, scale]);
 
   const previewUrl = pickedUrl ?? (keepsSaved ? token?.modelFileUrl ?? null : null);
-  return { picked, previewUrl, keepsSaved, invalid, clips, pick, remove, setInvalid, setClip, resolve };
+  return { picked, previewUrl, keepsSaved, invalid, clips, scale, pick, remove, setInvalid, setClip, setScale, resolve };
 };
 
 export default useModelFile;

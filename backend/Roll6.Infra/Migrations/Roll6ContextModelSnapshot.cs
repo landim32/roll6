@@ -1182,6 +1182,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("model_idle_clip");
 
+                    b.Property<int>("ModelScale")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(100)
+                        .HasColumnName("model_scale");
+
                     b.Property<string>("ModelWalkClip")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")

@@ -2,7 +2,9 @@ using Roll6.Domain.Animations;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Realtime;
 using Roll6.DTO.Common;
+using Roll6.DTO.Realtime;
 using Roll6.DTO.Token;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
@@ -17,6 +19,7 @@ public class TokenLibraryService : ITokenLibraryService
     private readonly INpcRepository<Npc> _npcRepository;
     private readonly IImageStorageAppService _imageStorage;
     private readonly IAnimationRepository<Animation> _animationRepository;
+    private readonly IRealtimeNotifier _notifier;
 
     public TokenLibraryService(
         ITokenRepository<Token> repository,
@@ -24,8 +27,10 @@ public class TokenLibraryService : ITokenLibraryService
         ICharacterRepository<Character> characterRepository,
         INpcRepository<Npc> npcRepository,
         IImageStorageAppService imageStorage,
-        IAnimationRepository<Animation> animationRepository)
+        IAnimationRepository<Animation> animationRepository,
+        IRealtimeNotifier notifier)
     {
+        _notifier = notifier;
         _animationRepository = animationRepository;
         _npcRepository = npcRepository;
         _characterRepository = characterRepository;
@@ -56,20 +61,27 @@ public class TokenLibraryService : ITokenLibraryService
         var token = new Token { UserId = userId };
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
-        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip);
+        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale);
         await CheckLibraryAnimationsAsync(token);
         token.CreatedAt = token.UpdatedAt;
         return MapToDto(await _repository.InsertAsync(token));
     }
 
+    /// <summary>
+    /// Saves the token and tells every campaign with a piece of it to reload its pieces (063: the model's size, its file,
+    /// animations and images reach the table without a reload).
+    /// </summary>
     public async Task<TokenInfo> UpdateAsync(long userId, long tokenId, TokenInsertInfo info)
     {
         var token = await GetOwnedAsync(userId, tokenId);
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
-        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip);
+        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale);
         await CheckLibraryAnimationsAsync(token);
-        return MapToDto(await _repository.UpdateAsync(token));
+        var saved = MapToDto(await _repository.UpdateAsync(token));
+        foreach (var campaignId in await _mapTokenRepository.ListCampaignIdsByTokenAsync(tokenId))
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
+        return saved;
     }
 
     public async Task DeleteAsync(long userId, long tokenId)
@@ -154,6 +166,7 @@ public class TokenLibraryService : ITokenLibraryService
         ModelIdleClip = token.ModelIdleClip,
         ModelWalkClip = token.ModelWalkClip,
         ModelDownClip = token.ModelDownClip,
+        ModelScale = token.ModelScale,
         CreatedAt = token.CreatedAt,
         UpdatedAt = token.UpdatedAt
     };

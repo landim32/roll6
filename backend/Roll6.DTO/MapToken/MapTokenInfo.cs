@@ -53,6 +53,10 @@ public class MapTokenInfo
     [JsonPropertyName("modelDownClip")]
     public string? ModelDownClip { get; set; }
 
+    /// <summary>Size of the token's 3D model in the 3D view (063), percent of its automatic height (100 = as before).</summary>
+    [JsonPropertyName("modelScale")]
+    public int ModelScale { get; set; } = 100;
+
     /// <summary>Participation of a Character token (its name/vitals/status/sheet are shown).</summary>
     [JsonPropertyName("campaignCharacterId")]
     public long? CampaignCharacterId { get; set; }

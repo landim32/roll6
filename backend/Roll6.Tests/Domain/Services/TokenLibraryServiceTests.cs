@@ -4,6 +4,7 @@ using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
+using Roll6.DTO.Realtime;
 using Roll6.DTO.Token;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
@@ -18,15 +19,17 @@ public class TokenLibraryServiceTests
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Mock<IAnimationRepository<Animation>> _animationRepository = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly TokenLibraryService _service;
 
     public TokenLibraryServiceTests()
     {
         _repository.Setup(r => r.InsertAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
         _repository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(new Token { TokenId = 5, UserId = 1, Name = "Goblin" });
+        _mapTokenRepository.Setup(r => r.ListCampaignIdsByTokenAsync(It.IsAny<long>())).ReturnsAsync(new List<long>());
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string>())).Returns((string? name) => name == null ? null : "https://x/" + name);
         _service = new TokenLibraryService(_repository.Object, _mapTokenRepository.Object, _characterRepository.Object, _npcRepository.Object, _imageStorage.Object,
-            _animationRepository.Object);
+            _animationRepository.Object, _notifier.Object);
     }
 
     private const string DOWN_IMAGE = "0123456789abcdef0123456789abcdef.png";
@@ -409,5 +412,62 @@ public class TokenLibraryServiceTests
 
         result.ModelIdleClip.Should().BeNull();
         _animationRepository.Verify(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_SavesTheModelSize()
+    {
+        var result = await _service.CreateAsync(1, new TokenInsertInfo { Name = "Ogro", ModelFile = MODEL_FILE, ModelScale = 150 });
+
+        result.ModelScale.Should().Be(150);
+    }
+
+    [Fact]
+    public async Task Create_InvalidModelSize_IsRefused()
+    {
+        var act = () => _service.CreateAsync(1, new TokenInsertInfo { Name = "Ogro", ModelFile = MODEL_FILE, ModelScale = 42 });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("modelScale");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<Token>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_ChangesTheModelSize_AndRemovingTheModelResetsIt()
+    {
+        _repository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(new Token { TokenId = 7, UserId = 1, Name = "Orc", ModelFile = MODEL_FILE, ModelScale = 150 });
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
+
+        (await _service.UpdateAsync(1, 7, new TokenInsertInfo { Name = "Orc", ModelFile = MODEL_FILE, ModelScale = 200 })).ModelScale.Should().Be(200);
+        (await _service.UpdateAsync(1, 7, new TokenInsertInfo { Name = "Orc", ModelScale = 200 })).ModelScale.Should().Be(100);
+    }
+
+    [Fact]
+    public async Task Update_TellsEachCampaignWithAPieceOfTheToken()
+    {
+        _repository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(new Token { TokenId = 7, UserId = 1, Name = "Orc", ModelFile = MODEL_FILE });
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
+        _mapTokenRepository.Setup(r => r.ListCampaignIdsByTokenAsync(7)).ReturnsAsync(new List<long> { 3, 9 });
+
+        await _service.UpdateAsync(1, 7, new TokenInsertInfo { Name = "Orc", ModelFile = MODEL_FILE, ModelScale = 120 });
+
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
+            e.Type == TableEventType.MAP_TOKENS_CHANGED && e.MapId == null && e.ActorUserId == 1 && (e.CampaignId == 3 || e.CampaignId == 9))), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Create_TellsNoCampaign()
+    {
+        await _service.CreateAsync(1, new TokenInsertInfo { Name = "Ogro" });
+
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_Refused_TellsNoCampaign()
+    {
+        var act = () => _service.UpdateAsync(2, 5, new TokenInsertInfo { Name = "Goblin" });
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
     }
 }

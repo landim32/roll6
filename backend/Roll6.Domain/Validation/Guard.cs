@@ -130,6 +130,24 @@ public static class Guard
             "Animação inválida. Use \"none\", \"clip:{nome}\" ou \"animation:{id}\".");
     }
 
+    /// <summary>Smallest, largest, step and default of the size of a token's 3D model (063), in percent.</summary>
+    public const int MODEL_SCALE_MIN = 25;
+    public const int MODEL_SCALE_MAX = 400;
+    public const int MODEL_SCALE_STEP = 5;
+    public const int MODEL_SCALE_DEFAULT = 100;
+
+    /// <summary>
+    /// The size of a token's 3D model (063): the percentage of its automatic height in the 3D view (the 2.5D figure's
+    /// silhouette), 25–400 in steps of 5. Null = 100 (as before).
+    /// </summary>
+    public static int ModelScale(int? value, string field)
+    {
+        var scale = value ?? MODEL_SCALE_DEFAULT;
+        if (scale < MODEL_SCALE_MIN || scale > MODEL_SCALE_MAX || scale % MODEL_SCALE_STEP != 0)
+            throw new DomainValidationException(field, "O tamanho do modelo deve ser de 25% a 400%, em passos de 5%.");
+        return scale;
+    }
+
     public static string Email(string? value, string field)
     {
         var email = RequiredText(value, field, 260).ToLowerInvariant();
