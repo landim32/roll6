@@ -3,9 +3,15 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { useAnimation } from '../../hooks/useAnimation';
+import { useAuth } from '../../hooks/useAuth';
 import type { ModelFileState } from '../../hooks/useModelFile';
+import { animationService } from '../../Services/animationService';
+import type { AnimationInfo } from '../../types/animation';
 import { checkModelFile } from '../../lib/modelFile';
-import { ANIMATION_STATES, clipChoiceFromValue, clipChoiceOptions } from '../../lib/modelAnimations';
+import {
+  ANIMATION_STATES, STATE_ANIMATION_TYPE, animationChoice, clipChoiceFromValue, clipChoiceOptions, isMixamoSkeleton, parseClipChoice,
+} from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ClipOption } from '../../lib/modelAnimations';
 import { ModelTimeline } from './ModelTimeline';
 import { CameraIcon } from '../ui/icons';
@@ -32,8 +38,8 @@ interface ModelFieldProps {
 /**
  * The "3D" tab of the token form (055): pick a `.glb` (checked here — extension, size, glTF 2.0 header — before
  * anything is sent), see it standing, walking and down (058) in a preview, choose which animation plays in each state (056: a clip
- * of the file, Roll6's own, none, or the automatic rule) and see that choice at once in the same preview, or remove
- * the saved model. The file is uploaded only when the token is saved.
+ * of the file, Roll6's own, a library animation of the state's type (059), none, or the automatic rule) and see that
+ * choice at once in the same preview, or remove the saved model. The file is uploaded only when the token is saved.
  */
 export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
   const { t } = useTranslation();
@@ -51,6 +57,12 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
   const [still, setStill] = useState(false);
   const previewRef = useRef<ModelPreviewHandle>(null);
   const { previewUrl, clips, setClip, setInvalid } = state;
+  const { byType, listForType } = useAnimation();
+  const { session } = useAuth();
+  const userId = session?.user.userId;
+  /** Names of chosen library animations that are not in the loaded lists (another user's, beyond the first page). */
+  const [chosenNames, setChosenNames] = useState<Record<number, string>>({});
+  const mixamo = info !== null && isMixamoSkeleton(info.boneNames);
 
   // A new model to show: wait for the preview to say what it found.
   useEffect(() => {
@@ -69,6 +81,38 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
       : null),
     [info],
   );
+
+  // The library animations each state may take (059): loaded once per type, only for a Mixamo skeleton.
+  useEffect(() => {
+    if (!mixamo) return;
+    for (const animation of ANIMATION_STATES) listForType(STATE_ANIMATION_TYPE[animation]);
+  }, [mixamo, listForType]);
+
+  const libraryOf = (animation: AnimationState): AnimationInfo[] => byType[STATE_ANIMATION_TYPE[animation]] ?? [];
+
+  /** A chosen library animation, by id, as it reads: its name (or "Animação #id" until it is known). */
+  const animationName = (animationId: number): string => {
+    for (const animation of ANIMATION_STATES) {
+      const found = libraryOf(animation).find((item) => item.animationId === animationId);
+      if (found) return found.name;
+    }
+    return chosenNames[animationId] || t('tokens.model.choice.libraryLoading', { id: animationId });
+  };
+
+  // Chosen library animations missing from the loaded lists: read their names.
+  useEffect(() => {
+    for (const animation of ANIMATION_STATES) {
+      const parsed = parseClipChoice(clips[animation]);
+      if (parsed.kind !== 'animation' || chosenNames[parsed.id] !== undefined) continue;
+      const list = byType[STATE_ANIMATION_TYPE[animation]];
+      if (!list || list.some((item) => item.animationId === parsed.id)) continue;
+      const id = parsed.id;
+      setChosenNames((current) => ({ ...current, [id]: current[id] ?? '' }));
+      animationService.get(id)
+        .then((found) => setChosenNames((current) => ({ ...current, [id]: found.name })))
+        .catch(() => undefined);
+    }
+  }, [clips, byType, chosenNames]);
 
   const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -95,6 +139,10 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
   const sourceLabel = (source: AnimationSource, animation: AnimationState): string => {
     if (animation === 'down' && source === 'roll6') return t('tokens.model.source.death');
     if (animation === 'down' && source === 'static') return t('tokens.model.source.lying');
+    if (source === 'library') {
+      const parsed = parseClipChoice(clips[animation]);
+      return t('tokens.model.source.library', { name: parsed.kind === 'animation' ? animationName(parsed.id) : '' });
+    }
     return t(`tokens.model.source.${source}`);
   };
 
@@ -229,6 +277,26 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
                   {options[animation].map((option) => (
                     <option key={option.value} value={option.value}>{optionLabel(option, animation)}</option>
                   ))}
+                  {(() => {
+                    const list = mixamo ? libraryOf(animation) : [];
+                    const chosen = parseClipChoice(clips[animation]);
+                    const extra = chosen.kind === 'animation' && !list.some((item) => item.animationId === chosen.id) ? chosen.id : null;
+                    if (list.length === 0 && extra === null) return null;
+                    return (
+                      <optgroup label={t('tokens.model.libraryGroup')}>
+                        {list.map((item) => (
+                          <option key={item.animationId} value={animationChoice(item.animationId)}>
+                            {item.userId === userId || !item.ownerName
+                              ? t('tokens.model.choice.library', { name: item.name })
+                              : t('tokens.model.choice.libraryOther', { name: item.name, owner: item.ownerName })}
+                          </option>
+                        ))}
+                        {extra !== null && (
+                          <option value={animationChoice(extra)}>{t('tokens.model.choice.library', { name: animationName(extra) })}</option>
+                        )}
+                      </optgroup>
+                    );
+                  })()}
                 </select>
                 {sources && (
                   <div className="form-text">{t('tokens.model.playing', { source: sourceLabel(sources[animation], animation) })}</div>

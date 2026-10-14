@@ -5,6 +5,7 @@ import { AnimationClip } from 'three';
 import { buildRoll6Clip, createClipBuilder } from './threeClips';
 import { AUTO_CLIPS } from '../../lib/modelAnimations';
 import { ROLL6_CLIPS, ROLL6_DEATH } from '../../lib/roll6Clips';
+import type { Roll6Clip } from '../../lib/roll6Clips';
 
 /**
  * A small Mixamo skeleton in a T pose (055), as three.js names the example orc's bones ("mixamorig:" loses its colon).
@@ -169,5 +170,29 @@ describe('the death on a Mixamo skeleton (058)', () => {
     // On the back: the head behind the hips (−Z), at about their height.
     expect(end.at('Head').z).toBeLessThan(end.at('Hips').z - 0.3);
     expect(Math.abs(end.at('Head').y - end.at('Hips').y)).toBeLessThan(0.15);
+  });
+
+  it('the builder plays library animations in full, once per id, and falls back while they are missing (059)', () => {
+    const root = skeleton();
+    const build = createClipBuilder(root, [], BONES(root), 1.6);
+    const wave: Roll6Clip = {
+      name: 'animation:7', duration: 1, loop: true, protect: false,
+      tracks: [{ bone: 'RightArm', times: [0, 1], degrees: [[0, 0, -150], [0, 0, -150]] }],
+      hipsLift: { times: [0], values: [0] },
+    };
+    const choices = { idle: 'animation:7', walk: null, down: null };
+
+    // Not loaded yet (or failed): the state plays its automatic animation.
+    expect(build(choices).sources.idle).toBe('roll6');
+    expect(build(choices, new Map([[7, null]])).idle?.name).toBe('roll6-idle');
+
+    const library = new Map([[7, wave]]);
+    const played = build(choices, library);
+    expect(played.sources).toEqual({ idle: 'library', walk: 'roll6', down: 'roll6' });
+    expect(played.idle?.name).toBe('roll6-animation:7');
+    // Not fitted to the rig: the arm goes all the way up (the synthetic rig tears nothing, so no warning).
+    expect(played.reduced).toBe(false);
+    // Built once per id: another set of choices using it gets the same clip.
+    expect(build({ idle: 'animation:7', walk: 'animation:7', down: null }, library).walk).toBe(played.idle);
   });
 });

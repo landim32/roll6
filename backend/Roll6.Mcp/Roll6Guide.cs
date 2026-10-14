@@ -178,11 +178,46 @@ public static class Roll6Guide
           no death (`"none"`, or no clip and another skeleton) the model is laid on its back. Pieces without a model
           that are down stay out of the 3D view. The guard stance and the death play in full even on rigs that hold
           arms and legs still (Roll6's idle and walk are reduced there), so they may deform such a model.
+        - A state may also play a **library animation** (059, see "Animations" below): `"animation:{id}"` in
+          `modelIdleClip` / `modelWalkClip` / `modelDownClip`, for Mixamo skeletons.
         - In **free mode** a player walks his own character in the 3D view, in third person (camera locked behind it,
           zoom = distance). That walk is **local to his screen**: it never moves the piece, records nothing and no tool
           sees it — pieces still move only through `move_map_token`.
         - `update_map_model` and `update_token` replace every field: send `maskImage`, `backgroundImage`,
           `wallTextureImage`, the four "2.5D" images and `modelFile` back unchanged or they are removed.
+
+        ## Animations
+        - The **animation library** (059) holds animations anyone can use on a token with a Mixamo skeleton. Each one has
+          a name, an owner, a **type** — 1 Parado (idle), 2 Andando (walk), 3 Correndo (run), 4 Agachado (crouch),
+          5 Derrotado (defeated), 6 Atacando (attack), 7 Defendendo (defend) — and a file. For now each token state takes
+          only its type: `modelIdleClip` ← 1, `modelWalkClip` ← 2, `modelDownClip` ← 5, as `"animation:{animationId}"`;
+          the other types are stored for states to come. `create_animation` uploads, `list_animations` /
+          `get_animation` / `get_animation_content` read, `update_animation` renames or retypes and `delete_animation`
+          removes (owner only; refused with 409 while a token uses it, and so is a retype away from the type of a
+          state that uses it). A stored file never changes: a new version is a new animation.
+        - The file is a JSON object in the **"roll6-animation" format, version 1** — the same data as Roll6's own
+          animations (breathing, walk, guard, death):
+          `{ "format": "roll6-animation", "version": 1, "duration": 1, "loop": true, "tracks": [ { "bone": "RightArm",
+          "times": [0, 0.5, 1], "degrees": [[0, 0, -150], [0, 0, -150], [0, 0, -150]] }, { "bone": "RightForeArm",
+          "times": [0, 0.25, 0.5, 0.75, 1], "degrees": [[0, 0, 0], [0, 0, 30], [0, 0, 0], [0, 0, -30], [0, 0, 0]] } ],
+          "hipsLift": { "times": [0, 0.5, 1], "values": [0, 0.003, 0] } }` (a wave of the right hand above the head).
+          Optional `name`, `type` (the English names above) and `description` are only suggestions.
+        - `duration` 0–30 s; `loop` true = a cycle (make the first key equal the last), false = played once and held on
+          its last frame (deaths, attacks). 1–64 `tracks`, each bone once; `times` 1–600 numbers from 0, ascending, up
+          to `duration`; one `[x, y, z]` per time, each within ±360. `hipsLift` (optional) moves the hips up/down: one
+          value per time, a share of the model's height (`of: "height"`, default) or of the hips' own height above the
+          lowest point (`of: "hips"`, for motions that end on the floor), each within ±2.
+        - Bones (Mixamo names without "mixamorig:"): Hips, Spine, Spine1, Spine2, Neck, Head; Left/Right + Shoulder,
+          Arm, ForeArm, Hand, UpLeg, Leg, Foot, ToeBase; Left/Right + HandThumb1–3, HandIndex1–3, HandMiddle1–3,
+          HandRing1–3, HandPinky1–3. A bone the model lacks is skipped.
+        - Turns are degrees about X, then Y, then Z **in the character's frame** (+X its left, +Y up, +Z forward), on top
+          of the bone's rest pose; the upper arms first hang relaxed whatever T or A pose the rig rests in. +X takes a
+          hanging limb **back** (a negative X raises an arm forward or a thigh forward); knees (`*Leg`) bend with
+          positive X, elbows (`*ForeArm`) with negative X; +Y turns the front to the character's left; +Z raises the
+          left side (`LeftArm` +Z lifts the left arm sideways, `RightArm` −Z the right one). Hips X −90 with hipsLift
+          `of: "hips"` down to about −0.8 lies on the back.
+        - Errors come back keyed: `content`, `content.format`, `content.version`, `content.duration`, `content.loop`,
+          `content.tracks`, `content.tracks[i].bone|times|degrees`, `content.hipsLift.times|values|of`.
 
         ## Chat
         - Each campaign has one **chat**, and it is the campaign's whole timeline: what the players and the master say

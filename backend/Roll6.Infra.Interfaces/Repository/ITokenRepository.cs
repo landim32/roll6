@@ -9,4 +9,8 @@ public interface ITokenRepository<TModel> where TModel : class
     Task<TModel> InsertAsync(TModel entity);
     Task<TModel> UpdateAsync(TModel entity);
     Task DeleteAsync(long id);
+    /// <summary>
+    /// Whether any token holds this animation choice (059, "animation:{id}") in one of the selected state columns.
+    /// </summary>
+    Task<bool> AnyUsesClipAsync(string choice, bool idle, bool walk, bool down);
 }

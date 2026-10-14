@@ -72,6 +72,8 @@ public class GuardTests
     [InlineData("none")]
     [InlineData("clip:Walk")]
     [InlineData("clip:Armature|mixamo.com|Layer0")]
+    [InlineData("animation:5")]
+    [InlineData("animation:12345")]
     public void ModelClip_AcceptsTheKnownChoices(string choice)
     {
         Guard.ModelClip(choice, "modelIdleClip").Should().Be(choice);
@@ -93,10 +95,29 @@ public class GuardTests
     [InlineData("guard")]
     [InlineData("clip:")]
     [InlineData("Walk")]
+    [InlineData("animation:")]
+    [InlineData("animation:abc")]
+    [InlineData("animation:0")]
+    [InlineData("animation:-3")]
     public void ModelClip_RejectsAnythingElse(string choice)
     {
         var act = () => Guard.ModelClip(choice, "modelWalkClip");
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelWalkClip");
+    }
+
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef.json", true)]
+    [InlineData("0123456789abcdef0123456789abcdef.glb", false)]
+    [InlineData("../x.json", false)]
+    [InlineData("0123456789ABCDEF0123456789abcdef.json", false)]
+    public void AnimationFileName_OnlyLibraryNames(string fileName, bool valid)
+    {
+        Guard.IsAnimationFileName(fileName).Should().Be(valid);
+        var act = () => Guard.AnimationFileName(fileName, "fileName");
+        if (valid)
+            act.Should().NotThrow();
+        else
+            act.Should().Throw<DomainValidationException>();
     }
 }

@@ -11,8 +11,10 @@ import { fitLyingModel, fitModel } from '../../lib/modelFit';
 import { occluderBoxes } from '../../lib/occluders';
 import { SHADE_FALLOFF } from '../../lib/raycaster';
 import type { CameraPose, MaskGrid } from '../../lib/raycaster';
-import { sameClipChoices } from '../../lib/modelAnimations';
+import { loadAnimations } from '../../lib/animationCache';
+import { clipChoiceIds, sameClipChoices } from '../../lib/modelAnimations';
 import type { ModelClipChoices } from '../../lib/modelAnimations';
+import type { Roll6Clip } from '../../lib/roll6Clips';
 import { instantiate, loadModel } from './loadModel';
 import type { ModelAsset } from './loadModel';
 import type { FigureDepthMap } from './raycastRenderer';
@@ -134,6 +136,8 @@ export const createModelLayer = (
   depthQuad.visible = false;
   scene.add(depthQuad);
   const drawn = new Map<number, Drawn>();
+  /** Library animations (059) read for this view: id → clip, null when it could not be read. */
+  const library = new Map<number, Roll6Clip | null>();
   const clock = new Clock();
   let dirty = true;
   let disposed = false;
@@ -164,7 +168,7 @@ export const createModelLayer = (
   const animate = (entry: Drawn, fall = false) => {
     if (!entry.asset || !entry.mixer) return;
     entry.mixer.stopAllAction();
-    const built = entry.asset.clips(entry.spec.clips);
+    const built = entry.asset.clips(entry.spec.clips, library);
     entry.idle = built.idle ? entry.mixer.clipAction(built.idle) : null;
     entry.walk = built.walk ? entry.mixer.clipAction(built.walk) : null;
     entry.down = built.down ? entry.mixer.clipAction(built.down) : null;
@@ -186,6 +190,22 @@ export const createModelLayer = (
     dirty = true;
   };
 
+  /**
+   * Library animations (059) the entry's choices name are read once (`lib/animationCache`); until they arrive the
+   * states play their automatic animation, then every model using them is animated again (a lying one at its last frame).
+   */
+  const requestLibrary = (entry: Drawn) => {
+    const missing = clipChoiceIds(entry.spec.clips).filter((id) => !library.has(id));
+    if (missing.length === 0) return;
+    void loadAnimations(missing).then((clips) => {
+      if (disposed) return;
+      for (const [id, clip] of clips) library.set(id, clip);
+      for (const other of drawn.values()) {
+        if (other.asset && clipChoiceIds(other.spec.clips).some((id) => clips.has(id))) animate(other);
+      }
+    });
+  };
+
   const load = (entry: Drawn) => {
     const url = entry.spec.url;
     loadModel(url).then((asset) => {
@@ -196,6 +216,7 @@ export const createModelLayer = (
       entry.object = object;
       entry.mixer = mixer;
       animate(entry);
+      requestLibrary(entry);
       scene.add(object);
       place(entry);
       events.onReady(entry.spec.id);
@@ -300,6 +321,7 @@ export const createModelLayer = (
           const rose = entry.spec.lying && !spec.lying;
           entry.spec = spec;
           if (changed || fell || rose) animate(entry, fell);
+          if (changed) requestLibrary(entry);
           place(entry);
         }
       }

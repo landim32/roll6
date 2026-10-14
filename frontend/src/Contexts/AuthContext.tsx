@@ -4,6 +4,7 @@ import { authService } from '../Services/authService';
 import {
   AUTH_STORAGE_KEY, CAMPAIGN_STORAGE_KEY, CHARACTER_STORAGE_KEY, MAP_STORAGE_KEY, TURN_STORAGE_KEY, readStoredSession, setUnauthorizedHandler,
 } from '../Services/apiHelpers';
+import { clearAnimationCache } from '../lib/animationCache';
 import { runBeforeLogout } from '../lib/beforeLogout';
 import { clearLayoutMode } from '../lib/layoutMode';
 import { clearViewModes } from '../lib/viewMode';
@@ -69,6 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     clearViewModes();
     clearViewQuality();
     clearLayoutMode();
+    clearAnimationCache();
     setSession(null);
   }, []);
 

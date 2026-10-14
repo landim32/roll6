@@ -20,4 +20,13 @@ public interface IImageService
 
     /// <summary>Reads a stored 3D model ({guid}.glb) for the browser (the bucket sends no CORS headers). Null for an invalid name or a missing file.</summary>
     Task<StoredImageInfo?> OpenModelAsync(string fileName);
+
+    /// <summary>Stores a library animation file (059): the validated JSON, as given. Returns its name ({guid}.json).</summary>
+    Task<string> StoreAnimationAsync(byte[] content);
+
+    /// <summary>Reads a stored animation file ({guid}.json). Null for an invalid name or a missing file.</summary>
+    Task<StoredImageInfo?> OpenAnimationAsync(string fileName);
+
+    /// <summary>Removes a stored animation file (059). Best effort: a failure is ignored (nothing points to the file any more).</summary>
+    Task DeleteAnimationAsync(string fileName);
 }

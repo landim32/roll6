@@ -1,3 +1,4 @@
+using Roll6.Domain.Animations;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
@@ -15,14 +16,17 @@ public class TokenLibraryService : ITokenLibraryService
     private readonly ICharacterRepository<Character> _characterRepository;
     private readonly INpcRepository<Npc> _npcRepository;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly IAnimationRepository<Animation> _animationRepository;
 
     public TokenLibraryService(
         ITokenRepository<Token> repository,
         IMapTokenRepository<MapToken> mapTokenRepository,
         ICharacterRepository<Character> characterRepository,
         INpcRepository<Npc> npcRepository,
-        IImageStorageAppService imageStorage)
+        IImageStorageAppService imageStorage,
+        IAnimationRepository<Animation> animationRepository)
     {
+        _animationRepository = animationRepository;
         _npcRepository = npcRepository;
         _characterRepository = characterRepository;
         _repository = repository;
@@ -53,6 +57,7 @@ public class TokenLibraryService : ITokenLibraryService
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
         token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip);
+        await CheckLibraryAnimationsAsync(token);
         token.CreatedAt = token.UpdatedAt;
         return MapToDto(await _repository.InsertAsync(token));
     }
@@ -63,6 +68,7 @@ public class TokenLibraryService : ITokenLibraryService
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
         token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip);
+        await CheckLibraryAnimationsAsync(token);
         return MapToDto(await _repository.UpdateAsync(token));
     }
 
@@ -76,6 +82,37 @@ public class TokenLibraryService : ITokenLibraryService
         if (await _npcRepository.ExistsByTokenAsync(tokenId))
             throw new ConflictException("O token está em uso por NPCs e não pode ser excluído.");
         await _repository.DeleteAsync(tokenId);
+    }
+
+    /// <summary>
+    /// Library animations chosen for the states (059, "animation:{id}") must exist and be of the state's type (Q2):
+    /// Parado ← Parado, Caminhando ← Andando, Caído ← Derrotado.
+    /// </summary>
+    private async Task CheckLibraryAnimationsAsync(Token token)
+    {
+        var chosen = new[]
+            {
+                (Field: AnimationStates.IDLE_FIELD, Choice: token.ModelIdleClip),
+                (Field: AnimationStates.WALK_FIELD, Choice: token.ModelWalkClip),
+                (Field: AnimationStates.DOWN_FIELD, Choice: token.ModelDownClip),
+            }
+            .Select(state => (state.Field, Id: AnimationStates.ParseChoice(state.Choice)))
+            .Where(state => state.Id != null)
+            .ToList();
+        if (chosen.Count == 0)
+            return;
+        var animations = (await _animationRepository.ListByIdsAsync(chosen.Select(state => state.Id!.Value)))
+            .ToDictionary(animation => animation.AnimationId);
+        foreach (var (field, id) in chosen)
+        {
+            if (!animations.TryGetValue(id!.Value, out var animation))
+                throw new DomainValidationException(field, AnimationService.NOT_FOUND);
+            var expected = AnimationStates.TypeFor(field);
+            if (animation.AnimationType != expected)
+                throw new DomainValidationException(field,
+                    $"Esta animação é do tipo {AnimationStates.TypeLabel(animation.AnimationType)}; o estado "
+                    + $"{AnimationStates.StateLabel(field)} aceita só animações do tipo {AnimationStates.TypeLabel(expected)}.");
+        }
     }
 
     private async Task<Token> GetTokenAsync(long tokenId)

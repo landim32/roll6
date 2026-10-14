@@ -5,7 +5,10 @@ import {
   Scene, WebGLRenderer,
 } from 'three';
 import type { AnimationAction, Object3D } from 'three';
+import { loadAnimations } from '../../lib/animationCache';
+import { clipChoiceIds } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ModelClipChoices } from '../../lib/modelAnimations';
+import type { Roll6Clip } from '../../lib/roll6Clips';
 import { LYING_TILT } from '../../lib/modelFit';
 import { instantiate, loadModel } from '../story/loadModel';
 import type { ModelAsset } from '../story/loadModel';
@@ -80,6 +83,8 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const assetRef = useRef<ModelAsset | null>(null);
   const shownRef = useRef(shown);
   const clipsRef = useRef(clips);
+  /** Library animations (059) read for this preview: id → clip, null when it could not be read. */
+  const libraryRef = useRef(new Map<number, Roll6Clip | null>());
   const drag = useRef<number | null>(null);
   const stage = useRef<Group | null>(null);
   const callbacks = useRef({ onLoaded, onClips, onError });
@@ -91,7 +96,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     const mixer = mixerRef.current;
     if (!asset || !mixer) return;
     mixer.stopAllAction();
-    const built = asset.clips(choices);
+    const built = asset.clips(choices, libraryRef.current);
     const down = built.down ? mixer.clipAction(built.down) : null;
     if (down) {
       // The death plays once and rests on its last frame (058).
@@ -105,6 +110,15 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     };
     show(actionOf(shownRef.current));
     callbacks.current.onClips(built.sources, built.reduced, built.deforms);
+    // A library animation not read yet (059): the state plays its automatic one until the file arrives, then the
+    // actions are built again — if the same choices are still shown.
+    const missing = clipChoiceIds(choices).filter((id) => !libraryRef.current.has(id));
+    if (missing.length > 0) {
+      void loadAnimations(missing).then((loaded) => {
+        for (const [id, clip] of loaded) libraryRef.current.set(id, clip);
+        if (assetRef.current === asset && clipsRef.current === choices) applyRef.current(choices);
+      });
+    }
   };
 
   /** The action of a state: the walk falls back to standing still, the down state has only its death. */

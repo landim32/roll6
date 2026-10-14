@@ -24,7 +24,7 @@ public static class TokenTools
         modelFile (optional, from upload_token_model) is a 3D model (.glb) the 3D view draws instead of the 2.5D figure,
         animated standing; the 2.5D images stay as the fallback while it loads. modelIdleClip / modelWalkClip /
         modelDownClip choose the animation of each state (omit = automatic; "roll6"; "none"; "clip:{name}" for a clip
-        of the file). A piece that is down or out of combat lies in the 3D view at the last frame of modelDownClip (the
+        of the file; "animation:{id}" for a library animation of the state's type — see create_animation). A piece that is down or out of combat lies in the 3D view at the last frame of modelDownClip (the
         death), or laid on its back when there is none.
         update_token replaces every field: a 2.5D image or a modelFile you do not send is removed, and an animation
         choice you do not send goes back to automatic.

@@ -22,6 +22,7 @@ public class Roll6Context : DbContext
     public DbSet<Campaign> Campaigns { get; set; }
     public DbSet<Map> Maps { get; set; }
     public DbSet<Token> Tokens { get; set; }
+    public DbSet<Animation> Animations { get; set; }
     public DbSet<MapToken> MapTokens { get; set; }
     public DbSet<Character> Characters { get; set; }
     public DbSet<CampaignCharacter> CampaignCharacters { get; set; }
@@ -153,6 +154,24 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_token");
+        });
+
+        modelBuilder.Entity<Animation>(entity =>
+        {
+            entity.ToTable("animations");
+            entity.HasKey(e => e.AnimationId).HasName("animations_pkey");
+            entity.Property(e => e.AnimationId).HasColumnName("animation_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(Animation.MAX_NAME).IsRequired();
+            entity.Property(e => e.AnimationType).HasColumnName("animation_type").HasConversion<int>();
+            entity.Property(e => e.FileName).HasColumnName("file_name").HasMaxLength(260).IsRequired();
+            entity.Property(e => e.Duration).HasColumnName("duration");
+            entity.Property(e => e.Loop).HasColumnName("loop");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.HasIndex(e => e.UserId).HasDatabaseName("ix_animations_user");
+            entity.HasIndex(e => e.AnimationType).HasDatabaseName("ix_animations_type");
+            HasOwner(entity, "fk_animation_user");
         });
 
         modelBuilder.Entity<MapToken>(entity =>

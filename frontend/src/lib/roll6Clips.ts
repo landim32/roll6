@@ -25,7 +25,8 @@ export interface Roll6Track {
 export type Roll6ClipName = 'idle' | 'walk' | 'guard' | 'death';
 
 export interface Roll6Clip {
-  name: Roll6ClipName;
+  /** One of `Roll6ClipName` for the built-in clips; `animation:{id}` for a clip read from the library (059). */
+  name: string;
   duration: number;
   tracks: Roll6Track[];
   /**

@@ -16,6 +16,9 @@ public class ImageService : IImageService
 
     public const string MODEL_CONTENT_TYPE = "model/gltf-binary";
 
+    /// <summary>Library animation files (059): validated JSON written by the server.</summary>
+    public const string ANIMATION_CONTENT_TYPE = "application/json";
+
     private const string MODEL_INVALID = "Envie um arquivo .glb (glTF binário, versão 2).";
 
     private static readonly Dictionary<string, string> EXTENSIONS = new(StringComparer.OrdinalIgnoreCase)
@@ -100,6 +103,33 @@ public class ImageService : IImageService
         if (!Guard.IsModelFileName(fileName))
             return null;
         return await _storage.OpenAsync(fileName);
+    }
+
+    public async Task<string> StoreAnimationAsync(byte[] content)
+    {
+        using var buffer = new MemoryStream(content, writable: false);
+        return await _storage.UploadAsync(buffer, ANIMATION_CONTENT_TYPE, "json");
+    }
+
+    public async Task<StoredImageInfo?> OpenAnimationAsync(string fileName)
+    {
+        if (!Guard.IsAnimationFileName(fileName))
+            return null;
+        return await _storage.OpenAsync(fileName);
+    }
+
+    public async Task DeleteAnimationAsync(string fileName)
+    {
+        if (!Guard.IsAnimationFileName(fileName))
+            return;
+        try
+        {
+            await _storage.DeleteAsync(fileName);
+        }
+        catch (Exception)
+        {
+            // Best effort: the row is already gone and no other row points to this file.
+        }
     }
 
     /// <summary>glTF 2.0 binary header (12 bytes) followed by the first chunk header, which must be JSON.</summary>
