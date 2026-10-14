@@ -4,11 +4,11 @@ import {
 import type { Bone, KeyframeTrack, Object3D, SkinnedMesh } from 'three';
 import { clipChoiceIds, clipChoicesKey, normalizeBoneName, resolveAnimation } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, LibraryClips, ModelClipChoices } from '../../lib/modelAnimations';
-import { HAND_FINGERS, RELAXED_ARMS, ROLL6_CLIPS_BY_NAME } from '../../lib/roll6Clips';
-import type { Roll6Clip, Roll6ClipName } from '../../lib/roll6Clips';
+import { RELAXED_ARMS } from '../../lib/roll6Clips';
+import type { Roll6Clip } from '../../lib/roll6Clips';
 
 /**
- * Turns Roll6's own animations (`lib/roll6Clips`, turns in the character's frame) into three.js clips for one skeleton
+ * Turns library animations (059; `lib/roll6Clips`, turns in the character's frame) into three.js clips for one skeleton
  * (055). For a bone whose parent rests at the orientation P (in the model's frame) and which rests at L in its parent,
  * a turn D in the model's frame becomes the local rotation P⁻¹·D·P·L: the bone turns about its own joint by D, whatever
  * local axes the rigger gave it. The upper arms first go from their rest direction (T or A pose) to `RELAXED_ARMS`.
@@ -19,9 +19,7 @@ export interface ModelClips {
   /** The death (058): played once by the players, which rest on its last frame. */
   down: AnimationClip | null;
   sources: Record<AnimationState, AnimationSource>;
-  /** Roll6's motion had to be reduced for this rig (some limbs held still so the mesh doesn't tear). */
-  reduced: boolean;
-  /** A chosen Roll6 clip played in full (guard, death — 058, Q1 = A) stretches this model's mesh. */
+  /** A chosen library animation stretches this model's mesh (058, Q1 = A: played in full, the form warns). */
   deforms: boolean;
 }
 
@@ -54,22 +52,17 @@ const worldQuaternion = (node: Object3D | null): Quaternion => {
 };
 
 /** The turn that takes an upper arm from its rest direction to the relaxed one (identity for any other bone). */
-const armCorrection = (bone: Bone, name: string, share = 1): Quaternion => {
+const armCorrection = (bone: Bone, name: string): Quaternion => {
   const relaxed = RELAXED_ARMS[name as keyof typeof RELAXED_ARMS];
   const child = childJoint(bone);
   if (!relaxed || !child) return new Quaternion();
   const from = new Vector3().setFromMatrixPosition(child.matrixWorld).sub(new Vector3().setFromMatrixPosition(bone.matrixWorld));
   if (from.lengthSq() < 1e-12) return new Quaternion();
-  const full = new Quaternion().setFromUnitVectors(from.normalize(), new Vector3(...relaxed).normalize());
-  return new Quaternion().slerp(full, share);
+  return new Quaternion().setFromUnitVectors(from.normalize(), new Vector3(...relaxed).normalize());
 };
 
-/**
- * A Roll6 clip for this skeleton, or null when it has none of the clip's bones. `height` is in the model's units.
- * `limits` scales each bone's turns (0–1, missing = 1); for the upper arms it also scales how far they come down from
- * the T pose — see `fitToRig`.
- */
-export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number, limits: Record<string, number> = {}): AnimationClip | null => {
+/** A library clip for this skeleton, or null when it has none of the clip's bones. `height` is in the model's units. */
+export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number): AnimationClip | null => {
   root.updateMatrixWorld(true);
   const bones = bonesByName(root);
   const rootInverse = worldQuaternion(root).invert();
@@ -82,11 +75,9 @@ export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number, 
     const parent = rootInverse.clone().multiply(worldQuaternion(bone.parent));
     const parentInverse = parent.clone().invert();
     const rest = bone.quaternion.clone();
-    const limit = limits[track.bone] ?? 1;
-    const correction = armCorrection(bone, track.bone, limit);
+    const correction = armCorrection(bone, track.bone);
     const values: number[] = [];
-    for (const [rx, ry, rz] of track.degrees) {
-      const [x, y, z] = [rx * limit, ry * limit, rz * limit];
+    for (const [x, y, z] of track.degrees) {
       const turn = new Quaternion().setFromEuler(new Euler(MathUtils.degToRad(x), MathUtils.degToRad(y), MathUtils.degToRad(z), 'XYZ'));
       const local = parentInverse.clone().multiply(turn.multiply(correction)).multiply(parent).multiply(rest);
       values.push(local.x, local.y, local.z, local.w);
@@ -130,15 +121,6 @@ export const hipsHeight = (root: Object3D, hips: Bone, bones: Map<string, Bone>)
   return Math.max(0, local(hips).y - lowest);
 };
 
-/** Bones that move together: a pair is limited as one, so a model never limps on one side only. */
-const LIMB_GROUPS: string[][] = [
-  ['LeftArm', 'RightArm'], ['LeftForeArm', 'RightForeArm'], ['LeftUpLeg', 'RightUpLeg'], ['LeftLeg', 'RightLeg'],
-  ['LeftFoot', 'RightFoot'], ['LeftShoulder', 'RightShoulder'], ['Spine'], ['Spine1'], ['Spine2'], ['Neck'], ['Head'], ['Hips'],
-  // The fingers of both hands (060): one group, so a rig that tears them keeps the hands open.
-  (['Left', 'Right'] as const).flatMap((side) => HAND_FINGERS.flatMap((finger) => [1, 2, 3].map((joint) => `${side}Hand${finger}${joint}`))),
-];
-/** Amplitudes tried, from the full motion down to none. */
-const LIMIT_STEPS = [1, 0.6, 0.3, 0];
 /** An edge is torn when it grows more than this share of the model's height and to more than 1.5 times its length… */
 const TEAR_GROWTH = 0.03;
 /** …and a motion is refused when more than this share of the edges (or 12, whichever is more) is torn. */
@@ -225,15 +207,10 @@ const tornEdges = (root: Object3D, probe: TearProbe, clip: AnimationClip, times:
 };
 
 /**
- * How much of each Roll6 motion this model's skinning can take (055). Automatic rigs often bind most of the mesh to the
- * hips (the example orc: two thirds of its vertices, feet and hands included): turning a limb then stretches the
- * triangles between it and what stayed behind. Each group of bones is tried alone on the model at its keyframes, from the
- * full motion down to none, and keeps the largest amplitude that tears (almost) nothing — a well rigged model keeps
- * everything, a poor one keeps what it can and never breaks.
- */
-/**
- * Whether a Roll6 clip played in full tears this model's mesh (058): the same test as `fitToRig`, once, on the whole
- * built clip at its keyframes. Used for the clips that are never reduced (guard, death) to warn in the preview.
+ * Whether a library clip tears this model's mesh (058): the built clip posed at its keyframes, an edge counted torn when
+ * it stretches past `TEAR_GROWTH`. Automatic rigs often bind most of the mesh to the hips (the example orc: two thirds
+ * of its vertices), so turning a limb stretches the triangles between it and what stayed behind; the clip still plays
+ * in full and the preview warns.
  */
 export const deformsAtFull = (clip: Roll6Clip, built: AnimationClip | null, root: Object3D, height: number): boolean => {
   if (!built) return false;
@@ -243,62 +220,19 @@ export const deformsAtFull = (clip: Roll6Clip, built: AnimationClip | null, root
   return tornEdges(root, probe, built, clip.tracks[0]?.times ?? [0], height) > allowed;
 };
 
-export const fitToRig = (clip: Roll6Clip, root: Object3D, height: number): Record<string, number> => {
-  const probe = tearProbe(root);
-  const limits: Record<string, number> = {};
-  if (probe.total === 0) return limits;
-  const allowed = Math.max(12, probe.total * TEAR_SHARE);
-  const times = clip.tracks[0]?.times ?? [0];
-  for (const group of LIMB_GROUPS) {
-    const tracks = clip.tracks.filter((track) => group.includes(track.bone));
-    if (tracks.length === 0) continue;
-    const alone: Roll6Clip = { ...clip, tracks, hipsLift: { times: [0, clip.duration], values: [0, 0] } };
-    let chosen = 0;
-    for (const step of LIMIT_STEPS) {
-      const stepLimits = Object.fromEntries(group.map((bone) => [bone, step]));
-      const built = buildRoll6Clip(alone, root, height, stepLimits);
-      if (!built || tornEdges(root, probe, built, times, height) <= allowed) {
-        chosen = step;
-        break;
-      }
-    }
-    for (const bone of group) limits[bone] = chosen;
-  }
-  return limits;
-};
-
 /**
  * The animations of one model for its choices (056; `ModelClipBuilder`): for each state — idle, walk and, since 058,
- * down — the clip `resolveAnimation` points at: a clip of the file, Roll6's own (fitted to the rig, or tested for
- * deformation, once per clip name, then reused: posing the whole mesh is the expensive part) or none. Results are kept
- * per set of choices, so the preview switching selects and every piece of the same token share the work.
+ * down — the clip `resolveAnimation` points at: a clip of the file, a library animation (built and tested for
+ * deformation once per id, then reused: posing the whole mesh is the expensive part) or none. Results are kept per set
+ * of choices, so the preview switching selects and every piece of the same token share the work.
  */
 export type ModelClipBuilder = (choices: ModelClipChoices, library?: LibraryClips) => ModelClips;
 
 export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], boneNames: string[], height: number): ModelClipBuilder => {
   const names = fileClips.map((clip) => clip.name);
-  // Roll6's own clips by name (057: the guard stance is not tied to a state), each fitted to the rig — or, for the
-  // clips played in full (058: guard, death), tested for deformation — once.
-  const own = new Map<Roll6ClipName, { clip: AnimationClip | null; reduced: boolean; deforms: boolean }>();
-  // Library animations (059) by id: played in full like the guard and the death, tested for deformation once.
+  // Library animations (059) by id: played in full, tested for deformation once.
   const fromLibrary = new Map<number, { clip: AnimationClip | null; deforms: boolean }>();
   const built = new Map<string, ModelClips>();
-
-  const roll6Of = (name: Roll6ClipName) => {
-    let entry = own.get(name);
-    if (!entry) {
-      const clip = ROLL6_CLIPS_BY_NAME[name];
-      if (clip.protect) {
-        const limits = fitToRig(clip, root, height);
-        entry = { clip: buildRoll6Clip(clip, root, height, limits), reduced: Object.values(limits).some((limit) => limit < 1), deforms: false };
-      } else {
-        const built = buildRoll6Clip(clip, root, height);
-        entry = { clip: built, reduced: false, deforms: deformsAtFull(clip, built, root, height) };
-      }
-      own.set(name, entry);
-    }
-    return entry;
-  };
 
   const libraryOf = (id: number, clip: Roll6Clip) => {
     let entry = fromLibrary.get(id);
@@ -316,7 +250,6 @@ export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], bo
     const key = `${clipChoicesKey(choices)}|${loaded.join(',')}`;
     let clips = built.get(key);
     if (clips) return clips;
-    let reduced = false;
     let deforms = false;
     const sources = { idle: 'static', walk: 'static', down: 'static' } as Record<AnimationState, AnimationSource>;
     const clipOf = (state: AnimationState): AnimationClip | null => {
@@ -328,18 +261,12 @@ export const createClipBuilder = (root: Object3D, fileClips: AnimationClip[], bo
         if (entry.deforms) deforms = true;
         return entry.clip;
       }
-      if (resolved.source === 'roll6') {
-        const entry = roll6Of(resolved.clip);
-        if (entry.reduced) reduced = true;
-        if (entry.deforms) deforms = true;
-        return entry.clip;
-      }
       return null;
     };
     const idle = clipOf('idle');
     const walk = clipOf('walk');
     const down = clipOf('down');
-    clips = { idle, walk, down, sources, reduced, deforms };
+    clips = { idle, walk, down, sources, deforms };
     built.set(key, clips);
     return clips;
   };

@@ -1,8 +1,8 @@
 import type { Roll6Clip } from './roll6Clips';
 
 /**
- * The animation file format (059, `roll6-animation` version 1): Roll6's own clips (`lib/roll6Clips`) as a JSON file a
- * user uploads to the library. Mirror of `Domain/Animations/AnimationFormat.cs` and of the `criar-animacao` skill's
+ * The animation file format (059, `roll6-animation` version 1): the clips of `lib/roll6Clips` as a JSON file a user
+ * uploads to the library. Mirror of `Domain/Animations/AnimationFormat.cs` and of the `criar-animacao` skill's
  * `validar.py` — same rules, same order, same error keys and messages; the shared cases live in
  * `specs/059-token-animation-library/fixtures/`. Change the three together.
  */
@@ -167,10 +167,9 @@ export const toRoll6Clip = (file: AnimationFile, name: string): Roll6Clip => ({
     ? { times: [...file.hipsLift.times], values: [...file.hipsLift.values], ...(file.hipsLift.of ? { of: file.hipsLift.of } : {}) }
     : { times: [0], values: [0] },
   loop: file.loop,
-  protect: false,
 });
 
-/** One of Roll6's own clips written as a file (the reference that the format is enough — 059, FR-002). */
+/** A clip written back as a file (the round trip that keeps the format lossless — 059, FR-002). */
 export const fromRoll6Clip = (clip: Roll6Clip, extra: { name?: string; type?: string } = {}): AnimationFile => ({
   format: ANIMATION_FORMAT,
   version: ANIMATION_VERSION,

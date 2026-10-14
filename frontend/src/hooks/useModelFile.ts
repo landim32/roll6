@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { modelService } from '../Services/modelService';
-import { AUTO_CLIPS } from '../lib/modelAnimations';
+import { AUTO_CLIPS, parseClipChoice } from '../lib/modelAnimations';
 import type { AnimationState, ModelClipChoice, ModelClipChoices } from '../lib/modelAnimations';
 import type { ResolvedModel } from '../lib/tokenForm';
 import type { TokenInfo } from '../types/token';
@@ -26,9 +26,13 @@ export interface ModelFileState {
   resolve: () => Promise<ResolvedModel>;
 }
 
+/** A saved choice as the form keeps it: one it does not know (e.g. the former "roll6", 061) is automatic. */
+const known = (choice: ModelClipChoice | undefined): ModelClipChoice =>
+  (parseClipChoice(choice ?? null).kind === 'auto' ? null : choice ?? null);
+
 const savedClips = (token: TokenInfo | null): ModelClipChoices =>
   token?.modelFile
-    ? { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null, down: token.modelDownClip ?? null }
+    ? { idle: known(token.modelIdleClip), walk: known(token.modelWalkClip), down: known(token.modelDownClip) }
     : AUTO_CLIPS;
 
 /**

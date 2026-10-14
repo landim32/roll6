@@ -41,7 +41,7 @@ export interface MapTokenInfo {
   backImageUrl: string | null;
   /** 3D model of the piece's token (055), drawn by the 3D view instead of the 2,5D figure. */
   modelFileUrl?: string | null;
-  /** Animations chosen for that model (056): null = automatic, "roll6", "none" or "clip:{name}". */
+  /** Animations chosen for that model (056): null = automatic, "none", "clip:{name}" or "animation:{id}". */
   modelIdleClip?: string | null;
   modelWalkClip?: string | null;
   /** The death (058): played once when the piece is down or out of combat; null = automatic. */

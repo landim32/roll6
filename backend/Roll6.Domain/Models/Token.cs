@@ -29,8 +29,8 @@ public class Token
     public string? ModelFile { get; set; }
     /// <summary>
     /// Which animation the 3D view plays while the model stands still (056): null = automatic (a clip of the file
-    /// named for it, else Roll6's own for a Mixamo skeleton, else none), "roll6", "none" or "clip:{name}" (a clip of
-    /// the file, by its exact name). Only with a model.
+    /// named for it, else none), "none", "clip:{name}" (a clip of the file, by its exact name) or "animation:{id}" (a
+    /// library animation, 059). Only with a model.
     /// </summary>
     public string? ModelIdleClip { get; set; }
     /// <summary>Which animation the 3D view plays while the model walks (056); same values as ModelIdleClip.</summary>

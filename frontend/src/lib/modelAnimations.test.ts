@@ -52,21 +52,20 @@ describe('pickClip', () => {
 });
 
 describe('animationSources', () => {
-  it('the orc (no clips, Mixamo skeleton) gets Roll6\'s idle and walk', () => {
-    expect(animationSources([], ORC_BONES)).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
+  it('a file with clips named for the states uses them', () => {
+    expect(animationSources(['Idle', 'Walk'])).toEqual({ idle: 'file', walk: 'file', down: 'static' });
   });
 
-  it('a file with both clips uses its own, whatever the skeleton', () => {
-    expect(animationSources(['Idle', 'Walk'], ['root'])).toEqual({ idle: 'file', walk: 'file', down: 'static' });
+  it('Roll6 has no animation of its own (061): no clip for a state means none, even on a Mixamo skeleton', () => {
+    expect(animationSources([])).toEqual({ idle: 'static', walk: 'static', down: 'static' });
+    expect(animationSources(['Idle'])).toEqual({ idle: 'file', walk: 'static', down: 'static' });
+    expect(resolveAnimation(null, [], ORC_BONES, 'idle')).toEqual({ source: 'static' });
   });
 
-  it('a file with only the idle clip walks with Roll6\'s walk', () => {
-    expect(animationSources(['Idle'], ORC_BONES)).toEqual({ idle: 'file', walk: 'roll6', down: 'roll6' });
-  });
-
-  it('no clips and another skeleton (or none): it stands still', () => {
-    expect(animationSources([], ['pelvis', 'thigh_l'])).toEqual({ idle: 'static', walk: 'static', down: 'static' });
-    expect(animationSources(['Idle'], [])).toEqual({ idle: 'file', walk: 'static', down: 'static' });
+  it('reads the "roll6"/"roll6-guard" of the former own animations as automatic (061)', () => {
+    expect(parseClipChoice('roll6')).toEqual({ kind: 'auto' });
+    expect(parseClipChoice('roll6-guard')).toEqual({ kind: 'auto' });
+    expect(resolveAnimation('roll6', ['Walk'], ORC_BONES, 'walk')).toEqual({ source: 'file', index: 0 });
   });
 });
 
@@ -100,7 +99,7 @@ describe('library animations (059)', () => {
 
   it('falls back to automatic while loading or when the file failed', () => {
     expect(resolveAnimation('animation:7', ['Idle'], ORC_BONES, 'idle')).toEqual({ source: 'file', index: 0 });
-    expect(resolveAnimation('animation:7', [], ORC_BONES, 'down', new Map([[7, null]]))).toEqual({ source: 'roll6', clip: 'death' });
+    expect(resolveAnimation('animation:7', [], ORC_BONES, 'down', new Map([[7, null]]))).toEqual({ source: 'static' });
   });
 
   it('is nothing on a skeleton that is not Mixamo', () => {
@@ -109,9 +108,9 @@ describe('library animations (059)', () => {
 
   it('tells the sources and the ids to load', () => {
     const choices = { idle: 'animation:7', walk: 'animation:7', down: 'animation:9' };
-    expect(resolvedSources(choices, [], ORC_BONES, new Map([[7, clip]]))).toEqual({ idle: 'library', walk: 'library', down: 'roll6' });
+    expect(resolvedSources(choices, [], ORC_BONES, new Map([[7, clip]]))).toEqual({ idle: 'library', walk: 'library', down: 'static' });
     expect(clipChoiceIds(choices)).toEqual([7, 9]);
-    expect(clipChoiceIds({ idle: 'roll6', walk: null, down: 'clip:Death' })).toEqual([]);
+    expect(clipChoiceIds({ idle: 'none', walk: null, down: 'clip:Death' })).toEqual([]);
   });
 
   it('takes one library type per state (Q2)', () => {

@@ -3,20 +3,20 @@ import type { AnimationType } from '../types/animation';
 import type { Roll6Clip } from './roll6Clips';
 
 /**
- * Where a 3D model's animations come from (055, clarification Q2 = A): for each state — standing still and walking —
- * the file's own clip when one is named for it; else, when the skeleton uses the Mixamo bone names (the convention of
- * the example orc and of the usual auto-riggers), Roll6's own animation; else nothing, and the model stands still.
- * Pure: only names go in.
+ * Where a 3D model's animations come from: for each state — standing still, walking and down — the file's own clip
+ * when one is named for it, else nothing (the model stands still; down lies on its back). Roll6 ships no animation of
+ * its own (061): the other choices are a clip of the file and, on a skeleton with the Mixamo bone names, an animation
+ * of the library (059). Pure: only names go in.
  */
 
 /** Standing still, walking and, since 058, down (the death: played once, resting on its last frame). */
 export type AnimationState = 'idle' | 'walk' | 'down';
-/** Where a state's animation comes from: the file, Roll6's own, the animation library (059) or nothing. */
-export type AnimationSource = 'file' | 'roll6' | 'library' | 'static';
+/** Where a state's animation comes from: the file, the animation library (059) or nothing. */
+export type AnimationSource = 'file' | 'library' | 'static';
 
 export const ANIMATION_STATES: readonly AnimationState[] = ['idle', 'walk', 'down'];
 
-/** The bones a skeleton needs, by their Mixamo names, for Roll6's own animations. */
+/** The bones a skeleton needs, by their Mixamo names, to play library animations (059). */
 export const MIXAMO_REQUIRED = ['Hips', 'Spine', 'Head', 'LeftUpLeg', 'LeftLeg', 'RightUpLeg', 'RightLeg', 'LeftArm', 'RightArm'];
 
 /**
@@ -43,18 +43,17 @@ export const pickClip = (clipNames: readonly string[], state: AnimationState): n
   return index >= 0 ? index : null;
 };
 
-export const animationSources = (clipNames: readonly string[], boneNames: readonly string[]): Record<AnimationState, AnimationSource> => {
-  const mixamo = isMixamoSkeleton(boneNames);
-  const sourceOf = (state: AnimationState): AnimationSource =>
-    pickClip(clipNames, state) !== null ? 'file' : mixamo ? 'roll6' : 'static';
+export const animationSources = (clipNames: readonly string[]): Record<AnimationState, AnimationSource> => {
+  const sourceOf = (state: AnimationState): AnimationSource => (pickClip(clipNames, state) !== null ? 'file' : 'static');
   return { idle: sourceOf('idle'), walk: sourceOf('walk'), down: sourceOf('down') };
 };
 
 // ---------- Chosen animations (056) ----------
 
 /**
- * What the token stores for one state (`modelIdleClip` / `modelWalkClip`): null = automatic (the rule above), "roll6",
- * "none" or "clip:{name}" — a clip of the file by its exact name. Mirrors `Guard.ModelClip` on the server.
+ * What the token stores for one state (`modelIdleClip` / `modelWalkClip` / `modelDownClip`): null = automatic (the rule
+ * above), "none", "clip:{name}" — a clip of the file by its exact name — or "animation:{id}" (059). Mirrors
+ * `Guard.ModelClip` on the server.
  */
 export type ModelClipChoice = string | null;
 export interface ModelClipChoices {
@@ -64,9 +63,6 @@ export interface ModelClipChoices {
   down: ModelClipChoice;
 }
 
-export const CLIP_CHOICE_ROLL6 = 'roll6';
-/** Roll6's guard stance (057, "Posição defensiva"). */
-export const CLIP_CHOICE_ROLL6_GUARD = 'roll6-guard';
 export const CLIP_CHOICE_NONE = 'none';
 export const CLIP_CHOICE_PREFIX = 'clip:';
 /** A library animation (059): "animation:{id}". */
@@ -92,17 +88,16 @@ export type LibraryClips = ReadonlyMap<number, Roll6Clip | null>;
 
 export type ParsedClipChoice =
   | { kind: 'auto' }
-  | { kind: 'roll6' }
-  | { kind: 'guard' }
   | { kind: 'none' }
   | { kind: 'file'; name: string }
   | { kind: 'animation'; id: number };
 
-/** Reads a stored choice; anything unknown counts as automatic (the server refuses it, but be lenient). */
+/**
+ * Reads a stored choice; anything unknown counts as automatic (the server refuses it, but be lenient) — also the
+ * "roll6"/"roll6-guard" of Roll6's former own animations (061).
+ */
 export const parseClipChoice = (choice: ModelClipChoice): ParsedClipChoice => {
   if (!choice) return { kind: 'auto' };
-  if (choice === CLIP_CHOICE_ROLL6) return { kind: 'roll6' };
-  if (choice === CLIP_CHOICE_ROLL6_GUARD) return { kind: 'guard' };
   if (choice === CLIP_CHOICE_NONE) return { kind: 'none' };
   if (choice.startsWith(CLIP_CHOICE_PREFIX) && choice.length > CLIP_CHOICE_PREFIX.length) {
     return { kind: 'file', name: choice.slice(CLIP_CHOICE_PREFIX.length) };
@@ -115,23 +110,18 @@ export const parseClipChoice = (choice: ModelClipChoice): ParsedClipChoice => {
   return { kind: 'auto' };
 };
 
-/** What the 3D view ends up playing for a state: a clip of the file (by index), Roll6's own, or nothing. */
+/** What the 3D view ends up playing for a state: a clip of the file (by index), a library animation, or nothing. */
 export type ResolvedAnimation =
   | { source: 'file'; index: number }
-  /** `clip`: which of Roll6's own animations — the state's own (the death for `down`), or the guard stance (057). */
-  | { source: 'roll6'; clip: 'idle' | 'walk' | 'guard' | 'death' }
   /** A library animation (059), by id: its clip is in the `LibraryClips` handed to `resolveAnimation`. */
   | { source: 'library'; id: number }
   | { source: 'static' };
 
-/** Roll6's own animation of each state (058: the death is the down state's). */
-export const ROLL6_CLIP_OF_STATE: Record<AnimationState, 'idle' | 'walk' | 'death'> = { idle: 'idle', walk: 'walk', down: 'death' };
-
 /**
  * The animation of one state, given the choice and what the model offers: automatic follows `animationSources`; a
- * chosen file clip the file lacks (the file was replaced) also falls back to automatic; "roll6" without a Mixamo
- * skeleton is nothing. A library animation (059) plays on a Mixamo skeleton once its file is loaded (`library`); while
- * it loads, or when it failed or was removed, the state plays its automatic animation — the model never waits on it.
+ * chosen file clip the file lacks (the file was replaced) also falls back to automatic. A library animation (059) plays
+ * on a Mixamo skeleton once its file is loaded (`library`); while it loads, or when it failed or was removed, the state
+ * plays its automatic animation — the model never waits on it.
  */
 export const resolveAnimation = (
   choice: ModelClipChoice, clipNames: readonly string[], boneNames: readonly string[], state: AnimationState,
@@ -143,16 +133,12 @@ export const resolveAnimation = (
     if (!isMixamoSkeleton(boneNames)) return { source: 'static' };
     if (library?.get(parsed.id)) return { source: 'library', id: parsed.id };
   }
-  const own = ROLL6_CLIP_OF_STATE[state];
-  if (parsed.kind === 'roll6') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: own } : { source: 'static' };
-  if (parsed.kind === 'guard') return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: 'guard' } : { source: 'static' };
   if (parsed.kind === 'file') {
     const index = clipNames.indexOf(parsed.name);
     if (index >= 0) return { source: 'file', index };
   }
   const auto = pickClip(clipNames, state);
-  if (auto !== null) return { source: 'file', index: auto };
-  return isMixamoSkeleton(boneNames) ? { source: 'roll6', clip: own } : { source: 'static' };
+  return auto !== null ? { source: 'file', index: auto } : { source: 'static' };
 };
 
 /** The sources of the three states for the chosen animations (what the form lists under the preview). */
@@ -186,8 +172,8 @@ export interface ClipOption {
 }
 
 /**
- * The options of the state's select: automatic (saying what it picks), every clip of the file in the file's order,
- * Roll6's own (only when the skeleton can take it) and none.
+ * The options of the state's select: automatic (saying what it picks), every clip of the file in the file's order and
+ * none. The library animations of the state's type are added by the form (059).
  */
 export const clipChoiceOptions = (clipNames: readonly string[], boneNames: readonly string[], state: AnimationState): ClipOption[] => {
   const auto = resolveAnimation(null, clipNames, boneNames, state);
@@ -199,11 +185,6 @@ export const clipChoiceOptions = (clipNames: readonly string[], boneNames: reado
     if (seen.has(name)) continue;
     seen.add(name);
     options.push({ value: fileClipChoice(name), kind: 'file', name });
-  }
-  if (isMixamoSkeleton(boneNames)) {
-    options.push({ value: CLIP_CHOICE_ROLL6, kind: 'roll6' });
-    // The guard stance is a way of standing: not offered for the death (058).
-    if (state !== 'down') options.push({ value: CLIP_CHOICE_ROLL6_GUARD, kind: 'guard' });
   }
   options.push({ value: CLIP_CHOICE_NONE, kind: 'none' });
   return options;

@@ -67,8 +67,6 @@ public class GuardTests
     }
 
     [Theory]
-    [InlineData("roll6")]
-    [InlineData("roll6-guard")]
     [InlineData("none")]
     [InlineData("clip:Walk")]
     [InlineData("clip:Armature|mixamo.com|Layer0")]

@@ -6,7 +6,7 @@ import type { TokenInfo, TokenInsertInfo } from '../types/token';
 /** The 3D model the form resolved on save (055/056): the stored `.glb` and the animation chosen for each state. */
 export interface ResolvedModel {
   modelFile: string | null;
-  /** `lib/modelAnimations` choices: null = automatic, "roll6", "none" or "clip:{name}". */
+  /** `lib/modelAnimations` choices: null = automatic, "none", "clip:{name}" or "animation:{id}". */
   modelIdleClip: string | null;
   modelWalkClip: string | null;
   /** The death (058): played once when a piece of the token is down or out of combat. */

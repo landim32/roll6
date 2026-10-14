@@ -106,31 +106,28 @@ public static class Guard
     /// <summary>True for a name the model upload could have produced ({guid:N}.glb).</summary>
     public static bool IsModelFileName(string? value) => value != null && MODEL_FILE_NAME_REGEX.IsMatch(value);
 
-    /// <summary>Roll6's own animation, chosen for a 3D model (056).</summary>
-    public const string MODEL_CLIP_ROLL6 = "roll6";
-    /// <summary>Roll6's guard stance ("Posição defensiva"), chosen for a 3D model (057).</summary>
-    public const string MODEL_CLIP_ROLL6_GUARD = "roll6-guard";
     /// <summary>No animation, chosen for a 3D model (056).</summary>
     public const string MODEL_CLIP_NONE = "none";
     /// <summary>Prefix of a clip of the file, chosen by its exact name (056): "clip:{name}".</summary>
     public const string MODEL_CLIP_PREFIX = "clip:";
 
     /// <summary>
-    /// The animation chosen for one state of a 3D model (056): null/empty = automatic, "roll6", "roll6-guard" (057), "none" or
-    /// "clip:{name}" with a non-empty name (the clip's name is kept as it is — the file decides its case and spaces), or
-    /// "animation:{id}" (059, a library animation — its existence and type are checked by the token service).
+    /// The animation chosen for one state of a 3D model (056): null/empty = automatic, "none", "clip:{name}" with a
+    /// non-empty name (the clip's name is kept as it is — the file decides its case and spaces), or "animation:{id}" (059, a
+    /// library animation — its existence and type are checked by the token service). Roll6 ships no animation of its own
+    /// any more (061): "roll6" and "roll6-guard" are refused.
     /// </summary>
     public static string? ModelClip(string? value, string field)
     {
         var choice = OptionalText(value, field, 260);
-        if (choice == null || choice == MODEL_CLIP_ROLL6 || choice == MODEL_CLIP_ROLL6_GUARD || choice == MODEL_CLIP_NONE)
+        if (choice == null || choice == MODEL_CLIP_NONE)
             return choice;
         if (choice.StartsWith(MODEL_CLIP_PREFIX, StringComparison.Ordinal) && choice.Length > MODEL_CLIP_PREFIX.Length)
             return choice;
         if (AnimationStates.ParseChoice(choice) != null)
             return choice;
         throw new DomainValidationException(field,
-            "Animação inválida. Use \"roll6\", \"roll6-guard\", \"none\", \"clip:{nome}\" ou \"animation:{id}\".");
+            "Animação inválida. Use \"none\", \"clip:{nome}\" ou \"animation:{id}\".");
     }
 
     public static string Email(string? value, string field)

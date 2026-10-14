@@ -4,7 +4,7 @@ import type { Object3D } from 'three';
 import { AnimationClip } from 'three';
 import { buildRoll6Clip, createClipBuilder } from './threeClips';
 import { AUTO_CLIPS } from '../../lib/modelAnimations';
-import { ROLL6_CLIPS, ROLL6_DEATH } from '../../lib/roll6Clips';
+import { SAMPLE_DEATH, SAMPLE_IDLE, SAMPLE_WALK } from '../../test/sampleClips';
 import type { Roll6Clip } from '../../lib/roll6Clips';
 
 /**
@@ -68,22 +68,22 @@ const sample = (root: Object3D, clip: ReturnType<typeof buildRoll6Clip>, seconds
   return { at };
 };
 
-describe('Roll6 clips on a Mixamo skeleton (055)', () => {
+describe('library clips on a Mixamo skeleton (055, 059)', () => {
   for (const twisted of [false, true]) {
     describe(twisted ? 'bones with twisted local axes' : 'bones with plain axes', () => {
       it('walks: left foot ahead (+Z) and left hand behind at the start, the other way at half the step', () => {
         const root = skeleton(twisted);
-        const walk = buildRoll6Clip(ROLL6_CLIPS.walk, root, 1.6);
+        const walk = buildRoll6Clip(SAMPLE_WALK, root, 1.6);
         const start = sample(root, walk, 0.0001);
         expect(start.at('LeftFoot').z).toBeGreaterThan(start.at('RightFoot').z + 0.1);
         expect(start.at('LeftHand').z).toBeLessThan(start.at('RightHand').z);
-        const half = sample(skeleton(twisted), buildRoll6Clip(ROLL6_CLIPS.walk, skeleton(twisted), 1.6), 0.5);
+        const half = sample(skeleton(twisted), buildRoll6Clip(SAMPLE_WALK, skeleton(twisted), 1.6), 0.5);
         expect(half.at('LeftFoot').z).toBeLessThan(half.at('RightFoot').z - 0.1);
       });
 
       it('lets the arms down from the T pose, each on its own side, and keeps the feet under the body', () => {
         const root = skeleton(twisted);
-        const idle = sample(root, buildRoll6Clip(ROLL6_CLIPS.idle, root, 1.6), 0.0001);
+        const idle = sample(root, buildRoll6Clip(SAMPLE_IDLE, root, 1.6), 0.0001);
         expect(idle.at('LeftHand').y).toBeLessThan(idle.at('LeftArm').y - 0.3);
         expect(idle.at('RightHand').y).toBeLessThan(idle.at('RightArm').y - 0.3);
         expect(idle.at('LeftHand').x).toBeGreaterThan(0);
@@ -96,33 +96,19 @@ describe('Roll6 clips on a Mixamo skeleton (055)', () => {
   it('the same walk on twisted and plain bones puts the joints in the same places', () => {
     const plain = skeleton(false);
     const twisted = skeleton(true);
-    const a = sample(plain, buildRoll6Clip(ROLL6_CLIPS.walk, plain, 1.6), 0.3);
-    const b = sample(twisted, buildRoll6Clip(ROLL6_CLIPS.walk, twisted, 1.6), 0.3);
+    const a = sample(plain, buildRoll6Clip(SAMPLE_WALK, plain, 1.6), 0.3);
+    const b = sample(twisted, buildRoll6Clip(SAMPLE_WALK, twisted, 1.6), 0.3);
     for (const joint of ['LeftFoot', 'RightFoot', 'LeftHand', 'RightHand', 'Head']) {
       expect(b.at(joint).distanceTo(a.at(joint))).toBeLessThan(1e-4);
     }
   });
 
-  it('the builder picks Roll6\'s clips for a Mixamo skeleton without clips, and none for another skeleton', () => {
+  it('Roll6 has no animation of its own (061): a Mixamo skeleton without clips stands still in every state', () => {
     const root = skeleton();
-    const mixamo = createClipBuilder(root, [], BONES(root), 1.6)(AUTO_CLIPS);
-    expect(mixamo.sources).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
-    expect(mixamo.idle).not.toBeNull();
-    expect(mixamo.walk).not.toBeNull();
-    const other = createClipBuilder(new Group(), [], ['pelvis'], 1.6)(AUTO_CLIPS);
-    expect(other).toMatchObject({ idle: null, walk: null, down: null, sources: { idle: 'static', walk: 'static', down: 'static' } });
-  });
-
-  it('the builder builds Roll6\'s guard stance by name (057) and keeps it apart from idle and walk', () => {
-    const root = skeleton();
-    const build = createClipBuilder(root, [], BONES(root), 1.6);
-    const guard = build({ idle: 'roll6-guard', walk: null, down: null });
-    expect(guard.idle?.name).toBe('roll6-guard');
-    expect(guard.walk?.name).toBe('roll6-walk');
-    expect(guard.sources).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
-    // Fitted once: another pair using the guard gets the same clip.
-    expect(build({ idle: 'roll6-guard', walk: 'roll6-guard', down: null }).walk).toBe(guard.idle);
-    expect(build({ idle: 'roll6', walk: null, down: null }).idle?.name).toBe('roll6-idle');
+    const clips = createClipBuilder(root, [], BONES(root), 1.6)(AUTO_CLIPS);
+    expect(clips).toMatchObject({ idle: null, walk: null, down: null, sources: { idle: 'static', walk: 'static', down: 'static' } });
+    // The choices of the former own animations read as automatic.
+    expect(createClipBuilder(root, [], BONES(root), 1.6)({ idle: 'roll6-guard', walk: 'roll6', down: 'roll6' }).idle).toBeNull();
   });
 
   it('the builder follows the chosen animations (056) and reuses what it built', () => {
@@ -130,30 +116,15 @@ describe('Roll6 clips on a Mixamo skeleton (055)', () => {
     const attack = new AnimationClip('Attack', 1, []);
     const build = createClipBuilder(root, [attack], BONES(root), 1.6);
     const chosen = build({ idle: 'clip:Attack', walk: 'none', down: null });
-    expect(chosen.sources).toEqual({ idle: 'file', walk: 'static', down: 'roll6' });
+    expect(chosen.sources).toEqual({ idle: 'file', walk: 'static', down: 'static' });
     expect(chosen.idle).toBe(attack);
     expect(chosen.walk).toBeNull();
     expect(build({ idle: 'clip:Attack', walk: 'none', down: null })).toBe(chosen);
-    const own = build({ idle: 'roll6', walk: null, down: null });
-    expect(own.sources).toEqual({ idle: 'roll6', walk: 'roll6', down: 'roll6' });
-    expect(own.idle?.name).toBe('roll6-idle');
-    // Roll6's clip of a state is fitted once: the same object comes back for another pair of choices.
-    expect(build(AUTO_CLIPS).walk).toBe(own.walk);
   });
 });
 
 describe('the death on a Mixamo skeleton (058)', () => {
-  it("the builder gives the down state Roll6's death, built once", () => {
-    const root = skeleton();
-    const build = createClipBuilder(root, [], BONES(root), 1.6);
-    const clips = build(AUTO_CLIPS);
-    expect(clips.down?.name).toBe('roll6-death');
-    expect(clips.down?.duration).toBeCloseTo(ROLL6_DEATH.duration);
-    expect(build({ idle: 'none', walk: 'none', down: 'roll6' }).down).toBe(clips.down);
-    expect(build({ idle: null, walk: null, down: 'none' }).down).toBeNull();
-  });
-
-  it("a file's death clip wins over Roll6's", () => {
+  it("a file's death clip plays in the down state", () => {
     const root = skeleton();
     const death = new AnimationClip('Death', 2, []);
     expect(createClipBuilder(root, [death], BONES(root), 1.6)(AUTO_CLIPS).down).toBe(death);
@@ -164,7 +135,7 @@ describe('the death on a Mixamo skeleton (058)', () => {
     const hips = root.getObjectByName('mixamorigHips')!;
     const restY = new Vector3().setFromMatrixPosition(hips.matrixWorld).y;
     // Just before the end: the test mixer loops, so the duration itself would wrap to the first frame.
-    const end = sample(root, buildRoll6Clip(ROLL6_DEATH, root, 1.6), ROLL6_DEATH.duration - 1e-4);
+    const end = sample(root, buildRoll6Clip(SAMPLE_DEATH, root, 1.6), SAMPLE_DEATH.duration - 1e-4);
     // The lowest joint of the skeleton is the feet, 0.95 under the hips (rest at y 1): the hips end 0.82 × 0.95 lower.
     expect(end.at('Hips').y).toBeCloseTo(restY - 0.82 * 0.95, 2);
     // On the back: the head behind the hips (−Z), at about their height.
@@ -174,24 +145,24 @@ describe('the death on a Mixamo skeleton (058)', () => {
 
   it('the builder plays library animations in full, once per id, and falls back while they are missing (059)', () => {
     const root = skeleton();
-    const build = createClipBuilder(root, [], BONES(root), 1.6);
+    const walkClip = new AnimationClip('Walk', 1, []);
+    const build = createClipBuilder(root, [walkClip], BONES(root), 1.6);
     const wave: Roll6Clip = {
-      name: 'animation:7', duration: 1, loop: true, protect: false,
+      name: 'animation:7', duration: 1, loop: true,
       tracks: [{ bone: 'RightArm', times: [0, 1], degrees: [[0, 0, -150], [0, 0, -150]] }],
       hipsLift: { times: [0], values: [0] },
     };
     const choices = { idle: 'animation:7', walk: null, down: null };
 
-    // Not loaded yet (or failed): the state plays its automatic animation.
-    expect(build(choices).sources.idle).toBe('roll6');
-    expect(build(choices, new Map([[7, null]])).idle?.name).toBe('roll6-idle');
+    // Not loaded yet (or failed): the state plays its automatic animation — here none.
+    expect(build(choices).sources.idle).toBe('static');
+    expect(build(choices, new Map([[7, null]])).idle).toBeNull();
 
     const library = new Map([[7, wave]]);
     const played = build(choices, library);
-    expect(played.sources).toEqual({ idle: 'library', walk: 'roll6', down: 'roll6' });
+    expect(played.sources).toEqual({ idle: 'library', walk: 'file', down: 'static' });
     expect(played.idle?.name).toBe('roll6-animation:7');
-    // Not fitted to the rig: the arm goes all the way up (the synthetic rig tears nothing, so no warning).
-    expect(played.reduced).toBe(false);
+    expect(played.deforms).toBe(false);
     // Built once per id: another set of choices using it gets the same clip.
     expect(build({ idle: 'animation:7', walk: 'animation:7', down: null }, library).walk).toBe(played.idle);
   });

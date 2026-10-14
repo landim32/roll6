@@ -62,9 +62,9 @@ public static class ImageTools
         sent and returns its file name, to be saved in the token's modelFile (create_token / update_token). The 3D view
         of the web app then draws that model instead of the token's 2.5D figure, standing where the piece is, fitted to
         the height of a figure of the piece's size, feet on the floor, facing the piece's look (the model's +Z is its
-        front). Animations: clips named like "idle"/"parado" and "walk"/"caminhar" in the file are used; when one is
-        missing and the skeleton uses Mixamo bone names (Hips, Spine, Head, LeftUpLeg… with or without "mixamorig:"),
-        Roll6's own idle and walk animations are used; otherwise the model stands still.
+        front). Animations: clips named like "idle"/"parado" and "walk"/"caminhar" in the file are used; otherwise the
+        model stands still, unless the token picks a library animation (Mixamo bone names — Hips, Spine, Head, LeftUpLeg…
+        with or without "mixamorig:").
         Who can use it: any authenticated user.
         Returns: { fileName, url }. Save fileName (e.g. "3f2a…c9.glb"); url is temporary (expires) — never store it.
         Common errors: 400 invalid base64, not a glTF 2.0 binary, or larger than 20 MB.

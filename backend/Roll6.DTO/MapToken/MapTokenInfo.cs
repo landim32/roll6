@@ -42,7 +42,7 @@ public class MapTokenInfo
     [JsonPropertyName("modelFileUrl")]
     public string? ModelFileUrl { get; set; }
 
-    /// <summary>Animations chosen for the token's model (056): null = automatic, "roll6", "none" or "clip:{name}".</summary>
+    /// <summary>Animations chosen for the token's model (056): null = automatic, "none", "clip:{name}" or "animation:{id}".</summary>
     [JsonPropertyName("modelIdleClip")]
     public string? ModelIdleClip { get; set; }
 

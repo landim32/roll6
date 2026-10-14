@@ -52,7 +52,7 @@ interface ModelPreviewProps {
   /** The model opened: the clips and bones it has. */
   onLoaded: (info: ModelPreviewInfo) => void;
   /** After the model opens and after every change of `clips`: where each animation comes from now. */
-  onClips: (sources: Record<AnimationState, AnimationSource>, reduced: boolean, deforms: boolean) => void;
+  onClips: (sources: Record<AnimationState, AnimationSource>, deforms: boolean) => void;
   /** The file could not be opened (or the device has no WebGL). */
   onError: () => void;
   label: string;
@@ -114,7 +114,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       down,
     };
     show(animatedRef.current ? actionOf(shownRef.current) : null);
-    callbacks.current.onClips(built.sources, built.reduced, built.deforms);
+    callbacks.current.onClips(built.sources, built.deforms);
     // A library animation not read yet (059): the state plays its automatic one until the file arrives, then the
     // actions are built again — if the same choices are still shown.
     const missing = clipChoiceIds(choices).filter((id) => !libraryRef.current.has(id));
