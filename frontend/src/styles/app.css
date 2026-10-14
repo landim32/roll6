@@ -328,6 +328,20 @@ body,
   cursor: grabbing;
 }
 
+/* The model card (060): the stage, and on the "Animação" tab its timeline and "Gerar imagem", in one frame. */
+.stm-model-card {
+  max-width: 352px;
+  margin: 0 auto;
+  padding: 0.75rem;
+  border-radius: var(--stm-radius);
+  background: var(--stm-surface);
+  border: 1px solid var(--stm-border);
+}
+
+.stm-model-card[hidden] {
+  display: none;
+}
+
 /* The "3D" tab of the token form (055): a square stage for the preview, like the 2,5D fields. */
 .stm-model-stage {
   position: relative;

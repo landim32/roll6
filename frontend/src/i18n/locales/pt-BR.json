@@ -246,6 +246,7 @@
     "tabToken": "Token",
     "tabSprites": "2,5D",
     "tab3d": "3D",
+    "tabAnimation": "Animação",
     "model": {
       "help": "Um modelo 3D (.glb, até 20 MB) aparece na vista 3D no lugar das imagens 2,5D, em pé e animado. A frente do modelo deve olhar para a frente do arquivo.",
       "pick": "Escolher arquivo .glb",
@@ -260,7 +261,7 @@
       "static": "Este modelo ficará parado: ele não tem animações e o esqueleto não segue os nomes do Mixamo.",
       "reduced": "O rig deste modelo prende boa parte da malha ao quadril, então braços e/ou pernas ficam parados para a malha não rasgar. Para animação completa, refaça o rig (por exemplo no Mixamo) e envie de novo.",
       "animations": "Animações",
-      "animationsHelp": "Escolha a animação de cada estado; a prévia acima mostra a escolha na hora. \"Automático\" usa o clip do arquivo com o nome do estado, senão a animação do Roll6 (esqueleto Mixamo), senão nenhuma. \"Caído\" toca uma vez e fica no último quadro: é assim que a peça caída ou fora de combate aparece na vista 3D.",
+      "animationsHelp": "Escolha a animação de cada tipo; a prévia acima mostra a escolha na hora. A biblioteca traz as animações desse tipo enviadas por todos os usuários. \"Automático\" usa o clip do arquivo com o nome do estado, senão a animação do Roll6 (esqueleto Mixamo), senão nenhuma. \"Caído\" toca uma vez e fica no último quadro: é assim que a peça caída ou fora de combate aparece na vista 3D.",
       "playing": "Tocando: {{source}}",
       "choice": {
         "auto": "Automático ({{resolved}})",
@@ -293,7 +294,13 @@
         "walk": "Caminhando",
         "down": "Caído"
       },
-      "showState": "Estado mostrado na prévia",
+      "showState": "Tipo de animação",
+      "animationOf": "Animação de \"{{state}}\"",
+      "animationNeedsModel": "Adicione um modelo .glb na aba 3D para escolher as animações.",
+      "restPose": "A prévia mostra o modelo na pose de repouso (pose T). As animações ficam na aba Animação.",
+      "refresh": "Atualizar",
+      "refreshTitle": "Atualizar a lista de animações da biblioteca",
+      "refreshFailed": "Não foi possível atualizar a lista de animações.",
       "source": {
         "file": "do arquivo",
         "roll6": "animação do Roll6",

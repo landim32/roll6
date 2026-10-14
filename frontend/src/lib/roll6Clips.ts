@@ -54,6 +54,41 @@ const WALK_TIMES = [0, 0.25, 0.5, 0.75, 1];
 const GUARD_TIMES = [0, 0.5, 1, 1.5, 2];
 const DEATH_TIMES = [0, 0.35, 0.8, 1.15, 1.4];
 
+/** The fingers of each hand, from the thumb; each bends at three joints (`…1` at the knuckle, `…3` at the tip). */
+export const HAND_FINGERS = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'] as const;
+
+/**
+ * The left hand closed in a fist (060), per finger and joint, in the character's frame. The T pose — the rest the turns
+ * start from — has the palm down, so −Z brings the left fingertips to the palm; the thumb also turns about +Y to cross
+ * in front of the bent fingers. The right hand is the mirror: Y and Z change sign. Measured on a Mixamo rig: the
+ * fingertips end under the palm and the thumb over the middle joints of the index and middle fingers.
+ */
+const FIST: Record<(typeof HAND_FINGERS)[number], [number, number, number][]> = {
+  Thumb: [[0, 45, -20], [0, 20, -30], [0, 0, -40]],
+  Index: [[0, 0, -70], [0, 0, -90], [0, 0, -60]],
+  Middle: [[0, 0, -70], [0, 0, -90], [0, 0, -60]],
+  Ring: [[0, 0, -70], [0, 0, -90], [0, 0, -60]],
+  Pinky: [[0, 0, -70], [0, 0, -90], [0, 0, -60]],
+};
+
+/** How closed the hands are: a relaxed hand hangs with the fingers a little bent; a fist is fully closed. */
+export const HAND_RELAXED = 0.3;
+export const HAND_FIST = 1;
+
+/** One decimal, never −0 (the files compare equal to the clips). */
+const tidy = (value: number): number => Math.round(value * 10) / 10 || 0;
+
+/**
+ * Tracks that hold both hands at `closed` (0 = open as in the rest pose, 1 = fist) on every key of `times` (060): the
+ * 30 finger bones, constant, so a cycle still ends where it starts. Rigs without fingers simply ignore them.
+ */
+export const handTracks = (closed: number, times: number[]): Roll6Track[] =>
+  (['Left', 'Right'] as const).flatMap((side) => HAND_FINGERS.flatMap((finger) => FIST[finger].map(([x, y, z], joint) => {
+    const mirror = side === 'Left' ? 1 : -1;
+    const triple: [number, number, number] = [tidy(x * closed), tidy(y * closed * mirror), tidy(z * closed * mirror)];
+    return { bone: `${side}Hand${finger}${joint + 1}`, times, degrees: times.map(() => [...triple] as [number, number, number]) };
+  })));
+
 /** The same turn on every key except the ones given. */
 const around = (axis: 0 | 1 | 2, values: number[]): [number, number, number][] =>
   values.map((value) => {
@@ -79,6 +114,8 @@ export const ROLL6_IDLE: Roll6Clip = {
     { bone: 'RightArm', times: IDLE_TIMES, degrees: around(0, [0, -1.5, 0, 1.5, 0]) },
     { bone: 'LeftForeArm', times: IDLE_TIMES, degrees: around(0, [-8, -9, -10, -9, -8]) },
     { bone: 'RightForeArm', times: IDLE_TIMES, degrees: around(0, [-8, -9, -10, -9, -8]) },
+    // Relaxed hands, the fingers a little bent (060).
+    ...handTracks(HAND_RELAXED, IDLE_TIMES),
   ],
   hipsLift: { times: IDLE_TIMES, values: [0, -0.002, -0.004, -0.002, 0] },
   loop: true,
@@ -106,6 +143,8 @@ export const ROLL6_WALK: Roll6Clip = {
     // The trunk twists against the hips and leans a little forward.
     { bone: 'Spine', times: WALK_TIMES, degrees: [[-3, 4, 0], [-3, 0, 0], [-3, -4, 0], [-3, 0, 0], [-3, 4, 0]] },
     { bone: 'Hips', times: WALK_TIMES, degrees: around(1, [-3, 0, 3, 0, -3]) },
+    // Relaxed hands, the fingers a little bent (060).
+    ...handTracks(HAND_RELAXED, WALK_TIMES),
   ],
   // The body is highest when a leg passes under it.
   hipsLift: { times: WALK_TIMES, values: [0, 0.015, 0, 0.015, 0] },
@@ -142,6 +181,8 @@ export const ROLL6_GUARD: Roll6Clip = {
     { bone: 'RightArm', times: GUARD_TIMES, degrees: [[-55, 0, 8], [-57, 0, 8], [-58, 0, 8], [-57, 0, 8], [-55, 0, 8]] },
     { bone: 'LeftForeArm', times: GUARD_TIMES, degrees: around(0, [-95, -97, -98, -97, -95]) },
     { bone: 'RightForeArm', times: GUARD_TIMES, degrees: around(0, [-95, -97, -98, -97, -95]) },
+    // Both hands closed in fists (060).
+    ...handTracks(HAND_FIST, GUARD_TIMES),
   ],
   // Lower than standing, bobbing a little with the breath.
   hipsLift: { times: GUARD_TIMES, values: [-0.04, -0.043, -0.046, -0.043, -0.04] },
@@ -178,6 +219,8 @@ export const ROLL6_DEATH: Roll6Clip = {
     { bone: 'RightArm', times: DEATH_TIMES, degrees: [[0, 0, 0], [-30, 0, -10], [-20, 0, -40], [0, 0, -65], [0, 0, -70]] },
     { bone: 'LeftForeArm', times: DEATH_TIMES, degrees: around(0, [0, -20, -15, -10, -10]) },
     { bone: 'RightForeArm', times: DEATH_TIMES, degrees: around(0, [0, -20, -15, -10, -10]) },
+    // The hands go limp, a little bent.
+    ...handTracks(HAND_RELAXED, DEATH_TIMES),
   ],
   hipsLift: { times: DEATH_TIMES, values: [0, -0.25, -0.55, -0.8, -0.82], of: 'hips' },
   loop: false,

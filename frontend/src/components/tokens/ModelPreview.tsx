@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   AnimationMixer, CircleGeometry, Clock, DirectionalLight, Group, HemisphereLight, LoopOnce, Mesh, MeshBasicMaterial, PerspectiveCamera,
-  Scene, WebGLRenderer,
+  Quaternion, Scene, Vector3, WebGLRenderer,
 } from 'three';
 import type { AnimationAction, Object3D } from 'three';
 import { loadAnimations } from '../../lib/animationCache';
@@ -45,6 +45,8 @@ interface ModelPreviewProps {
   url: string;
   /** The state shown (058): standing still, walking, or down — the death played once, resting on its last frame. */
   shown: AnimationState;
+  /** False (060, the "3D" tab): no animation plays and the model stands in its rest pose — the T-pose of the rig. */
+  animated?: boolean;
   /** The animation chosen for each state (056); the preview rebuilds its actions when it changes. */
   clips: ModelClipChoices;
   /** The model opened: the clips and bones it has. */
@@ -68,7 +70,7 @@ const FADE_SECONDS = 0.25;
  * the form (056), so the user sees each choice at once. Without a death the down state shows the model laid on its back,
  * as the 3D view does. Its own small three.js scene, loaded lazily with the tab, released when it closes.
  */
-export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, clips, onLoaded, onClips, onError, label }, ref) => {
+export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** The action the preview shows now (057): the timeline's subject; null when that state has no animation. */
   const current = useRef<AnimationAction | null>(null);
@@ -82,6 +84,9 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const mixerRef = useRef<AnimationMixer | null>(null);
   const assetRef = useRef<ModelAsset | null>(null);
   const shownRef = useRef(shown);
+  const animatedRef = useRef(animated);
+  /** Every node's transform as loaded (060): the rest pose the "3D" tab shows. */
+  const restRef = useRef<{ node: Object3D; position: Vector3; quaternion: Quaternion; scale: Vector3 }[]>([]);
   const clipsRef = useRef(clips);
   /** Library animations (059) read for this preview: id → clip, null when it could not be read. */
   const libraryRef = useRef(new Map<number, Roll6Clip | null>());
@@ -108,7 +113,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       walk: built.walk ? mixer.clipAction(built.walk) : null,
       down,
     };
-    show(actionOf(shownRef.current));
+    show(animatedRef.current ? actionOf(shownRef.current) : null);
     callbacks.current.onClips(built.sources, built.reduced, built.deforms);
     // A library animation not read yet (059): the state plays its automatic one until the file arrives, then the
     // actions are built again — if the same choices are still shown.
@@ -139,6 +144,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
 
   /** Another state shown: standing still ↔ walking with a short cross-fade; the down state (058) starts its death over. */
   const switchState = (previous: AnimationState, next: AnimationState) => {
+    if (!animatedRef.current) return;
     if (next === 'down' || previous === 'down') {
       mixerRef.current?.stopAllAction();
       show(actionOf(next));
@@ -169,6 +175,17 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   function show(action: AnimationAction | null) {
     pausedRef.current = false;
     current.current = action;
+    if (!animatedRef.current) {
+      // The rest pose (060): nothing plays, the model stands as the file binds it.
+      mixerRef.current?.stopAllAction();
+      for (const rest of restRef.current) {
+        rest.node.position.copy(rest.position);
+        rest.node.quaternion.copy(rest.quaternion);
+        rest.node.scale.copy(rest.scale);
+      }
+      layDown(false);
+      return;
+    }
     layDown(shownRef.current === 'down' && action === null);
     action?.reset().play();
   }
@@ -259,6 +276,11 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     loadModel(url).then((asset) => {
       if (cancelled) return;
       const model = instantiate(asset);
+      const rest: typeof restRef.current = [];
+      model.traverse((node) => {
+        if (node !== model) rest.push({ node, position: node.position.clone(), quaternion: node.quaternion.clone(), scale: node.scale.clone() });
+      });
+      restRef.current = rest;
       const [minX, minY, minZ] = asset.bounds.min;
       const [maxX, maxY, maxZ] = asset.bounds.max;
       const scale = PREVIEW_HEIGHT / Math.max(1e-6, maxY - minY);
@@ -301,6 +323,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       current.current = null;
       modelRef.current = null;
       holderRef.current = null;
+      restRef.current = [];
       stage.current = null;
       ground.geometry.dispose();
       (ground.material as MeshBasicMaterial).dispose();
@@ -314,6 +337,15 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     clipsRef.current = clips;
     applyRef.current(clips);
   }, [clips]);
+
+  // The "3D" tab shows the rest pose, the "Animação" tab the animation of the state shown (060).
+  useEffect(() => {
+    if (animatedRef.current === animated) return;
+    animatedRef.current = animated;
+    show(animated ? actionOf(shownRef.current) : null);
+    // show/actionOf only read refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animated]);
 
   // Another state shown (058: Parado, Caminhando or Caído).
   useEffect(() => {

@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { MIXAMO_REQUIRED } from './modelAnimations';
-import { RELAXED_ARMS, ROLL6_CLIPS, ROLL6_CLIPS_BY_NAME, ROLL6_DEATH, ROLL6_GUARD } from './roll6Clips';
+import { HAND_FINGERS, RELAXED_ARMS, ROLL6_CLIPS, ROLL6_CLIPS_BY_NAME, ROLL6_DEATH, ROLL6_GUARD } from './roll6Clips';
+import type { Roll6Clip } from './roll6Clips';
+
+/** The 30 finger bones (060). */
+const FINGER_BONES = (['Left', 'Right'] as const).flatMap((side) => HAND_FINGERS.flatMap((finger) => [1, 2, 3].map((joint) => `${side}Hand${finger}${joint}`)));
+const isFinger = (bone: string) => FINGER_BONES.includes(bone);
+/** The tracks that move the body — the hands are a held pose, checked on their own. */
+const bodyTracks = (clip: Roll6Clip) => clip.tracks.filter((track) => !isFinger(track.bone));
 
 /** Every bone name of a Mixamo skeleton these clips may use. */
 const MIXAMO_BONES = new Set([
   ...MIXAMO_REQUIRED, 'Spine1', 'Spine2', 'Neck', 'LeftShoulder', 'RightShoulder', 'LeftForeArm', 'RightForeArm',
-  'LeftHand', 'RightHand', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase',
+  'LeftHand', 'RightHand', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', ...FINGER_BONES,
 ]);
 
 describe('Roll6 clips (055)', () => {
@@ -28,14 +35,14 @@ describe('Roll6 clips (055)', () => {
       });
 
       it('keeps every turn within ±40°', () => {
-        for (const track of clip.tracks) for (const triple of track.degrees) for (const value of triple) expect(Math.abs(value)).toBeLessThanOrEqual(40);
+        for (const track of bodyTracks(clip)) for (const triple of track.degrees) for (const value of triple) expect(Math.abs(value)).toBeLessThanOrEqual(40);
       });
     });
   }
 
   it('standing still is gentle: no turn over 10° and a slow breath', () => {
     expect(ROLL6_CLIPS.idle.duration).toBeGreaterThanOrEqual(2);
-    for (const track of ROLL6_CLIPS.idle.tracks) for (const triple of track.degrees) for (const value of triple) expect(Math.abs(value)).toBeLessThanOrEqual(10);
+    for (const track of bodyTracks(ROLL6_CLIPS.idle)) for (const triple of track.degrees) for (const value of triple) expect(Math.abs(value)).toBeLessThanOrEqual(10);
   });
 
   it('walking moves the legs in opposite phase and the arms against them', () => {
@@ -128,7 +135,7 @@ describe('Roll6 death (058)', () => {
   });
 
   it('starts standing: every turn and the hips lift begin at 0', () => {
-    for (const item of ROLL6_DEATH.tracks) expect(item.degrees[0]).toEqual([0, 0, 0]);
+    for (const item of bodyTracks(ROLL6_DEATH)) expect(item.degrees[0]).toEqual([0, 0, 0]);
     expect(ROLL6_DEATH.hipsLift.values[0]).toBe(0);
   });
 
@@ -146,6 +153,32 @@ describe('Roll6 death (058)', () => {
     expect(ROLL6_DEATH.hipsLift.values[ROLL6_DEATH.hipsLift.values.length - 1]).toBeCloseTo(-0.82);
     for (let i = 1; i < ROLL6_DEATH.hipsLift.values.length; i++) {
       expect(ROLL6_DEATH.hipsLift.values[i]).toBeLessThanOrEqual(ROLL6_DEATH.hipsLift.values[i - 1]);
+    }
+  });
+});
+
+describe('Roll6 hands (060)', () => {
+  /** How far a finger's knuckle bends, in degrees (Z), on the left hand. */
+  const knuckle = (clip: Roll6Clip, finger: string) => clip.tracks.find((track) => track.bone === `LeftHand${finger}1`)!.degrees[0][2];
+
+  it('every clip holds all 30 finger bones still, the right hand mirroring the left', () => {
+    for (const clip of [...Object.values(ROLL6_CLIPS), ROLL6_GUARD, ROLL6_DEATH]) {
+      expect(clip.tracks.filter((track) => isFinger(track.bone)).map((track) => track.bone).sort()).toEqual([...FINGER_BONES].sort());
+      for (const track of clip.tracks.filter((item) => isFinger(item.bone))) {
+        for (const triple of track.degrees) expect(triple).toEqual(track.degrees[0]);
+        if (!track.bone.startsWith('Left')) continue;
+        const [x, y, z] = track.degrees[0];
+        const right = clip.tracks.find((item) => item.bone === track.bone.replace('Left', 'Right'))!.degrees[0];
+        expect(right).toEqual([x, -y || 0, -z || 0]);
+      }
+    }
+  });
+
+  it('closes the fists on guard and keeps the other hands relaxed: fingers bend toward the palm (−Z on the left)', () => {
+    expect(knuckle(ROLL6_GUARD, 'Index')).toBe(-70);
+    for (const clip of [ROLL6_CLIPS.idle, ROLL6_CLIPS.walk, ROLL6_DEATH]) {
+      expect(knuckle(clip, 'Index')).toBeLessThan(0);
+      expect(knuckle(clip, 'Index')).toBeGreaterThan(-40);
     }
   });
 });
