@@ -33,20 +33,24 @@ describe('validateTokenForm', () => {
 
 describe('toTokenInsert', () => {
   it('sends the 3D model it is given (055) with its chosen animations (056)', () => {
-    const sent = toTokenInsert(form(), 'a.png', null, undefined, { modelFile: 'm.glb', modelIdleClip: 'clip:Idle', modelWalkClip: null });
-    expect(sent).toMatchObject({ modelFile: 'm.glb', modelIdleClip: 'clip:Idle', modelWalkClip: null });
+    const sent = toTokenInsert(form(), 'a.png', null, undefined, {
+      modelFile: 'm.glb', modelIdleClip: 'clip:Idle', modelWalkClip: null, modelDownClip: 'roll6',
+    });
+    expect(sent).toMatchObject({ modelFile: 'm.glb', modelIdleClip: 'clip:Idle', modelWalkClip: null, modelDownClip: 'roll6' });
     expect(toTokenInsert(form(), 'a.png', null).modelFile).toBeNull();
   });
 
   it('drops the animation choices when there is no model', () => {
-    const sent = toTokenInsert(form(), 'a.png', null, undefined, { modelFile: null, modelIdleClip: 'none', modelWalkClip: 'roll6' });
-    expect(sent).toMatchObject({ modelFile: null, modelIdleClip: null, modelWalkClip: null });
+    const sent = toTokenInsert(form(), 'a.png', null, undefined, {
+      modelFile: null, modelIdleClip: 'none', modelWalkClip: 'roll6', modelDownClip: 'none',
+    });
+    expect(sent).toMatchObject({ modelFile: null, modelIdleClip: null, modelWalkClip: null, modelDownClip: null });
   });
 
   it('trims texts, converts spaces and keeps the images', () => {
     expect(toTokenInsert(form({ name: ' Goblin ', description: '  ', upSpace: '1', downSpace: '' }), 'a.png', null)).toEqual({
       name: 'Goblin', description: null, upSpace: 1, downSpace: null, upImage: 'a.png', downImage: null,
-      frontImage: null, rightImage: null, leftImage: null, backImage: null, modelFile: null, modelIdleClip: null, modelWalkClip: null,
+      frontImage: null, rightImage: null, leftImage: null, backImage: null, modelFile: null, modelIdleClip: null, modelWalkClip: null, modelDownClip: null,
     });
     expect(toTokenInsert(form({ downSpace: '2' }), null, 'b.png').downSpace).toBe(2);
   });

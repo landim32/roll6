@@ -44,6 +44,8 @@ export interface MapTokenInfo {
   /** Animations chosen for that model (056): null = automatic, "roll6", "none" or "clip:{name}". */
   modelIdleClip?: string | null;
   modelWalkClip?: string | null;
+  /** The death (058): played once when the piece is down or out of combat; null = automatic. */
+  modelDownClip?: string | null;
   downImageUrl: string | null;
   campaignCharacterId: number | null;
   characterId: number | null;

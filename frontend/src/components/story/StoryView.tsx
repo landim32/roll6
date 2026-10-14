@@ -13,7 +13,7 @@ import { canWalk, walkerBlocker, walkerLook } from '../../lib/walker';
 import type { WalkerState } from '../../lib/walker';
 import { HEX_SIZE } from '../../lib/hexGrid';
 import { loadImage } from '../../lib/mapSnapshot';
-import { isShownIn3d, spriteSpec } from '../../lib/pieceDrawing';
+import { isLying, isModelShownIn3d, isShownIn3d, spriteSpec } from '../../lib/pieceDrawing';
 import { fitSprites } from '../../lib/spriteFit';
 import { SPRITE_VIEWS } from '../../lib/spriteView';
 import { lastActions, pieceKey } from '../../lib/turnStatus';
@@ -383,11 +383,15 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
 
   // ---------- 3D models (055) ----------
 
-  // The pieces standing whose token has a model, as the model layer wants them.
-  const modelSpecs = useMemo((): ModelSpec[] => pieces.filter(isShownIn3d).flatMap((piece) => {
+  // The pieces whose token has a model, as the model layer wants them: standing, or (058) down / out of combat, lying at
+  // the end of the death — those have no figure, proxy or balloon (`isShownIn3d`), only the model.
+  const modelSpecs = useMemo((): ModelSpec[] => pieces.filter(isModelShownIn3d).flatMap((piece) => {
     const spec = spriteSpec(piece, HEX_SIZE);
     return spec.modelUrl
-      ? [{ id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: lookToYaw(piece.look), clips: spec.modelClips }]
+      ? [{
+        id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: lookToYaw(piece.look),
+        clips: spec.modelClips, lying: isLying(piece),
+      }]
       : [];
   }), [pieces]);
   const hasModels = modelSpecs.length > 0;

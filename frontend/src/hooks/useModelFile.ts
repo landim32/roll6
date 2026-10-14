@@ -5,7 +5,7 @@ import type { AnimationState, ModelClipChoice, ModelClipChoices } from '../lib/m
 import type { ResolvedModel } from '../lib/tokenForm';
 import type { TokenInfo } from '../types/token';
 
-/** The "3D" tab of the token form (055): a newly picked `.glb`, or the saved model kept or removed, and its animations (056). */
+/** The "3D" tab of the token form (055): a newly picked `.glb`, or the saved model kept or removed, and its animations (056, the death since 058). */
 export interface ModelFileState {
   /** The file picked now (checked, not uploaded yet). */
   picked: File | null;
@@ -27,7 +27,9 @@ export interface ModelFileState {
 }
 
 const savedClips = (token: TokenInfo | null): ModelClipChoices =>
-  token?.modelFile ? { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null } : AUTO_CLIPS;
+  token?.modelFile
+    ? { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null, down: token.modelDownClip ?? null }
+    : AUTO_CLIPS;
 
 /**
  * State of the token's 3D model in the form, for "Incluir token" and "Editar token". `active` is the modal's open flag:
@@ -79,7 +81,7 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
 
   const resolve = useCallback(async (): Promise<ResolvedModel> => {
     const modelFile = picked ? (await modelService.upload(picked)).fileName : keepsSaved ? token?.modelFile ?? null : null;
-    return { modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk };
+    return { modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down };
   }, [picked, keepsSaved, token, clips]);
 
   const previewUrl = pickedUrl ?? (keepsSaved ? token?.modelFileUrl ?? null : null);

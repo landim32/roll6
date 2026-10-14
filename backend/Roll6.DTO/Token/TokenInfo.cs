@@ -77,6 +77,10 @@ public class TokenInfo
     [JsonPropertyName("modelWalkClip")]
     public string? ModelWalkClip { get; set; }
 
+    /// <summary>Animation chosen for the down state, the death (058); same values as modelIdleClip.</summary>
+    [JsonPropertyName("modelDownClip")]
+    public string? ModelDownClip { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

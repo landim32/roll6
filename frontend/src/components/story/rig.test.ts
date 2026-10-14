@@ -4,7 +4,7 @@ import {
   Vector3,
 } from 'three';
 import { alignSkeletonToMesh, restoreBindPose } from './loadModel';
-import { fitToRig } from './threeClips';
+import { createClipBuilder, fitToRig } from './threeClips';
 import { ROLL6_CLIPS } from '../../lib/roll6Clips';
 
 /**
@@ -138,6 +138,38 @@ describe('fitToRig (055)', () => {
     const { root, bones } = character({ handOnHips: true });
     const before = worldOf(bones.hand);
     fitToRig(ROLL6_CLIPS.walk, root, 1);
+    expect(worldOf(bones.hand).distanceTo(before)).toBeLessThan(1e-9);
+  });
+});
+
+describe('clips played in full (058, Q1 = A)', () => {
+  // Every name a Mixamo skeleton needs, so the builder offers Roll6's clips; the tiny character has only some of them.
+  const MIXAMO_NAMES = ['Hips', 'Spine', 'Head', 'LeftUpLeg', 'LeftLeg', 'RightUpLeg', 'RightLeg', 'LeftArm', 'RightArm']
+    .map((name) => `mixamorig${name}`);
+
+  it('the guard is never reduced: on a rig that tears it plays in full and says it deforms', () => {
+    const { root } = character({ handOnHips: true });
+    const build = createClipBuilder(root, [], MIXAMO_NAMES, 1);
+    const guard = build({ idle: 'roll6-guard', walk: 'none', down: 'none' });
+    expect(guard.idle?.name).toBe('roll6-guard');
+    expect(guard.reduced).toBe(false);
+    expect(guard.deforms).toBe(true);
+    // Roll6's idle on the same rig is still fitted (reduced) and never reported as deforming.
+    const idle = build({ idle: 'roll6', walk: 'none', down: 'none' });
+    expect(idle.reduced).toBe(true);
+    expect(idle.deforms).toBe(false);
+  });
+
+  it('a sound rig takes the guard without deforming', () => {
+    const { root } = character();
+    const guard = createClipBuilder(root, [], MIXAMO_NAMES, 1)({ idle: 'roll6-guard', walk: 'none', down: 'none' });
+    expect(guard.deforms).toBe(false);
+  });
+
+  it('puts the bones back at rest after testing a clip in full', () => {
+    const { root, bones } = character({ handOnHips: true });
+    const before = worldOf(bones.hand);
+    createClipBuilder(root, [], MIXAMO_NAMES, 1)({ idle: 'roll6-guard', walk: 'none', down: 'roll6' });
     expect(worldOf(bones.hand).distanceTo(before)).toBeLessThan(1e-9);
   });
 });

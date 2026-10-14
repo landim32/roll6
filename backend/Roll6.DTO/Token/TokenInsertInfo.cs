@@ -53,4 +53,11 @@ public class TokenInsertInfo
     /// <summary>Animation played while the model walks (056); same values as modelIdleClip.</summary>
     [JsonPropertyName("modelWalkClip")]
     public string? ModelWalkClip { get; set; }
+
+    /// <summary>
+    /// Animation played once when a piece of this token is down or out of combat, resting on its last frame (058);
+    /// same values as modelIdleClip ("roll6" = Roll6's death). Omitted = automatic.
+    /// </summary>
+    [JsonPropertyName("modelDownClip")]
+    public string? ModelDownClip { get; set; }
 }

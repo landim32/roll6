@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BASE_COLORS, isLying, isOutOfCombat, isShownIn3d, OBJECT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec,
+  BASE_COLORS, isLying, isModelShownIn3d, isOutOfCombat, isShownIn3d, OBJECT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec,
 } from './pieceDrawing';
 import { hexCenter } from './hexGrid';
 import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
@@ -159,5 +159,19 @@ describe('3D view figures (034)', () => {
       expect(spec.center.x).toBeCloseTo((a.x + b.x) / 2);
       expect(spec.center.y).toBeCloseTo((a.y + b.y) / 2);
     });
+  });
+});
+
+describe('isModelShownIn3d (058)', () => {
+  it('draws the model of a piece in every posture: down and out of combat lie at the end of the death', () => {
+    for (const posture of [POSTURE.standing, POSTURE.down, POSTURE.outOfCombat, null]) {
+      expect(isModelShownIn3d({ modelFileUrl: 'https://files/orc.glb', ...{ posture } })).toBe(true);
+    }
+  });
+
+  it('draws nothing for a token without a model, whatever its 2,5D images', () => {
+    expect(isModelShownIn3d({ modelFileUrl: null })).toBe(false);
+    expect(isModelShownIn3d({ modelFileUrl: '' })).toBe(false);
+    expect(isModelShownIn3d({})).toBe(false);
   });
 });

@@ -35,6 +35,8 @@ public class Token
     public string? ModelIdleClip { get; set; }
     /// <summary>Which animation the 3D view plays while the model walks (056); same values as ModelIdleClip.</summary>
     public string? ModelWalkClip { get; set; }
+    /// <summary>The death (058): played once when a piece of this token is down or out of combat; same values.</summary>
+    public string? ModelDownClip { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -63,14 +65,15 @@ public class Token
     }
 
     /// <summary>
-    /// The token's 3D model (055) and the animations chosen for it (056); null removes it (the PUT of a token
-    /// replaces every field). Without a model the choices are dropped: they only mean something for a file.
+    /// The token's 3D model (055) and the animations chosen for it (056; the death since 058); null removes it (the PUT
+    /// of a token replaces every field). Without a model the choices are dropped: they only mean something for a file.
     /// </summary>
-    public void UpdateModel(string? modelFile, string? idleClip = null, string? walkClip = null)
+    public void UpdateModel(string? modelFile, string? idleClip = null, string? walkClip = null, string? downClip = null)
     {
         ModelFile = Guard.ModelFileName(modelFile, "modelFile");
         ModelIdleClip = ModelFile == null ? null : Guard.ModelClip(idleClip, "modelIdleClip");
         ModelWalkClip = ModelFile == null ? null : Guard.ModelClip(walkClip, "modelWalkClip");
+        ModelDownClip = ModelFile == null ? null : Guard.ModelClip(downClip, "modelDownClip");
         UpdatedAt = DateTime.UtcNow;
     }
 

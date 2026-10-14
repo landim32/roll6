@@ -149,6 +149,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.ModelFile).HasColumnName("model_file").HasMaxLength(260);
             entity.Property(e => e.ModelIdleClip).HasColumnName("model_idle_clip").HasMaxLength(260);
             entity.Property(e => e.ModelWalkClip).HasColumnName("model_walk_clip").HasMaxLength(260);
+            entity.Property(e => e.ModelDownClip).HasColumnName("model_down_clip").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_token");

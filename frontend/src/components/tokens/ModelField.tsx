@@ -31,7 +31,7 @@ interface ModelFieldProps {
 
 /**
  * The "3D" tab of the token form (055): pick a `.glb` (checked here — extension, size, glTF 2.0 header — before
- * anything is sent), see it standing and walking in a preview, choose which animation plays in each state (056: a clip
+ * anything is sent), see it standing, walking and down (058) in a preview, choose which animation plays in each state (056: a clip
  * of the file, Roll6's own, none, or the automatic rule) and see that choice at once in the same preview, or remove
  * the saved model. The file is uploaded only when the token is saved.
  */
@@ -39,11 +39,14 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [walking, setWalking] = useState(false);
+  /** The state the preview shows (058: Parado, Caminhando or Caído). */
+  const [shown, setShown] = useState<AnimationState>('idle');
   const [info, setInfo] = useState<ModelPreviewInfo | null>(null);
   const [sources, setSources] = useState<Record<AnimationState, AnimationSource> | null>(null);
   const [loading, setLoading] = useState(false);
   const [reduced, setReduced] = useState(false);
+  /** A chosen guard or death plays in full and stretches this model (058, Q1 = A). */
+  const [deforms, setDeforms] = useState(false);
   /** The preview shows a still pose (paused, or a state without animation) — 057. */
   const [still, setStill] = useState(false);
   const previewRef = useRef<ModelPreviewHandle>(null);
@@ -54,12 +57,16 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
     setInfo(null);
     setSources(null);
     setReduced(false);
-    setWalking(false);
+    setDeforms(false);
+    setShown('idle');
     setLoading(previewUrl !== null);
   }, [previewUrl]);
 
   const options = useMemo(
-    () => (info ? { idle: clipChoiceOptions(info.clipNames, info.boneNames, 'idle'), walk: clipChoiceOptions(info.clipNames, info.boneNames, 'walk') } : null),
+    () => (info
+      ? Object.fromEntries(ANIMATION_STATES.map((animation) => [animation, clipChoiceOptions(info.clipNames, info.boneNames, animation)])) as
+        Record<AnimationState, ClipOption[]>
+      : null),
     [info],
   );
 
@@ -84,16 +91,23 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
     setError(t('tokens.model.invalid'));
   };
 
-  const optionLabel = (option: ClipOption): string => {
+  /** How a source reads for a state: Roll6's own is the death and nothing is "lying" for the down state (058). */
+  const sourceLabel = (source: AnimationSource, animation: AnimationState): string => {
+    if (animation === 'down' && source === 'roll6') return t('tokens.model.source.death');
+    if (animation === 'down' && source === 'static') return t('tokens.model.source.lying');
+    return t(`tokens.model.source.${source}`);
+  };
+
+  const optionLabel = (option: ClipOption, animation: AnimationState): string => {
     switch (option.kind) {
       case 'file': return t('tokens.model.choice.file', { name: option.name });
-      case 'roll6': return t('tokens.model.choice.roll6');
+      case 'roll6': return t(animation === 'down' ? 'tokens.model.choice.death' : 'tokens.model.choice.roll6');
       case 'guard': return t('tokens.model.choice.guard');
       case 'none': return t('tokens.model.choice.none');
       default: {
         const resolved = option.resolves === 'file' && option.resolvesName
           ? t('tokens.model.choice.file', { name: option.resolvesName })
-          : t(`tokens.model.source.${option.resolves ?? 'static'}`);
+          : sourceLabel(option.resolves ?? 'static', animation);
         return t('tokens.model.choice.auto', { resolved });
       }
     }
@@ -127,10 +141,22 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
             {t('tokens.model.remove')}
           </button>
         )}
-        {previewUrl && sources && (sources.walk !== 'static') && (
-          <button type="button" className="btn btn-outline-secondary btn-sm" aria-pressed={walking} onClick={() => setWalking((prev) => !prev)}>
-            {t(walking ? 'tokens.model.stop' : 'tokens.model.walk')}
-          </button>
+        {previewUrl && sources && (
+          <div className="btn-group btn-group-sm" role="group" aria-label={t('tokens.model.showState')}>
+            {ANIMATION_STATES.map((animation) => (
+              <button
+                key={animation}
+                type="button"
+                className={`btn btn-outline-secondary${shown === animation ? ' active' : ''}`}
+                aria-pressed={shown === animation}
+                // Walking without a walk would only stand still; down without a death still lies (058).
+                disabled={animation === 'walk' && sources.walk === 'static'}
+                onClick={() => setShown(animation)}
+              >
+                {t(`tokens.model.state.${animation}`)}
+              </button>
+            ))}
+          </div>
         )}
       </div>
       {state.picked && <div className="small text-secondary mb-2 text-truncate">{state.picked.name}</div>}
@@ -141,11 +167,11 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
             <ModelPreview
               ref={previewRef}
               url={previewUrl}
-              walking={walking}
+              shown={shown}
               clips={clips}
               label={t('tokens.model.previewLabel', { name: name || '—' })}
               onLoaded={(found) => { setLoading(false); setInfo(found); setInvalid(false); }}
-              onClips={(found, limited) => { setSources(found); setReduced(limited); }}
+              onClips={(found, limited, stretched) => { setSources(found); setReduced(limited); setDeforms(stretched); }}
               onError={onError}
             />
           </Suspense>
@@ -158,7 +184,7 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
         <ModelTimeline
           preview={previewRef}
           disabled={loading || !!error}
-          resetKey={`${previewUrl}|${walking}|${clips.idle ?? ''}|${clips.walk ?? ''}`}
+          resetKey={`${previewUrl}|${shown}|${clips.idle ?? ''}|${clips.walk ?? ''}|${clips.down ?? ''}`}
           onStillChange={setStill}
         />
       )}
@@ -192,20 +218,20 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
           <div className="form-text mb-2">{t('tokens.model.animationsHelp')}</div>
           <div className="row g-2">
             {ANIMATION_STATES.map((animation) => (
-              <div className="col-12 col-sm-6" key={animation}>
+              <div className="col-12 col-sm-4" key={animation}>
                 <label htmlFor={`${id}-clip-${animation}`} className="form-label small mb-1">{t(`tokens.model.state.${animation}`)}</label>
                 <select
                   id={`${id}-clip-${animation}`}
                   className="form-select form-select-sm"
                   value={clips[animation] ?? ''}
-                  onChange={(e) => { setClip(animation, clipChoiceFromValue(e.target.value)); if (animation === 'walk') setWalking(true); else setWalking(false); }}
+                  onChange={(e) => { setClip(animation, clipChoiceFromValue(e.target.value)); setShown(animation); }}
                 >
                   {options[animation].map((option) => (
-                    <option key={option.value} value={option.value}>{optionLabel(option)}</option>
+                    <option key={option.value} value={option.value}>{optionLabel(option, animation)}</option>
                   ))}
                 </select>
                 {sources && (
-                  <div className="form-text">{t('tokens.model.playing', { source: t(`tokens.model.source.${sources[animation]}`) })}</div>
+                  <div className="form-text">{t('tokens.model.playing', { source: sourceLabel(sources[animation], animation) })}</div>
                 )}
               </div>
             ))}
@@ -214,6 +240,7 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
       )}
       {isStatic && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.static')}</div>}
       {reduced && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.reduced')}</div>}
+      {deforms && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.deforms')}</div>}
     </div>
   );
 };

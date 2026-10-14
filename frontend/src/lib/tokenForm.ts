@@ -9,6 +9,8 @@ export interface ResolvedModel {
   /** `lib/modelAnimations` choices: null = automatic, "roll6", "none" or "clip:{name}". */
   modelIdleClip: string | null;
   modelWalkClip: string | null;
+  /** The death (058): played once when a piece of the token is down or out of combat. */
+  modelDownClip: string | null;
 }
 
 /** Same limits as the backend Token.Update. */
@@ -83,4 +85,5 @@ export const toTokenInsert = (
   modelFile: model?.modelFile ?? null,
   modelIdleClip: model?.modelFile ? model.modelIdleClip : null,
   modelWalkClip: model?.modelFile ? model.modelWalkClip : null,
+  modelDownClip: model?.modelFile ? model.modelDownClip : null,
 });

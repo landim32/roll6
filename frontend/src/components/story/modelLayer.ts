@@ -1,5 +1,5 @@
 import {
-  AlwaysDepth, AnimationMixer, BoxGeometry, Clock, DataTexture, DirectionalLight, FloatType, Fog, HemisphereLight, InstancedMesh, Matrix4,
+  AlwaysDepth, AnimationMixer, BoxGeometry, Clock, DataTexture, DirectionalLight, FloatType, Fog, HemisphereLight, InstancedMesh, LoopOnce, Matrix4,
   Mesh, MeshBasicMaterial, NearestFilter, PerspectiveCamera, PlaneGeometry, Quaternion, RedFormat, Scene, ShaderMaterial, Vector3,
   WebGLRenderer,
 } from 'three';
@@ -7,7 +7,7 @@ import type { AnimationAction, Object3D } from 'three';
 import type { Point } from '../../lib/hexGrid';
 import { cameraSetup } from '../../lib/modelCamera';
 import { FIGURE_DEPTH_BIAS, FIGURE_DEPTH_GLSL } from '../../lib/modelDepth';
-import { fitModel } from '../../lib/modelFit';
+import { fitLyingModel, fitModel } from '../../lib/modelFit';
 import { occluderBoxes } from '../../lib/occluders';
 import { SHADE_FALLOFF } from '../../lib/raycaster';
 import type { CameraPose, MaskGrid } from '../../lib/raycaster';
@@ -21,7 +21,9 @@ import type { FigureDepthMap } from './raycastRenderer';
  * The 3D models of the 3D view (055): a transparent WebGL canvas over the raycaster's, drawn with the same camera
  * (`lib/modelCamera`), the walls of the mask written only to the depth buffer so a model behind a wall is hidden the way
  * a figure is, and one clone per piece standing like the figure it replaces (`lib/modelFit`), with its own animation
- * mixer (idle; walk for the piece the player walks). Only imported dynamically, when a piece on the map has a model.
+ * mixer (idle; walk for the piece the player walks). Since 058 a piece that is down or out of combat lies: at the last
+ * frame of its death animation (played once when it falls while on screen), or laid on its back without one. Only
+ * imported dynamically, when a piece on the map has a model.
  */
 export interface ModelSpec {
   id: number;
@@ -32,6 +34,8 @@ export interface ModelSpec {
   yaw: number;
   /** The animation chosen for each state on the token (056). */
   clips: ModelClipChoices;
+  /** The piece is down or out of combat (058): the model lies at the end of its death. */
+  lying: boolean;
 }
 
 export interface ModelLayer {
@@ -83,6 +87,8 @@ interface Drawn {
   mixer: AnimationMixer | null;
   idle: AnimationAction | null;
   walk: AnimationAction | null;
+  /** The death (058): played once, clamped on its last frame. */
+  down: AnimationAction | null;
   walking: boolean;
 }
 
@@ -135,10 +141,14 @@ export const createModelLayer = (
 
   const place = (entry: Drawn) => {
     if (!entry.object || !entry.asset) return;
-    const fit = fitModel(entry.asset.bounds, entry.spec.width, entry.spec.center, entry.spec.yaw);
+    const { bounds } = entry.asset;
+    const { width, center, yaw } = entry.spec;
+    // Lying without a death animation (058): the whole model laid on its back. With one, it stands where it falls.
+    const lying = entry.spec.lying && !entry.down ? fitLyingModel(bounds, width, center, yaw) : null;
+    const fit = lying ?? fitModel(bounds, width, center, yaw);
     entry.object.scale.setScalar(fit.scale);
     entry.object.position.set(fit.position.x, fit.position.y, fit.position.z);
-    entry.object.rotation.set(0, fit.rotationY, 0);
+    entry.object.rotation.set(lying?.tilt ?? 0, fit.rotationY, 0, 'YXZ');
     dirty = true;
   };
 
@@ -147,14 +157,32 @@ export const createModelLayer = (
     if (entry.object) scene.remove(entry.object);
   };
 
-  /** Builds the two actions for the entry's choices and plays the state it is in. */
-  const animate = (entry: Drawn) => {
+  /**
+   * Builds the actions for the entry's choices and plays the state it is in. Lying (058): `fall` plays the death once
+   * from the start (the piece fell while on screen); otherwise it shows its last frame at once (FR-011).
+   */
+  const animate = (entry: Drawn, fall = false) => {
     if (!entry.asset || !entry.mixer) return;
     entry.mixer.stopAllAction();
     const built = entry.asset.clips(entry.spec.clips);
     entry.idle = built.idle ? entry.mixer.clipAction(built.idle) : null;
     entry.walk = built.walk ? entry.mixer.clipAction(built.walk) : null;
-    (entry.walking && entry.walk ? entry.walk : entry.idle)?.reset().play();
+    entry.down = built.down ? entry.mixer.clipAction(built.down) : null;
+    if (entry.down) {
+      entry.down.setLoop(LoopOnce, 1);
+      entry.down.clampWhenFinished = true;
+    }
+    if (entry.spec.lying) {
+      if (entry.down) {
+        entry.down.reset().play();
+        if (!fall) {
+          entry.down.time = entry.down.getClip().duration;
+          entry.mixer.update(0);
+        }
+      }
+    } else {
+      (entry.walking && entry.walk ? entry.walk : entry.idle)?.reset().play();
+    }
     dirty = true;
   };
 
@@ -194,7 +222,7 @@ export const createModelLayer = (
     const delta = clock.getDelta();
     let animating = false;
     for (const entry of drawn.values()) {
-      if (entry.mixer && (entry.idle || entry.walk)) {
+      if (entry.mixer && (entry.idle || entry.walk || entry.down)) {
         entry.mixer.update(delta);
         animating = true;
       }
@@ -260,14 +288,19 @@ export const createModelLayer = (
         const entry = drawn.get(spec.id);
         if (!entry || entry.spec.url !== spec.url) {
           if (entry) remove(entry);
-          const fresh: Drawn = { spec, asset: null, object: null, mixer: null, idle: null, walk: null, walking: entry?.walking ?? false };
+          const fresh: Drawn = {
+            spec, asset: null, object: null, mixer: null, idle: null, walk: null, down: null, walking: entry?.walking ?? false,
+          };
           drawn.set(spec.id, fresh);
           load(fresh);
         } else {
           const changed = !sameClipChoices(entry.spec.clips, spec.clips);
+          // Down ↔ out of combat is still lying: nothing plays again (058). Standing → lying plays the fall.
+          const fell = !entry.spec.lying && spec.lying;
+          const rose = entry.spec.lying && !spec.lying;
           entry.spec = spec;
+          if (changed || fell || rose) animate(entry, fell);
           place(entry);
-          if (changed) animate(entry);
         }
       }
       dirty = true;
@@ -304,6 +337,8 @@ export const createModelLayer = (
       const entry = drawn.get(id);
       if (!entry || entry.walking === walking) return;
       entry.walking = walking;
+      // A piece lying down never walks (the walker refuses it): its death stays as it is.
+      if (entry.spec.lying) return;
       const to = walking ? entry.walk : entry.idle;
       const from = walking ? entry.idle : entry.walk;
       if (to && from) {

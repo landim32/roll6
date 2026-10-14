@@ -172,6 +172,12 @@ public static class Roll6Guide
           `modelIdleClip` / `modelWalkClip` override it per state with `"roll6"`, `"roll6-guard"` (Roll6's guard stance:
           legs bent apart, arms raised in front — for Mixamo skeletons), `"none"` or `"clip:{name}"` (a clip
           of the file, by its exact name) — the web form lists the file's clips and previews each choice.
+        - A piece with a model that is **down or out of combat** lies in the 3D view (058): at the last frame of the
+          token's `modelDownClip` — automatic = the file's clip named "death"/"die"/"dead"/"morte", else Roll6's
+          death (falling on the back) for Mixamo skeletons — played once for whoever is watching when it falls; with
+          no death (`"none"`, or no clip and another skeleton) the model is laid on its back. Pieces without a model
+          that are down stay out of the 3D view. The guard stance and the death play in full even on rigs that hold
+          arms and legs still (Roll6's idle and walk are reduced there), so they may deform such a model.
         - In **free mode** a player walks his own character in the 3D view, in third person (camera locked behind it,
           zoom = distance). That walk is **local to his screen**: it never moves the piece, records nothing and no tool
           sees it — pieces still move only through `move_map_token`.
