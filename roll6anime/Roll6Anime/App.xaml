@@ -19,6 +19,7 @@
         <SolidColorBrush x:Key="WarningBg" Color="#3A321A" />
 
         <local:VisibleWhenSetConverter x:Key="VisibleWhenSet" />
+        <local:PngImageConverter x:Key="PngImage" />
         <BooleanToVisibilityConverter x:Key="VisibleWhenTrue" />
 
         <Style x:Key="Heading" TargetType="TextBlock">

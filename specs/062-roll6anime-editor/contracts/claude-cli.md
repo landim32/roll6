@@ -8,9 +8,9 @@ Conferido com o Claude Code 2.1.300 nesta máquina. Saída real em [samples/clau
 |---|---|
 | Executável | `Roll6Anime:ClaudeExecutable` (padrão `claude`, pelo PATH) |
 | WorkingDirectory | `Roll6Anime:ClaudeWorkingDirectory` (padrão `C:\repos\gurps-adventure`) |
-| Argumentos (1º pedido da conversa) | `-p --output-format stream-json --verbose --include-partial-messages --session-id <uuid> --permission-mode acceptEdits --allowedTools <ClaudeAllowedTools> --append-system-prompt <contexto>` |
+| Argumentos (1º pedido da conversa) | `-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages --session-id <uuid> --permission-mode acceptEdits --allowedTools <ClaudeAllowedTools> --append-system-prompt <contexto>` |
 | Argumentos (pedidos seguintes) | igual, com `--resume <uuid>` no lugar de `--session-id <uuid>` |
-| stdin | o texto do pedido, UTF-8, depois fechado |
+| stdin | uma linha JSON (`PromptMessage`), UTF-8, depois fechado: `{"type":"user","message":{"role":"user","content":[…]}}` — primeiro um bloco `image` (`source` base64, `image/png`) por print anexado, depois um bloco `text` com o pedido e, havendo prints, "Imagem N: {legenda}" de cada um |
 | stdout | uma linha JSON por evento (UTF-8) |
 | stderr | guardado; usado só na mensagem de falha |
 | Ambiente | o do usuário **menos** `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, para valer o login da conta |

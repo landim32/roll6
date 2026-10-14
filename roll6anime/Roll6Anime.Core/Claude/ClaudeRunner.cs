@@ -21,7 +21,8 @@ public record ClaudeOutcome(ClaudeOutcomeKind Kind, string? Message = null, IRea
 
 /// <summary>
 /// Runs one request on the local Claude Code (062, research R6, contracts/claude-cli.md): the CLI in the configured
-/// working directory, the prompt through stdin, the stream-json output read line by line. The variables that would
+/// working directory, the request through stdin as one stream-json user message (the text and the attached prints),
+/// the stream-json output read line by line. The variables that would
 /// put the CLI on an API key are removed, so it uses the user's own login. One process per request; the conversation's
 /// session id carries the memory.
 /// </summary>
@@ -37,7 +38,7 @@ public static class ClaudeRunner
     private static readonly string[] LOGIN_HINTS = { "login", "log in", "auth", "401", "credential" };
 
     public static async Task<ClaudeOutcome> RunAsync(
-        AnimeSettings settings, Conversation conversation, string context, string prompt,
+        AnimeSettings settings, Conversation conversation, string context, string prompt, IReadOnlyList<PromptImage> images,
         IProgress<ClaudeEvent> progress, CancellationToken cancellation)
     {
         if (settings.CheckClaudeWorkingDirectory() is { } missing)
@@ -77,7 +78,7 @@ public static class ClaudeRunner
         {
             try
             {
-                await process.StandardInput.WriteAsync(prompt);
+                await process.StandardInput.WriteAsync(PromptMessage.Build(prompt, images));
                 await process.StandardInput.FlushAsync();
                 process.StandardInput.Close();
             }

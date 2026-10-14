@@ -13,6 +13,21 @@ export interface Playback {
   enabled: boolean;
 }
 
+/**
+ * Where the camera is around the character, in degrees (062, print of the view): `azimuth` 0 = in front (glTF +Z),
+ * positive toward the character's left (+X), ±180 behind; `elevation` above the point it looks at.
+ */
+export const cameraAngles = (
+  camera: { x: number; y: number; z: number },
+  target: { x: number; y: number; z: number },
+): { azimuth: number; elevation: number } => {
+  const dx = camera.x - target.x;
+  const dy = camera.y - target.y;
+  const dz = camera.z - target.z;
+  const toDegrees = (radians: number) => (radians * 180) / Math.PI;
+  return { azimuth: toDegrees(Math.atan2(dx, dz)), elevation: toDegrees(Math.atan2(dy, Math.hypot(dx, dz))) };
+};
+
 /** The time bar's state before any animation. */
 export const NO_PLAYBACK: Playback = { time: 0, duration: 0, paused: true, enabled: false };
 

@@ -1,0 +1,68 @@
+using System.Globalization;
+using System.Text.Json;
+
+namespace Roll6Anime.Core.Claude;
+
+/// <summary>A print of the 3D view attached to a request: the PNG and the text that says what it shows.</summary>
+public sealed record PromptImage(byte[] Png, string Caption);
+
+/// <summary>
+/// What the 3D view reported when it was printed: the PNG, the animation's instant (null without an animation) and
+/// where the camera was, around the character (<c>Azimuth</c> 0° = in front, positive toward its left — the
+/// character's +X — up to ±180° behind; <c>Elevation</c> above the middle of the model).
+/// </summary>
+public sealed record ViewCapture(byte[] Png, double? Time, double? Duration, bool Paused, double Azimuth, double Elevation)
+{
+    private static readonly CultureInfo BRAZIL = CultureInfo.GetCultureInfo("pt-BR");
+
+    /// <summary>The caption in Portuguese: which animation, which instant and from where the camera looks.</summary>
+    public string Caption(string? animationName)
+    {
+        var what = animationName == null || Time is not { } time || Duration is not { } duration
+            ? "o modelo na pose de descanso, sem animação"
+            : $"a animação {animationName} no instante {Seconds(time)} de {Seconds(duration)}{(Paused ? " (pausada)" : " (tocando)")}";
+        return $"print da vista 3D do roll6anime: {what}; câmera {Camera()}.";
+    }
+
+    private string Camera()
+    {
+        var azimuth = Math.Round(Azimuth);
+        var side = Math.Abs(azimuth) switch
+        {
+            <= 10 => "de frente para o personagem",
+            >= 170 => "atrás do personagem (vê as costas)",
+            _ => $"{Degrees(azimuth)} da frente, para o lado {(azimuth > 0 ? "esquerdo" : "direito")} do personagem",
+        };
+        var elevation = Math.Round(Elevation);
+        var height = Math.Abs(elevation) <= 5
+            ? "na altura do meio do corpo"
+            : $"{Degrees(elevation)} {(elevation > 0 ? "acima" : "abaixo")} do meio do corpo";
+        return $"{side}, {height}";
+    }
+
+    private static string Degrees(double value) => $"{Math.Abs(value).ToString(CultureInfo.InvariantCulture)}°";
+
+    private static string Seconds(double seconds) => $"{seconds.ToString("0.00", BRAZIL)} s";
+}
+
+/// <summary>
+/// The request as the CLI reads it with <c>--input-format stream-json</c> (contracts/claude-cli.md): one user message
+/// line with the prints first (images are read best before the text) and the text, which names each print.
+/// </summary>
+public static class PromptMessage
+{
+    public static string Build(string text, IReadOnlyList<PromptImage> images)
+    {
+        var content = new List<object>();
+        foreach (var image in images)
+            content.Add(new { type = "image", source = new { type = "base64", media_type = "image/png", data = Convert.ToBase64String(image.Png) } });
+        var body = text;
+        if (images.Count > 0)
+        {
+            var captions = images.Select((image, index) => $"Imagem {index + 1}: {image.Caption}");
+            body = $"{text}\n\n{string.Join("\n", captions)}";
+        }
+        content.Add(new { type = "text", text = body });
+        return JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content } }) + "\n";
+    }
+}

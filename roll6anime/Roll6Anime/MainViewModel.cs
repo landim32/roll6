@@ -15,6 +15,8 @@ namespace Roll6Anime;
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
+    /// <summary>Most prints one request carries.</summary>
+    public const int MAX_ATTACHMENTS = 5;
     private const string NOT_MIXAMO = "O esqueleto deste modelo não usa os nomes do Mixamo: as animações não se aplicam a ele.";
 
     private readonly AnimeSettings _settings;
@@ -29,6 +31,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private string? _status;
     private string _prompt = string.Empty;
     private bool _isRunning;
+    private bool _capturing;
     private CancellationTokenSource? _running;
     /// <summary>True while a request of the "nova animação" conversation runs: the next new file is adopted (FR-015).</summary>
     private bool _creating;
@@ -45,6 +48,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _viewer.ModelError += message => { ModelWarning = $"Não foi possível abrir o modelo: {message}"; };
         _viewer.AnimationError += message => { Status = message; };
         Conversation = _book.For(null);
+        Attachments.CollectionChanged += (_, _) => { OnChanged(nameof(HasAttachments)); OnChanged(nameof(CanSend)); OnChanged(nameof(CanCapture)); };
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -74,7 +78,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string? ModelPath
     {
         get => _modelPath;
-        private set { _modelPath = value; OnChanged(); OnChanged(nameof(ModelName)); }
+        private set { _modelPath = value; OnChanged(); OnChanged(nameof(ModelName)); OnChanged(nameof(CanCapture)); }
     }
 
     public string ModelName => _modelPath == null ? "Nenhum modelo aberto" : Path.GetFileName(_modelPath);
@@ -105,10 +109,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set { _prompt = value; OnChanged(); OnChanged(nameof(CanSend)); }
     }
 
+    /// <summary>Prints of the 3D view waiting to go with the next request; cleared when it is sent.</summary>
+    public ObservableCollection<PromptImage> Attachments { get; } = new();
+
+    public bool HasAttachments => Attachments.Count > 0;
+
+    /// <summary>"Anexar print": a model on screen, no request running, room for one more.</summary>
+    public bool CanCapture => !_isRunning && !_capturing && _modelPath != null && Attachments.Count < MAX_ATTACHMENTS;
+
     public bool IsRunning
     {
         get => _isRunning;
-        private set { _isRunning = value; OnChanged(); OnChanged(nameof(CanSend)); OnChanged(nameof(CanEditPrompt)); }
+        private set { _isRunning = value; OnChanged(); OnChanged(nameof(CanSend)); OnChanged(nameof(CanEditPrompt)); OnChanged(nameof(CanCapture)); }
     }
 
     public bool CanEditPrompt => !_isRunning;
@@ -116,7 +128,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>Why requests cannot be sent (the Claude's folder is missing), or null.</summary>
     public string? SendBlockedReason => _settings.CheckClaudeWorkingDirectory();
 
-    public bool CanSend => !_isRunning && !string.IsNullOrWhiteSpace(_prompt) && SendBlockedReason == null;
+    public bool CanSend => !_isRunning && (!string.IsNullOrWhiteSpace(_prompt) || Attachments.Count > 0) && SendBlockedReason == null;
 
     /// <summary>Lists and follows the folder, and reopens the last model (US1, US3, US4).</summary>
     public void Start()
@@ -187,17 +199,56 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnChanged(nameof(ConversationTitle));
     }
 
+    /// <summary>
+    /// "Anexar print": the 3D view as it is now — the pose of this instant from the user's camera — joins the next
+    /// request, with a caption saying which animation, which instant and from where the camera looks.
+    /// </summary>
+    public async Task CaptureAsync()
+    {
+        if (!CanCapture)
+            return;
+        _capturing = true;
+        OnChanged(nameof(CanCapture));
+        try
+        {
+            var capture = await _viewer.CaptureAsync();
+            var animation = capture.Time != null && _selected != null
+                ? PromptContext.Relative(_settings.ClaudeWorkingDirectory, _selected.FullPath)
+                : null;
+            Attachments.Add(new PromptImage(capture.Png, capture.Caption(animation)));
+        }
+        catch (Exception ex)
+        {
+            Status = $"Não foi possível capturar a vista 3D: {ex.Message}";
+        }
+        finally
+        {
+            _capturing = false;
+            OnChanged(nameof(CanCapture));
+        }
+    }
+
+    public void RemoveAttachment(PromptImage image)
+    {
+        if (!_isRunning)
+            Attachments.Remove(image);
+    }
+
     /// <summary>Sends the request to the local Claude with the screen's context (US2, FR-010–FR-014).</summary>
     public async Task SendAsync()
     {
         if (!CanSend)
             return;
+        var images = Attachments.ToList();
         var text = _prompt.Trim();
+        if (text.Length == 0)
+            text = "Veja a imagem anexada.";
         Prompt = string.Empty;
+        Attachments.Clear();
         var conversation = Conversation;
         var entry = _selected;
         _creating = entry == null;
-        conversation.Messages.Add(new ConversationMessage(ConversationRole.User, text));
+        conversation.Messages.Add(new ConversationMessage(ConversationRole.User, text, images.Select(image => image.Png).ToList()));
         ConversationMessage? answer = null;
         var progress = new Progress<ClaudeEvent>(claudeEvent =>
         {
@@ -228,7 +279,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         try
         {
             var context = PromptContext.Build(_settings, entry?.FullPath, _modelPath);
-            var outcome = await ClaudeRunner.RunAsync(_settings, conversation, context, text, progress, _running.Token);
+            var outcome = await ClaudeRunner.RunAsync(_settings, conversation, context, text, images, progress, _running.Token);
             if (outcome.Kind != ClaudeOutcomeKind.Done)
                 conversation.Messages.Add(new ConversationMessage(ConversationRole.Notice, outcome.Message ?? "O pedido falhou."));
             if (outcome.PermissionDenials is { Count: > 0 } denials)

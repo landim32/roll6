@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampTime, formatTime, NO_PLAYBACK, nextPlayback } from './player';
+import { cameraAngles, clampTime, formatTime, NO_PLAYBACK, nextPlayback } from './player';
 
 describe('roll6anime player (062)', () => {
   it('keeps a time inside the duration', () => {
@@ -29,5 +29,23 @@ describe('roll6anime player (062)', () => {
 
   it('starts with the bar disabled', () => {
     expect(NO_PLAYBACK.enabled).toBe(false);
+  });
+});
+
+describe('cameraAngles', () => {
+  const target = { x: 0, y: 1, z: 0 };
+
+  it('is 0/0 straight in front of the character', () => {
+    expect(cameraAngles({ x: 0, y: 1, z: 5 }, target)).toEqual({ azimuth: 0, elevation: 0 });
+  });
+
+  it('is positive on the character\'s left (+X) and above', () => {
+    const { azimuth, elevation } = cameraAngles({ x: 5, y: 6, z: 0 }, target);
+    expect(azimuth).toBeCloseTo(90);
+    expect(elevation).toBeCloseTo(45);
+  });
+
+  it('is ±180 behind', () => {
+    expect(Math.abs(cameraAngles({ x: 0, y: 1, z: -5 }, target).azimuth)).toBeCloseTo(180);
   });
 });

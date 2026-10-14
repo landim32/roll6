@@ -8,7 +8,7 @@ import { instantiate, loadModel } from '@roll6/components/story/loadModel';
 import { isMixamoSkeleton } from '@roll6/lib/modelAnimations';
 import { listen, send } from './bridge';
 import type { HostMessage } from './bridge';
-import { Player } from './player';
+import { Player, cameraAngles } from './player';
 import { createTimeline } from './timeline';
 import './style.css';
 
@@ -92,6 +92,31 @@ const openModel = async (url: string) => {
   }
 };
 
+/**
+ * A print of the view exactly as it is on screen — the pose of this instant from this camera — drawn again and read
+ * at once, since the WebGL buffer is cleared after each frame.
+ */
+const capture = (id: number) => {
+  if (!player) {
+    send({ type: 'captureFailed', id, message: 'Nenhum modelo aberto na vista.' });
+    return;
+  }
+  renderer.render(scene, camera);
+  const png = canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+  const playback = player.playback();
+  const { azimuth, elevation } = cameraAngles(camera.position, controls.target);
+  send({
+    type: 'captured',
+    id,
+    png,
+    time: playback.enabled ? playback.time : null,
+    duration: playback.enabled ? playback.duration : null,
+    paused: playback.paused,
+    azimuth,
+    elevation,
+  });
+};
+
 listen((message) => {
   switch (message.type) {
     case 'model':
@@ -106,6 +131,9 @@ listen((message) => {
     case 'clear':
       animation = null;
       player?.clear();
+      break;
+    case 'capture':
+      capture(message.id);
       break;
   }
 });
