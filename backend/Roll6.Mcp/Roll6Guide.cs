@@ -216,6 +216,11 @@ public static class Roll6Guide
           positive X, elbows (`*ForeArm`) with negative X; +Y turns the front to the character's left; +Z raises the
           left side (`LeftArm` +Z lifts the left arm sideways, `RightArm` −Z the right one). Hips X −90 with hipsLift
           `of: "hips"` down to about −0.8 lies on the back.
+        - Hands: the fingers start from the T pose (palm down), so a finger curls toward the palm with **−Z on the left
+          hand and +Z on the right**. A left fist: Index/Middle/Ring/Pinky 1, 2, 3 = Z −70, −90, −60; Thumb1 [0, 45, −20],
+          Thumb2 [0, 20, −30], Thumb3 [0, 0, −40]; the right fist changes the sign of Y and Z. Scale it: ~0.3 relaxed,
+          ~0.85 gripping a handle, 1 a fist. Hold the hand on every key (the same triple) unless it opens or closes. Without
+          finger tracks the hands stay open as in the rest pose.
         - Errors come back keyed: `content`, `content.format`, `content.version`, `content.duration`, `content.loop`,
           `content.tracks`, `content.tracks[i].bone|times|degrees`, `content.hipsLift.times|values|of`.
 

@@ -42,8 +42,8 @@ interface GeneratedImage {
 /**
  * Fields of a library token, shared by "Incluir token" and "Editar token", in two tabs: "Token" (name, description,
  * standing and lying images — crop with zoom and rotation, saved at the footprint's pixel size — and the spaces) and
- * "2,5D" (the four images the 3D view draws, one per side of the character) and "3D" (a `.glb` model the 3D view draws
- * instead, 055). The panels stay mounted and the inactive ones are hidden, so nothing is lost when the user switches:
+ * "2,5D" (the four images the 3D view draws, one per side of the character), "3D" (a `.glb` model the 3D view draws
+ * instead, 055, shown in its rest pose) and "Animação" (060: the animation of each state of that model). The panels stay mounted and the inactive ones are hidden, so nothing is lost when the user switches:
  * texts, chosen files and open crops (FR-005).
  */
 export const TokenFormFields = ({
@@ -68,6 +68,7 @@ export const TokenFormFields = ({
           { key: 'token', label: t('tokens.tabToken') },
           { key: 'sprites', label: t('tokens.tabSprites') },
           { key: 'model', label: t('tokens.tab3d') },
+          { key: 'animation', label: t('tokens.tabAnimation') },
         ]}
         active={tab}
         onChange={setTab}
@@ -146,12 +147,14 @@ export const TokenFormFields = ({
           ))}
         </div>
       </div>
-      <div hidden={tab !== 'model'}>
+      {/* One field for the two model tabs (060), so the preview is not loaded twice. */}
+      <div hidden={tab !== 'model' && tab !== 'animation'}>
         <ModelField
           id={id('model')}
           state={model}
           name={current?.name ?? form.name}
           generate={canGenerate ? { upSize, downSize, onGenerated } : undefined}
+          section={tab === 'animation' ? 'animation' : 'model'}
         />
       </div>
     </>

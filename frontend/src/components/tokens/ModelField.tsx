@@ -14,7 +14,7 @@ import {
 } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ClipOption } from '../../lib/modelAnimations';
 import { ModelTimeline } from './ModelTimeline';
-import { CameraIcon } from '../ui/icons';
+import { ArrowClockwiseIcon, CameraIcon } from '../ui/icons';
 import type { ModelPreviewHandle, ModelPreviewInfo } from './ModelPreview';
 
 const ModelPreview = lazy(() => import('./ModelPreview'));
@@ -33,15 +33,23 @@ interface ModelFieldProps {
   name: string;
   /** Only in forms that save the token: the paused pose can become the standing or the lying image. */
   generate?: ModelFieldGenerate;
+  /**
+   * Which tab shows it (060): "model" = the "3D" tab (pick or remove the `.glb`, seen in its rest pose — the T-pose of
+   * the rig); "animation" = the "Animação" tab (the state, the animated preview with its timeline and "Gerar imagem",
+   * and the animation of that state with "Atualizar" for the library).
+   */
+  section: 'model' | 'animation';
 }
 
 /**
- * The "3D" tab of the token form (055): pick a `.glb` (checked here — extension, size, glTF 2.0 header — before
- * anything is sent), see it standing, walking and down (058) in a preview, choose which animation plays in each state (056: a clip
- * of the file, Roll6's own, a library animation of the state's type (059), none, or the automatic rule) and see that
- * choice at once in the same preview, or remove the saved model. The file is uploaded only when the token is saved.
+ * The token's 3D model, in two tabs of the token form (060). "3D" (055): pick a `.glb` (checked here — extension, size,
+ * glTF 2.0 header — before anything is sent) or remove the saved one, seen in its rest pose. "Animação": choose the
+ * state (Parado, Caminhando, Caído — 058), watch it in the preview card (timeline, "Gerar imagem" — 057) and choose the
+ * animation of that state (056: a clip of the file, Roll6's own, a library animation of the state's type from every
+ * user (059), none, or the automatic rule), refreshing the library list with "Atualizar". The file is uploaded only
+ * when the token is saved.
  */
-export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
+export const ModelField = ({ id, state, name, generate, section }: ModelFieldProps) => {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +65,8 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
   const [still, setStill] = useState(false);
   const previewRef = useRef<ModelPreviewHandle>(null);
   const { previewUrl, clips, setClip, setInvalid } = state;
-  const { byType, listForType } = useAnimation();
+  const { byType, listForType, refreshType } = useAnimation();
+  const [refreshing, setRefreshing] = useState(false);
   const { session } = useAuth();
   const userId = session?.user.userId;
   /** Names of chosen library animations that are not in the loaded lists (another user's, beyond the first page). */
@@ -176,139 +185,176 @@ export const ModelField = ({ id, state, name, generate }: ModelFieldProps) => {
   };
   const canShoot = !!generate && !!previewUrl && !loading && !error && still;
 
+  const libraryType = STATE_ANIMATION_TYPE[shown];
+  /** "Atualizar" (060): reads again the library animations of the state's type, from every user. */
+  const refreshLibrary = async () => {
+    setRefreshing(true);
+    try {
+      await refreshType(libraryType);
+    } catch {
+      toast.error(t('tokens.model.refreshFailed'));
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  /** The library animations of the state shown (059), plus a chosen one outside the loaded list. */
+  const libraryGroup = () => {
+    const list = mixamo ? libraryOf(shown) : [];
+    const chosen = parseClipChoice(clips[shown]);
+    const extra = chosen.kind === 'animation' && !list.some((item) => item.animationId === chosen.id) ? chosen.id : null;
+    if (list.length === 0 && extra === null) return null;
+    return (
+      <optgroup label={t('tokens.model.libraryGroup')}>
+        {list.map((item) => (
+          <option key={item.animationId} value={animationChoice(item.animationId)}>
+            {item.userId === userId || !item.ownerName
+              ? t('tokens.model.choice.library', { name: item.name })
+              : t('tokens.model.choice.libraryOther', { name: item.name, owner: item.ownerName })}
+          </option>
+        ))}
+        {extra !== null && (
+          <option value={animationChoice(extra)}>{t('tokens.model.choice.library', { name: animationName(extra) })}</option>
+        )}
+      </optgroup>
+    );
+  };
+
+  const animating = section === 'animation';
+
+  // The card stays at the same place in both sections, so switching tabs keeps the loaded model (060).
   return (
     <div className="stm-model-field">
-      <div className="form-text mb-2">{t('tokens.model.help')}</div>
-      <div className="d-flex flex-wrap gap-2 mb-2">
-        <input ref={input} id={id} type="file" accept=".glb,model/gltf-binary" className="d-none" onChange={(e) => { void onFile(e); }} />
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => input.current?.click()}>
-          {t(previewUrl ? 'tokens.model.change' : 'tokens.model.pick')}
-        </button>
-        {previewUrl && (
-          <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => { setError(null); state.remove(); }}>
-            {t('tokens.model.remove')}
-          </button>
-        )}
-        {previewUrl && sources && (
-          <div className="btn-group btn-group-sm" role="group" aria-label={t('tokens.model.showState')}>
-            {ANIMATION_STATES.map((animation) => (
-              <button
-                key={animation}
-                type="button"
-                className={`btn btn-outline-secondary${shown === animation ? ' active' : ''}`}
-                aria-pressed={shown === animation}
-                // Walking without a walk would only stand still; down without a death still lies (058).
-                disabled={animation === 'walk' && sources.walk === 'static'}
-                onClick={() => setShown(animation)}
+      {animating ? (
+        <div className="mb-2">
+          {previewUrl ? (
+            <>
+              <label htmlFor={`${id}-state`} className="form-label small mb-1">{t('tokens.model.showState')}</label>
+              <select
+                id={`${id}-state`}
+                className="form-select form-select-sm"
+                value={shown}
+                onChange={(e) => setShown(e.target.value as AnimationState)}
               >
-                {t(`tokens.model.state.${animation}`)}
+                {ANIMATION_STATES.map((animation) => (
+                  <option key={animation} value={animation}>{t(`tokens.model.state.${animation}`)}</option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <div className="form-text">{t('tokens.model.animationNeedsModel')}</div>
+          )}
+        </div>
+      ) : (
+        <div>
+          <div className="form-text mb-2">{t('tokens.model.help')}</div>
+          <div className="d-flex flex-wrap gap-2 mb-2">
+            <input ref={input} id={id} type="file" accept=".glb,model/gltf-binary" className="d-none" onChange={(e) => { void onFile(e); }} />
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => input.current?.click()}>
+              {t(previewUrl ? 'tokens.model.change' : 'tokens.model.pick')}
+            </button>
+            {previewUrl && (
+              <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => { setError(null); state.remove(); }}>
+                {t('tokens.model.remove')}
               </button>
-            ))}
+            )}
           </div>
-        )}
-      </div>
-      {state.picked && <div className="small text-secondary mb-2 text-truncate">{state.picked.name}</div>}
-      {error && <div className="invalid-feedback d-block mb-2">{error}</div>}
-      <div className="stm-model-stage">
-        {previewUrl ? (
-          <Suspense fallback={<div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}>
-            <ModelPreview
-              ref={previewRef}
-              url={previewUrl}
-              shown={shown}
-              clips={clips}
-              label={t('tokens.model.previewLabel', { name: name || '—' })}
-              onLoaded={(found) => { setLoading(false); setInfo(found); setInvalid(false); }}
-              onClips={(found, limited, stretched) => { setSources(found); setReduced(limited); setDeforms(stretched); }}
-              onError={onError}
-            />
-          </Suspense>
-        ) : (
-          <div className="stm-model-stage-note small text-secondary">{t('tokens.model.none')}</div>
-        )}
-        {previewUrl && loading && !error && <div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}
-      </div>
-      {previewUrl && (
-        <ModelTimeline
-          preview={previewRef}
-          disabled={loading || !!error}
-          resetKey={`${previewUrl}|${shown}|${clips.idle ?? ''}|${clips.walk ?? ''}|${clips.down ?? ''}`}
-          onStillChange={setStill}
-        />
-      )}
-      {generate && previewUrl && (
-        <div className="stm-model-generate">
-          <DropdownMenu.Root modal={false}>
-            <DropdownMenu.Trigger asChild disabled={!canShoot}>
-              <button
-                type="button"
-                className="btn btn-outline-secondary btn-sm dropdown-toggle d-inline-flex align-items-center gap-2"
-                disabled={!canShoot}
-                title={canShoot ? undefined : t('tokens.model.generate.pauseFirst')}
-              >
-                <CameraIcon size={14} /> {t('tokens.model.generate.button')}
-              </button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content className="dropdown-menu show" align="center" sideOffset={4}>
-              <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('up'); }}>
-                {t('tokens.model.generate.up')}
-              </DropdownMenu.Item>
-              <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('down'); }}>
-                {t('tokens.model.generate.down')}
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
+          {state.picked && <div className="small text-secondary mb-2 text-truncate">{state.picked.name}</div>}
+          {error && <div className="invalid-feedback d-block mb-2">{error}</div>}
+          {previewUrl && <div className="form-text mb-2">{t('tokens.model.restPose')}</div>}
         </div>
       )}
-      {previewUrl && options && (
-        <fieldset className="mt-3">
-          <legend className="form-label small fw-semibold mb-1">{t('tokens.model.animations')}</legend>
-          <div className="form-text mb-2">{t('tokens.model.animationsHelp')}</div>
-          <div className="row g-2">
-            {ANIMATION_STATES.map((animation) => (
-              <div className="col-12 col-sm-4" key={animation}>
-                <label htmlFor={`${id}-clip-${animation}`} className="form-label small mb-1">{t(`tokens.model.state.${animation}`)}</label>
-                <select
-                  id={`${id}-clip-${animation}`}
-                  className="form-select form-select-sm"
-                  value={clips[animation] ?? ''}
-                  onChange={(e) => { setClip(animation, clipChoiceFromValue(e.target.value)); setShown(animation); }}
+      <div className="stm-model-card" hidden={animating && !previewUrl}>
+        <div className="stm-model-stage">
+          {previewUrl ? (
+            <Suspense fallback={<div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}>
+              <ModelPreview
+                ref={previewRef}
+                url={previewUrl}
+                shown={shown}
+                animated={animating}
+                clips={clips}
+                label={t('tokens.model.previewLabel', { name: name || '—' })}
+                onLoaded={(found) => { setLoading(false); setInfo(found); setInvalid(false); }}
+                onClips={(found, limited, stretched) => { setSources(found); setReduced(limited); setDeforms(stretched); }}
+                onError={onError}
+              />
+            </Suspense>
+          ) : (
+            <div className="stm-model-stage-note small text-secondary">{t('tokens.model.none')}</div>
+          )}
+          {previewUrl && loading && !error && <div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}
+        </div>
+        {animating && previewUrl && (
+          <ModelTimeline
+            preview={previewRef}
+            disabled={loading || !!error}
+            resetKey={`${previewUrl}|${shown}|${clips.idle ?? ''}|${clips.walk ?? ''}|${clips.down ?? ''}`}
+            onStillChange={setStill}
+          />
+        )}
+        {animating && generate && previewUrl && (
+          <div className="stm-model-generate">
+            <DropdownMenu.Root modal={false}>
+              <DropdownMenu.Trigger asChild disabled={!canShoot}>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm dropdown-toggle d-inline-flex align-items-center gap-2"
+                  disabled={!canShoot}
+                  title={canShoot ? undefined : t('tokens.model.generate.pauseFirst')}
                 >
-                  {options[animation].map((option) => (
-                    <option key={option.value} value={option.value}>{optionLabel(option, animation)}</option>
-                  ))}
-                  {(() => {
-                    const list = mixamo ? libraryOf(animation) : [];
-                    const chosen = parseClipChoice(clips[animation]);
-                    const extra = chosen.kind === 'animation' && !list.some((item) => item.animationId === chosen.id) ? chosen.id : null;
-                    if (list.length === 0 && extra === null) return null;
-                    return (
-                      <optgroup label={t('tokens.model.libraryGroup')}>
-                        {list.map((item) => (
-                          <option key={item.animationId} value={animationChoice(item.animationId)}>
-                            {item.userId === userId || !item.ownerName
-                              ? t('tokens.model.choice.library', { name: item.name })
-                              : t('tokens.model.choice.libraryOther', { name: item.name, owner: item.ownerName })}
-                          </option>
-                        ))}
-                        {extra !== null && (
-                          <option value={animationChoice(extra)}>{t('tokens.model.choice.library', { name: animationName(extra) })}</option>
-                        )}
-                      </optgroup>
-                    );
-                  })()}
-                </select>
-                {sources && (
-                  <div className="form-text">{t('tokens.model.playing', { source: sourceLabel(sources[animation], animation) })}</div>
-                )}
-              </div>
-            ))}
+                  <CameraIcon size={14} /> {t('tokens.model.generate.button')}
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content className="dropdown-menu show" align="center" sideOffset={4}>
+                <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('up'); }}>
+                  {t('tokens.model.generate.up')}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('down'); }}>
+                  {t('tokens.model.generate.down')}
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
           </div>
-        </fieldset>
+        )}
+      </div>
+      {animating && previewUrl && options && (
+        <div className="stm-model-choice mt-3">
+          <label htmlFor={`${id}-clip`} className="form-label small mb-1">
+            {t('tokens.model.animationOf', { state: t(`tokens.model.state.${shown}`) })}
+          </label>
+          <div className="d-flex gap-2">
+            <select
+              id={`${id}-clip`}
+              className="form-select form-select-sm"
+              value={clips[shown] ?? ''}
+              onChange={(e) => setClip(shown, clipChoiceFromValue(e.target.value))}
+            >
+              {options[shown].map((option) => (
+                <option key={option.value} value={option.value}>{optionLabel(option, shown)}</option>
+              ))}
+              {libraryGroup()}
+            </select>
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
+              onClick={() => { void refreshLibrary(); }}
+              disabled={refreshing || !mixamo}
+              title={t('tokens.model.refreshTitle')}
+              aria-label={t('tokens.model.refreshTitle')}
+            >
+              <ArrowClockwiseIcon size={14} /> <span className="d-none d-sm-inline">{t('tokens.model.refresh')}</span>
+            </button>
+          </div>
+          {sources && (
+            <div className="form-text">{t('tokens.model.playing', { source: sourceLabel(sources[shown], shown) })}</div>
+          )}
+          <div className="form-text">{t('tokens.model.animationsHelp')}</div>
+        </div>
       )}
-      {isStatic && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.static')}</div>}
-      {reduced && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.reduced')}</div>}
-      {deforms && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.deforms')}</div>}
+      {animating && isStatic && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.static')}</div>}
+      {animating && reduced && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.reduced')}</div>}
+      {animating && deforms && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.deforms')}</div>}
     </div>
   );
 };

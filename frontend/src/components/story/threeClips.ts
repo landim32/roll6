@@ -4,7 +4,7 @@ import {
 import type { Bone, KeyframeTrack, Object3D, SkinnedMesh } from 'three';
 import { clipChoiceIds, clipChoicesKey, normalizeBoneName, resolveAnimation } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, LibraryClips, ModelClipChoices } from '../../lib/modelAnimations';
-import { RELAXED_ARMS, ROLL6_CLIPS_BY_NAME } from '../../lib/roll6Clips';
+import { HAND_FINGERS, RELAXED_ARMS, ROLL6_CLIPS_BY_NAME } from '../../lib/roll6Clips';
 import type { Roll6Clip, Roll6ClipName } from '../../lib/roll6Clips';
 
 /**
@@ -134,6 +134,8 @@ export const hipsHeight = (root: Object3D, hips: Bone, bones: Map<string, Bone>)
 const LIMB_GROUPS: string[][] = [
   ['LeftArm', 'RightArm'], ['LeftForeArm', 'RightForeArm'], ['LeftUpLeg', 'RightUpLeg'], ['LeftLeg', 'RightLeg'],
   ['LeftFoot', 'RightFoot'], ['LeftShoulder', 'RightShoulder'], ['Spine'], ['Spine1'], ['Spine2'], ['Neck'], ['Head'], ['Hips'],
+  // The fingers of both hands (060): one group, so a rig that tears them keeps the hands open.
+  (['Left', 'Right'] as const).flatMap((side) => HAND_FINGERS.flatMap((finger) => [1, 2, 3].map((joint) => `${side}Hand${finger}${joint}`))),
 ];
 /** Amplitudes tried, from the full motion down to none. */
 const LIMIT_STEPS = [1, 0.6, 0.3, 0];
