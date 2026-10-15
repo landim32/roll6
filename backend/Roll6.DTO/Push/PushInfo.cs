@@ -3,26 +3,6 @@ using Roll6.DTO.Chat;
 
 namespace Roll6.DTO.Push;
 
-/// <summary>
-/// A personal notice shown as a toast inside the app (043) when its campaign is on screen: "Falta apenas você",
-/// "Turno N terminado", PV, Fadiga, a poke. Sent through the table hub method <c>notice</c>.
-/// </summary>
-public class NoticeInfo
-{
-    /// <summary>majority | turnFinished | life | fatigue | poke</summary>
-    [JsonPropertyName("kind")]
-    public string Kind { get; set; } = string.Empty;
-
-    [JsonPropertyName("campaignId")]
-    public long CampaignId { get; set; }
-
-    [JsonPropertyName("title")]
-    public string Title { get; set; } = string.Empty;
-
-    [JsonPropertyName("body")]
-    public string Body { get; set; } = string.Empty;
-}
-
 /// <summary>The VAPID public key the browser subscribes with; null when notifications are not configured.</summary>
 public class PushKeyInfo
 {
@@ -81,11 +61,17 @@ public class CampaignNotificationUpdateInfo
     public bool Muted { get; set; }
 }
 
-/// <summary>The result of a poke (043): how many players were poked, their first names and the chat line (null when nobody).</summary>
+/// <summary>
+/// The result of a poke (043): how many players were poked, their first names and the chat line (null when nobody).
+/// Since 074 a player's poke with nobody missing pokes the master: <see cref="Master"/> true, names ["o mestre"].
+/// </summary>
 public class PokeResultInfo
 {
     [JsonPropertyName("poked")]
     public int Poked { get; set; }
+
+    [JsonPropertyName("master")]
+    public bool Master { get; set; }
 
     [JsonPropertyName("names")]
     public List<string> Names { get; set; } = new();

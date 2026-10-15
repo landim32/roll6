@@ -19,6 +19,8 @@ interface PushContextType {
   /** Only from a user's tap: asks the permission, subscribes and registers the device (iOS in the browser: the install guide). */
   enable: () => Promise<'enabled' | 'denied' | 'needs-install' | 'unavailable'>;
   disable: () => Promise<void>;
+  /** This browser's subscription endpoint (074: "este aparelho" in the device list and its test); null when off. */
+  endpoint: string | null;
 }
 
 const PushContext = createContext<PushContextType | undefined>(undefined);
@@ -45,6 +47,7 @@ export const PushProvider = ({ children }: { children: ReactNode }) => {
   const [busy, setBusy] = useState(false);
   const keyRef = useRef<string | null>(null);
   const endpointRef = useRef<string | null>(null);
+  const [endpoint, setEndpoint] = useState<string | null>(null);
 
   const support = pushSupport({
     hasServiceWorker: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
@@ -60,6 +63,7 @@ export const PushProvider = ({ children }: { children: ReactNode }) => {
       setAvailable(null);
       setSubscribed(false);
       endpointRef.current = null;
+      setEndpoint(null);
       return;
     }
     let cancelled = false;
@@ -74,6 +78,7 @@ export const PushProvider = ({ children }: { children: ReactNode }) => {
         const existing = reg ? await reg.pushManager.getSubscription() : null;
         if (cancelled) return;
         endpointRef.current = existing?.endpoint ?? null;
+        setEndpoint(existing?.endpoint ?? null);
         setSubscribed(existing !== null && Notification.permission === 'granted');
         // Re-register the endpoint for this user (keys may have changed, or another user used this browser).
         const body = existing ? subscriptionBody(existing.toJSON(), navigator.userAgent) : null;
@@ -94,6 +99,7 @@ export const PushProvider = ({ children }: { children: ReactNode }) => {
     void pushService.unsubscribe(endpoint).catch(() => undefined);
     void registration().then((reg) => reg?.pushManager.getSubscription()).then((sub) => sub?.unsubscribe()).catch(() => undefined);
     endpointRef.current = null;
+    setEndpoint(null);
   }), []);
 
   const enable = useCallback(async () => {
@@ -117,6 +123,7 @@ export const PushProvider = ({ children }: { children: ReactNode }) => {
       if (!body) return 'unavailable' as const;
       await pushService.subscribe(body);
       endpointRef.current = body.endpoint;
+      setEndpoint(body.endpoint);
       setSubscribed(true);
       return 'enabled' as const;
     } finally {
@@ -134,6 +141,7 @@ export const PushProvider = ({ children }: { children: ReactNode }) => {
         await subscription.unsubscribe();
       }
       endpointRef.current = null;
+      setEndpoint(null);
       setSubscribed(false);
     } finally {
       setBusy(false);
@@ -141,8 +149,8 @@ export const PushProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const value = useMemo<PushContextType>(() => ({
-    support, available, permission, subscribed, busy, enable, disable,
-  }), [support, available, permission, subscribed, busy, enable, disable]);
+    support, available, permission, subscribed, busy, enable, disable, endpoint,
+  }), [support, available, permission, subscribed, busy, enable, disable, endpoint]);
 
   return <PushContext.Provider value={value}>{children}</PushContext.Provider>;
 };

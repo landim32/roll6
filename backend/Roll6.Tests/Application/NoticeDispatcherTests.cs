@@ -1,16 +1,17 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Roll6.Application.Notifications;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Models;
 using Roll6.Domain.Notifications;
-using Roll6.DTO.Push;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Tests.Application;
 
+/// <summary>
+/// 074: every notice goes to every device of each recipient through the durable outbox — no presence, no toast.
+/// </summary>
 public class NoticeDispatcherTests
 {
     private const long MASTER = 1;
@@ -18,17 +19,20 @@ public class NoticeDispatcherTests
     private const long BRUNO = 3;
     private const long OUTSIDER = 9;
     private const long CAMPAIGN = 10;
+    private static readonly DateTime NOW = new(2026, 10, 15, 21, 0, 0, DateTimeKind.Utc);
 
     private readonly Mock<ICampaignRepository<Campaign>> _campaigns = new();
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _participations = new();
     private readonly Mock<ICharacterRepository<Character>> _characters = new();
     private readonly Mock<ICampaignNotificationPrefRepository<CampaignNotificationPref>> _prefs = new();
     private readonly Mock<IPushSubscriptionRepository<PushSubscription>> _subscriptions = new();
+    private readonly Mock<IPushDeliveryRepository<PushDelivery>> _deliveries = new();
     private readonly Mock<IPushSender> _sender = new();
     private readonly Mock<IUserNotificationRepository<UserNotification>> _inbox = new();
-    private readonly Mock<IPresence> _presence = new();
     private readonly Mock<INoticeChannel> _channel = new();
-    private readonly List<(long UserId, string Payload)> _sent = new();
+    private readonly PushDeliverySignal _signal = new();
+    private readonly List<PushDelivery> _queued = new();
+    private readonly List<UserNotification> _stored = new();
     private readonly NoticeDispatcher _dispatcher;
 
     public NoticeDispatcherTests()
@@ -49,17 +53,21 @@ public class NoticeDispatcherTests
             new() { CharacterId = 82, UserId = MASTER, Name = "Goran" }
         });
         _prefs.Setup(r => r.ListMutedUserIdsAsync(CAMPAIGN)).ReturnsAsync(new List<long>());
+        // Two devices per user (a phone and a desktop): both get every notice.
         _subscriptions.Setup(r => r.ListByUsersAsync(It.IsAny<IReadOnlyCollection<long>>()))
-            .ReturnsAsync((IReadOnlyCollection<long> ids) => ids.Select(id => new PushSubscription
+            .ReturnsAsync((IReadOnlyCollection<long> ids) => ids.SelectMany(id => new[]
             {
-                PushSubscriptionId = id * 100, UserId = id, Endpoint = $"https://push/{id}", P256dh = "k", Auth = "a"
+                new PushSubscription { PushSubscriptionId = id * 100, UserId = id, Endpoint = $"https://push/{id}/phone", P256dh = "k", Auth = "a" },
+                new PushSubscription { PushSubscriptionId = id * 100 + 1, UserId = id, Endpoint = $"https://push/{id}/desktop", P256dh = "k", Auth = "a" }
             }).ToList());
+        _deliveries.Setup(r => r.InsertRangeAsync(It.IsAny<IReadOnlyCollection<PushDelivery>>()))
+            .Callback((IReadOnlyCollection<PushDelivery> rows) => _queued.AddRange(rows)).Returns(Task.CompletedTask);
+        _inbox.Setup(r => r.InsertRangeAsync(It.IsAny<IEnumerable<UserNotification>>()))
+            .Callback((IEnumerable<UserNotification> rows) => _stored.AddRange(rows)).Returns(Task.CompletedTask);
         _sender.SetupGet(s => s.Enabled).Returns(true);
-        _sender.Setup(s => s.SendAsync(It.IsAny<PushTarget>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<TimeSpan>()))
-            .Callback((PushTarget t, string payload, string _, bool _, TimeSpan _) => _sent.Add((long.Parse(t.Endpoint.Split('/').Last()), payload)))
-            .ReturnsAsync(PushSendResult.Sent);
+        var time = new TestClock(NOW);
         _dispatcher = new NoticeDispatcher(_campaigns.Object, _participations.Object, _characters.Object, _prefs.Object,
-            _subscriptions.Object, _inbox.Object, _sender.Object, _presence.Object, _channel.Object, NullLogger<NoticeDispatcher>.Instance);
+            _subscriptions.Object, _deliveries.Object, _inbox.Object, _sender.Object, _channel.Object, _signal, time);
     }
 
     private static TableNotice Message(long actor) => new()
@@ -67,120 +75,91 @@ public class NoticeDispatcherTests
         Kind = NoticeKind.Message, CampaignId = CAMPAIGN, ActorUserId = actor, Speaker = "Aria", Body = "Vamos pela ponte"
     };
 
+    private long[] QueuedUsers() => _queued.Select(d => d.PushSubscriptionId / 100).Distinct().OrderBy(u => u).ToArray();
+
     [Fact]
-    public async Task Message_GoesToEveryoneButTheAuthor_OncePerPerson()
+    public async Task Message_GoesToEveryDeviceOfEveryoneButTheAuthor()
     {
         await _dispatcher.DispatchAsync(Message(ANA));
 
-        _sent.Select(s => s.UserId).Should().BeEquivalentTo(new[] { MASTER, BRUNO });
-        _sent[0].Payload.Should().Contain("\"title\":\"Aria · Tormento Vil\"").And.Contain("\"body\":\"Vamos pela ponte\"")
-            .And.Contain("/campaign/tormento-vil?chat=1").And.Contain("campaign:10:chat");
+        _queued.Select(d => d.PushSubscriptionId).Should().BeEquivalentTo(new long[] { 100, 101, 300, 301 });
+        var payload = _queued[0].Payload;
+        payload.Should().Contain("\"title\":\"Aria · Tormento Vil\"").And.Contain("\"body\":\"Vamos pela ponte\"")
+            .And.Contain("/campaign/tormento-vil?chat=1").And.Contain("campaign:10:message").And.Contain("\"renotify\":true");
+        _queued.Should().OnlyContain(d => d.Topic == "c10-message" && d.NextAttemptAt == NOW && d.ExpiresAt == NOW.AddHours(12));
     }
 
     [Fact]
-    public async Task Message_SkipsWhoHasTheChatOnScreen_AndWhoMuted()
+    public async Task Muted_AreSkipped_ButNothingDependsOnWhatIsOnScreen()
     {
-        _presence.Setup(p => p.IsChatVisible(BRUNO, CAMPAIGN)).Returns(true);
         _prefs.Setup(r => r.ListMutedUserIdsAsync(CAMPAIGN)).ReturnsAsync(new List<long> { MASTER });
 
         await _dispatcher.DispatchAsync(Message(ANA));
 
-        _sent.Should().BeEmpty();
-        _channel.VerifyNoOtherCalls();
+        QueuedUsers().Should().Equal(BRUNO);
     }
 
     [Fact]
-    public async Task Personal_IsAToastWhenTheCampaignIsOnScreen_ElseAPush()
-    {
-        _presence.Setup(p => p.IsCampaignVisible(ANA, CAMPAIGN)).Returns(true);
-        var notice = new TableNotice
-        {
-            Kind = NoticeKind.TurnFinished, CampaignId = CAMPAIGN, ActorUserId = MASTER, Body = NoticeTexts.TurnFinished(4),
-            TargetUserIds = new[] { ANA, BRUNO }
-        };
-
-        await _dispatcher.DispatchAsync(notice);
-
-        _channel.Verify(c => c.SendNoticeAsync(ANA, CAMPAIGN, It.Is<NoticeInfo>(n =>
-            n.Kind == "turnFinished" && n.Body == "Turno 4 terminado. Pode agir novamente" && n.Title == "Tormento Vil")), Times.Once);
-        _sent.Select(s => s.UserId).Should().Equal(BRUNO);
-    }
-
-    [Fact]
-    public async Task Personal_UsesTheBodyOfEachRecipient()
+    public async Task Personal_IsAlwaysAPush_WithTheBodyOfEachRecipient()
     {
         var notice = new TableNotice
         {
-            Kind = NoticeKind.Majority, CampaignId = CAMPAIGN, ActorUserId = MASTER, Body = NoticeTexts.Majority(Array.Empty<string>()),
+            Kind = NoticeKind.Pending, CampaignId = CAMPAIGN, ActorUserId = MASTER, Body = NoticeTexts.Pending(Array.Empty<string>()),
             TargetUserIds = new[] { ANA, BRUNO },
-            BodyByUser = new Dictionary<long, string> { [ANA] = NoticeTexts.Majority(new[] { "Bruno" }) }
+            BodyByUser = new Dictionary<long, string> { [ANA] = NoticeTexts.Pending(new[] { "Bruno" }) }
         };
 
         await _dispatcher.DispatchAsync(notice);
 
-        _sent.Single(s => s.UserId == ANA).Payload.Should().Contain("Falta apenas você e Bruno");
-        _sent.Single(s => s.UserId == BRUNO).Payload.Should().Contain("\"body\":\"Falta apenas você\"");
+        _queued.Where(d => d.PushSubscriptionId / 100 == ANA).Should().OnlyContain(d => d.Payload.Contains("Falta apenas Bruno e você"));
+        _queued.Where(d => d.PushSubscriptionId / 100 == BRUNO).Should().OnlyContain(d => d.Payload.Contains("\"body\":\"Falta só você\""));
+        _queued.Should().OnlyContain(d => d.Payload.Contains("\"kind\":\"pending\"") && d.Topic == "c10-pending");
     }
 
     [Fact]
     public async Task OnlyCurrentParticipants_AreNotified()
     {
-        var notice = new TableNotice
+        await _dispatcher.DispatchAsync(new TableNotice
         {
             Kind = NoticeKind.Poke, CampaignId = CAMPAIGN, ActorUserId = ANA, Body = NoticeTexts.Poke("Ana"),
             TargetUserIds = new[] { BRUNO, OUTSIDER }
-        };
+        });
 
-        await _dispatcher.DispatchAsync(notice);
-
-        _sent.Select(s => s.UserId).Should().Equal(BRUNO);
+        QueuedUsers().Should().Equal(BRUNO);
     }
 
     [Fact]
-    public async Task GoneSubscriptions_AreRemoved()
+    public async Task Deliveries_AreQueued_AndTheWorkerIsWoken()
     {
-        _sender.Setup(s => s.SendAsync(It.IsAny<PushTarget>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<TimeSpan>()))
-            .ReturnsAsync(PushSendResult.Gone);
-
         await _dispatcher.DispatchAsync(Message(ANA));
 
-        _subscriptions.Verify(r => r.DeleteAsync(MASTER * 100), Times.Once);
-        _subscriptions.Verify(r => r.DeleteAsync(BRUNO * 100), Times.Once);
-        _subscriptions.Verify(r => r.TouchAsync(It.IsAny<long>(), It.IsAny<DateTime>()), Times.Never);
+        var woke = _signal.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+        (await Task.WhenAny(woke, Task.Delay(1000))).Should().Be(woke);
+        _sender.Verify(s => s.SendAsync(It.IsAny<PushTarget>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>()), Times.Never);
     }
 
     [Fact]
-    public async Task WithoutKeys_NothingIsPushed()
+    public async Task WithoutKeys_NothingIsQueued_ButTheBellStillLists()
     {
         _sender.SetupGet(s => s.Enabled).Returns(false);
 
         await _dispatcher.DispatchAsync(Message(ANA));
 
-        _subscriptions.Verify(r => r.ListByUsersAsync(It.IsAny<IReadOnlyCollection<long>>()), Times.Never);
+        _queued.Should().BeEmpty();
+        _stored.Select(n => n.UserId).Should().BeEquivalentTo(new[] { MASTER, BRUNO });
     }
 
     [Fact]
-    public async Task Inbox_GetsExactlyWhatWasSent_ToastsIncluded_ButNotWhatWasSkipped()
+    public async Task Inbox_GetsEveryRecipient_ExactlyAsSent()
     {
-        _presence.Setup(p => p.IsChatVisible(BRUNO, CAMPAIGN)).Returns(true);
-        var stored = new List<UserNotification>();
-        _inbox.Setup(r => r.InsertRangeAsync(It.IsAny<IEnumerable<UserNotification>>()))
-            .Callback((IEnumerable<UserNotification> rows) => stored.AddRange(rows)).Returns(Task.CompletedTask);
-
-        await _dispatcher.DispatchAsync(Message(ANA));
-
-        stored.Should().ContainSingle();
-        (stored[0].UserId, stored[0].Title, stored[0].Body, stored[0].Url, stored[0].Kind)
-            .Should().Be((MASTER, "Aria · Tormento Vil", "Vamos pela ponte", "/campaign/tormento-vil?chat=1", "message"));
-        _channel.Verify(c => c.InboxChangedAsync(MASTER), Times.Once);
-
-        stored.Clear();
-        _presence.Setup(p => p.IsCampaignVisible(ANA, CAMPAIGN)).Returns(true);
         await _dispatcher.DispatchAsync(new TableNotice
         {
-            Kind = NoticeKind.Poke, CampaignId = CAMPAIGN, ActorUserId = MASTER, Body = "Rodrigo está cutucando você",
-            TargetUserIds = new[] { ANA }
+            Kind = NoticeKind.PokeMaster, CampaignId = CAMPAIGN, ActorUserId = ANA, Body = NoticeTexts.PokeMaster("Ana"),
+            TargetUserIds = new[] { MASTER }
         });
-        stored.Select(n => (n.UserId, n.Kind, n.Body)).Should().Equal((ANA, "poke", "Rodrigo está cutucando você"));
+
+        _stored.Select(n => (n.UserId, n.Title, n.Body, n.Url, n.Kind)).Should().Equal(
+            (MASTER, "Tormento Vil", "Ana está cutucando você: todos já agiram", "/campaign/tormento-vil?chat=1", "pokeMaster"));
+        _channel.Verify(c => c.InboxChangedAsync(MASTER), Times.Once);
     }
 }

@@ -431,17 +431,46 @@ public partial class TurnServiceChatTests
             && n.TargetUserIds!.OrderBy(u => u).SequenceEqual(new[] { 5L, 6L }))), Times.Once);
     }
 
-    [Fact]
-    public async Task Poke_WhenEveryoneActed_SendsNothing()
-    {
-        PokeTable();
+    private void EveryoneActed() =>
         _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3)).ReturnsAsync(new[] { ARIA, 81L, 82L }
             .Select(c => new Turn { CampaignId = CAMPAIGN, TurnNo = 3, TurnType = TurnType.Action, CharacterId = c }).ToList());
 
+    [Fact]
+    public async Task Poke_ByAPlayer_WhenEveryoneActed_PokesTheMaster()
+    {
+        // 074: nobody else is missing, so the player is asking the master to move on.
+        PokeTable();
+        EveryoneActed();
+
         var result = await _service.PokeAsync(PLAYER, CAMPAIGN);
 
-        result.Poked.Should().Be(0);
+        (result.Poked, result.Master, string.Join(",", result.Names)).Should().Be((1, true, "o mestre"));
+        result.Item!.Text.Should().Be("Rodrigo cutucou o mestre");
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.PokeMaster
+            && n.Body == "Rodrigo está cutucando você: todos já agiram" && n.TargetUserIds!.SequenceEqual(new[] { MASTER }))), Times.Once);
+    }
+
+    [Fact]
+    public async Task Poke_ByTheMaster_WhenEveryoneActed_SendsNothing()
+    {
+        PokeTable();
+        EveryoneActed();
+
+        var result = await _service.PokeAsync(MASTER, CAMPAIGN);
+
+        (result.Poked, result.Master).Should().Be((0, false));
         _repository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+        _queue.Verify(q => q.Enqueue(It.IsAny<TableNotice>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Poke_TheMaster_TwiceInAMinute_Is409()
+    {
+        PokeTable();
+        EveryoneActed();
+        _repository.Setup(r => r.LastPokeAtAsync(CAMPAIGN, PLAYER)).ReturnsAsync(DateTime.UtcNow.AddSeconds(-20));
+
+        await _service.Invoking(s => s.PokeAsync(PLAYER, CAMPAIGN)).Should().ThrowAsync<ConflictException>();
     }
 
     [Fact]

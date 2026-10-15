@@ -67,6 +67,38 @@ public class PushController : ApiControllerBase
     }
 
     /// <summary>The campaigns of the user's table and whether each one's notifications are muted.</summary>
+    /// <summary>The caller's devices that receive notifications (074); a browser thing, login session only.</summary>
+    [HttpGet("device")]
+    [Authorize(Policy = AuthConstants.SESSION_POLICY)]
+    [ProducesResponseType(typeof(List<PushDeviceInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Devices()
+    {
+        try
+        {
+            return Ok(await _pushService.ListDevicesAsync(CurrentUserId));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Sends a test notification right now to this device (by endpoint) or to all of the caller's (074).</summary>
+    [HttpPost("test")]
+    [Authorize(Policy = AuthConstants.SESSION_POLICY)]
+    [ProducesResponseType(typeof(PushTestResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Test([FromBody] PushTestInfo? info)
+    {
+        try
+        {
+            return Ok(await _pushService.TestAsync(CurrentUserId, info ?? new PushTestInfo()));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpGet("campaigns")]
     [ProducesResponseType(typeof(List<CampaignNotificationInfo>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Campaigns()

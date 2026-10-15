@@ -318,6 +318,36 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Master: sends to their own devices a test notice of the given kind, as the table would send it (074).</summary>
+    [HttpPost("{id:long}/notifications/simulate")]
+    [ProducesResponseType(typeof(PushTestResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SimulateNotification(long id, [FromBody] NotificationSimulateInfo info)
+    {
+        try
+        {
+            return Ok(await _pushService.SimulateAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Master: who still owes a play this turn and the "Falta…" each would get now (074).</summary>
+    [HttpGet("{id:long}/notifications/preview")]
+    [ProducesResponseType(typeof(TurnNoticePreviewInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> PreviewNotifications(long id)
+    {
+        try
+        {
+            return Ok(await _pushService.PreviewAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Moves the caller's read mark forward (041); everything after it counts as unread.</summary>
     [HttpPut("{id:long}/chat/read")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

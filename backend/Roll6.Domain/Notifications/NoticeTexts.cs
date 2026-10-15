@@ -61,9 +61,10 @@ public static class NoticeTexts
 
     public static string Narration(string? text) => Ellipsize("Narração: " + Plain(text));
 
-    /// <summary>N3: "Falta apenas você", "Falta apenas você e Bruno", "Falta apenas você, Bruno e Ana".</summary>
-    public static string Majority(IReadOnlyList<string> otherFirstNames) =>
-        "Falta apenas " + JoinNames(new[] { "você" }.Concat(otherFirstNames).ToList());
+    /// <summary>N3 (074): "Falta só você", "Falta apenas Bruno e você", "Falta apenas Ana, Bruno e você".</summary>
+    public static string Pending(IReadOnlyList<string> otherFirstNames) => otherFirstNames.Count == 0
+        ? "Falta só você"
+        : "Falta apenas " + JoinNames(otherFirstNames.Append("você").ToList());
 
     public static string TurnFinished(int turnNo) => $"Turno {turnNo} terminado. Pode agir novamente";
 
@@ -72,6 +73,19 @@ public static class NoticeTexts
     public static string Fatigue(int current, int total) => $"Você está com {current}/{total} de Fadiga";
 
     public static string Poke(string pokerFirstName) => $"{pokerFirstName} está cutucando você";
+
+    /// <summary>N7b (074): a player pokes the master when every character already acted.</summary>
+    public static string PokeMaster(string pokerFirstName) => $"{pokerFirstName} está cutucando você: todos já agiram";
+
+    /// <summary>Who a poke of the master names in the chat line: "Ana cutucou o mestre".</summary>
+    public const string MASTER = "o mestre";
+
+    /// <summary>The device test (074).</summary>
+    public const string TEST_TITLE = "Roll6 · Teste";
+    public const string TEST_BODY = "Se você está vendo isto, as notificações chegam neste aparelho.";
+
+    /// <summary>The master's simulation (074): "Teste · Tormento Vil".</summary>
+    public static string SimulationTitle(string campaignName) => $"Teste · {campaignName}";
 
     /// <summary>The chat line of a poke: "Rodrigo cutucou Ana e Bruno".</summary>
     public static string PokeLine(string pokerFirstName, string pokedNames) => $"{pokerFirstName} cutucou {pokedNames}";

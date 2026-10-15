@@ -42,11 +42,6 @@ class RealtimeService {
   async sendWalk(connection: HubConnection, info: WalkSend): Promise<void> {
     await connection.send('Walk', info);
   }
-
-  /** Whether this window is on screen and the chat visible (043): decides push vs nothing vs toast on the server. */
-  async setPresence(connection: HubConnection, visible: boolean, chatVisible: boolean): Promise<void> {
-    await connection.invoke('SetPresence', visible, chatVisible);
-  }
 }
 
 export const realtimeService = new RealtimeService();

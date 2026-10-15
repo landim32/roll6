@@ -82,7 +82,7 @@ public partial class TurnService
             foreach (var previous in cancelled)
                 await PublishUpdatedAsync(campaign, userId, previous);
             await PublishTurnChangedAsync(campaign.CampaignId, userId);
-            await NotifyActionAsync(campaign, userId, characterId, turn.Description);
+            await NotifyActionAsync(campaign, userId, characterId, null, turn.Description, firstAction: cancelled.Count == 0);
         }
         else if (to == "message")
         {

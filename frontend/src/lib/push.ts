@@ -50,3 +50,32 @@ export const subscriptionBody = (json: SubscriptionJson, userAgent: string) => {
   if (!json.endpoint || !p256dh || !auth) return null;
   return { endpoint: json.endpoint, keys: { p256dh, auth }, userAgent: userAgent.slice(0, 500) };
 };
+
+/** The kinds the master can simulate (074), in the order of the select. */
+export const SIMULATE_KINDS = [
+  'message', 'action', 'pending', 'pendingLast', 'turnFinished', 'life', 'fatigue', 'poke', 'pokeMaster',
+] as const;
+
+export type SimulateKind = (typeof SIMULATE_KINDS)[number];
+
+/** i18n key of a device's answer to a test (074). */
+export const resultKey = (result: string): string => {
+  if (result === 'sent') return 'notifications.test.sent';
+  if (result === 'gone') return 'notifications.test.gone';
+  return 'notifications.test.failed';
+};
+
+/** i18n key of the short badge a device gets in the list after "Testar todos" (074). */
+export const deviceResultKey = (result: string): string => {
+  if (result === 'sent') return 'notifications.devices.result.sent';
+  if (result === 'gone') return 'notifications.devices.result.gone';
+  return 'notifications.devices.result.failed';
+};
+
+/** The summary of a test over several devices: every device sent, some failed, or none registered. */
+export const testSummaryKey = (results: { result: string }[]): string => {
+  if (results.length === 0) return 'notifications.test.noDevice';
+  if (results.every((r) => r.result === 'sent')) return 'notifications.test.allSent';
+  if (results.some((r) => r.result === 'sent')) return 'notifications.test.someFailed';
+  return 'notifications.test.noneSent';
+};

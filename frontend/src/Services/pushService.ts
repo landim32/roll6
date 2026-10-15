@@ -1,6 +1,8 @@
 import type {
-  CampaignNotificationInfo, PokeResultInfo, PushKeyInfo, PushSubscriptionInfo, UserNotificationPageInfo,
+  CampaignNotificationInfo, PokeResultInfo, PushDeviceInfo, PushKeyInfo, PushSubscriptionInfo, PushTestResultInfo,
+  TurnNoticePreviewInfo, UserNotificationPageInfo,
 } from '../types/push';
+import type { SimulateKind } from '../lib/push';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 interface PushServiceConfig {
@@ -63,6 +65,34 @@ class PushService {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ userNotificationId }),
     });
     return this.handleResponse<void>(response);
+  }
+
+  /** The user's devices that receive notifications (074). */
+  async devices(): Promise<PushDeviceInfo[]> {
+    const response = await fetch(`${API_URL}/api/push/device`, { headers: getHeaders(true) });
+    return this.handleResponse<PushDeviceInfo[]>(response);
+  }
+
+  /** Sends a test push now to this device (endpoint) or to all of the user's (null), answering per device (074). */
+  async test(endpoint: string | null): Promise<PushTestResultInfo> {
+    const response = await fetch(`${API_URL}/api/push/test`, {
+      method: 'POST', headers: getHeaders(true), body: JSON.stringify({ endpoint }),
+    });
+    return this.handleResponse<PushTestResultInfo>(response);
+  }
+
+  /** Master: sends to their own devices a notice of the kind, as the table would (074). */
+  async simulate(campaignId: number, kind: SimulateKind): Promise<PushTestResultInfo> {
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/notifications/simulate`, {
+      method: 'POST', headers: getHeaders(true), body: JSON.stringify({ kind }),
+    });
+    return this.handleResponse<PushTestResultInfo>(response);
+  }
+
+  /** Master: who still owes a play and the "Falta…" each would get now (074). */
+  async preview(campaignId: number): Promise<TurnNoticePreviewInfo> {
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/notifications/preview`, { headers: getHeaders(true) });
+    return this.handleResponse<TurnNoticePreviewInfo>(response);
   }
 
   async poke(campaignId: number): Promise<PokeResultInfo> {

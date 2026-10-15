@@ -13,22 +13,4 @@ public class MajorityTests
     [InlineData(5, 3)]
     public void Threshold_IsHalfRoundedUp(int characters, int threshold) =>
         Majority.Threshold(characters).Should().Be(threshold);
-
-    [Fact]
-    public void Crossed_OnlyAtTheActionThatReachesIt()
-    {
-        Majority.Crossed(4, 1, 2).Should().BeTrue();
-        Majority.Crossed(4, 2, 3).Should().BeFalse();
-        Majority.Crossed(4, 0, 1).Should().BeFalse();
-        Majority.Crossed(3, 1, 2).Should().BeTrue();
-        Majority.Crossed(5, 2, 3).Should().BeTrue();
-    }
-
-    [Fact]
-    public void Crossed_NeverWhenNobodyIsMissing()
-    {
-        Majority.Crossed(1, 0, 1).Should().BeFalse();
-        Majority.Crossed(2, 1, 2).Should().BeFalse();
-        Majority.Crossed(0, 0, 0).Should().BeFalse();
-    }
 }

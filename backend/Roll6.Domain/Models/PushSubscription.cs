@@ -1,4 +1,5 @@
 using Roll6.Domain.Exceptions;
+using Roll6.Domain.Notifications;
 
 namespace Roll6.Domain.Models;
 
@@ -17,7 +18,14 @@ public class PushSubscription
     public string Auth { get; set; } = string.Empty;
     public string? UserAgent { get; set; }
     public DateTime CreatedAt { get; set; }
+    /// <summary>Last successful delivery.</summary>
     public DateTime? LastUsedAt { get; set; }
+
+    /// <summary>Failed deliveries in a row (074); a success resets it.</summary>
+    public int FailureCount { get; set; }
+
+    /// <summary>Too many failures in a row: no new pushes go to it until a test or a new registration succeeds.</summary>
+    public bool Skipped => FailureCount >= PushPolicy.MAX_FAILURES;
 
     public static PushSubscription Create(long userId, string? endpoint, string? p256dh, string? auth, string? userAgent)
     {
@@ -31,9 +39,20 @@ public class PushSubscription
     {
         UserId = userId;
         Fill(Endpoint, p256dh, auth, userAgent);
+        // Registered again by the browser: it works, so it starts over.
+        FailureCount = 0;
     }
 
     public void Touch(DateTime now) => LastUsedAt = now;
+
+    /// <summary>A push was accepted for it.</summary>
+    public void Succeeded(DateTime now)
+    {
+        LastUsedAt = now;
+        FailureCount = 0;
+    }
+
+    public void Failed() => FailureCount++;
 
     private void Fill(string? endpoint, string? p256dh, string? auth, string? userAgent)
     {

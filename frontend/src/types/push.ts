@@ -24,14 +24,6 @@ export interface CampaignNotificationInfo {
   muted: boolean;
 }
 
-/** A personal notice shown as a toast while its campaign is on screen (hub method `notice`). */
-export interface NoticeInfo {
-  kind: 'majority' | 'turnFinished' | 'life' | 'fatigue' | 'poke';
-  campaignId: number;
-  title: string;
-  body: string;
-}
-
 /** A notice in the bell (inbox): exactly what the Web Push carried. */
 export interface UserNotificationInfo {
   userNotificationId: number;
@@ -52,7 +44,53 @@ export interface UserNotificationPageInfo {
 
 export interface PokeResultInfo {
   poked: number;
+  /** 074: nobody else was missing, so the master was poked. */
+  master?: boolean;
   names: string[];
   /** The chat line, when someone was poked. */
   item?: ChatItemInfo | null;
+}
+
+/** A device of the user that receives notifications (074). */
+export interface PushDeviceInfo {
+  pushSubscriptionId: number;
+  /** "Chrome · Android". */
+  label: string;
+  endpoint: string;
+  /** UTC without a zone. */
+  createdAt: string;
+  lastSuccessAt: string | null;
+  failureCount: number;
+  /** Too many failures in a row: no pushes until a test succeeds. */
+  skipped: boolean;
+}
+
+export type PushTestResult = 'sent' | 'gone' | 'failed';
+
+export interface PushTestDeviceInfo {
+  pushSubscriptionId: number;
+  label: string;
+  result: PushTestResult;
+}
+
+export interface PushTestResultInfo {
+  devices: PushTestDeviceInfo[];
+}
+
+export interface TurnNoticePendingInfo {
+  userId: number;
+  name: string;
+  characters: string[];
+  /** What "Falta…" would say now; null before the majority. */
+  body: string | null;
+}
+
+/** The master's preview of "Falta…" (074). */
+export interface TurnNoticePreviewInfo {
+  turnNo: number;
+  approved: number;
+  acted: number;
+  threshold: number;
+  majorityReached: boolean;
+  pending: TurnNoticePendingInfo[];
 }

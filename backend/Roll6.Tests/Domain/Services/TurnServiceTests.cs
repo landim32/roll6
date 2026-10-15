@@ -275,16 +275,17 @@ public class TurnServiceTests
     }
 
     [Fact]
-    public async Task Act_InFreeMode_SendsNoMajorityNotice()
+    public async Task Act_InFreeMode_StillTellsWhoIsMissing()
     {
+        // 074 (Q1 = A): "Falta…" in any mode.
         _campaign.FreeMode = true;
-        ThreePlayers(BRAM, ARIA);
+        FourPlayers(BRAM, ARIA);
 
         await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
 
-        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Majority)), Times.Never);
-        _campaignRepository.Verify(r => r.TrySetMajorityNotifiedAsync(It.IsAny<long>(), It.IsAny<int>()), Times.Never);
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Pending)), Times.Once);
         _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
+        _campaign.FreeMode = false;
     }
 
     [Fact]
@@ -1281,8 +1282,33 @@ public class TurnServiceTests
             ids.Select(id => new User { UserId = id, Name = id == 5 ? "Bruno Lima" : id == 6 ? "Caio Reis" : "Ana" }).ToList());
         _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3)).ReturnsAsync(actedCharacterIds
             .Select(c => new Turn { CampaignId = CAMPAIGN, TurnNo = 3, TurnType = TurnType.Action, CharacterId = c }).ToList());
-        _campaignRepository.Setup(r => r.TrySetMajorityNotifiedAsync(CAMPAIGN, 3)).ReturnsAsync(true);
     }
+
+    /// <summary>
+    /// The US3 table of 074: Aria (Ana = PLAYER), Bram (Bruno, user 5), Cael (Caio, user 6) and Dara (Duda, user 7); the
+    /// given characters have a valid action this turn (the one being saved included — the mock doesn't store it).
+    /// </summary>
+    private void FourPlayers(params long[] actedCharacterIds)
+    {
+        _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(new[] { ARIA, BRAM, 82L, 83L }
+            .Select(c => new CampaignCharacter { CampaignId = CAMPAIGN, CharacterId = c, Status = CampaignCharacterStatus.Approved }).ToList());
+        var owners = new Dictionary<long, long> { [ARIA] = PLAYER, [BRAM] = 5, [82] = 6, [83] = 7 };
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            ids.Where(owners.ContainsKey).Select(id => new Character { CharacterId = id, UserId = owners[id], Name = $"C{id}" }).ToList());
+        var names = new Dictionary<long, string> { [PLAYER] = "Ana Souza", [5] = "Bruno Lima", [6] = "Caio Reis", [7] = "Duda Melo" };
+        _userRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            ids.Select(id => new User { UserId = id, Name = names.TryGetValue(id, out var n) ? n : $"User {id}" }).ToList());
+        _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3)).ReturnsAsync(actedCharacterIds
+            .Select(c => new Turn { CampaignId = CAMPAIGN, TurnNo = 3, TurnType = TurnType.Action, CharacterId = c }).ToList());
+    }
+
+    private void VerifyPending(Dictionary<long, string> expected) =>
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Pending
+            && n.TargetUserIds!.OrderBy(u => u).SequenceEqual(expected.Keys.OrderBy(u => u))
+            && expected.All(e => n.BodyFor(e.Key) == e.Value))), Times.Once);
+
+    private void VerifyNoPending() =>
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Pending)), Times.Never);
 
     [Fact]
     public async Task Act_NotifiesTheMasterOnly_WithTheActionText()
@@ -1295,38 +1321,86 @@ public class TurnServiceTests
             && n.Speaker == "Aria" && n.TargetUserIds!.SequenceEqual(new[] { MASTER }) && n.ActorUserId == PLAYER)), Times.Once);
     }
 
-    [Fact]
-    public async Task Act_ThatMakesTheMajority_TellsWhoIsMissing()
-    {
-        // 3 characters → majority 2: Bram already acted, now Aria acts.
-        ThreePlayers(BRAM, ARIA);
-
-        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
-
-        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Majority
-            && n.TargetUserIds!.SequenceEqual(new[] { 6L }) && n.BodyFor(6) == "Falta apenas você")), Times.Once);
-    }
+    // ---- 074: the US3 table ----
 
     [Fact]
-    public async Task Act_AfterTheMajorityWasSent_DoesNotRepeat()
+    public async Task Act_1of4_TellsNobodyButTheMaster()
     {
-        ThreePlayers(BRAM, ARIA);
-        _campaign.MajorityNotifiedTurn = 3;
-
-        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
-
-        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Majority)), Times.Never);
-        _campaign.MajorityNotifiedTurn = null;
-    }
-
-    [Fact]
-    public async Task Act_BelowTheMajority_TellsNobodyButTheMaster()
-    {
-        ThreePlayers(ARIA);
+        FourPlayers(ARIA);
 
         await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Ando" });
 
-        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Majority)), Times.Never);
+        VerifyNoPending();
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_2of4_TellsEachMissingPlayerTheOthers()
+    {
+        FourPlayers(BRAM, ARIA);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
+
+        VerifyPending(new Dictionary<long, string> { [6] = "Falta apenas Duda e você", [7] = "Falta apenas Caio e você" });
+    }
+
+    [Fact]
+    public async Task Act_3of4_TellsTheLastOne()
+    {
+        FourPlayers(BRAM, 82, ARIA);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
+
+        VerifyPending(new Dictionary<long, string> { [7] = "Falta só você" });
+    }
+
+    [Fact]
+    public async Task Act_4of4_TellsNoPlayer()
+    {
+        FourPlayers(BRAM, 82, 83, ARIA);
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
+
+        VerifyNoPending();
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_ReplacingAnAction_DoesNotRepeatFalta()
+    {
+        FourPlayers(BRAM, ARIA);
+        var previous = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Antes");
+        previous.TurnId = 600;
+        _repository.Setup(r => r.ListValidActionsAsync(CAMPAIGN, 3, ARIA, null)).ReturnsAsync(new List<Turn> { previous });
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Depois" });
+
+        VerifyNoPending();
+        // The master still gets the new action.
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action && n.Body == "Depois")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Act_ByTheMaster_SendsHimNothing_ButStillTellsWhoIsMissing()
+    {
+        FourPlayers(BRAM, ARIA);
+
+        await _service.ActAsync(MASTER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Defendo" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Never);
+        VerifyPending(new Dictionary<long, string> { [6] = "Falta apenas Duda e você", [7] = "Falta apenas Caio e você" });
+    }
+
+    [Fact]
+    public async Task Act_OfAnAllyByItsCommander_TellsTheMaster_WithTheInstanceName()
+    {
+        GoblinIsAriasAlly();
+
+        await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = GOBLIN_PIECE, Description = "Morde o orc" });
+
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action && n.Speaker == "Goblin 1"
+            && n.Body == "Morde o orc" && n.TargetUserIds!.SequenceEqual(new[] { MASTER }))), Times.Once);
+        VerifyNoPending();
     }
 
     [Fact]

@@ -241,7 +241,8 @@ export const ChatComposer = () => {
   const onPoke = async () => {
     try {
       const result = await poke();
-      if (result.poked === 0) toast.info(t('chat.pokeNobody'));
+      if (result.master) toast.success(t('chat.pokeMaster'));
+      else if (result.poked === 0) toast.info(t('chat.pokeNobody'));
       else toast.success(t('chat.pokeDone', { count: result.poked }));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));

@@ -448,7 +448,57 @@
     "unavailable": "As notificações não estão disponíveis no momento.",
     "needsInstall": "No iPhone e no iPad, as notificações só funcionam com o Roll6 instalado na tela de início (iOS 16.4 ou mais novo).",
     "howToInstall": "Como instalar",
-    "whatArrives": "Você recebe as mensagens do chat, os avisos do seu turno, as mudanças de PV e Fadiga do seu personagem e os cutucões. O mestre recebe também as ações dos personagens.",
+    "whatArrives": "Você recebe, em todos os seus aparelhos, as mensagens do chat, os avisos de quem falta agir no turno, o fim do turno, as mudanças de PV e Fadiga do seu personagem e os cutucões. O mestre recebe também cada ação dos personagens.",
+    "test": {
+      "send": "Enviar teste",
+      "sent": "Enviada. Ela deve aparecer neste aparelho em alguns segundos.",
+      "gone": "Este aparelho não está mais registrado. Ative as notificações de novo.",
+      "failed": "Falhou. Tente de novo em instantes; se continuar, desative e ative as notificações.",
+      "noDevice": "Nenhum aparelho com notificações ativadas.",
+      "allSent": "Teste enviado para todos os aparelhos.",
+      "someFailed": "Teste enviado, mas algum aparelho falhou.",
+      "noneSent": "Nenhum aparelho recebeu o teste."
+    },
+    "devices": {
+      "title": "Seus aparelhos",
+      "none": "Nenhum aparelho com notificações ativadas.",
+      "this": "este aparelho",
+      "skipped": "sem entregar",
+      "skippedHint": "Falhou várias vezes seguidas e está sem receber. Um teste que funcione volta a ativá-lo.",
+      "lastSuccess": "última entrega {{when}}",
+      "never": "nenhuma entrega ainda",
+      "testAll": "Testar todos",
+      "result": {
+        "sent": "enviada",
+        "gone": "removido",
+        "failed": "falhou"
+      }
+    },
+    "simulate": {
+      "title": "Simular (mestre)",
+      "hint": "Envia para os seus aparelhos uma notificação de {{campaign}} igual à da mesa, marcada como teste. Ninguém mais recebe.",
+      "kind": "Tipo de notificação",
+      "send": "Enviar para mim",
+      "kinds": {
+        "message": "Mensagem no chat",
+        "action": "Ação de um personagem",
+        "pending": "Falta apenas Fulano e você",
+        "pendingLast": "Falta só você",
+        "turnFinished": "Fim do turno",
+        "life": "PV do personagem",
+        "fatigue": "Fadiga do personagem",
+        "poke": "Cutucada",
+        "pokeMaster": "Cutucada no mestre"
+      }
+    },
+    "preview": {
+      "title": "Quem falta agir agora",
+      "refresh": "Atualizar",
+      "failed": "Não foi possível ler o turno.",
+      "summary": "Turno {{turn}}: {{acted}} de {{approved}} agiram (maioria: {{threshold}}).",
+      "nobody": "Ninguém falta agir.",
+      "beforeMajority": "nada ainda — a maioria não agiu"
+    },
     "campaigns": "Campanhas",
     "noCampaigns": "Você ainda não está em nenhuma campanha.",
     "muted": "silenciada",
@@ -883,6 +933,7 @@
     "pokeNobody": "Todos já agiram neste turno.",
     "pokeDone_one": "Cutucou {{count}} jogador.",
     "pokeDone_other": "Cutucou {{count}} jogadores.",
+    "pokeMaster": "Todos já agiram: você cutucou o mestre.",
     "actionsHint": "Segure para curtir, responder ou mais opções",
     "actionsLabel": "Opções da mensagem",
     "like": "Curtir",

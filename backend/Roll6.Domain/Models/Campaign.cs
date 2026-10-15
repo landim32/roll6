@@ -30,9 +30,6 @@ public class Campaign
     /// </summary>
     public CampaignStatus Status { get; set; } = CampaignStatus.Active;
 
-    /// <summary>The turn in which "Falta apenas você…" was already sent (043), so it goes once per turn.</summary>
-    public int? MajorityNotifiedTurn { get; set; }
-
     /// <summary>
     /// Free mode (054): while on, character and NPC pieces move any number of times without the Deslocamento limit and without a Movement entry, the turn
     /// finishes without a pending list and no majority notice goes out. Switching it never touches the turn. Actions
