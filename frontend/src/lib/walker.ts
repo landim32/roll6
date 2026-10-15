@@ -3,7 +3,7 @@ import type { Point } from './hexGrid';
 import { isBlocked } from './occupancy';
 import type { Occupancy } from './occupancy';
 import { isLying } from './pieceDrawing';
-import { CAMERA_RADIUS, forwardOf, lookToYaw, segmentHitsWall } from './storyCamera';
+import { CAMERA_RADIUS, forwardOf, lookToYaw, orbitPose } from './storyCamera';
 import type { CameraBlocked, CameraPose } from './storyCamera';
 import type { MapTokenInfo } from '../types/mapToken';
 
@@ -29,8 +29,6 @@ export const WALK_DISTANCE_MIN = 0.75 * HEX_STEP;
 export const WALK_DISTANCE_DEFAULT = 1.1 * HEX_STEP;
 export const WALK_DISTANCE_MAX = 6 * HEX_STEP;
 export const WALK_DISTANCE_STEP = 0.5 * HEX_STEP;
-/** Steps along the segment from the character to the camera when looking for walls. */
-const SEGMENT_STEP = HEX_SIZE / 4;
 
 export interface WalkerState {
   x: number;
@@ -99,20 +97,12 @@ export const zoomWalker = (state: WalkerState, steps: number): WalkerState => ({
 /** The camera at a given distance behind the character, within its limits (a pinch scales it). */
 export const withDistance = (state: WalkerState, distance: number): WalkerState => ({ ...state, distance: clampDistance(distance) });
 
-/** The camera behind the character, looking where it looks; a wall in between brings it closer instead. */
-export const walkCamera = (state: WalkerState, wallsAndEdge: CameraBlocked): CameraPose => {
-  const ahead = forwardOf(state.yaw);
-  const target = { x: state.x, y: state.z };
-  const wanted = { x: state.x - ahead.x * state.distance, y: state.z - ahead.y * state.distance };
-  const hit = segmentHitsWall(target, wanted, wallsAndEdge);
-  const reach = hit === null ? 1 : Math.max(0, hit - SEGMENT_STEP / state.distance);
-  return {
-    x: target.x + (wanted.x - target.x) * reach,
-    z: target.y + (wanted.y - target.y) * reach,
-    yaw: state.yaw,
-    attached: true,
-  };
-};
+/**
+ * The camera behind the character, looking where it looks — or, with an `orbit` (068), at that angle around it; a wall
+ * in between brings it closer instead.
+ */
+export const walkCamera = (state: WalkerState, wallsAndEdge: CameraBlocked, orbit = 0): CameraPose =>
+  orbitPose({ x: state.x, y: state.z }, state.yaw, orbit, state.distance, wallsAndEdge);
 
 /** The hex side (0–5) nearest to a yaw: how a 2,5D figure faces while it walks. */
 export const walkerLook = (yaw: number): number => {

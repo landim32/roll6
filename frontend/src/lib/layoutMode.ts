@@ -6,7 +6,8 @@
 export const LAYOUT_MODE = {
   /** Only the map (2D or 3D), as before the chat. */
   map: 'map',
-  /** Map (or 3D) on top, chat below, half each. */
+  /** Map (or 3D) and chat together: side by side on desktop (map 70% left, chat 30% right, 068), map on top and chat
+   * below on phones (< 768 px). */
   split: 'split',
   /** Only the chat; the map isn't drawn. */
   chat: 'chat',

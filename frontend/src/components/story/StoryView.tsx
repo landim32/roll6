@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCampaign } from '../../hooks/useCampaign';
+import { useChat } from '../../hooks/useChat';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useStoryCamera } from '../../hooks/useStoryCamera';
 import { useTurn } from '../../hooks/useTurn';
 import type { FollowedPiece, WalkOptions } from '../../hooks/useStoryCamera';
+import { chatBalloons, nextBalloonExpiry } from '../../lib/chatBubbles';
 import { isFreeMode } from '../../lib/freeMode';
 import { buildOccupancy } from '../../lib/occupancy';
 import { canWalk, walkerBlocker, walkerLook } from '../../lib/walker';
@@ -82,6 +84,9 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   const freeMode = isFreeMode(currentCampaign);
   const { registerStoryZoom } = useMapEditor();
   const { entries } = useTurn();
+  const { items: chatItems } = useChat();
+  /** The clock of the chat balloons (068): moved forward when one of them expires. */
+  const [balloonNow, setBalloonNow] = useState(() => Date.now());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<RaycastRenderer | null>(null);
   /** The 3D models (055): their canvas over the raycaster's, the layer once three.js is loaded, and which ones are drawn. */
@@ -127,17 +132,34 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   ), [ownPiece]);
 
   // The speech balloons (036): what each actor last said in the turn in progress, for the standing pieces of this map
-  // that said something — the same text and the same key (`pieceKey`) the 2D map uses. Objects say nothing.
+  // that said something — the same text and the same key (`pieceKey`) the 2D map uses. Objects say nothing. In free mode
+  // (068) it is whatever each one last said in the chat — a message, a caption, a roll or an action — for 60 seconds from
+  // when it was sent; leaving free mode brings the turn's actions back at once.
   const bubbles = useMemo((): StoryBubble[] => {
-    const actions = lastActions(entries);
-    if (actions.size === 0) return [];
+    const texts = freeMode
+      ? new Map([...chatBalloons(chatItems, balloonNow)].map(([key, balloon]) => [key, balloon.text]))
+      : lastActions(entries);
+    if (texts.size === 0) return [];
     return pieces.reduce<StoryBubble[]>((list, piece) => {
       if (!isShownIn3d(piece)) return list;
       const key = pieceKey(piece);
-      const text = key ? actions.get(key) : undefined;
+      const text = key ? texts.get(key) : undefined;
       return text ? [...list, { id: piece.mapTokenId, name: piece.name, text }] : list;
     }, []);
-  }, [entries, pieces]);
+  }, [freeMode, chatItems, balloonNow, entries, pieces]);
+
+  // The clock of the balloons (068): read again when free mode starts and when the next balloon to expire is due — a
+  // stale clock only means that wake-up comes at once.
+  useEffect(() => {
+    if (freeMode) setBalloonNow(Date.now());
+  }, [freeMode]);
+  useEffect(() => {
+    if (!freeMode) return;
+    const next = nextBalloonExpiry(chatItems, balloonNow);
+    if (next === null) return;
+    const timer = window.setTimeout(() => setBalloonNow(Date.now()), Math.max(0, next - Date.now()) + 20);
+    return () => window.clearTimeout(timer);
+  }, [freeMode, chatItems, balloonNow]);
 
   // A new saying has to show at once, and the renderer only draws when something moved.
   useEffect(() => {
@@ -470,7 +492,15 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
 
   return (
     <div className="stm-story">
-      <canvas ref={canvasRef} className="stm-story-canvas" tabIndex={0} aria-label={t('story.view3d')} {...camera.pointerHandlers} />
+      {/* The right button steers the character (068): the browser's menu never opens over the view. */}
+      <canvas
+        ref={canvasRef}
+        className="stm-story-canvas"
+        tabIndex={0}
+        aria-label={t('story.view3d')}
+        onContextMenu={(event) => event.preventDefault()}
+        {...camera.pointerHandlers}
+      />
       <canvas ref={modelCanvasRef} className="stm-story-models" aria-hidden="true" hidden={!hasModels} />
       {ready && <BubbleLayer ref={bubbleLayer} bubbles={bubbles} />}
       {walkHint && <div className="stm-story-walk-hint small" role="status">{t('story.walkHint')}</div>}

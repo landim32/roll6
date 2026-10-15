@@ -14,6 +14,13 @@ const sprite = (over: Partial<FrameSprite> = {}): FrameSprite => ({
 const place = (over: Partial<FrameSprite> = {}) => bubblePlacement(sprite(over), FRAME, CANVAS, SIZE);
 
 describe('bubblePlacement', () => {
+  it('follows its figure frame by frame, as a walked character moves across the view (068)', () => {
+    const before = place({ screenX: 20 });
+    const after = place({ screenX: 40 });
+    expect(after!.x - before!.x).toBeCloseTo(200);   // 20 frame columns × 10
+    expect(after!.y).toBeCloseTo(before!.y);
+  });
+
   it('keeps the normal size at the reference distance', () => {
     expect(place()?.scale).toBeCloseTo(1);
   });
