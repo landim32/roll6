@@ -109,6 +109,14 @@ public class MapTokenInfo
     [JsonPropertyName("look")]
     public int Look { get; set; }
 
+    /// <summary>NPC pieces (071): 1 Inimigo, 2 Neutro, 3 Aliado in the piece's campaign; null for characters and objects.</summary>
+    [JsonPropertyName("npcCategory")]
+    public int? NpcCategory { get; set; }
+
+    /// <summary>NPC pieces (071): the player commanding this ally (owner of its approved master character); null when none.</summary>
+    [JsonPropertyName("commanderUserId")]
+    public long? CommanderUserId { get; set; }
+
     /// <summary>Where a 3D walk left the figure inside its hex (map pixels) and its exact direction (radians); null = the middle of the hex, facing look (069).</summary>
     [JsonPropertyName("walkX")]
     public double? WalkX { get; set; }

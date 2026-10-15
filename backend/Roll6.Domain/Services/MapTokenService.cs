@@ -9,6 +9,8 @@ using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
+using Roll6.Domain.Npcs;
+
 namespace Roll6.Domain.Services;
 
 /// <summary>
@@ -46,9 +48,11 @@ public partial class MapTokenService : IMapTokenService
         ICampaignRepository<Campaign> campaignRepository,
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
+        ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         IRealtimeNotifier notifier)
     {
         _notifier = notifier;
+        _npcCommand = new NpcCommandLoader(campaignNpcRepository, campaignCharacterRepository, characterRepository);
         _turnRepository = turnRepository;
         _campaignRepository = campaignRepository;
         _repository = repository;
@@ -65,6 +69,7 @@ public partial class MapTokenService : IMapTokenService
     }
 
     private readonly MapOccupancyLoader _occupancy;
+    private readonly NpcCommandLoader _npcCommand;
 
     public async Task<List<MapTokenInfo>> ListByMapAsync(long userId, long mapId)
     {
@@ -158,7 +163,7 @@ public partial class MapTokenService : IMapTokenService
         var look = info.Look ?? mapToken.Look;
         var layout = await _occupancy.LoadAsync(map);
         if (map.UserId != userId)
-            await EnsurePlayerMoveAsync(userId, layout, mapToken, info.X, info.Y, look, campaign.FreeMode);
+            await EnsurePlayerMoveAsync(userId, layout, mapToken, info.X, info.Y, look, campaign);
         layout.EnsureFits(info.X, info.Y, look, layout.SpaceOf(mapToken), mapToken.MapTokenId);
 
         // Characters and NPC occurrences move once per turn, and the move is recorded (016); objects don't.
@@ -206,8 +211,22 @@ public partial class MapTokenService : IMapTokenService
     /// A player moves only his own approved character, within its Deslocamento in this campaign (037) — the whole
     /// shape around the other pieces. In free mode (054) only the ownership check remains: any distance, any path.
     /// </summary>
-    private async Task EnsurePlayerMoveAsync(long userId, MapLayout layout, MapToken mapToken, int x, int y, int look, bool freeMode)
+    private async Task EnsurePlayerMoveAsync(long userId, MapLayout layout, MapToken mapToken, int x, int y, int look, Campaign campaign)
     {
+        var freeMode = campaign.FreeMode;
+        // 071: the player commanding an ally moves its pieces like his own character, within the occurrence's Deslocamento.
+        if (mapToken.MapNpcId is long mapNpcId)
+        {
+            var mapNpc = await _mapNpcRepository.GetByIdAsync(mapNpcId);
+            if (mapNpc == null || !await _npcCommand.CommandsAsync(userId, campaign, mapNpc.NpcId))
+                throw new UnauthorizedAccessException("Você só pode mover os seus personagens e aliados.");
+            if (freeMode)
+                return;
+            var npcCost = layout.MovementCost(mapToken, x, y, look);
+            if (npcCost == null || npcCost > mapNpc.CurrentMove)
+                throw new DomainValidationException("move", "O movimento passou do máximo.");
+            return;
+        }
         var participation = mapToken.CampaignCharacterId is long participationId
             ? await _campaignCharacterRepository.GetByIdAsync(participationId)
             : null;
@@ -333,6 +352,16 @@ public partial class MapTokenService : IMapTokenService
             mapNpcs = (await _mapNpcRepository.ListByIdsAsync(mapNpcIds)).ToDictionary(e => e.MapNpcId);
             npcs = (await _npcRepository.ListByIdsAsync(mapNpcs.Values.Select(e => e.NpcId).Distinct())).ToDictionary(e => e.NpcId);
         }
+        // 071: the category of each NPC in the piece's campaign and who commands it (an ally's master character owner).
+        var standings = new Dictionary<(long MapId, long NpcId), NpcStanding>();
+        foreach (var group in mapNpcs.Values.GroupBy(e => e.MapId))
+        {
+            var pieceMap = await _mapRepository.GetByIdAsync(group.Key);
+            if (pieceMap == null)
+                continue;
+            foreach (var (npcId, standing) in await _npcCommand.StandingAsync(pieceMap.CampaignId, group.Select(e => e.NpcId)))
+                standings[(group.Key, npcId)] = standing;
+        }
 
         return mapTokens.Select(mapToken =>
         {
@@ -394,6 +423,9 @@ public partial class MapTokenService : IMapTokenService
             {
                 info.MapNpcId = mapNpc.MapNpcId;
                 info.NpcId = mapNpc.NpcId;
+                var standing = standings.GetValueOrDefault((mapNpc.MapId, mapNpc.NpcId));
+                info.NpcCategory = (int)(standing?.Category ?? NpcCategory.Enemy);
+                info.CommanderUserId = standing?.CommanderUserId;
                 // The occurrence owns name, current vitals and status; the NPC gives totals, move and the sheet (026).
                 var npc = npcs.GetValueOrDefault(mapNpc.NpcId);
                 info.Name = mapNpc.Name;

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Moq;
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
@@ -48,6 +49,82 @@ public class CampaignNpcServiceTests
     }
 
     private static CampaignNpcInsertInfo Add(long npcId = NPC) => new() { CampaignId = CAMPAIGN, NpcId = npcId };
+
+    // ---- 071: category and master ----
+
+    private CampaignNpc SetupCampaignNpc(NpcCategory category = NpcCategory.Enemy, long? master = null)
+    {
+        var campaignNpc = new CampaignNpc { CampaignNpcId = 5, CampaignId = CAMPAIGN, NpcId = NPC, Category = category, MasterCampaignCharacterId = master };
+        _repository.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(campaignNpc);
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<CampaignNpc>())).ReturnsAsync((CampaignNpc c) => c);
+        return campaignNpc;
+    }
+
+    private void SetupParticipation(CampaignCharacterStatus status = CampaignCharacterStatus.Approved)
+    {
+        var participation = new CampaignCharacter { CampaignCharacterId = 70, CampaignId = CAMPAIGN, CharacterId = 80, Status = status };
+        _campaignCharacterRepository.Setup(r => r.GetByIdAsync(70)).ReturnsAsync(participation);
+        _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter> { participation });
+    }
+
+    [Fact]
+    public async Task Update_TheCategoryAndMaster_AreSavedAndPublished()
+    {
+        SetupCampaignNpc();
+        SetupParticipation();
+
+        var result = await _service.UpdateAsync(MASTER, 5, new CampaignNpcUpdateInfo { Category = 3, MasterCampaignCharacterId = 70 });
+
+        (result.Category, result.MasterCampaignCharacterId, result.MasterCharacterId).Should().Be((3, (long?)70, (long?)80));
+        _repository.Verify(r => r.UpdateAsync(It.Is<CampaignNpc>(c => c.Category == NpcCategory.Ally && c.MasterCampaignCharacterId == 70)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CAMPAIGN_NPCS_CHANGED)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.MapId == null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_SameValues_PublishesNothing()
+    {
+        SetupCampaignNpc(NpcCategory.Neutral);
+
+        var result = await _service.UpdateAsync(MASTER, 5, new CampaignNpcUpdateInfo { Category = 2 });
+
+        result.Category.Should().Be(2);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<CampaignNpc>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_NotTheMaster_Throws403_UnknownThrows404()
+    {
+        SetupCampaignNpc();
+
+        await _service.Invoking(s => s.UpdateAsync(PLAYER, 5, new CampaignNpcUpdateInfo { Category = 3 })).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _service.Invoking(s => s.UpdateAsync(MASTER, 404, new CampaignNpcUpdateInfo { Category = 3 })).Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Update_MasterOnANonAllyOrUnknown_Throws400()
+    {
+        SetupCampaignNpc();
+        SetupParticipation();
+
+        (await _service.Invoking(s => s.UpdateAsync(MASTER, 5, new CampaignNpcUpdateInfo { Category = 2, MasterCampaignCharacterId = 70 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("masterCampaignCharacterId");
+        (await _service.Invoking(s => s.UpdateAsync(MASTER, 5, new CampaignNpcUpdateInfo { Category = 3, MasterCampaignCharacterId = 999 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("masterCampaignCharacterId");
+    }
+
+    [Fact]
+    public async Task List_AMasterNoLongerApproved_ReadsAsNone()
+    {
+        var campaignNpc = SetupCampaignNpc(NpcCategory.Ally, master: 70);
+        SetupParticipation(CampaignCharacterStatus.Denied);
+        _repository.Setup(r => r.ListByCampaignAsync(CAMPAIGN)).ReturnsAsync(new List<CampaignNpc> { campaignNpc });
+
+        var result = (await _service.ListByCampaignAsync(MASTER, CAMPAIGN)).Single();
+
+        (result.Category, result.MasterCampaignCharacterId, result.MasterCharacterId).Should().Be((3, (long?)null, (long?)null));
+    }
 
     [Fact]
     public async Task Add_Master_ReturnsTheNpcData()

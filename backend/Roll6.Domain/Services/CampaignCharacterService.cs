@@ -26,6 +26,7 @@ public class CampaignCharacterService : ICampaignCharacterService
     private readonly ITurnRepository<Turn> _turnRepository;
     private readonly IRealtimeNotifier _notifier;
     private readonly INotificationQueue _queue;
+    private readonly ICampaignNpcRepository<CampaignNpc> _campaignNpcRepository;
 
     public CampaignCharacterService(
         ICampaignCharacterRepository<CampaignCharacter> repository,
@@ -38,8 +39,10 @@ public class CampaignCharacterService : ICampaignCharacterService
         IImageStorageAppService imageStorage,
         ITurnRepository<Turn> turnRepository,
         INotificationQueue queue,
+        ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         IRealtimeNotifier notifier)
     {
+        _campaignNpcRepository = campaignNpcRepository;
         _queue = queue;
         _notifier = notifier;
         _turnRepository = turnRepository;
@@ -87,7 +90,10 @@ public class CampaignCharacterService : ICampaignCharacterService
         var participation = await GetParticipationAsync(campaignCharacterId);
         EnsureMaster(userId, await GetCampaignAsync(participation.CampaignId));
         participation.DenyRequest();
+        // 071: a character that is no longer approved commands no ally.
+        var cleared = await _campaignNpcRepository.ClearMasterAsync(new[] { participation.CampaignCharacterId });
         var result = await SaveAndPublishAsync(participation, userId);
+        await PublishAlliesAsync(cleared, userId);
         await RemoveOwnerIfNoAccessAsync(result.CharacterOwnerId, participation.CampaignId);
         return result;
     }
@@ -224,16 +230,29 @@ public class CampaignCharacterService : ICampaignCharacterService
     {
         var participation = await GetParticipationAsync(campaignCharacterId);
         EnsureMaster(userId, await GetCampaignAsync(participation.CampaignId));
-        // Its pieces on the campaign maps go first (FKs never cascade).
+        // Its pieces on the campaign maps and its allies' link go first (FKs never cascade).
+        var cleared = new List<long>();
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
+            cleared = await _campaignNpcRepository.ClearMasterAsync(new[] { participation.CampaignCharacterId });
             await _mapTokenRepository.DeleteByCampaignCharacterAsync(participation.CampaignCharacterId);
             await _repository.DeleteAsync(participation.CampaignCharacterId);
         });
         await PublishPartyAsync(participation.CampaignId, userId, piecesToo: true);
+        await PublishAlliesAsync(cleared, userId);
         var character = await _characterRepository.GetByIdAsync(participation.CharacterId);
         if (character != null)
             await RemoveOwnerIfNoAccessAsync(character.UserId, participation.CampaignId);
+    }
+
+    /// <summary>Allies left without a master (071): the panels and the pieces (commander, color) reload.</summary>
+    private async Task PublishAlliesAsync(IEnumerable<long>? campaignIds, long userId)
+    {
+        foreach (var campaignId in campaignIds ?? Enumerable.Empty<long>())
+        {
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_NPCS_CHANGED, campaignId, userId));
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
+        }
     }
 
     private async Task<CampaignCharacterInfo> SaveAndPublishAsync(CampaignCharacter participation, long userId)

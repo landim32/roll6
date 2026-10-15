@@ -32,6 +32,7 @@ public class MapNpcServiceTests
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<ICharacterRepository<Character>> _characterRepository = new();
     private readonly List<MapToken> _insertedPieces = new();
     private readonly MapNpcService _service;
     private long _nextId = 90;
@@ -54,7 +55,7 @@ public class MapNpcServiceTests
         _campaignRepository.Setup(r => r.GetByIdAsync(CAMPAIGN)).ReturnsAsync(new Campaign { CampaignId = CAMPAIGN, UserId = MASTER, CurrentTurn = 4 });
         _service = new MapNpcService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _mapTokenRepository.Object,
             _npcRepository.Object, _campaignNpcRepository.Object, _campaignCharacterRepository.Object, _tokenRepository.Object,
-            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object, _campaignRepository.Object, _notifier.Object);
+            _unitOfWork.Object, Mock.Of<IImageStorageAppService>(), _turnRepository.Object, _campaignRepository.Object, _characterRepository.Object, _notifier.Object);
     }
 
     private static MapNpcInsertInfo At(int x, int y) => new() { MapId = MAP, NpcId = NPC, X = x, Y = y };
@@ -147,6 +148,60 @@ public class MapNpcServiceTests
 
         await _service.Invoking(s => s.UpdateAsync(PLAYER, 90, new MapNpcUpdateInfo { Name = "X" })).Should().ThrowAsync<UnauthorizedAccessException>();
         _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    private void GoblinIsTheAllyOf(long owner)
+    {
+        _campaignNpcRepository.Setup(r => r.ListByCampaignAndNpcsAsync(CAMPAIGN, It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignNpc>
+        {
+            new() { CampaignNpcId = 3, CampaignId = CAMPAIGN, NpcId = NPC, Category = NpcCategory.Ally, MasterCampaignCharacterId = 70 }
+        });
+        _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter>
+        {
+            new() { CampaignCharacterId = 70, CampaignId = CAMPAIGN, CharacterId = 80, Status = CampaignCharacterStatus.Approved }
+        });
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync(new List<Character> { new() { CharacterId = 80, UserId = owner, Name = "Aria" } });
+    }
+
+    [Fact]
+    public async Task Update_PlayerCommandingTheAlly_ChangesVitalsStatusAndPosture()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2, CurrentMove = 6 });
+        GoblinIsTheAllyOf(PLAYER);
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
+
+        var result = await _service.UpdateAsync(PLAYER, 90, new MapNpcUpdateInfo
+        {
+            Name = "Goblin", CurrentLife = 3, CurrentEnergy = 1, Status = "ferido", CurrentMove = 6, Posture = (int)Posture.Down
+        });
+
+        (result.CurrentLife, result.Status, result.Posture).Should().Be((3, "ferido", (int)Posture.Down));
+        recorded!.UserId.Should().Be(PLAYER);
+    }
+
+    [Fact]
+    public async Task Update_PlayerCommandingTheAlly_CannotRenameOrChangeTheDeslocamento()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2, CurrentMove = 6 });
+        GoblinIsTheAllyOf(PLAYER);
+
+        await _service.Invoking(s => s.UpdateAsync(PLAYER, 90, new MapNpcUpdateInfo { Name = "Rex", CurrentLife = 7, CurrentEnergy = 2 }))
+            .Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("Apenas o mestre altera o nome e o Deslocamento do NPC.");
+        await _service.Invoking(s => s.UpdateAsync(PLAYER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 7, CurrentEnergy = 2, CurrentMove = 9 }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapNpc>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_AnotherPlayer_StillCannot()
+    {
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin", CurrentLife = 7 });
+        GoblinIsTheAllyOf(3);
+
+        await _service.Invoking(s => s.UpdateAsync(PLAYER, 90, new MapNpcUpdateInfo { Name = "Goblin", CurrentLife = 1 }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]

@@ -9,6 +9,8 @@ using Roll6.DTO.Realtime;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
+using Roll6.Domain.Npcs;
+
 namespace Roll6.Domain.Services;
 
 /// <summary>
@@ -28,6 +30,7 @@ public class MapNpcService : IMapNpcService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITurnRepository<Turn> _turnRepository;
     private readonly ICampaignRepository<Campaign> _campaignRepository;
+    private readonly NpcCommandLoader _npcCommand;
     private readonly IImageStorageAppService _imageStorage;
 
     private readonly IRealtimeNotifier _notifier;
@@ -45,9 +48,11 @@ public class MapNpcService : IMapNpcService
         IImageStorageAppService imageStorage,
         ITurnRepository<Turn> turnRepository,
         ICampaignRepository<Campaign> campaignRepository,
+        ICharacterRepository<Character> characterRepository,
         IRealtimeNotifier notifier)
     {
         _notifier = notifier;
+        _npcCommand = new NpcCommandLoader(campaignNpcRepository, campaignCharacterRepository, characterRepository);
         _campaignRepository = campaignRepository;
         _turnRepository = turnRepository;
         _repository = repository;
@@ -116,7 +121,7 @@ public class MapNpcService : IMapNpcService
 
     public async Task<MapNpcInfo> UpdateAsync(long userId, long mapNpcId, MapNpcUpdateInfo info)
     {
-        var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
+        var (mapNpc, map) = await GetCommandedAsync(userId, mapNpcId, info);
         var before = (mapNpc.Name, mapNpc.CurrentLife, mapNpc.CurrentEnergy, mapNpc.Status, mapNpc.Posture, mapNpc.CurrentMove);
         var npc = await _npcRepository.GetByIdAsync(mapNpc.NpcId)
             ?? throw new KeyNotFoundException("NPC não encontrado.");
@@ -174,6 +179,28 @@ public class MapNpcService : IMapNpcService
     /// <summary>The occurrence's piece shows its name/vitals: the map's pieces must be reloaded (017).</summary>
     private Task PublishPiecesChangedAsync(Map map, long userId) =>
         _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, map.CampaignId, userId, map.MapId));
+
+    /// <summary>
+    /// The instance for an update (071): the master as before, or the player commanding the ally — who changes only the
+    /// current life/energy, status and posture; a different name or Deslocamento stays with the master.
+    /// </summary>
+    private async Task<(MapNpc MapNpc, Map Map)> GetCommandedAsync(long userId, long mapNpcId, MapNpcUpdateInfo info)
+    {
+        var mapNpc = await _repository.GetByIdAsync(mapNpcId);
+        if (mapNpc == null || mapNpc.IsRemoved)
+            throw new KeyNotFoundException("NPC do mapa não encontrado.");
+        var map = await GetMapAsync(mapNpc.MapId);
+        if (map.UserId == userId)
+            return (mapNpc, await GetMasteredMapAsync(userId, mapNpc.MapId));
+        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
+            ?? throw new KeyNotFoundException("Campanha não encontrada.");
+        if (!await _npcCommand.CommandsAsync(userId, campaign, mapNpc.NpcId))
+            throw new UnauthorizedAccessException("Apenas o mestre da campanha pode gerenciar os NPCs do mapa.");
+        if ((info.Name ?? string.Empty).Trim() != mapNpc.Name || (info.CurrentMove is int move && move != mapNpc.CurrentMove))
+            throw new UnauthorizedAccessException("Apenas o mestre altera o nome e o Deslocamento do NPC.");
+        campaign.EnsureMapEditable(false);
+        return (mapNpc, map);
+    }
 
     private async Task<(MapNpc MapNpc, Map Map)> GetOwnedAsync(long userId, long mapNpcId)
     {

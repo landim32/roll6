@@ -2062,5 +2062,41 @@ BEGIN
     VALUES ('20261015172704_AddMapTokenWalkPosition', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015181236_AddCampaignNpcCategory') THEN
+    ALTER TABLE campaign_npcs ADD category integer NOT NULL DEFAULT 1;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015181236_AddCampaignNpcCategory') THEN
+    ALTER TABLE campaign_npcs ADD master_campaign_character_id bigint;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015181236_AddCampaignNpcCategory') THEN
+    CREATE INDEX ix_campaign_npcs_master ON campaign_npcs (master_campaign_character_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015181236_AddCampaignNpcCategory') THEN
+    ALTER TABLE campaign_npcs ADD CONSTRAINT fk_campaign_npc_master FOREIGN KEY (master_campaign_character_id) REFERENCES campaign_characters (campaign_character_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015181236_AddCampaignNpcCategory') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261015181236_AddCampaignNpcCategory', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

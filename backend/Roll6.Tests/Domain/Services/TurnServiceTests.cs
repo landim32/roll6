@@ -305,6 +305,45 @@ public class TurnServiceTests
         _repository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
     }
 
+    // ---- 071: the player commanding an ally ----
+
+    private void GoblinIsAriasAlly()
+    {
+        _campaignNpcRepository.Setup(r => r.ListByCampaignAndNpcsAsync(CAMPAIGN, It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignNpc>
+        {
+            new() { CampaignNpcId = 5, CampaignId = CAMPAIGN, NpcId = NPC, Category = NpcCategory.Ally, MasterCampaignCharacterId = PARTICIPATION }
+        });
+        _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter>
+        {
+            new() { CampaignCharacterId = PARTICIPATION, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved }
+        });
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync(new List<Character> { new() { CharacterId = ARIA, UserId = PLAYER, Name = "Aria" } });
+    }
+
+    [Fact]
+    public async Task Act_PlayerCommandingTheAlly_ActsForIt()
+    {
+        GoblinIsAriasAlly();
+
+        var result = await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = GOBLIN_PIECE, Description = "Morde" });
+
+        (result.NpcId, result.MapNpcId).Should().Be(((long?)NPC, (long?)MAP_NPC));
+        _repository.Verify(r => r.InsertAsync(It.Is<Turn>(t => t.UserId == PLAYER && t.MapNpcId == MAP_NPC)), Times.Once);
+        await _service.Invoking(s => s.ActAsync(STRANGER, new TurnActInfo { MapTokenId = GOBLIN_PIECE, Description = "x" }))
+            .Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("Apenas o mestre ou quem comanda o aliado age com este NPC.");
+    }
+
+    [Fact]
+    public async Task Reset_PlayerCommandingTheAlly_ResetsIt()
+    {
+        GoblinIsAriasAlly();
+
+        await _service.Invoking(s => s.ResetAsync(PLAYER, new TurnPieceInfo { MapTokenId = GOBLIN_PIECE })).Should().NotThrowAsync();
+        await _service.Invoking(s => s.ResetAsync(STRANGER, new TurnPieceInfo { MapTokenId = GOBLIN_PIECE }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
     [Fact]
     public async Task Act_WithAnObjectOrWithoutText_Throws()
     {

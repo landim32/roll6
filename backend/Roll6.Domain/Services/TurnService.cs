@@ -11,6 +11,8 @@ using Roll6.DTO.Turn;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
+using Roll6.Domain.Npcs;
+
 namespace Roll6.Domain.Services;
 
 /// <summary>
@@ -42,6 +44,7 @@ public partial class TurnService : ITurnService
 
     /// <summary>Hexes taken on a map (031): resets and processed moves need the whole shape free.</summary>
     private readonly MapOccupancyLoader _occupancy;
+    private readonly NpcCommandLoader _npcCommand;
 
     public TurnService(
         ITurnRepository<Turn> repository,
@@ -72,6 +75,7 @@ public partial class TurnService : ITurnService
         _chatReadRepository = chatReadRepository;
         _imageStorage = imageStorage;
         _occupancy = new MapOccupancyLoader(mapModelRepository, mapTokenRepository, tokenRepository, campaignCharacterRepository, mapNpcRepository);
+        _npcCommand = new NpcCommandLoader(campaignNpcRepository, campaignCharacterRepository, characterRepository);
         _campaignNpcRepository = campaignNpcRepository;
         _mapModelRepository = mapModelRepository;
         _notifier = notifier;
@@ -367,8 +371,8 @@ public partial class TurnService : ITurnService
     }
 
     /// <summary>
-    /// Who the piece is in the turn: a character (its owner or the master may act) or an NPC occurrence (master
-    /// only). Objects don't take part in turns.
+    /// Who the piece is in the turn: a character (its owner or the master may act) or an NPC occurrence (the master, or
+    /// since 071 the player commanding the ally). Objects don't take part in turns.
     /// </summary>
     private async Task<(long? CharacterId, long? NpcId, long? MapNpcId)> ResolveActorAsync(long userId, MapToken piece, Campaign campaign)
     {
@@ -385,10 +389,10 @@ public partial class TurnService : ITurnService
         }
         if (piece.MapNpcId is long mapNpcId)
         {
-            if (!isMaster)
-                throw new UnauthorizedAccessException("Apenas o mestre age com os NPCs.");
             var mapNpc = await _mapNpcRepository.GetByIdAsync(mapNpcId)
                 ?? throw new KeyNotFoundException("NPC do mapa não encontrado.");
+            if (!isMaster && !await _npcCommand.CommandsAsync(userId, campaign, mapNpc.NpcId))
+                throw new UnauthorizedAccessException("Apenas o mestre ou quem comanda o aliado age com este NPC.");
             return (null, mapNpc.NpcId, mapNpc.MapNpcId);
         }
         throw new DomainValidationException("mapTokenId", "Objetos não participam de turnos.");

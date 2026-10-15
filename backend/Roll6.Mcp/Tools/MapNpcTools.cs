@@ -47,7 +47,8 @@ public static class MapNpcTools
         and optionally currentMove, the occurrence's own Deslocamento); the library NPC and the other occurrences are
         unchanged. Every change is logged in the turn. The piece and the NPC card
         show it at once for everyone; there is no need to touch the piece (update_map_token).
-        Who can use it: only the master.
+        Who can use it: the master; the player commanding an ally NPC (update_campaign_npc) may change only currentLife,
+        currentEnergy, status and posture — name must stay the same and currentMove omitted or unchanged (else 403).
         {{RETURNS}}
         Common errors: 403 not the master, 404 not found (or already removed from the map), 400 invalid name/status,
         current value above the total or negative currentMove.

@@ -385,7 +385,18 @@
     "removeMessage_one": "Retirar {{name}} da campanha? A peça dele sai do mapa; o que ela fez fica no chat. O NPC continua na sua biblioteca.",
     "removeMessage_other": "Retirar {{name}} da campanha? As {{count}} peças dele saem dos mapas da campanha; o que elas fizeram fica no chat. O NPC continua na sua biblioteca.",
     "editInstance": "Editar {{name}}",
-    "removeInstance": "Retirar {{name}} do mapa"
+    "removeInstance": "Retirar {{name}} do mapa",
+    "category": {
+      "1": "Inimigo",
+      "2": "Neutro",
+      "3": "Aliado"
+    },
+    "categoryLabel": "Categoria",
+    "campaignSection": "Nesta campanha",
+    "master": "Personagem-mestre",
+    "masterNone": "Nenhum",
+    "masterHint": "O dono deste personagem passa a agir, mover e cuidar da vida e do status do aliado.",
+    "allies": "Aliados"
   },
   "hexMenu": {
     "emptyHex": "Hex vazio",
@@ -980,7 +991,8 @@
       "lifeAboveTotal": "A vida atual não pode passar da vida total.",
       "energyAboveTotal": "A energia atual não pode passar da energia total.",
       "statusTooLong": "O status pode ter no máximo 260 caracteres."
-    }
+    },
+    "commanderHint": "Você comanda este aliado: nome e Deslocamento só o mestre altera."
   },
   "campaignStatus": {
     "title": "Status da campanha",

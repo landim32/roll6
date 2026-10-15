@@ -175,7 +175,8 @@ export const MainPage = () => {
               picking={tokenPick !== null || toDelete !== null}
             />
           )}
-          <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })} />
+          <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })}
+            onEditNpc={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />
           <NpcPanel onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />
           <MapControls onOpenImage={openImage} />
           <GridSizeFooter onEditGrid={() => setGridOpen(true)} />
@@ -185,7 +186,8 @@ export const MainPage = () => {
         <div className="stm-chat-region">
           {/* Chat only: the cards come along — fixed columns on the desktop, the map's collapsible panels on phones. */}
           <div className="stm-chat-body">
-            {!showMap && <PartyPanel docked={desktop} onOpen={(participation, mode) => setEditing({ participation, mode })} />}
+            {!showMap && <PartyPanel docked={desktop} onOpen={(participation, mode) => setEditing({ participation, mode })}
+              onEditNpc={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />}
             <ChatPanel />
             {!showMap && <NpcPanel docked={desktop} onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />}
           </div>

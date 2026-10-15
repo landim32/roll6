@@ -22,11 +22,11 @@ public partial class MapTokenService
         var map = await _mapRepository.GetByIdAsync(mapToken.MapId)
             ?? throw new KeyNotFoundException("Mapa não encontrado.");
         map.EnsureNotDeleted();
-        await EnsureMapEditableAsync(map, userId);
+        var editable = await EnsureMapEditableAsync(map, userId);
         if (mapToken.CampaignCharacterId is long participationId)
             await SetCharacterPostureAsync(userId, map, participationId, info.Posture);
         else if (mapToken.MapNpcId is long mapNpcId)
-            await SetNpcPostureAsync(userId, map, mapToken, mapNpcId, info.Posture);
+            await SetNpcPostureAsync(userId, map, editable, mapToken, mapNpcId, info.Posture);
         else
             throw new DomainValidationException("posture", "Objetos não têm postura.");
         return await MapToDtoAsync(mapToken);
@@ -59,18 +59,17 @@ public partial class MapTokenService
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, map.CampaignId, userId));
     }
 
-    private async Task SetNpcPostureAsync(long userId, Map map, MapToken mapToken, long mapNpcId, int posture)
+    private async Task SetNpcPostureAsync(long userId, Map map, Campaign campaign, MapToken mapToken, long mapNpcId, int posture)
     {
-        if (map.UserId != userId)
-            throw new UnauthorizedAccessException("Apenas o mestre da campanha pode alterar a postura dos NPCs.");
         var mapNpc = await _mapNpcRepository.GetByIdAsync(mapNpcId)
             ?? throw new KeyNotFoundException("NPC do mapa não encontrado.");
+        // 071: the master, or the player commanding the ally.
+        if (map.UserId != userId && !await _npcCommand.CommandsAsync(userId, campaign, mapNpc.NpcId))
+            throw new UnauthorizedAccessException("Apenas o mestre ou quem comanda o aliado altera a postura dele.");
 
         var before = mapNpc.Posture;
         if (!mapNpc.ChangePosture(posture))
             return;
-        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
-            ?? throw new KeyNotFoundException("Campanha não encontrada.");
         var turn = Turn.CharacterUpdate(campaign.CampaignId, map.MapId, null, mapNpc.NpcId, mapNpc.MapNpcId, campaign.CurrentTurn, userId,
             TurnChange.Diff(("posture", (int)before, (int)mapNpc.Posture)));
         await _unitOfWork.ExecuteInTransactionAsync(async () =>

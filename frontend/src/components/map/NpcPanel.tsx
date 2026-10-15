@@ -4,6 +4,8 @@ import { SidePanel } from './SidePanel';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useNpc } from '../../hooks/useNpc';
+import { useCharacter } from '../../hooks/useCharacter';
+import { groupNpcs } from '../../lib/npcCategory';
 import type { MapTokenInfo } from '../../types/mapToken';
 import type { CampaignNpcInfo } from '../../types/npc';
 
@@ -19,13 +21,16 @@ interface NpcPanelProps {
 
 /**
  * Right-hand panel with the NPCs of the current campaign (014). Mirrors the party panel. The master edits,
- * drags and adds NPCs ("Incluir NPC" closes the list); approved players only see the cards.
+ * drags and adds NPCs ("Incluir NPC" closes the list); approved players only see the cards. Since 071 only enemies and
+ * neutrals are here: allies show on the party's side (while there is a party to show them under).
  */
 export const NpcPanel = ({ onAdd, onEdit, onEditInstance, onRemoveInstance, docked = false }: NpcPanelProps) => {
   const { t } = useTranslation();
   const { currentCampaign, isMaster } = useCampaign();
-  const { campaignNpcs } = useNpc();
+  const { campaignNpcs: allNpcs } = useNpc();
+  const { party } = useCharacter();
   const { canPlace } = useMapToken();
+  const campaignNpcs = party.length === 0 ? allNpcs : groupNpcs(allNpcs, party.map((p) => p.campaignCharacterId)).right;
 
   // Players get the list only when they may see it; with nothing to show there is no panel for them.
   if (!currentCampaign || (!isMaster && campaignNpcs.length === 0)) return null;

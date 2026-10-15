@@ -1,5 +1,6 @@
 import { hexCenter } from '../../lib/hexGrid';
 import { pieceGeometry, pieceImage } from '../../lib/pieceDrawing';
+import { isAllyPiece } from '../../lib/npcCategory';
 import { MAP_TOKEN_TYPE, POSTURE } from '../../types/mapToken';
 import type { MapTokenInfo } from '../../types/mapToken';
 
@@ -10,10 +11,11 @@ interface TokenLayerProps {
   preview?: { mapTokenId: number; x: number; y: number; look: number } | null;
 }
 
-/** Disc color class per piece type: blue characters, red NPCs, gray objects. */
-const pieceClass = (tokenType: number): string => {
-  if (tokenType === MAP_TOKEN_TYPE.character) return ' is-character';
-  if (tokenType === MAP_TOKEN_TYPE.npc) return ' is-npc';
+/** Disc color class per piece: blue characters, red NPCs (teal allies, 071), gray objects. */
+const pieceClass = (token: MapTokenInfo): string => {
+  if (token.tokenType === MAP_TOKEN_TYPE.character) return ' is-character';
+  if (isAllyPiece(token)) return ' is-npc is-ally';
+  if (token.tokenType === MAP_TOKEN_TYPE.npc) return ' is-npc';
   return '';
 };
 
@@ -22,7 +24,7 @@ const IMAGE_LOOK = 3;
 
 /** Extra classes of a piece: disc color by type and black and white when out of combat. */
 const pieceClasses = (token: MapTokenInfo): string =>
-  `stm-map-token${pieceClass(token.tokenType)}${token.posture === POSTURE.outOfCombat ? ' is-out' : ''}`;
+  `stm-map-token${pieceClass(token)}${token.posture === POSTURE.outOfCombat ? ' is-out' : ''}`;
 
 /** The name's initial when the token has no image. */
 const Initial = ({ name, size }: { name: string; size: number }) => (

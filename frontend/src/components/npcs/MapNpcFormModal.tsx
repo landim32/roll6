@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import { useNpc } from '../../hooks/useNpc';
+import { useCampaign } from '../../hooks/useCampaign';
 import { fromPiece, toUpdateInfo, validateInstance } from '../../lib/npcInstanceForm';
 import type { InstanceForm } from '../../lib/npcInstanceForm';
 import { POSTURES } from '../../types/mapToken';
@@ -18,10 +19,14 @@ interface MapNpcFormModalProps {
 /**
  * "Editar NPC" on an NPC piece or on its row of the NPC card (051): the instance's own name, current life/energy,
  * Deslocamento, status and posture. The library NPC and the other instances are untouched; removal is on the menu/card.
+ * The player commanding an ally (071) gets it with the name and the Deslocamento read-only.
  */
 export const MapNpcFormModal = ({ piece, onClose }: MapNpcFormModalProps) => {
   const { t } = useTranslation();
   const { updateInstance } = useNpc();
+  const { isMaster } = useCampaign();
+  /** 071: not the master, so the commander of an ally — the server refuses anything else. */
+  const commander = !isMaster;
   const [form, setForm] = useState<InstanceForm | null>(null);
   const [busy, setBusy] = useState(false);
   const mapNpcId = piece?.mapNpcId ?? null;
@@ -72,8 +77,8 @@ export const MapNpcFormModal = ({ piece, onClose }: MapNpcFormModalProps) => {
         <form id="npc-instance-form" onSubmit={onSubmit} noValidate>
           <div className="mb-3">
             <label className="form-label" htmlFor={id('name')}>{t('npcInstance.name')}</label>
-            <input id={id('name')} className="form-control" value={form.name} maxLength={260} autoFocus
-              onChange={(e) => onField('name', e.target.value)} />
+            <input id={id('name')} className="form-control" value={form.name} maxLength={260} autoFocus={!commander}
+              readOnly={commander} onChange={(e) => onField('name', e.target.value)} />
           </div>
           <div className="row g-2 mb-3">
             <div className="col-4">
@@ -95,10 +100,10 @@ export const MapNpcFormModal = ({ piece, onClose }: MapNpcFormModalProps) => {
             <div className="col-4">
               <label className="form-label" htmlFor={id('move')}>{t('npcInstance.move')}</label>
               <input id={id('move')} type="number" min={0} step={1} className="form-control" value={form.currentMove}
-                onChange={(e) => onField('currentMove', e.target.value)} />
+                readOnly={commander} onChange={(e) => onField('currentMove', e.target.value)} />
             </div>
           </div>
-          <div className="form-text mb-3">{t('npcInstance.moveHint')}</div>
+          <div className="form-text mb-3">{t(commander ? 'npcInstance.commanderHint' : 'npcInstance.moveHint')}</div>
           <div className="row g-2">
             <div className="col-8">
               <label className="form-label" htmlFor={id('status')}>{t('npcInstance.status')}</label>

@@ -1,3 +1,4 @@
+using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
@@ -106,6 +107,30 @@ public class CampaignNpcService : ICampaignNpcService
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, campaignNpc.CampaignId, userId));
     }
 
+    /// <summary>
+    /// Category and master of the NPC in the campaign (071): master only, in any campaign status. Only an ally may have a
+    /// master, an approved participation of this campaign; any other category clears it.
+    /// </summary>
+    public async Task<CampaignNpcInfo> UpdateAsync(long userId, long campaignNpcId, CampaignNpcUpdateInfo info)
+    {
+        var campaignNpc = await _repository.GetByIdAsync(campaignNpcId)
+            ?? throw new KeyNotFoundException("NPC da campanha não encontrado.");
+        await GetMasteredAsync(userId, campaignNpc.CampaignId);
+        CampaignCharacter? master = null;
+        if (info.MasterCampaignCharacterId is long masterId)
+        {
+            master = await _campaignCharacterRepository.GetByIdAsync(masterId)
+                ?? throw new DomainValidationException("masterCampaignCharacterId", "O personagem-mestre precisa estar aprovado nesta campanha.");
+        }
+        if (campaignNpc.Classify(info.Category, master))
+        {
+            campaignNpc = await _repository.UpdateAsync(campaignNpc);
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_NPCS_CHANGED, campaignNpc.CampaignId, userId));
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignNpc.CampaignId, userId));
+        }
+        return (await MapToDtoAsync(new List<CampaignNpc> { campaignNpc })).Single();
+    }
+
     private async Task<Campaign> GetMasteredAsync(long userId, long campaignId)
     {
         var campaign = await _campaignRepository.GetByIdAsync(campaignId)
@@ -125,11 +150,19 @@ public class CampaignNpcService : ICampaignNpcService
         var tokens = (await _tokenRepository.ListByIdsAsync(npcs.Values.Select(n => n.TokenId).Distinct())).ToDictionary(t => t.TokenId);
         // 051: how many pieces "Retirar da campanha" would remove (all the campaign NPCs are of one campaign).
         var counts = await _mapNpcRepository.CountByCampaignAsync(campaignNpcs[0].CampaignId);
+        // 071: an ally's master shows only while its participation is approved.
+        var masterIds = campaignNpcs.Where(c => c.MasterCampaignCharacterId != null).Select(c => c.MasterCampaignCharacterId!.Value).Distinct().ToList();
+        var masters = masterIds.Count == 0
+            ? new Dictionary<long, CampaignCharacter>()
+            : (await _campaignCharacterRepository.ListByIdsAsync(masterIds) ?? new List<CampaignCharacter>())
+                .Where(p => p.Status == CampaignCharacterStatus.Approved)
+                .ToDictionary(p => p.CampaignCharacterId);
 
         return campaignNpcs.Select(c =>
         {
             var npc = npcs.GetValueOrDefault(c.NpcId);
             var token = npc != null ? tokens.GetValueOrDefault(npc.TokenId) : null;
+            var master = c.Category == NpcCategory.Ally && c.MasterCampaignCharacterId is long masterId ? masters.GetValueOrDefault(masterId) : null;
             return new CampaignNpcInfo
             {
                 CampaignNpcId = c.CampaignNpcId,
@@ -143,6 +176,9 @@ public class CampaignNpcService : ICampaignNpcService
                 Energy = npc?.Energy ?? 0,
                 Move = npc?.Move ?? 0,
                 MapNpcCount = counts.GetValueOrDefault(c.NpcId),
+                Category = (int)c.Category,
+                MasterCampaignCharacterId = master?.CampaignCharacterId,
+                MasterCharacterId = master?.CharacterId,
                 CreatedAt = c.CreatedAt
             };
         }).ToList();

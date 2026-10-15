@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BASE_COLORS, isLying, isModelShownIn3d, isOutOfCombat, isShownIn3d, OBJECT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec, walkPose,
+  BASE_COLORS, isLying, isModelShownIn3d, isOutOfCombat, isShownIn3d, OBJECT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec, walkPose, ALLY_BASE_COLOR, baseColorOf,
 } from './pieceDrawing';
 import { hexCenter } from './hexGrid';
 import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
@@ -137,6 +137,15 @@ describe('3D view figures (034)', () => {
       expect(far.yaw).toBe(0);
       expect(walkPose(token({ walkX: middle.x, walkY: middle.y, walkYaw: 1, posture: POSTURE.down }), 40)).toBeNull();
       expect(walkPose(token({ walkX: middle.x, walkY: middle.y, walkYaw: 1 }), 40)).toEqual({ center: middle, yaw: 1 });
+    });
+
+    it('ally NPC pieces are teal, every other piece keeps its color (071)', () => {
+      const npcPiece = token({ tokenType: MAP_TOKEN_TYPE.npc, npcCategory: 3 });
+      expect(baseColorOf(npcPiece)).toBe(ALLY_BASE_COLOR);
+      expect(spriteSpec(npcPiece, 40).baseColor).toBe(ALLY_BASE_COLOR);
+      expect(baseColorOf(token({ tokenType: MAP_TOKEN_TYPE.npc, npcCategory: 2 }))).toBe(BASE_COLORS[MAP_TOKEN_TYPE.npc]);
+      expect(baseColorOf(token({ npcCategory: 3 }))).toBe(BASE_COLORS[MAP_TOKEN_TYPE.character]);
+      expect(baseColorOf(token({ tokenType: MAP_TOKEN_TYPE.object }))).toBe(OBJECT_BASE_COLOR);
     });
 
     it('carries the four "2,5D" urls of the token, also for objects (035)', () => {

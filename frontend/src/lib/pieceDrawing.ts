@@ -2,6 +2,7 @@ import { footprintLocal, hexCenter, hexCorners, pixelToHex } from './hexGrid';
 import type { Point } from './hexGrid';
 import { tokenSpriteUrls } from './spriteView';
 import { modelScaleFactor } from './modelScale';
+import { isAllyPiece } from './npcCategory';
 import type { ModelClipChoices } from './modelAnimations';
 import type { ViewImages } from './spriteView';
 import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
@@ -90,6 +91,12 @@ export const BASE_COLORS: Record<number, string> = {
   [MAP_TOKEN_TYPE.npc]: '#dc3545',
 };
 export const OBJECT_BASE_COLOR = '#6c757d';
+/** Pieces of ally NPCs (071): teal, apart from the red NPCs, the blue characters and the brand green. */
+export const ALLY_BASE_COLOR = '#20c997';
+
+/** The piece's own color: an ally NPC is teal, every other piece by its type. */
+export const baseColorOf = (token: { tokenType: number; npcCategory?: number | null }): string =>
+  isAllyPiece(token) ? ALLY_BASE_COLOR : BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR;
 
 /**
  * Whether a piece is drawn in the 3D view (034): only the ones standing (objects have no posture and always stand) and
@@ -177,7 +184,7 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     width: geometry.box.width,
     center: walked?.center ?? center,
     yaw: walked?.yaw ?? (((token.look % 6) + 6) % 6) * (Math.PI / 3),
-    baseColor: BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
+    baseColor: baseColorOf(token),
     modelUrl: token.modelFileUrl ?? null,
     modelClips: { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null, down: token.modelDownClip ?? null },
     modelScale: modelScaleFactor(token.modelScale),

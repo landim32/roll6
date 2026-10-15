@@ -2116,6 +2116,36 @@ button.stm-chat-quote { cursor: pointer; }
   stroke: rgba(110, 168, 254, 0.85);
 }
 
+/* Ally cards on the party's side (071): smaller and indented under their master character */
+.stm-party-card.stm-ally-card {
+  margin-left: 1.25rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.85em;
+  border-left: 2px solid rgba(32, 201, 151, 0.6);
+}
+
+.stm-allies-title {
+  margin: 0.5rem 0.25rem 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #20c997;
+  list-style: none;
+}
+
+.stm-npc-category {
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+/* Ally NPCs (071): teal, apart from the red NPCs and the blue characters */
+.stm-map .stm-map-token.is-ally .stm-map-token-disc {
+  fill: rgba(32, 201, 151, 0.35);
+  stroke: rgba(121, 223, 193, 0.85);
+}
+
 /* Pieces of several hexes (031): the fill covers the shape, only its outer edges are outlined */
 .stm-map .stm-map-token-disc.stm-map-token-area {
   stroke: none;
@@ -2134,6 +2164,10 @@ button.stm-chat-quote { cursor: pointer; }
 
 .stm-map .stm-map-token.is-character .stm-map-token-edge {
   stroke: rgba(110, 168, 254, 0.85);
+}
+
+.stm-map .stm-map-token.is-ally .stm-map-token-edge {
+  stroke: rgba(121, 223, 193, 0.85);
 }
 
 /* Out of combat (031): the whole piece — image and disc — in black and white */

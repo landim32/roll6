@@ -26,6 +26,7 @@ public class MapTokenServiceTests
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
+    private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
     private readonly MapTokenService _service;
 
     private const long APPROVED = 70;
@@ -49,7 +50,7 @@ public class MapTokenServiceTests
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string>())).Returns((string? name) => name == null ? null : "https://x/" + name);
         _service = new MapTokenService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _tokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _turnRepository.Object, _campaignRepository.Object,
-            _unitOfWork.Object, _imageStorage.Object, _notifier.Object);
+            _unitOfWork.Object, _imageStorage.Object, _campaignNpcRepository.Object, _notifier.Object);
     }
 
     [Fact]
@@ -1026,6 +1027,78 @@ public class MapTokenServiceTests
 
         // Facing up, the knight lying at (4, 4) also takes (4, 5).
         await _service.Invoking(s => s.MoveAsync(1, 70, new MapTokenPositionInfo { X = 4, Y = 5 })).Should().ThrowAsync<ConflictException>();
+    }
+
+    // ---- 071: the player commanding an ally ----
+
+    private MapToken WolfPiece(bool ally = true, int currentMove = 2)
+    {
+        var piece = MapToken.PlaceNpc(30, 5, 90, "Lobo", 2, 2, 0);
+        piece.MapTokenId = 60;
+        _repository.Setup(r => r.GetByIdAsync(60)).ReturnsAsync(piece);
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { piece });
+        var wolf = new MapNpc { MapNpcId = 90, MapId = 30, NpcId = 8, Name = "Lobo", CurrentMove = currentMove, Posture = Posture.Standing };
+        _mapNpcRepository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(wolf);
+        _mapNpcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<MapNpc> { wolf });
+        _mapNpcRepository.Setup(r => r.UpdateAsync(It.IsAny<MapNpc>())).ReturnsAsync((MapNpc m) => m);
+        _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Npc> { new() { NpcId = 8, Name = "Lobo", TokenId = 5 } });
+        _campaignNpcRepository.Setup(r => r.ListByCampaignAndNpcsAsync(10, It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignNpc>
+        {
+            new() { CampaignNpcId = 5, CampaignId = 10, NpcId = 8, Category = ally ? NpcCategory.Ally : NpcCategory.Enemy, MasterCampaignCharacterId = ally ? APPROVED : null }
+        });
+        _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter>
+        {
+            new() { CampaignCharacterId = APPROVED, CampaignId = 10, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved }
+        });
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync(new List<Character> { new() { CharacterId = ARIA, UserId = 2, Name = "Aria" } });
+        return piece;
+    }
+
+    [Fact]
+    public async Task Pieces_OfAnAlly_CarryItsCategoryAndCommander()
+    {
+        WolfPiece();
+
+        var pieces = await _service.ListByMapAsync(1, 30);
+
+        (pieces.Single().NpcCategory, pieces.Single().CommanderUserId).Should().Be(((int?)3, (long?)2));
+    }
+
+    [Fact]
+    public async Task Move_PlayerCommandingTheAlly_MovesWithinItsDeslocamento()
+    {
+        WolfPiece(currentMove: 1);
+
+        (await _service.Invoking(s => s.MoveAsync(2, 60, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 }))
+            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
+
+        var moved = await _service.MoveAsync(2, 60, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 });
+        (moved.X, moved.Y).Should().Be((2, 1));
+    }
+
+    [Fact]
+    public async Task Move_PlayerWithAnEnemyOrNotCommanding_Throws403()
+    {
+        WolfPiece(ally: false);
+        await _service.Invoking(s => s.MoveAsync(2, 60, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 }))
+            .Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("Você só pode mover os seus personagens e aliados.");
+
+        WolfPiece();
+        await _service.Invoking(s => s.MoveAsync(3, 60, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    [Fact]
+    public async Task Posture_PlayerCommandingTheAlly_ChangesIt_OthersCannot()
+    {
+        WolfPiece();
+
+        var result = await _service.SetPostureAsync(2, 60, new MapTokenPostureInfo { Posture = (int)Posture.Down });
+        result.Posture.Should().Be((int)Posture.Down);
+
+        await _service.Invoking(s => s.SetPostureAsync(3, 60, new MapTokenPostureInfo { Posture = (int)Posture.Standing }))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
     // ---- 069: the shared walk ----

@@ -27,7 +27,7 @@ interface HexMenuProps {
   onPosture?: (posture: Posture) => void;
   /** Master: add/change/delete tokens. Players only get "Mover" on their own characters. */
   canManage?: boolean;
-  /** "Editar NPC" (051): the instance form of an NPC piece; absent for other pieces and for players. */
+  /** "Editar NPC" (051): the instance form of an NPC piece; the master's, and since 071 the commander's of an ally. */
   onEditNpc?: () => void;
   /** Text of the destructive item: "Excluir" for tokens, "Retirar do mapa" for NPC pieces (051). */
   deleteLabel?: string;
@@ -141,14 +141,15 @@ export const HexMenu = ({
           ))}
         </div>
       )}
+      {/* 071: the player commanding an ally edits its instance too, without the master's items. */}
+      {token && onEditNpc && (
+        <button type="button" className="stm-float-menu-item" role="menuitem" onClick={choose(onEditNpc)}>
+          <span>{t('hexMenu.editNpc')}</span>
+          <PencilIcon size={18} />
+        </button>
+      )}
       {!canManage ? null : token ? (
         <>
-          {onEditNpc && (
-            <button type="button" className="stm-float-menu-item" role="menuitem" onClick={choose(onEditNpc)}>
-              <span>{t('hexMenu.editNpc')}</span>
-              <PencilIcon size={18} />
-            </button>
-          )}
           <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove && !onAct} onClick={choose(onChange)}>
             <span>{t('hexMenu.changeToken')}</span>
             <SwapIcon size={18} />
