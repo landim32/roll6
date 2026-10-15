@@ -38,7 +38,7 @@ describe('bubblePlacement', () => {
     expect(placement?.x).toBeCloseTo(320);          // the frame's center column, blown up
     expect(placement?.below).toBe(false);
     expect(placement!.y).toBeLessThan(200);         // the head is at 20 × 10 = 200, under the ceiling line (144)
-    expect(placement!.y).toBeCloseTo(190);          // 10 px of tail above it
+    expect(placement!.y).toBeCloseTo(182);          // 18 px of tail above it
     expect(placement?.visible).toBe(true);
   });
 

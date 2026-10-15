@@ -14,8 +14,8 @@ export const MIN_SCALE = 0.7;
 export const MAX_SCALE = 1.2;
 /** How far from the edge of the canvas a balloon may go. */
 export const SCREEN_MARGIN = 8;
-/** The tail of the balloon: the gap between it and the head it points at. */
-const TAIL_GAP = 10;
+/** The tail of the balloon: the gap between its oval and the head it points at (the comic tail is 17 px, 068). */
+const TAIL_GAP = 18;
 /**
  * The highest the bottom edge of a balloon goes, as a share of the canvas height from the top: a little above the middle
  * of the view (the horizon is at 50%), where the camera looks at a figure. A close figure has its head far above the
