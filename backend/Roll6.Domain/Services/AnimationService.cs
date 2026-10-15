@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Roll6.Domain.Animations;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
@@ -87,22 +88,36 @@ public class AnimationService : IAnimationService
     public async Task<AnimationInfo> UpdateAsync(long userId, long animationId, AnimationUpdateInfo info)
     {
         var animation = await GetOwnedAsync(userId, animationId);
+        // Everything is validated before the new file is stored, so a bad request leaves the animation and the bucket as they were.
+        var content = info.Content is { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) } given ? given : (JsonElement?)null;
+        var file = content is { } json ? AnimationFormat.Parse(json) : null;
         var oldType = animation.AnimationType;
-        animation.Rename(info.Name);
-        animation.ChangeType(info.Type);
+        if (info.Name is not null)
+            animation.Rename(info.Name);
+        if (info.Type is { } type)
+            animation.ChangeType(type);
         if (animation.AnimationType != oldType && AnimationStates.FieldOf(oldType) is { } field
             && await IsUsedInAsync(animationId, field))
             throw new ConflictException(IN_USE);
-        var saved = await _repository.UpdateAsync(animation);
-        return MapToDto(saved, await OwnerNamesAsync(new[] { saved.UserId }));
+        if (file is null)
+        {
+            var updated = await _repository.UpdateAsync(animation);
+            return MapToDto(updated, await OwnerNamesAsync(new[] { updated.UserId }));
+        }
+        return await SaveWithNewFileAsync(animation, content!.Value, file);
     }
 
     public async Task<AnimationInfo> ReplaceContentAsync(long userId, long animationId, AnimationContentInfo info)
     {
         var animation = await GetOwnedAsync(userId, animationId);
-        var file = AnimationFormat.Parse(info.Content);
+        return await SaveWithNewFileAsync(animation, info.Content, AnimationFormat.Parse(info.Content));
+    }
+
+    /// <summary>Stores the new file, points the row to it and only then removes the old one (a failed update removes the new file).</summary>
+    private async Task<AnimationInfo> SaveWithNewFileAsync(Animation animation, JsonElement content, AnimationFile file)
+    {
         var oldFileName = animation.FileName;
-        var fileName = await _imageService.StoreAnimationAsync(AnimationFormat.Serialize(info.Content));
+        var fileName = await _imageService.StoreAnimationAsync(AnimationFormat.Serialize(content));
         Animation saved;
         try
         {

@@ -27,7 +27,7 @@ public static class AnimationTools
         degrees: [[x, y, z] per time] }], hipsLift?: { times, values, of?: "height" | "hips" } } — turns in degrees in the
         character's frame (+X its left, +Y up, +Z forward) on top of the rest pose. Full rules, bones, signs and an example:
         get_roll6_guide, section "Animations". The file is validated before it is stored; the owner may replace it later
-        with update_animation_content.
+        with update_animation (name, type and/or content) or update_animation_content.
         Who can use it: any authenticated user (the uploader becomes the owner).
         Returns: the animation {{ITEM}}. To use it on a token, send modelIdleClip / modelWalkClip / modelDownClip =
         "animation:{animationId}" in create_token / update_token (the type must match the state: 1 / 2 / 5).
@@ -85,33 +85,51 @@ public static class AnimationTools
     [ApiOperation("GET", "/api/animation/{id}/file")]
     [Description("""
         What it does: returns the animation's file — the "roll6-animation" JSON — so it can be read, studied or adapted
-        into a new animation (create_animation) or changed and sent back (update_animation_content, owner only).
+        into a new animation (create_animation) or changed and sent back (update_animation or update_animation_content, owner only).
         Who can use it: any authenticated user.
         Returns: the JSON document { format, version, duration, loop, tracks, hipsLift? … }.
         Common errors: 404 animation (or its file) not found.
-        Related tools: get_animation, create_animation, update_animation_content.
+        Related tools: get_animation, create_animation, update_animation, update_animation_content.
         """)]
     public static Task<CallToolResult> GetAnimationContent(
         Roll6ApiClient api,
         [Description(ANIMATION_ID)] long animationId) =>
         api.SendAsync(HttpMethod.Get, $"/api/animation/{animationId}/file");
 
-    [McpServerTool(Name = "update_animation", Title = "Update animation", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [McpServerTool(Name = "update_animation", Title = "Update animation", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
     [ApiOperation("PUT", "/api/animation/{id}")]
     [Description($$"""
-        What it does: renames or retypes an animation (send both; the file stays — see update_animation_content).
+        What it does: changes an animation — its name, its type and/or its file — in one call. Send only what changes: a
+        parameter left out keeps its current value. A content replaces the file exactly like update_animation_content
+        (same id, so every token that uses "animation:{id}" plays the new version; duration and loop are read again from
+        the new file; the previous file is removed and cannot be recovered — read it first with get_animation_content to
+        keep a copy). {{McpDocs.DESTRUCTIVE}} Everything is validated before anything is saved: an invalid field changes
+        nothing.
         Who can use it: only the owner.
         Returns: the animation {{ITEM}}.
-        Common errors: 400 name/type, 403 not the owner, 404 not found, 409 the type cannot change while a token uses the
-        animation in the state of its current type.
-        Related tools: get_animation, list_animations, update_animation_content.
+        Common errors: 400 name (empty or over 100 characters), type (1–7) or content with the problem's key — content (not
+        an object, over 1 MB), content.format, content.version, content.duration, content.loop, content.tracks,
+        content.tracks[i].bone, .times, .degrees, content.hipsLift…; 403 not the owner, 404 not found, 409 the type cannot
+        change while a token uses the animation in the state of its current type.
+        Related tools: get_animation, get_animation_content, list_animations, update_animation_content, get_roll6_guide.
         """)]
-    public static Task<CallToolResult> UpdateAnimation(
+    public static async Task<CallToolResult> UpdateAnimation(
         Roll6ApiClient api,
         [Description(ANIMATION_ID)] long animationId,
-        [Description("Name (required, up to 100 characters).")] string name,
-        [Description(TYPE)] int type) =>
-        api.SendAsync(HttpMethod.Put, $"/api/animation/{animationId}", new AnimationUpdateInfo { Name = name, Type = type });
+        [Description("New name (up to 100 characters). Omit to keep the current one.")] string? name = null,
+        [Description(TYPE + " Omit to keep the current one.")] int? type = null,
+        [Description(CONTENT + " Omit to keep the current file.")] JsonElement? content = null)
+    {
+        JsonElement? document = null;
+        if (content is { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) } given)
+        {
+            if (!TryReadContent(given, out var parsed, out var failure))
+                return failure!;
+            document = parsed;
+        }
+        return await api.SendAsync(HttpMethod.Put, $"/api/animation/{animationId}",
+            new AnimationUpdateInfo { Name = name, Type = type, Content = document });
+    }
 
     [McpServerTool(Name = "update_animation_content", Title = "Update animation content", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
     [ApiOperation("PUT", "/api/animation/{id}/content")]
@@ -119,8 +137,8 @@ public static class AnimationTools
         What it does: replaces the file of an animation with a new "roll6-animation" content (same rules as
         create_animation), keeping its id, name, type and owner — so every token that uses "animation:{id}" plays the new
         version. Duration and loop are read again from the new file; the previous file is removed and cannot be recovered
-        (read it first with get_animation_content to keep a copy). {{McpDocs.DESTRUCTIVE}} To change the name or the type use
-        update_animation.
+        (read it first with get_animation_content to keep a copy). {{McpDocs.DESTRUCTIVE}} update_animation does the same and
+        can also change the name and the type in the same call.
         Who can use it: only the owner.
         Returns: the animation {{ITEM}}.
         Common errors: 400 with the problem's key — content (not an object, over 1 MB), content.format, content.version,

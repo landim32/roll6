@@ -89,7 +89,9 @@ public class AnimationController : ApiControllerBase
         }
     }
 
+    /// <summary>Changes name, type and/or file (owner only); a field left out keeps its value.</summary>
     [HttpPut("{id:long}")]
+    [RequestSizeLimit(1_100_000)]
     [ProducesResponseType(typeof(AnimationInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(long id, [FromBody] AnimationUpdateInfo info)
     {
