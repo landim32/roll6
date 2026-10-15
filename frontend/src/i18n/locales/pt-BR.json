@@ -549,7 +549,7 @@
     "maskHint": "Preto = parede alta, branco = vazio, cinza = parede mais baixa. Mesma proporção da imagem. Só aparece na vista 3D."
   },
   "story": {
-    "walkHint": "Modo livre: ande com o seu personagem",
+    "walkHint": "Modo livre: ande com o seu personagem. Arraste para girar a câmera; o botão direito vira o personagem",
     "view2d": "Ver em 2D",
     "view3d": "Ver em 3D",
     "followCharacter": "Voltar ao personagem",

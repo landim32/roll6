@@ -646,20 +646,18 @@ body,
   text-decoration: none;
 }
 
-/* ---------- map and chat regions (041) ----------
+/* ---------- map and chat regions (041, 068) ----------
    The map region keeps the old geometry (it starts under the translucent menu), so every map layer offset by
-   --stm-menu-height still works; in "split" it ends halfway down the space under the menu and the chat takes the rest.
-   In "chat" the map region isn't mounted. */
+   --stm-menu-height still works. In "split" the two sit side by side on desktop (068: map on the left, the chat a column
+   of 30% on the right, from the menu down) and one above the other on phones (map 60% on top, chat below). Only CSS
+   changes between the two shapes, so nothing remounts when the window crosses the breakpoint. In "chat" the map region
+   isn't mounted. */
 .stm-map-region {
   position: absolute;
   inset: 0;
   overflow: hidden;
 }
 
-.stm-layout-split .stm-map-region {
-  /* Map 60%, chat 40% of the space under the menu. */
-  bottom: calc((100% - var(--stm-menu-height)) * 0.4);
-}
 
 .stm-chat-region {
   position: absolute;
@@ -671,9 +669,32 @@ body,
   background: var(--bs-body-bg);
 }
 
-.stm-layout-split .stm-chat-region {
-  top: calc(var(--stm-menu-height) + (100% - var(--stm-menu-height)) * 0.6);
-  border-top: 1px solid var(--stm-border);
+@media (min-width: 768px) {
+  .stm-layout-split .stm-map-region {
+    right: 30%;
+  }
+
+  .stm-layout-split .stm-chat-region {
+    left: 70%;
+    border-left: 1px solid var(--stm-border);
+  }
+
+  /* The notice belongs to the map, in the middle of its 70%. */
+  .stm-layout-split .stm-no-map-notice {
+    left: 35%;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .stm-layout-split .stm-map-region {
+    /* Map 60%, chat 40% of the space under the menu. */
+    bottom: calc((100% - var(--stm-menu-height)) * 0.4);
+  }
+
+  .stm-layout-split .stm-chat-region {
+    top: calc(var(--stm-menu-height) + (100% - var(--stm-menu-height)) * 0.6);
+    border-top: 1px solid var(--stm-border);
+  }
 }
 
 .stm-rotate-90 {
@@ -726,18 +747,21 @@ body,
   max-height: calc(100% - 16px - 72px);
 }
 
-/* Split: the map is short, so its buttons line up horizontally and the NPC panel needs little room under it. */
-.stm-layout-split {
-  --stm-controls-space: 72px;
-}
+/* Split on phones: the map is short, so its buttons line up horizontally and the NPC panel needs little room under it.
+   On desktop the map keeps the whole height beside the chat (068) and the usual column of buttons. */
+@media (max-width: 767.98px) {
+  .stm-layout-split {
+    --stm-controls-space: 72px;
+  }
 
-.stm-layout-split .stm-controls {
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-content: flex-end;
-  max-height: none;
-  max-width: calc(100% - 2rem);
+  .stm-layout-split .stm-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-content: flex-end;
+    max-height: none;
+    max-width: calc(100% - 2rem);
+  }
 }
 
 /* ---------- chat (041) ---------- */

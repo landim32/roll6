@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import { HEX_SIZE } from '../lib/hexGrid';
 import type { Point } from '../lib/hexGrid';
+import { DRAG_TURN, easeBack, foldIntoCharacter, orbitBy } from '../lib/orbitCamera';
 import { followPose, FOV_STEP, initialCamera, stepCamera } from '../lib/storyCamera';
 import type { CameraBlocked, CameraPose } from '../lib/storyCamera';
 import { startWalker, stepWalker, walkCamera, withDistance, zoomWalker } from '../lib/walker';
@@ -10,8 +11,6 @@ import type { WalkerState } from '../lib/walker';
 /** Walking speed (map px per second) and turning speed (radians per second). */
 const WALK_SPEED = 5 * HEX_SIZE;
 const TURN_SPEED = 1.8;
-/** Radians per horizontally dragged pixel. */
-const DRAG_TURN = 0.005;
 
 export interface FollowedPiece {
   mapTokenId: number;
@@ -66,10 +65,27 @@ const axes = (keys: Set<string>) => {
   };
 };
 
+/** What the mouse is doing over the view (068): left = orbit, right = steer, both = walk forward. */
+type MouseMode = 'orbit' | 'steer' | 'walk' | null;
+
+/** `PointerEvent.buttons` → what the drag does; a finger or a pen counts as the left button. */
+const mouseModeOf = (event: { buttons: number; pointerType: string }): MouseMode => {
+  if (event.pointerType !== 'mouse') return event.buttons ? 'orbit' : null;
+  const left = (event.buttons & 1) !== 0;
+  const right = (event.buttons & 2) !== 0;
+  if (left && right) return 'walk';
+  if (right) return 'steer';
+  return left ? 'orbit' : null;
+};
+
 /**
- * Camera of the 3D view (034): starts behind the chosen character and follows its piece; keyboard (W/A/S/D, Q/E,
- * arrows), mouse drag (sideways) and the touch joystick walk and turn freely (letting go of the character); the wheel and a
- * pinch zoom through the field of view. Every rule lives in the pure `lib/storyCamera`.
+ * Camera of the 3D view (034): starts behind the chosen character and follows its piece. Around the character it works
+ * like World of Warcraft's (068): a left drag (one finger) circles the camera around it without turning it, and the
+ * camera stays there while the character stands still; when it walks or turns the camera eases back behind it; a right
+ * drag turns the character to where the camera looks, and both buttons walk forward. Sideways only — it never tilts.
+ * Keyboard (W/A/S/D, Q/E, arrows) and the touch joystick walk the character in free mode (055) or, otherwise, walk and
+ * turn the camera freely (letting go of the character; the free camera still turns with the drag); the wheel and a
+ * pinch zoom. Every rule lives in the pure `lib/storyCamera`, `lib/orbitCamera` and `lib/walker`.
  */
 export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed, fov, setFov, walk = null }: UseStoryCameraOptions) => {
   const poseRef = useRef<CameraPose | null>(null);
@@ -85,6 +101,10 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   const walkerRef = useRef<WalkerState | null>(null);
   /** The camera distance chosen while walking, kept when the walk starts again from the piece. */
   const walkDistance = useRef<number | undefined>(undefined);
+  /** The camera's angle around the character (068): 0 = behind it. */
+  const orbitRef = useRef(0);
+  /** What the mouse buttons held over the view do (068). */
+  const mouse = useRef<MouseMode>(null);
 
   const setPose = useCallback((pose: CameraPose) => {
     poseRef.current = pose;
@@ -98,6 +118,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   followedRef.current = followed;
   useEffect(() => {
     const piece = followedRef.current;
+    orbitRef.current = 0;
     if (piece) setPose(followPose(piece.center, piece.look, latest.current.blocked));
     else if (!poseRef.current) setPose(initialCamera(null, columns, rows, latest.current.blocked));
     // The piece went away: stay where the camera is, free.
@@ -111,24 +132,26 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   useEffect(() => {
     const piece = followedRef.current;
     if (!piece || !poseRef.current?.attached || walkerRef.current) return;
+    // Someone moved or turned the piece: the camera goes back behind it (068).
+    orbitRef.current = 0;
     setPose(followPose(piece.center, piece.look, latest.current.blocked));
   }, [followedX, followedY, followedLook, setPose]);
 
   // Walls changed under the camera (map saved elsewhere): re-apply so nothing stands inside a wall.
   useEffect(() => {
     if (walkerRef.current) {
-      setPose(walkCamera(walkerRef.current, blocked));
+      setPose(walkCamera(walkerRef.current, blocked, orbitRef.current));
       return;
     }
     const piece = followedRef.current;
-    if (piece && poseRef.current?.attached) setPose(followPose(piece.center, piece.look, blocked));
+    if (piece && poseRef.current?.attached) setPose(followPose(piece.center, piece.look, blocked, orbitRef.current));
   }, [blocked, setPose]);
 
   /** A new state of the walk: the camera goes behind it and the view hears about it. */
   const setWalker = useCallback((walker: WalkerState) => {
     walkerRef.current = walker;
     walkDistance.current = walker.distance;
-    setPose(walkCamera(walker, latest.current.blocked));
+    setPose(walkCamera(walker, latest.current.blocked, orbitRef.current));
     latest.current.walk?.onWalker(walker);
   }, [setPose]);
 
@@ -136,6 +159,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   const walkKey = walk?.key ?? null;
   useEffect(() => {
     const current = latest.current.walk;
+    orbitRef.current = 0;
     if (current) {
       setWalker(startWalker(current.center, current.look, walkDistance.current));
       return;
@@ -161,6 +185,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
 
   const reattach = useCallback(() => {
     const piece = followedRef.current;
+    orbitRef.current = 0;
     if (piece) setPose(followPose(piece.center, piece.look, latest.current.blocked));
   }, [setPose]);
 
@@ -198,12 +223,18 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
       const walking = latest.current.walk;
       if (walker && walking) {
         // Walking (055): forward/back walk, the sides (and the joystick's horizontal axis) turn — no side steps.
+        // Both mouse buttons walk forward where the camera looks (068).
         const clamp = (value: number) => Math.max(-1, Math.min(1, value));
-        const next = stepWalker(walker, {
-          forward: clamp(held.forward - joystick.current.y),
+        const input = {
+          forward: clamp(held.forward - joystick.current.y + (mouse.current === 'walk' ? 1 : 0)),
           turn: clamp(held.turn + held.strafe + joystick.current.x),
-        }, dt, walking.blocked);
-        if (next.x !== walker.x || next.z !== walker.z || next.yaw !== walker.yaw || next.moving !== walker.moving) setWalker(next);
+        };
+        // Walking or turning swings the camera back behind the character; standing still it stays where it was put.
+        const orbit = input.forward !== 0 || input.turn !== 0 ? easeBack(orbitRef.current, dt) : orbitRef.current;
+        const orbitChanged = orbit !== orbitRef.current;
+        orbitRef.current = orbit;
+        const next = stepWalker(walker, input, dt, walking.blocked);
+        if (orbitChanged || next.x !== walker.x || next.z !== walker.z || next.yaw !== walker.yaw || next.moving !== walker.moving) setWalker(next);
         return;
       }
       const forward = (held.forward - joystick.current.y) * WALK_SPEED * dt;
@@ -221,14 +252,29 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     };
   }, [setPose, setWalker]);
 
-  // Mouse/finger drag turns sideways; two fingers pinch the zoom.
+  /**
+   * A new combination of mouse buttons (068). Entering "steer" or "walk" while walking turns the character to where
+   * the camera looks, so it walks that way and the camera is behind it again.
+   */
+  const setMouse = useCallback((mode: MouseMode) => {
+    const previous = mouse.current;
+    mouse.current = mode;
+    const walker = walkerRef.current;
+    if (!walker || mode === previous || (mode !== 'steer' && mode !== 'walk') || orbitRef.current === 0) return;
+    const folded = foldIntoCharacter(walker.yaw, orbitRef.current);
+    orbitRef.current = folded.orbit;
+    setWalker({ ...walker, yaw: folded.yaw });
+  }, [setWalker]);
+
+  // Mouse/finger drag circles the character (or turns the free camera); two fingers pinch the zoom.
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.focus();
     touches.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     drag.current = { x: event.clientX, y: event.clientY };
     pinch.current = null;
-  }, []);
+    setMouse(mouseModeOf(event));
+  }, [setMouse]);
 
   const onPointerMove = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {
     if (!touches.current.has(event.pointerId)) return;
@@ -251,24 +297,39 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     }
     const pose = poseRef.current;
     if (!drag.current || !pose) return;
-    // Only the horizontal drag turns the camera: it never looks up or down (034).
+    // A second button pressed (or released) during a drag only shows in a move: pointerdown fires for the first one.
+    if (event.pointerType === 'mouse') setMouse(mouseModeOf(event));
+    // Only the horizontal drag turns the camera: it never looks up or down (034, 068 Q1 = A).
     const dx = event.clientX - drag.current.x;
     drag.current = { x: event.clientX, y: event.clientY };
     if (dx === 0) return;
     const walker = walkerRef.current;
     if (walker) {
-      setWalker({ ...walker, yaw: walker.yaw + dx * DRAG_TURN });
+      // Right drag: the character turns and the camera stays behind it; left drag: the camera circles it (068).
+      if (mouse.current === 'steer' || mouse.current === 'walk') setWalker({ ...walker, yaw: walker.yaw + dx * DRAG_TURN });
+      else {
+        orbitRef.current = orbitBy(orbitRef.current, dx);
+        setWalker(walker);
+      }
+      return;
+    }
+    const piece = followedRef.current;
+    if (piece && pose.attached) {
+      // Following the piece outside free mode: either button circles the camera around it (068).
+      orbitRef.current = orbitBy(orbitRef.current, dx);
+      setPose(followPose(piece.center, piece.look, latest.current.blocked, orbitRef.current));
       return;
     }
     setPose(stepCamera(pose, { turn: dx * DRAG_TURN }, latest.current.blocked));
-  }, [setPose, setWalker]);
+  }, [setPose, setWalker, setMouse]);
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {
     touches.current.delete(event.pointerId);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (touches.current.size < 2) pinch.current = null;
     if (touches.current.size === 0) drag.current = null;
-  }, []);
+    setMouse(event.pointerType === 'mouse' ? mouseModeOf(event) : null);
+  }, [setMouse]);
 
   const onWheel = useCallback((event: ReactWheelEvent<HTMLCanvasElement>) => {
     if (walkerRef.current) {

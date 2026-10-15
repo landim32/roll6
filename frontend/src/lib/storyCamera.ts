@@ -70,16 +70,23 @@ export const segmentHitsWall = (from: Point, to: Point, blocked: CameraBlocked):
 };
 
 /**
- * Behind the piece at `target` (map px of its center), looking the way it faces; with a wall in between the camera
- * comes closer to the piece instead of standing behind the wall (FR-012).
+ * The camera `distance` away from the character at `target`, at `orbit` around the way it faces (`characterYaw`; 0 =
+ * behind it, π = in front, 068), looking at it so the character stays in the middle of the view. A wall (or the edge
+ * of the map) in between brings the camera closer, one step before it, instead of standing behind the wall (FR-012).
  */
-export const followPose = (target: Point, look: number, blocked: CameraBlocked): CameraPose => {
-  const yaw = lookToYaw(look);
-  const forward = forwardOf(yaw);
-  const wanted = { x: target.x - forward.x * FOLLOW_DISTANCE, y: target.y - forward.y * FOLLOW_DISTANCE };
+export const orbitPose = (
+  target: Point,
+  characterYaw: number,
+  orbit: number,
+  distance: number,
+  blocked: CameraBlocked,
+): CameraPose => {
+  const yaw = characterYaw + orbit;
+  const ahead = forwardOf(yaw);
+  const wanted = { x: target.x - ahead.x * distance, y: target.y - ahead.y * distance };
   const hit = segmentHitsWall(target, wanted, blocked);
   // Stop one step before the first blocked point (never past the piece itself).
-  const reach = hit === null ? 1 : Math.max(0, hit - SEGMENT_STEP / FOLLOW_DISTANCE);
+  const reach = hit === null ? 1 : Math.max(0, hit - SEGMENT_STEP / distance);
   return {
     x: target.x + (wanted.x - target.x) * reach,
     z: target.y + (wanted.y - target.y) * reach,
@@ -87,6 +94,13 @@ export const followPose = (target: Point, look: number, blocked: CameraBlocked):
     attached: true,
   };
 };
+
+/**
+ * Behind the piece at `target` (map px of its center), looking the way it faces — or, with an `orbit` (068), at that
+ * angle around it.
+ */
+export const followPose = (target: Point, look: number, blocked: CameraBlocked, orbit = 0): CameraPose =>
+  orbitPose(target, lookToYaw(look), orbit, FOLLOW_DISTANCE, blocked);
 
 /**
  * One step of free navigation: turn, then walk/strafe one axis at a time so the camera slides along a wall instead of
