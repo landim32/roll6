@@ -685,6 +685,8 @@
     "label": "Turno {{no}}",
     "freeMode": "Livre",
     "freeModeTitle": "Modo livre: várias ações por personagem, movimento livre sem rastro e sem lista de pendentes",
+    "freeModeOnTitle": "Modo livre ligado — toque para desligar",
+    "freeModeOffTitle": "Modo livre desligado — toque para ligar",
     "freeBadge": "Turno livre",
     "update": "Alteração",
     "narration": "Narração",

@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FinishTurnModal } from '../modals/FinishTurnModal';
-import { LightningIcon } from '../ui/icons';
+import { InfinityIcon, LightningIcon } from '../ui/icons';
 import { isPlayable } from '../../lib/campaignStatus';
 import { isFreeMode } from '../../lib/freeMode';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useTurn } from '../../hooks/useTurn';
 
 /**
- * The master's turn controls (016): the "Livre" switch (054, any status — switching never touches the turn) and
+ * The master's turn controls (016): the "Livre" on/off button (054, any status — switching never touches the turn) and
  * "Finalizar turno" (only while the campaign plays). The turn number itself is shown in the map footer.
  */
 export const TurnControls = () => {
@@ -56,11 +56,13 @@ export const TurnControls = () => {
 
   return (
     <div className="stm-turn-controls">
-      <div className="form-check form-switch stm-free-mode-switch" title={t('turn.freeModeTitle')}>
-        <input className="form-check-input" type="checkbox" role="switch" id="stm-free-mode" checked={freeMode}
-          disabled={switching} onChange={() => { void toggleFreeMode(); }} aria-label={t('turn.freeModeTitle')} />
-        <label className="form-check-label" htmlFor="stm-free-mode">{t('turn.freeMode')}</label>
-      </div>
+      {/* An on/off button (the switch broke the phone menu): green while on; phones show only the icon. */}
+      <button type="button" className={`btn btn-sm stm-free-mode-toggle ${freeMode ? 'btn-success' : 'btn-outline-secondary'}`}
+        aria-pressed={freeMode} disabled={switching} onClick={() => { void toggleFreeMode(); }}
+        title={t(freeMode ? 'turn.freeModeOnTitle' : 'turn.freeModeOffTitle')} aria-label={t('turn.freeModeTitle')}>
+        <InfinityIcon size={16} />
+        <span className="d-none d-md-inline">{t('turn.freeMode')}</span>
+      </button>
       {/* 049: the turn only ends while the campaign plays. */}
       {isPlayable(currentCampaign?.status) && (
         <>
