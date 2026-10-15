@@ -87,9 +87,15 @@ public static class MapTokenTools
         Cost (players): 1 per step into the hex ahead + 1 per 60° turn, shortest path around other pieces.
         Free mode (set_campaign_free_mode): character and NPC pieces move any number of times per turn, without the
         Deslocamento limit, and no Movement entry is written; an occupied hex or a hex outside the grid is still refused.
+        Walk (walk = true, free mode only): the position a player reached walking his own standing character in the 3D
+        view — on the campaign's current map only, other pieces ignored (they may end up on the same hex), no turn entry,
+        no Deslocamento. The master cannot walk pieces either; he moves them without walk. Leaving free mode is refused
+        while pieces share a hex.
         Returns: the updated piece.
         Common errors: 409 a hex of the piece's shape occupied or already moved this turn, 400 beyond the move or shape
-        outside the grid (big pieces need their whole shape free at every step and turn), 403 not your piece.
+        outside the grid (big pieces need their whole shape free at every step and turn), 403 not your piece. With walk:
+        409 "Só é possível andar no modo livre." / "Só é possível andar no mapa atual da campanha." / "Um personagem
+        caído não anda.", 403 "Você só pode andar com os seus personagens.", 400 shape outside the grid.
         Related tools: list_map_tokens (ids and positions), get_map (grid size), get_turn_state, reset_turn.
         """)]
     public static Task<CallToolResult> MoveMapToken(
@@ -97,8 +103,9 @@ public static class MapTokenTools
         [Description(McpDocs.MAP_TOKEN_ID)] long mapTokenId,
         [Description("Destination column. " + McpDocs.X)] int x,
         [Description("Destination row. " + McpDocs.Y)] int y,
-        [Description(McpDocs.LOOK_OPTIONAL)] int? look = null) =>
-        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/position", new MapTokenPositionInfo { X = x, Y = y, Look = look });
+        [Description(McpDocs.LOOK_OPTIONAL)] int? look = null,
+        [Description("True = a free-mode walk position of your own standing character (ignores other pieces, current map only, no turn entry). Omit for a normal move.")] bool? walk = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/position", new MapTokenPositionInfo { X = x, Y = y, Look = look, Walk = walk });
 
     [McpServerTool(Name = "change_map_token_image", Title = "Change piece token", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/maptoken/{id}/token")]

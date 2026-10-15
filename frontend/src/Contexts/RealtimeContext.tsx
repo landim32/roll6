@@ -5,11 +5,11 @@ import { HubConnectionState } from '@microsoft/signalr';
 import type { HubConnection } from '@microsoft/signalr';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { realtimeService, TABLE_EVENT_METHOD } from '../Services/realtimeService';
+import { realtimeService, TABLE_EVENT_METHOD, WALK_METHOD } from '../Services/realtimeService';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
 import { REALTIME_STATUS, TABLE_EVENT } from '../types/realtime';
-import type { RealtimeStatus, TableEvent } from '../types/realtime';
+import type { RealtimeStatus, TableEvent, WalkMessage, WalkSend } from '../types/realtime';
 import type { CampaignInfo } from '../types/campaign';
 
 /** After the automatic retries give up (or a join is refused), try again this often. */
@@ -29,6 +29,10 @@ interface RealtimeContextType {
   subscribe: (handler: TableEventHandler) => () => void;
   /** Reports whether this window is on screen and the chat visible (043); re-sent after every join. */
   setPresence: (visible: boolean, chatVisible: boolean) => void;
+  /** Sends a sample of the own free-mode walk (069); nothing while not following the campaign. */
+  sendWalk: (info: WalkSend) => void;
+  /** Receives the other participants' walk samples of the current campaign (069); returns the unsubscribe function. */
+  onWalk: (handler: (message: WalkMessage) => void) => () => void;
 }
 
 /** Hub method of the personal notices (043). */
@@ -51,6 +55,7 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
   const [joinedId, setJoinedId] = useState<number | null>(null);
   const connectionRef = useRef<HubConnection | null>(null);
   const handlersRef = useRef(new Set<TableEventHandler>());
+  const walkHandlersRef = useRef(new Set<(message: WalkMessage) => void>());
   const campaignId = currentCampaign?.campaignId ?? null;
   /** Campaign wanted right now (read by the connection callbacks). */
   const wantedRef = useRef<number | null>(campaignId);
@@ -145,6 +150,17 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
     // Personal notices of the campaign on screen (043): "Falta apenas você", turn finished, PV, Fadiga, pokes.
     // The bell has a new notice (any campaign): it reloads its inbox.
     connection.on(INBOX_METHOD, () => window.dispatchEvent(new Event(INBOX_EVENT)));
+    // Other participants walking in the 3D view (069).
+    connection.on(WALK_METHOD, (message: WalkMessage) => {
+      if (message.campaignId !== joinedRef.current || message.campaignId !== wantedRef.current) return;
+      walkHandlersRef.current.forEach((handler) => {
+        try {
+          handler(message);
+        } catch {
+          // One broken handler must not stop the others.
+        }
+      });
+    });
     connection.on(NOTICE_METHOD, (notice: NoticeInfo) => {
       if (notice.campaignId === joinedRef.current) toast.info(notice.title, { description: notice.body });
     });
@@ -214,7 +230,21 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
     sendPresence();
   }, [sendPresence]);
 
-  const value = useMemo<RealtimeContextType>(() => ({ status, live, subscribe, setPresence }), [status, live, subscribe, setPresence]);
+  const sendWalk = useCallback((info: WalkSend) => {
+    const connection = connectionRef.current;
+    if (!connection || connection.state !== HubConnectionState.Connected || joinedRef.current === null) return;
+    void realtimeService.sendWalk(connection, info).catch(() => undefined);
+  }, []);
+
+  const onWalk = useCallback((handler: (message: WalkMessage) => void) => {
+    walkHandlersRef.current.add(handler);
+    return () => { walkHandlersRef.current.delete(handler); };
+  }, []);
+
+  const value = useMemo<RealtimeContextType>(
+    () => ({ status, live, subscribe, setPresence, sendWalk, onWalk }),
+    [status, live, subscribe, setPresence, sendWalk, onWalk],
+  );
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
 };
 

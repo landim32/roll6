@@ -2,6 +2,7 @@ using FluentAssertions;
 using Moq;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
+using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Campaign;
@@ -29,6 +30,7 @@ public class CampaignServiceTests
     private readonly Mock<ICampaignNotificationPrefRepository<CampaignNotificationPref>> _notificationPrefs = new();
     private readonly Mock<IUserNotificationRepository<UserNotification>> _inbox = new();
     private readonly Mock<ICampaignPlanRepository<CampaignPlan>> _campaignPlanRepository = new();
+    private readonly Mock<IMapTokenService> _mapTokenService = new();
     private readonly CampaignService _service;
 
     public CampaignServiceTests()
@@ -46,7 +48,8 @@ public class CampaignServiceTests
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
             _unitOfWork.Object, _turnRepository.Object, _notifier.Object, _campaignPlanRepository.Object,
-            _chatReadRepository.Object, _imageStorage.Object, _notificationPrefs.Object, _inbox.Object);
+            _chatReadRepository.Object, _imageStorage.Object, _notificationPrefs.Object, _inbox.Object, _mapTokenService.Object);
+        _mapTokenService.Setup(s => s.ListOverlapsAsync(It.IsAny<long>())).ReturnsAsync(new List<IReadOnlyList<string>>());
     }
 
     [Fact]
@@ -322,6 +325,59 @@ public class CampaignServiceTests
         _repository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.FreeMode)));
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CAMPAIGN_CHANGED
             && ((CampaignInfo)e.Data!).FreeMode)), Times.Once);
+    }
+
+    // ---- 069: leaving free mode with pieces on the same hex ----
+
+    private void CampaignIsFree() =>
+        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "Campanha", FreeMode = true });
+
+    [Fact]
+    public async Task SetFreeMode_Off_WithOverlappingPieces_Refuses()
+    {
+        CampaignIsFree();
+        _mapTokenService.Setup(s => s.ListOverlapsAsync(10)).ReturnsAsync(new List<IReadOnlyList<string>> { new List<string> { "Aria", "Borin" } });
+
+        var act = () => _service.SetFreeModeAsync(1, 10, new CampaignFreeModeInfo { FreeMode = false });
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.Message
+            .Should().Be("Não é possível sair do modo livre: Aria e Borin estão no mesmo hex.");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetFreeMode_Off_WithoutOverlaps_SwitchesOff()
+    {
+        CampaignIsFree();
+
+        var result = await _service.SetFreeModeAsync(1, 10, new CampaignFreeModeInfo { FreeMode = false });
+
+        result.FreeMode.Should().BeFalse();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => !c.FreeMode)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetFreeMode_On_NeverChecksOverlaps()
+    {
+        await _service.SetFreeModeAsync(1, 10, new CampaignFreeModeInfo { FreeMode = true });
+
+        _mapTokenService.Verify(s => s.ListOverlapsAsync(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public void FreeModeOverlapMessage_JoinsGroupsAndCutsLongLists()
+    {
+        CampaignService.FreeModeOverlapMessage(new List<IReadOnlyList<string>>
+        {
+            new List<string> { "Aria", "Borin" },
+            new List<string> { "Guarda", "Guarda 2", "Orc" }
+        }).Should().Be("Não é possível sair do modo livre: Aria e Borin; Guarda, Guarda 2 e Orc estão no mesmo hex.");
+
+        var many = Enumerable.Range(1, 40).Select(i => (IReadOnlyList<string>)new List<string> { $"Guerreiro {i}", $"Mago {i}" }).ToList();
+        var cut = CampaignService.FreeModeOverlapMessage(many);
+        cut.Length.Should().BeLessThanOrEqualTo(CampaignService.OVERLAP_MESSAGE_MAX);
+        cut.Should().EndWith("…");
     }
 
     [Fact]

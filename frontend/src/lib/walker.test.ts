@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { hexCenter, HEX_SIZE } from './hexGrid';
-import { buildOccupancy } from './occupancy';
 import { POSTURE } from '../types/mapToken';
 import type { CameraBlocked } from './storyCamera';
 import {
@@ -50,29 +49,12 @@ describe('stepWalker', () => {
 });
 
 describe('walkerBlocker', () => {
-  const own = { mapTokenId: 1, x: 2, y: 2, look: 0, space: 1 };
-  const other = { mapTokenId: 2, x: 2, y: 0, look: 0, space: 1 };
-  const blocked = walkerBlocker(open, buildOccupancy([own, other]), 1);
-
-  it('blocks the hexes of the other pieces and leaves its own free', () => {
-    const otherCenter = hexCenter(2, 0, HEX_SIZE);
-    const ownCenter = hexCenter(2, 2, HEX_SIZE);
-    expect(blocked(otherCenter.x, otherCenter.y)).toBe(true);
-    expect(blocked(ownCenter.x, ownCenter.y)).toBe(false);
-  });
-
-  it('keeps the walls and the edge of the camera\'s rule', () => {
-    const edge = walkerBlocker((x) => x < 0, buildOccupancy([]), 1);
+  it('passes through the pieces and keeps the walls and the edge of the camera rule (069)', () => {
+    const edge = walkerBlocker((x) => x < 0);
     expect(edge(-1, 50)).toBe(true);
     expect(edge(50, 50)).toBe(false);
-  });
-
-  it('stops a walk into another piece', () => {
-    const start = startWalker(hexCenter(2, 2, HEX_SIZE), 0);
-    let walker = start;
-    for (let i = 0; i < 60; i++) walker = stepWalker(walker, FORWARD, 0.05, blocked);
-    const otherCenter = hexCenter(2, 0, HEX_SIZE);
-    expect(walker.z).toBeGreaterThan(otherCenter.y + HEX_SIZE / 2);
+    const center = hexCenter(2, 0, HEX_SIZE);
+    expect(walkerBlocker(open)(center.x, center.y)).toBe(false);
   });
 });
 

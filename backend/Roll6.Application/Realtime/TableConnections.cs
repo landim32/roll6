@@ -13,6 +13,8 @@ public class TableConnections : IPresence
 
     private readonly object _lock = new();
     private readonly Dictionary<string, Connection> _connections = new();
+    /// <summary>Walks this connection may relay, until when (069): the permission is checked again every 10 s.</summary>
+    private readonly Dictionary<(string ConnectionId, long MapTokenId), DateTime> _walks = new();
 
     public void Add(string connectionId, long userId)
     {
@@ -21,7 +23,37 @@ public class TableConnections : IPresence
 
     public void Remove(string connectionId)
     {
-        lock (_lock) _connections.Remove(connectionId);
+        lock (_lock)
+        {
+            _connections.Remove(connectionId);
+            ForgetWalks(connectionId);
+        }
+    }
+
+    /// <summary>The campaign the connection follows, or null.</summary>
+    public long? CampaignOf(string connectionId)
+    {
+        lock (_lock)
+            return _connections.TryGetValue(connectionId, out var current) ? current.CampaignId : null;
+    }
+
+    /// <summary>The connection was allowed to walk the piece and the answer still holds (069).</summary>
+    public bool IsWalkAllowed(string connectionId, long mapTokenId, DateTime now)
+    {
+        lock (_lock)
+            return _walks.TryGetValue((connectionId, mapTokenId), out var until) && until > now;
+    }
+
+    /// <summary>Remembers that the connection may walk the piece until <paramref name="until"/> (069).</summary>
+    public void AllowWalk(string connectionId, long mapTokenId, DateTime until)
+    {
+        lock (_lock) _walks[(connectionId, mapTokenId)] = until;
+    }
+
+    private void ForgetWalks(string connectionId)
+    {
+        foreach (var key in _walks.Keys.Where(k => k.ConnectionId == connectionId).ToList())
+            _walks.Remove(key);
     }
 
     /// <summary>
@@ -34,6 +66,7 @@ public class TableConnections : IPresence
         {
             var previous = _connections.TryGetValue(connectionId, out var current) ? current.CampaignId : null;
             _connections[connectionId] = new Connection(userId, campaignId, campaignId != null, false);
+            ForgetWalks(connectionId);
             return previous;
         }
     }

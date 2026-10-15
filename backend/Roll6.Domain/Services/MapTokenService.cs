@@ -148,6 +148,9 @@ public partial class MapTokenService : IMapTokenService
     {
         var mapToken = await _repository.GetByIdAsync(mapTokenId)
             ?? throw new KeyNotFoundException("Token do mapa não encontrado.");
+        // 069: walking in the 3D view writes the piece's hex with its own rules (other pieces don't block).
+        if (info.Walk == true)
+            return await WalkAsync(userId, mapToken, info);
         var map = await _mapRepository.GetByIdAsync(mapToken.MapId)
             ?? throw new KeyNotFoundException("Mapa não encontrado.");
         map.EnsureNotDeleted();
