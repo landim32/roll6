@@ -183,11 +183,9 @@ public partial class TurnService : ITurnService
         // 047: a whispered action still is the actor's action of the turn; only who reads its text changes.
         var whisper = await ResolveWhisperAsync(campaign, userId, actor.CharacterId, info.WhisperCharacterIds, info.WhisperMaster);
         await ApplyReplyAsync(turn, info.ReplyToTurnId);
-        // 044: one valid action per actor and turn — the previous one stays in the chat as "Ação cancelada".
-        // 054: in free mode every action of the actor stays valid (the map shows the last one).
-        var cancelled = campaign.FreeMode
-            ? new List<Turn>()
-            : await CancelValidActionsAsync(campaign, actor.CharacterId, actor.CharacterId.HasValue ? null : actor.MapNpcId);
+        // 044: one valid action per actor and turn — the previous one stays in the chat as "Ação cancelada". Since 073
+        // also in free mode (054 used to keep every action there).
+        var cancelled = await CancelValidActionsAsync(campaign, actor.CharacterId, actor.CharacterId.HasValue ? null : actor.MapNpcId);
         var saved = await SaveEntryAsync(turn, whisper, async () =>
         {
             foreach (var previous in cancelled)

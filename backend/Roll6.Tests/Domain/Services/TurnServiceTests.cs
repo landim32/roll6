@@ -202,7 +202,7 @@ public class TurnServiceTests
     // ---- 054: free mode ----
 
     [Fact]
-    public async Task Act_InFreeMode_KeepsPreviousActionValid()
+    public async Task Act_InFreeMode_CancelsPreviousAction()
     {
         _campaign.FreeMode = true;
         var previous = Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, "Antes");
@@ -212,15 +212,15 @@ public class TurnServiceTests
         var result = await _service.ActAsync(PLAYER, new TurnActInfo { MapTokenId = ARIA_PIECE, Description = "Depois" });
 
         result.Description.Should().Be("Depois");
-        previous.IsCancelled.Should().BeFalse();
-        _repository.Verify(r => r.UpdateAsync(It.IsAny<Turn>()), Times.Never);
-        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Never);
+        previous.IsCancelled.Should().BeTrue();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 600 && t.IsCancelled)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Once);
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Once);
         _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
     }
 
     [Fact]
-    public async Task Act_AfterLeavingFreeMode_CancelsAllEarlierActions()
+    public async Task Act_WithSeveralValidActions_CancelsThemAll()
     {
         _campaign.FreeMode = false;
         var earlier = Enumerable.Range(0, 3).Select(i =>
