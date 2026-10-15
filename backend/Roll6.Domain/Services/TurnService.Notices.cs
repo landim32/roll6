@@ -14,8 +14,12 @@ namespace Roll6.Domain.Services;
 /// </summary>
 public partial class TurnService
 {
-    /// <summary>A poke per person and campaign at most this often.</summary>
-    public static readonly TimeSpan POKE_COOLDOWN = TimeSpan.FromMinutes(1);
+    /// <summary>A poke per person and campaign at most this often (075: 30 minutes, it was 1).</summary>
+    public static readonly TimeSpan POKE_COOLDOWN = TimeSpan.FromMinutes(30);
+
+    /// <summary>"Você só pode cutucar a cada 30 minutos. Tente de novo em 12 min." — the wait rounded up, at least 1.</summary>
+    public static string PokeCooldownMessage(TimeSpan left) =>
+        $"Você só pode cutucar a cada {(int)POKE_COOLDOWN.TotalMinutes} minutos. Tente de novo em {Math.Max(1, (int)Math.Ceiling(left.TotalMinutes))} min.";
 
     /// <summary>
     /// Builds a notice without ever failing the write that caused it (FR-015): the action/turn/change is already
@@ -121,7 +125,7 @@ public partial class TurnService
     /// <summary>
     /// Pokes the players whose characters haven't acted in the turn (043, N7): a line in the chat ("Rodrigo cutucou Ana
     /// e Bruno") and a notice to each of them. When nobody else is missing, a player's poke goes to the master instead
-    /// (074, N7b: "Ana cutucou o mestre"). Master or approved participant; at most once a minute per person.
+    /// (074, N7b: "Ana cutucou o mestre"). Master or approved participant; at most once every 30 minutes per person.
     /// </summary>
     public async Task<PokeResultInfo> PokeAsync(long userId, long campaignId)
     {
@@ -157,7 +161,7 @@ public partial class TurnService
     {
         var last = await _repository.LastPokeAtAsync(campaign.CampaignId, userId);
         if (last.HasValue && DateTime.UtcNow - last.Value < POKE_COOLDOWN)
-            throw new ConflictException("Aguarde um minuto para cutucar de novo.");
+            throw new ConflictException(PokeCooldownMessage(POKE_COOLDOWN - (DateTime.UtcNow - last.Value)));
     }
 
     /// <summary>N7b (074): every character acted, so a player's poke asks the master to move on.</summary>

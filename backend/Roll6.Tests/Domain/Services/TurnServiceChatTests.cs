@@ -464,7 +464,7 @@ public partial class TurnServiceChatTests
     }
 
     [Fact]
-    public async Task Poke_TheMaster_TwiceInAMinute_Is409()
+    public async Task Poke_TheMaster_TwiceIn30Minutes_Is409()
     {
         PokeTable();
         EveryoneActed();
@@ -474,13 +474,33 @@ public partial class TurnServiceChatTests
     }
 
     [Fact]
-    public async Task Poke_TwiceInAMinute_Is409()
+    public async Task Poke_TwiceIn30Minutes_Is409_SayingHowLongToWait()
+    {
+        // 075: the cooldown went from 1 to 30 minutes.
+        PokeTable();
+        _repository.Setup(r => r.LastPokeAtAsync(CAMPAIGN, PLAYER)).ReturnsAsync(DateTime.UtcNow.AddMinutes(-18).AddSeconds(-10));
+
+        await _service.Invoking(s => s.PokeAsync(PLAYER, CAMPAIGN)).Should().ThrowAsync<ConflictException>()
+            .WithMessage("Você só pode cutucar a cada 30 minutos. Tente de novo em 12 min.");
+    }
+
+    [Fact]
+    public async Task Poke_After30Minutes_IsAllowedAgain()
     {
         PokeTable();
-        _repository.Setup(r => r.LastPokeAtAsync(CAMPAIGN, PLAYER)).ReturnsAsync(DateTime.UtcNow.AddSeconds(-20));
+        _repository.Setup(r => r.LastPokeAtAsync(CAMPAIGN, PLAYER)).ReturnsAsync(DateTime.UtcNow.AddMinutes(-31));
 
-        await _service.Invoking(s => s.PokeAsync(PLAYER, CAMPAIGN)).Should().ThrowAsync<ConflictException>();
+        var result = await _service.PokeAsync(PLAYER, CAMPAIGN);
+
+        result.Poked.Should().Be(2);
     }
+
+    [Theory]
+    [InlineData(1800, "Tente de novo em 30 min.")]
+    [InlineData(61, "Tente de novo em 2 min.")]
+    [InlineData(5, "Tente de novo em 1 min.")]
+    public void PokeCooldownMessage_RoundsTheWaitUp(int secondsLeft, string end) =>
+        TurnService.PokeCooldownMessage(TimeSpan.FromSeconds(secondsLeft)).Should().EndWith(end);
 
     [Fact]
     public async Task Poke_Stranger_Is403()

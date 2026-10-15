@@ -278,7 +278,7 @@ public static class Roll6Guide
           any mode, free mode included; "Turno N terminado. Pode agir novamente"; their character's PV/Fadiga changes made
           by someone else; and pokes. So `act_in_turn`, `finish_turn`, `process_turn` and changing PV/energy notify people.
         - `poke_players` pokes everyone whose character hasn't acted in the turn (a gray chat line + a notification; once
-          a minute per person); with nobody else missing, a player's poke goes to the master. `list_notification_settings`
+          every 30 minutes per person); with nobody else missing, a player's poke goes to the master. `list_notification_settings`
           / `set_campaign_notifications` read and mute campaigns.
         - Testing (master): `simulate_notification` sends any kind to your own devices as a test, and
           `preview_turn_notices` shows the "Falta…" each missing player would get now.
