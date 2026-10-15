@@ -15,8 +15,8 @@ export interface BubbleLayerHandle {
   update: (result: FrameResult, canvas: { width: number; height: number }) => void;
 }
 
-/** The balloon's box (canvas px, unscaled): as wide as the 2D balloon's limit and up to three lines of text. */
-const BALLOON = { width: 220, height: 60 };
+/** The balloon's box (canvas px, unscaled): its widest and, with three lines of text and the tail, its tallest (068). */
+const BALLOON = { width: 220, height: 84 };
 
 /**
  * The speech balloons of the turn over the 3D figures (036): an HTML layer above the canvas, because the frame is drawn
@@ -45,10 +45,11 @@ export const BubbleLayer = forwardRef<BubbleLayerHandle, { bubbles: StoryBubble[
           node.style.opacity = '0';
           continue;
         }
-        // The placement gives the box's center and its bottom edge, in canvas pixels.
+        // The placement gives the box's center and its bottom edge, in canvas pixels; the box grows upwards from that
+        // edge (translateY(-100%) of its own height, however many lines it has) and is scaled from there.
         node.style.left = `${Math.round(at.x - (BALLOON.width * at.scale) / 2)}px`;
-        node.style.top = `${Math.round(at.y - BALLOON.height * at.scale)}px`;
-        node.style.transform = `scale(${at.scale.toFixed(3)})`;
+        node.style.top = `${Math.round(at.y)}px`;
+        node.style.transform = `scale(${at.scale.toFixed(3)}) translateY(-100%)`;
         node.style.zIndex = String(at.order + 1);
         node.style.opacity = '1';
         node.classList.toggle('is-below', at.below);
@@ -69,7 +70,7 @@ export const BubbleLayer = forwardRef<BubbleLayerHandle, { bubbles: StoryBubble[
             else nodes.current.delete(bubble.id);
           }}
         >
-          {bubble.text}
+          <div className="stm-comic-balloon"><span className="stm-comic-text">{bubble.text}</span></div>
         </div>
       ))}
     </div>

@@ -10,13 +10,14 @@ interface SpeechBubbleLayerProps {
 }
 
 /**
- * Comic speech balloons over the pieces that acted in the turn in progress: white box with a tail pointing to
- * the piece, up to three lines (the full text in the tooltip). Drawn above every piece, never catching clicks.
+ * Comic speech balloons over the pieces that acted in the turn in progress: a white oval with an ink outline, a tail
+ * pointing to the piece and comic lettering (068, `.stm-comic-balloon`), up to three lines (the full text in the
+ * tooltip). Drawn above every piece, never catching clicks.
  */
 export const SpeechBubbleLayer = ({ tokens, bubbles, hexSize }: SpeechBubbleLayerProps) => {
   if (bubbles.size === 0) return null;
-  const width = hexSize * 4;
-  const height = hexSize * 2;
+  const width = hexSize * 4.5;
+  const height = hexSize * 2.5;
   const gap = hexSize * 0.75;
   return (
     <g className="stm-bubbles">
@@ -28,7 +29,9 @@ export const SpeechBubbleLayer = ({ tokens, bubbles, hexSize }: SpeechBubbleLaye
         return (
           <foreignObject key={token.mapTokenId} x={center.x - width / 2} y={center.y - gap - height} width={width} height={height}>
             <div className="stm-bubble-anchor">
-              <div className="stm-bubble" title={`${token.name}: ${text}`}>{text}</div>
+              <div className="stm-bubble stm-comic-balloon" title={`${token.name}: ${text}`}>
+                <span className="stm-comic-text">{text}</span>
+              </div>
             </div>
           </foreignObject>
         );
