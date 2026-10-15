@@ -2,6 +2,7 @@ import type {
   MapTokenCharacterInsertInfo, MapTokenInfo, MapTokenInsertInfo, MapTokenPositionInfo, MapTokenPostureInfo, MapTokenTokenInfo,
 } from '../types/mapToken';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
+import type { WalkWrite } from '../lib/walkSync';
 
 const API_BASE = `${API_URL}/api/maptoken`;
 
@@ -47,9 +48,12 @@ class MapTokenService {
     return this.send('PUT', `/${id}/position`, data);
   }
 
-  /** Writes where the own character's free-mode walk took the piece (069): other pieces don't block. */
-  async walkTo(id: number, x: number, y: number, look: number): Promise<MapTokenInfo> {
-    return this.send('PUT', `/${id}/position`, { x, y, look, walk: true });
+  /**
+   * Writes where the own character's free-mode walk took the piece (069): its hex and facing, plus the exact point and
+   * direction inside that hex (070). Other pieces don't block.
+   */
+  async walkTo(id: number, write: WalkWrite): Promise<MapTokenInfo> {
+    return this.send('PUT', `/${id}/position`, { ...write, walk: true });
   }
 
   async changeToken(id: number, data: MapTokenTokenInfo): Promise<MapTokenInfo> {

@@ -45,10 +45,11 @@ export interface WalkerInput {
   turn: number;
 }
 
-export const startWalker = (center: Point, look: number, distance = WALK_DISTANCE_DEFAULT): WalkerState => ({
+export const startWalker = (center: Point, look: number, distance = WALK_DISTANCE_DEFAULT, yaw?: number): WalkerState => ({
   x: center.x,
   z: center.y,
-  yaw: lookToYaw(look),
+  // 070: a piece left by a walk starts facing exactly where it faced.
+  yaw: yaw ?? lookToYaw(look),
   moving: false,
   distance: clampDistance(distance),
 });

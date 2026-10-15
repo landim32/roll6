@@ -15,6 +15,7 @@ import { isFreeMode } from '../../lib/freeMode';
 import { addSample, remotePose } from '../../lib/remoteWalk';
 import type { RemotePose, RemoteTrack } from '../../lib/remoteWalk';
 import { isOwnEcho } from '../../lib/walkSync';
+import type { PiecePlace } from '../../lib/walkSync';
 import { canWalk, walkerBlocker, walkerLook } from '../../lib/walker';
 import type { WalkerState } from '../../lib/walker';
 import { HEX_SIZE } from '../../lib/hexGrid';
@@ -136,7 +137,10 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     return (participation && pieces.find((token) => token.campaignCharacterId === participation.campaignCharacterId)) || null;
   }, [currentSelection, party, pieces]);
   const followed = useMemo((): FollowedPiece | null => (
-    ownPiece ? { mapTokenId: ownPiece.mapTokenId, center: spriteSpec(ownPiece, HEX_SIZE).center, look: ownPiece.look } : null
+    ownPiece ? (() => {
+      const spec = spriteSpec(ownPiece, HEX_SIZE);
+      return { mapTokenId: ownPiece.mapTokenId, center: spec.center, look: ownPiece.look, yaw: spec.yaw };
+    })() : null
   ), [ownPiece]);
 
   // The speech balloons (036): what each actor last said in the turn in progress, for the standing pieces of this map
@@ -256,32 +260,40 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     const layer = modelLayerRef.current;
     if (ownId === undefined || !layer) return;
     if (walker) layer.setPose(ownId, { x: walker.x, y: walker.z }, walker.yaw);
-    else if (followed) layer.setPose(ownId, followed.center, lookToYaw(followed.look));
+    else if (followed) layer.setPose(ownId, followed.center, followed.yaw ?? lookToYaw(followed.look));
     layer.setWalking(ownId, walker?.moving ?? false);
   }, [pushSprites, ownPiece?.mapTokenId, followed, syncWalk]);
 
-  // Where the walk starts from (069): the piece's place, except when it is only this tab's own write coming back — the
-  // walk goes on from where it is instead of jumping back to the middle of the hex. Someone else moving or turning the
-  // piece changes it, and the walk starts again from there.
-  const [walkAnchor, setWalkAnchor] = useState('');
+  // Where the walk starts from (069): the piece's place — since 070 the exact point and direction the walk left it at —
+  // except when it is only one of this tab's own writes coming back, even late and out of order: the walk goes on from
+  // where it is instead of jumping to another hex. Someone else moving or turning the piece changes it, and the walk
+  // starts again from there.
+  const [walkAnchor, setWalkAnchor] = useState<PiecePlace | null>(null);
   const ownX = ownPiece?.x;
   const ownY = ownPiece?.y;
   const ownLook = ownPiece?.look;
+  const ownWalkX = ownPiece?.walkX ?? null;
+  const ownWalkY = ownPiece?.walkY ?? null;
+  const ownWalkYaw = ownPiece?.walkYaw ?? null;
+  const walkSent = walkSync.sent;
   useEffect(() => {
     if (ownX === undefined || ownY === undefined || ownLook === undefined) return;
-    if (isOwnEcho({ x: ownX, y: ownY, look: ownLook }, walkSync.lastSent.current)) return;
-    setWalkAnchor(`${ownX}|${ownY}|${ownLook}`);
-  }, [ownX, ownY, ownLook, walkSync.lastSent]);
+    const place = { x: ownX, y: ownY, look: ownLook, walkX: ownWalkX, walkY: ownWalkY, walkYaw: ownWalkYaw };
+    if (isOwnEcho(place, walkSent.current)) return;
+    setWalkAnchor(place);
+  }, [ownX, ownY, ownLook, ownWalkX, ownWalkY, ownWalkYaw, walkSent]);
 
   const walk = useMemo((): WalkOptions | null => {
     if (!ready || !ownPiece || !followed || !walkAnchor) return null;
     if (!canWalk({ freeMode, isGm: currentSelection === 'gm' || currentSelection === null, piece: ownPiece })) return null;
-    const [anchorX, anchorY, anchorLook] = walkAnchor.split('|').map(Number);
+    const start = spriteSpec({ ...ownPiece, ...walkAnchor }, HEX_SIZE);
+    const anchor = [walkAnchor.x, walkAnchor.y, walkAnchor.look, walkAnchor.walkX, walkAnchor.walkY, walkAnchor.walkYaw].join('|');
     return {
       // Anything that changes the piece throws the walk away: it starts again from the piece (but not its own echo).
-      key: `${draft.mapId}|${ownPiece.mapTokenId}|${walkAnchor}|${ownPiece.posture}`,
-      center: spriteSpec({ ...ownPiece, x: anchorX, y: anchorY, look: anchorLook }, HEX_SIZE).center,
-      look: anchorLook,
+      key: `${draft.mapId}|${ownPiece.mapTokenId}|${anchor}|${ownPiece.posture}`,
+      center: start.center,
+      look: walkAnchor.look,
+      yaw: start.yaw,
       // 069: other pieces don't stop it; walls and the edge still do.
       blocked: walkerBlocker(blocked),
       onWalker,
@@ -309,11 +321,14 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
         layer?.setWalking(id, pose.moving);
         continue;
       }
-      // The walk is over: the figure goes back to the piece, which holds the walker's last hex.
+      // The walk is over: the figure stays on the piece, which holds where the walker stopped (070).
       remoteTracks.current.delete(id);
       remotePoses.current.delete(id);
       const piece = piecesRef.current.find((p) => p.mapTokenId === id);
-      if (piece) layer?.setPose(id, spriteSpec(piece, HEX_SIZE).center, lookToYaw(piece.look));
+      if (piece) {
+        const spec = spriteSpec(piece, HEX_SIZE);
+        layer?.setPose(id, spec.center, spec.yaw);
+      }
       layer?.setWalking(id, false);
     }
     pushSprites();
@@ -498,7 +513,7 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     const spec = spriteSpec(piece, HEX_SIZE);
     return spec.modelUrl
       ? [{
-        id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: lookToYaw(piece.look),
+        id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: spec.yaw,
         clips: spec.modelClips, lying: isLying(piece), scale: spec.modelScale,
       }]
       : [];

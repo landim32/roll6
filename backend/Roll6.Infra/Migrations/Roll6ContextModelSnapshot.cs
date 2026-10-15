@@ -960,6 +960,18 @@ namespace Roll6.Infra.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<double?>("WalkX")
+                        .HasColumnType("double precision")
+                        .HasColumnName("walk_x");
+
+                    b.Property<double?>("WalkY")
+                        .HasColumnType("double precision")
+                        .HasColumnName("walk_y");
+
+                    b.Property<double?>("WalkYaw")
+                        .HasColumnType("double precision")
+                        .HasColumnName("walk_yaw");
+
                     b.Property<int>("X")
                         .HasColumnType("integer")
                         .HasColumnName("x");

@@ -70,6 +70,13 @@ export interface MapTokenInfo {
   y: number;
   /** Hex side the piece faces, 0–5 clockwise from the top. */
   look: number;
+  /**
+   * Where a 3D walk left the figure inside its hex (070): map px and the direction in radians (0 = up, clockwise). The 3D
+   * view draws it there; the 2D map always draws the middle of the hex. Null/absent = the middle, facing `look`.
+   */
+  walkX?: number | null;
+  walkY?: number | null;
+  walkYaw?: number | null;
   /** Posture of the character/NPC occurrence; null for objects. */
   posture: Posture | null;
   /** Hexes the piece takes now: the token's standing or down size, depending on the posture (1, 2, 3, 7 or 10). */

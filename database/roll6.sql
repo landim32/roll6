@@ -2033,5 +2033,34 @@ BEGIN
     VALUES ('20261014220053_AddTokenModelScale', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015172704_AddMapTokenWalkPosition') THEN
+    ALTER TABLE map_tokens ADD walk_x double precision;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015172704_AddMapTokenWalkPosition') THEN
+    ALTER TABLE map_tokens ADD walk_y double precision;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015172704_AddMapTokenWalkPosition') THEN
+    ALTER TABLE map_tokens ADD walk_yaw double precision;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015172704_AddMapTokenWalkPosition') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261015172704_AddMapTokenWalkPosition', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

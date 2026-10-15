@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BASE_COLORS, isLying, isModelShownIn3d, isOutOfCombat, isShownIn3d, OBJECT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec,
+  BASE_COLORS, isLying, isModelShownIn3d, isOutOfCombat, isShownIn3d, OBJECT_BASE_COLOR, pieceGeometry, pieceImage, spriteSpec, walkPose,
 } from './pieceDrawing';
 import { hexCenter } from './hexGrid';
 import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
@@ -119,6 +119,24 @@ describe('3D view figures (034)', () => {
       expect(spriteSpec(token({ modelFileUrl: 'https://files/orc.glb', modelScale: 150 }), 40).modelScale).toBe(1.5);
       expect(spec.center.x).toBeCloseTo(hexCenter(3, 2, 40).x);
       expect(spec.center.y).toBeCloseTo(hexCenter(3, 2, 40).y);
+    });
+
+    it('stands where a 3D walk left it, facing its exact direction (070)', () => {
+      const middle = hexCenter(3, 2, 40);
+      const walked = spriteSpec(token({ walkX: middle.x + 9, walkY: middle.y - 6, walkYaw: 0.4 }), 40);
+      expect(walked.center).toEqual({ x: middle.x + 9, y: middle.y - 6 });
+      expect(walked.yaw).toBe(0.4);
+      // Without a walk: the middle of the hex, facing its side.
+      expect(spriteSpec(token({ look: 2 }), 40).yaw).toBeCloseTo((2 * Math.PI) / 3);
+    });
+
+    it('ignores a walk point outside its hex or on a lying piece (070)', () => {
+      const middle = hexCenter(3, 2, 40);
+      const far = spriteSpec(token({ walkX: middle.x + 80, walkY: middle.y, walkYaw: 0.4 }), 40);
+      expect(far.center.x).toBeCloseTo(middle.x);
+      expect(far.yaw).toBe(0);
+      expect(walkPose(token({ walkX: middle.x, walkY: middle.y, walkYaw: 1, posture: POSTURE.down }), 40)).toBeNull();
+      expect(walkPose(token({ walkX: middle.x, walkY: middle.y, walkYaw: 1 }), 40)).toEqual({ center: middle, yaw: 1 });
     });
 
     it('carries the four "2,5D" urls of the token, also for objects (035)', () => {

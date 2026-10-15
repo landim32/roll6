@@ -1,5 +1,6 @@
 using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
+using Roll6.Domain.Grid;
 using Roll6.Domain.Validation;
 
 namespace Roll6.Domain.Models;
@@ -40,6 +41,15 @@ public class MapToken
     /// 0 top, 1 top-right, 2 bottom-right, 3 bottom, 4 bottom-left, 5 top-left.
     /// </summary>
     public int Look { get; set; }
+
+    /// <summary>
+    /// Where the 3D walk (069) left the figure inside its hex, in map pixels, and the exact direction it faces (radians,
+    /// the walker's yaw). The 2D map draws the piece at the middle of <see cref="X"/>/<see cref="Y"/>; the 3D view draws it
+    /// here, so stopping between two hexes does not jump. Any other move clears them (<see cref="MoveTo"/>).
+    /// </summary>
+    public double? WalkX { get; set; }
+    public double? WalkY { get; set; }
+    public double? WalkYaw { get; set; }
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -97,6 +107,27 @@ public class MapToken
     {
         X = x;
         Y = y;
+        WalkX = null;
+        WalkY = null;
+        WalkYaw = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// The exact place of a 3D walk (069): the point must lie in the piece's hex (cube rounding, as the client computes
+    /// it). Call after <see cref="MoveTo"/>, which clears it.
+    /// </summary>
+    public void WalkTo(double x, double y, double yaw)
+    {
+        if (!double.IsFinite(x) || !double.IsFinite(y))
+            throw new DomainValidationException("walkX", "A posição do andar é inválida.");
+        if (!double.IsFinite(yaw))
+            throw new DomainValidationException("walkYaw", "A direção do andar é inválida.");
+        if (HexGrid.PixelToHex(x, y, HexGrid.HEX_SIZE) != (X, Y))
+            throw new DomainValidationException("walkX", "A posição do andar não está no hex da peça.");
+        WalkX = x;
+        WalkY = y;
+        WalkYaw = Math.Atan2(Math.Sin(yaw), Math.Cos(yaw));
         UpdatedAt = DateTime.UtcNow;
     }
 
