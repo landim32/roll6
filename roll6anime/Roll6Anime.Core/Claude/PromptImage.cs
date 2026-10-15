@@ -1,10 +1,37 @@
 using System.Globalization;
 using System.Text.Json;
+using Roll6Anime.Core.Markup;
 
 namespace Roll6Anime.Core.Claude;
 
 /// <summary>A print of the 3D view attached to a request: the PNG and the text that says what it shows.</summary>
-public sealed record PromptImage(byte[] Png, string Caption);
+public sealed record PromptImage(byte[] Png, string Caption)
+{
+    private static readonly (MarkKind Kind, string One, string Many)[] NAMES =
+    {
+        (MarkKind.Pencil, "traço à mão", "traços à mão"),
+        (MarkKind.Rectangle, "retângulo", "retângulos"),
+        (MarkKind.Ellipse, "circunferência", "circunferências"),
+        (MarkKind.Arrow, "seta", "setas"),
+    };
+
+    /// <summary>
+    /// What the caption of a marked print adds (064, FR-009): the red shapes are the user's, pointing at parts of the
+    /// picture, and how many of each there are — so the Claude does not take them for things in the scene. Empty
+    /// without marks.
+    /// </summary>
+    public static string MarkupNote(IReadOnlyList<Mark> marks)
+    {
+        if (marks.Count == 0)
+            return string.Empty;
+        var counts = NAMES
+            .Select(name => (name, count: marks.Count(mark => mark.Kind == name.Kind)))
+            .Where(item => item.count > 0)
+            .Select(item => $"{item.count} {(item.count == 1 ? item.name.One : item.name.Many)}");
+        return " Marcações em vermelho desenhadas pelo usuário para apontar partes da imagem (não fazem parte da cena): "
+            + string.Join(", ", counts) + ".";
+    }
+}
 
 /// <summary>
 /// What the 3D view reported when it was printed: the PNG, the animation's instant (null without an animation) and

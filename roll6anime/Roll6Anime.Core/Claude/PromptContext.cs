@@ -26,6 +26,7 @@ public static class PromptContext
         lines.Add("Grave e altere arquivos com as ferramentas Write/Edit. No Bash, rode só comandos python simples, como o validar.py (sem heredoc, \"&&\", \";\" ou \"|\"): o resto não tem permissão.");
         lines.Add("Não envie a animação ao Roll6 a menos que o usuário peça.");
         lines.Add("Imagens anexadas ao pedido são prints da vista 3D desta ferramenta, cada uma com a legenda do instante da animação e de onde a câmera olha: use-as para ver a pose que o usuário está comentando.");
+        lines.Add("Formas vermelhas nos prints (traços, retângulos e circunferências pontilhados, setas) são marcações do usuário apontando o que ele quer mostrar; não fazem parte do modelo nem da cena.");
         return string.Join(Environment.NewLine, lines);
     }
 

@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Threading;
 using Roll6Anime.Core.Animations;
 using Roll6Anime.Core.Claude;
+using Roll6Anime.Core.Markup;
 using Roll6Anime.Core.Settings;
 
 namespace Roll6Anime;
@@ -110,7 +111,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>Prints of the 3D view waiting to go with the next request; cleared when it is sent.</summary>
-    public ObservableCollection<PromptImage> Attachments { get; } = new();
+    public ObservableCollection<PrintAttachment> Attachments { get; } = new();
 
     public bool HasAttachments => Attachments.Count > 0;
 
@@ -200,13 +201,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
-    /// "Anexar print": the 3D view as it is now — the pose of this instant from the user's camera — joins the next
-    /// request, with a caption saying which animation, which instant and from where the camera looks.
+    /// "Anexar print": the 3D view as it is now — the pose of this instant from the user's camera — with a caption saying
+    /// which animation, which instant and from where the camera looks. The window opens it in the markup editor (064) and
+    /// attaches it on Concluir; null when nothing could be captured (the status says why).
     /// </summary>
-    public async Task CaptureAsync()
+    public async Task<PrintAttachment?> CapturePrintAsync()
     {
         if (!CanCapture)
-            return;
+            return null;
         _capturing = true;
         OnChanged(nameof(CanCapture));
         try
@@ -215,11 +217,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             var animation = capture.Time != null && _selected != null
                 ? PromptContext.Relative(_settings.ClaudeWorkingDirectory, _selected.FullPath)
                 : null;
-            Attachments.Add(new PromptImage(capture.Png, capture.Caption(animation)));
+            return PrintAttachment.Plain(capture.Png, capture.Caption(animation));
         }
         catch (Exception ex)
         {
             Status = $"Não foi possível capturar a vista 3D: {ex.Message}";
+            return null;
         }
         finally
         {
@@ -228,10 +231,25 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    public void RemoveAttachment(PromptImage image)
+    /// <summary>A print the editor finished (064): it joins the next request.</summary>
+    public void AddAttachment(PrintAttachment print)
+    {
+        if (!_isRunning && Attachments.Count < MAX_ATTACHMENTS)
+            Attachments.Add(print);
+    }
+
+    /// <summary>A print marked again in the editor takes the place of the one it was.</summary>
+    public void ReplaceAttachment(PrintAttachment old, PrintAttachment print)
+    {
+        var index = Attachments.IndexOf(old);
+        if (!_isRunning && index >= 0)
+            Attachments[index] = print;
+    }
+
+    public void RemoveAttachment(PrintAttachment print)
     {
         if (!_isRunning)
-            Attachments.Remove(image);
+            Attachments.Remove(print);
     }
 
     /// <summary>Sends the request to the local Claude with the screen's context (US2, FR-010–FR-014).</summary>
@@ -239,7 +257,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         if (!CanSend)
             return;
-        var images = Attachments.ToList();
+        var images = Attachments.Select(print => print.ToPromptImage()).ToList();
         var text = _prompt.Trim();
         if (text.Length == 0)
             text = "Veja a imagem anexada.";

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Input;
 using Microsoft.Win32;
 using Roll6Anime.Core.Claude;
+using Roll6Anime.Core.Markup;
 using Roll6Anime.Core.Settings;
 
 namespace Roll6Anime;
@@ -63,16 +64,35 @@ public partial class MainWindow : Window
 
     private void OnStop(object sender, RoutedEventArgs e) => _model.Stop();
 
+    /// <summary>"Anexar print" (064, Q1 = B): the print opens in the markup editor; Concluir attaches it, Cancelar drops it.</summary>
     private async void OnCapture(object sender, RoutedEventArgs e)
     {
-        await _model.CaptureAsync();
+        if (await _model.CapturePrintAsync() is { } print && Mark(print) is { } done)
+            _model.AddAttachment(done);
         PromptBox.Focus();
+    }
+
+    /// <summary>A click on a print's thumbnail opens it again in the editor, with its marks.</summary>
+    private void OnOpenAttachment(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (!_model.CanEditPrompt || (sender as FrameworkElement)?.DataContext is not PrintAttachment print)
+            return;
+        e.Handled = true;
+        if (Mark(print) is { } done)
+            _model.ReplaceAttachment(print, done);
+        PromptBox.Focus();
+    }
+
+    private PrintAttachment? Mark(PrintAttachment print)
+    {
+        var editor = new MarkupWindow(print) { Owner = this };
+        return editor.ShowDialog() == true ? editor.Result : null;
     }
 
     private void OnRemoveAttachment(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is PromptImage image)
-            _model.RemoveAttachment(image);
+        if ((sender as FrameworkElement)?.DataContext is PrintAttachment print)
+            _model.RemoveAttachment(print);
     }
 
     /// <summary>Enter sends, Shift+Enter breaks the line.</summary>

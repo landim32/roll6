@@ -59,9 +59,13 @@ As variáveis de ambiente `Roll6Anime__AnimationsFolder` etc. também valem. O �
 6. **Nova animação** deixa nada selecionado. O próximo pedido cria um arquivo, que entra na lista, fica selecionado
    e herda a conversa.
 7. **Anexar print** junta ao próximo pedido uma imagem da vista 3D como está na tela: a pose do instante atual,
-   vista da câmera onde você a deixou. A miniatura fica sobre o campo do pedido (o X remove), até 5 por pedido. A
+   vista da câmera onde você a deixou. Antes de anexar, o print abre em **Marcar print**, onde dá para apontar ao
+   Claude o que olhar, em vermelho: Lápis, Retângulo e Circunferência pontilhados e Seta (teclas 1–4), com Desfazer
+   (Ctrl+Z) e Limpar. **Concluir** (Enter) anexa, com ou sem marcações; **Cancelar** (Esc) desiste do print. Clicar na
+   miniatura reabre o editor com as marcações. A miniatura fica sobre o campo do pedido (o X remove), até 5 por pedido. A
    imagem vai ao Claude como imagem, com uma legenda que diz a animação, o instante e de onde a câmera olha ("122° da
-   frente, para o lado esquerdo do personagem"). Dá para enviar só o print, sem texto.
+   frente, para o lado esquerdo do personagem") e, com marcações, o aviso de que as formas vermelhas são suas. Dá para
+   enviar só o print, sem texto.
 8. **Parar** interrompe o Claude.
 
 ## Como é feito
