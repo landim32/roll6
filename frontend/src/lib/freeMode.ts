@@ -12,8 +12,12 @@ import { MAP_TOKEN_TYPE } from '../types/mapToken';
 /** True only when the campaign says so; a missing campaign or flag reads as turn mode. */
 export const isFreeMode = (campaign: { freeMode?: boolean } | null | undefined): boolean => campaign?.freeMode === true;
 
-/** The pending pictures over the chat: only while the campaign plays and nobody is free of the turn. */
-export const showPending = (status: number | null | undefined, freeMode: boolean): boolean => isPlayable(status) && !freeMode;
+/**
+ * The pending pictures over the chat: only while the campaign plays and the master keeps the notice on (072) — in
+ * free mode too, where only actions count because moves are not recorded. A missing flag reads as on.
+ */
+export const showPending = (campaign: { status?: number | null; pendingNotice?: boolean } | null | undefined): boolean =>
+  !!campaign && isPlayable(campaign.status) && campaign.pendingNotice !== false;
 
 /** Movement trails of the turn: hidden while free (even the moves made before the switch). */
 export const showTrails = (freeMode: boolean): boolean => !freeMode;

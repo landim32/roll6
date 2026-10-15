@@ -9,6 +9,7 @@ public class CampaignTableRow
     public string Slug { get; set; } = string.Empty;
     public int Status { get; set; }
     public bool FreeMode { get; set; }
+    public bool PendingNotice { get; set; } = true;
     public long? CurrentMapId { get; set; }
     public string? CurrentMapName { get; set; }
     public string? CurrentMapSlug { get; set; }

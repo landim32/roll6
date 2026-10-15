@@ -25,6 +25,10 @@ public class CampaignTableInfo
     [JsonPropertyName("freeMode")]
     public bool FreeMode { get; set; }
 
+    /// <summary>Pending notice over the chat (072).</summary>
+    [JsonPropertyName("pendingNotice")]
+    public bool PendingNotice { get; set; } = true;
+
     [JsonPropertyName("isMaster")]
     public bool IsMaster { get; set; }
 

@@ -159,6 +159,21 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Shows or hides the notice over the chat with who still owes a play this turn (072, master, any status).</summary>
+    [HttpPut("{id:long}/pending-notice")]
+    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetPendingNotice(long id, [FromBody] CampaignPendingNoticeInfo info)
+    {
+        try
+        {
+            return Ok(await _campaignService.SetPendingNoticeAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Changes the campaign status (049, master): 1 Preparando, 2 Ativa, 3 Pausada, 4 Finalizada.</summary>
     [HttpPut("{id:long}/status")]
     [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]

@@ -27,6 +27,10 @@ public class CampaignInfo
     [JsonPropertyName("freeMode")]
     public bool FreeMode { get; set; }
 
+    /// <summary>Pending notice over the chat (072): the pictures of who still owes a play. On by default.</summary>
+    [JsonPropertyName("pendingNotice")]
+    public bool PendingNotice { get; set; } = true;
+
     /// <summary>Map the master opened last; players follow it (017).</summary>
     [JsonPropertyName("currentMapId")]
     public long? CurrentMapId { get; set; }

@@ -327,6 +327,35 @@ public class CampaignServiceTests
             && ((CampaignInfo)e.Data!).FreeMode)), Times.Once);
     }
 
+    [Fact]
+    public async Task SetPendingNotice_Off_PublishesCampaignChanged()
+    {
+        var result = await _service.SetPendingNoticeAsync(1, 10, new CampaignPendingNoticeInfo { PendingNotice = false });
+
+        result.PendingNotice.Should().BeFalse();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => !c.PendingNotice)));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CAMPAIGN_CHANGED
+            && !((CampaignInfo)e.Data!).PendingNotice)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetPendingNotice_SameValue_DoesNothing()
+    {
+        var result = await _service.SetPendingNoticeAsync(1, 10, new CampaignPendingNoticeInfo { PendingNotice = true });
+
+        result.PendingNotice.Should().BeTrue();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetPendingNotice_NotMaster_IsForbidden()
+    {
+        var act = () => _service.SetPendingNoticeAsync(2, 10, new CampaignPendingNoticeInfo { PendingNotice = false });
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
     // ---- 069: leaving free mode with pieces on the same hex ----
 
     private void CampaignIsFree() =>

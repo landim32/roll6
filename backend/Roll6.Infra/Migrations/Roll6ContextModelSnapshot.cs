@@ -190,6 +190,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("open");
 
+                    b.Property<bool>("PendingNotice")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("pending_notice");
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(100)

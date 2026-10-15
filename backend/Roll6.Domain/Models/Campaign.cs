@@ -39,6 +39,12 @@ public class Campaign
     /// finishes without a pending list and no majority notice goes out. Switching it never touches the turn.
     /// </summary>
     public bool FreeMode { get; set; }
+
+    /// <summary>
+    /// The notice over the chat (072): the blinking pictures of the characters that still owe their play this turn.
+    /// On by default; the master switches it in any status, and with it on it shows in free mode too.
+    /// </summary>
+    public bool PendingNotice { get; set; } = true;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -87,6 +93,13 @@ public class Campaign
     public void SetFreeMode(bool freeMode)
     {
         FreeMode = freeMode;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Switches the pending notice over the chat (072; master only, checked by the service).</summary>
+    public void SetPendingNotice(bool pendingNotice)
+    {
+        PendingNotice = pendingNotice;
         UpdatedAt = DateTime.UtcNow;
     }
 

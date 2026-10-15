@@ -17,6 +17,7 @@ public interface ICampaignService
     Task<CampaignInfo> SetOpenAsync(long userId, long campaignId, CampaignOpenInfo info);
     Task<CampaignInfo> SetStatusAsync(long userId, long campaignId, CampaignStatusInfo info);
     Task<CampaignInfo> SetFreeModeAsync(long userId, long campaignId, CampaignFreeModeInfo info);
+    Task<CampaignInfo> SetPendingNoticeAsync(long userId, long campaignId, CampaignPendingNoticeInfo info);
     Task DeleteAsync(long userId, long campaignId);
 
     /// <summary>True for the master and for users with an approved character (who may follow the table in real time).</summary>
