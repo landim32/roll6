@@ -57,22 +57,16 @@ public static class TableNotices
         TargetUserIds = new[] { masterUserId }
     };
 
-    /// <summary>N3: each pending player gets the first names of the others still missing.</summary>
-    public static TableNotice Majority(long campaignId, long actorUserId, IReadOnlyDictionary<long, string> pendingFirstNames)
+    /// <summary>N3 (074): each pending player gets its own body (<see cref="Notifications.Pending.Reminders"/>).</summary>
+    public static TableNotice Pending(long campaignId, long actorUserId, IReadOnlyDictionary<long, string> bodiesByUser) => new()
     {
-        var bodies = pendingFirstNames.ToDictionary(
-            p => p.Key,
-            p => NoticeTexts.Majority(pendingFirstNames.Where(o => o.Key != p.Key).Select(o => o.Value).ToList()));
-        return new TableNotice
-        {
-            Kind = NoticeKind.Majority,
-            CampaignId = campaignId,
-            ActorUserId = actorUserId,
-            Body = NoticeTexts.Majority(Array.Empty<string>()),
-            BodyByUser = bodies,
-            TargetUserIds = pendingFirstNames.Keys.ToList()
-        };
-    }
+        Kind = NoticeKind.Pending,
+        CampaignId = campaignId,
+        ActorUserId = actorUserId,
+        Body = NoticeTexts.Pending(Array.Empty<string>()),
+        BodyByUser = bodiesByUser,
+        TargetUserIds = bodiesByUser.Keys.ToList()
+    };
 
     /// <summary>N4: "Turno N terminado. Pode agir novamente" to the players.</summary>
     public static TableNotice TurnFinished(long campaignId, long actorUserId, int finishedTurn, IEnumerable<long> players) => new()
@@ -110,6 +104,16 @@ public static class TableNotices
             TargetUserIds = new[] { ownerUserId }
         };
     }
+
+    /// <summary>N7b (074): a player pokes the master when everyone already acted.</summary>
+    public static TableNotice PokeMaster(long campaignId, long actorUserId, string pokerFirstName, long masterUserId) => new()
+    {
+        Kind = NoticeKind.PokeMaster,
+        CampaignId = campaignId,
+        ActorUserId = actorUserId,
+        Body = NoticeTexts.PokeMaster(pokerFirstName),
+        TargetUserIds = new[] { masterUserId }
+    };
 
     /// <summary>N7: "Rodrigo está cutucando você".</summary>
     public static TableNotice Poke(long campaignId, long actorUserId, string pokerFirstName, IEnumerable<long> poked) => new()

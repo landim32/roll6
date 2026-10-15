@@ -32,6 +32,7 @@ public class Roll6Context : DbContext
     public DbSet<Turn> Turns { get; set; }
     public DbSet<ChatRead> ChatReads { get; set; }
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
+    public DbSet<PushDelivery> PushDeliveries { get; set; }
     public DbSet<ChatReaction> ChatReactions { get; set; }
     public DbSet<ChatPollOption> ChatPollOptions { get; set; }
     public DbSet<TurnWhisperTarget> TurnWhisperTargets { get; set; }
@@ -94,7 +95,6 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Open).HasColumnName("open");
             entity.Property(e => e.CurrentTurn).HasColumnName("current_turn").HasDefaultValue(1).HasSentinel(0);
             entity.Property(e => e.CurrentMapId).HasColumnName("current_map_id");
-            entity.Property(e => e.MajorityNotifiedTurn).HasColumnName("majority_notified_turn");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>()
                 .HasDefaultValue(CampaignStatus.Active).HasSentinel((CampaignStatus)0);
             entity.Property(e => e.FreeMode).HasColumnName("free_mode").HasDefaultValue(false);
@@ -550,10 +550,31 @@ public class Roll6Context : DbContext
             entity.Property(e => e.UserAgent).HasColumnName("user_agent").HasMaxLength(500);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP);
             entity.Property(e => e.LastUsedAt).HasColumnName("last_used_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.FailureCount).HasColumnName("failure_count").HasDefaultValue(0).HasSentinel(-1);
+            entity.Ignore(e => e.Skipped);
             entity.HasIndex(e => e.Endpoint).IsUnique().HasDatabaseName("ix_push_subscriptions_endpoint");
             entity.HasIndex(e => e.UserId).HasDatabaseName("ix_push_subscriptions_user");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_push_subscription");
+        });
+
+        // The durable push outbox (074).
+        modelBuilder.Entity<PushDelivery>(entity =>
+        {
+            entity.ToTable("push_deliveries");
+            entity.HasKey(e => e.PushDeliveryId).HasName("push_deliveries_pkey");
+            entity.Property(e => e.PushDeliveryId).HasColumnName("push_delivery_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.PushSubscriptionId).HasColumnName("push_subscription_id");
+            entity.Property(e => e.Payload).HasColumnName("payload").HasMaxLength(PushDelivery.MAX_PAYLOAD).IsRequired();
+            entity.Property(e => e.Topic).HasColumnName("topic").HasMaxLength(PushDelivery.MAX_TOPIC).IsRequired();
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.Attempts).HasColumnName("attempts").HasDefaultValue(0).HasSentinel(-1);
+            entity.Property(e => e.NextAttemptAt).HasColumnName("next_attempt_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP);
+            entity.HasIndex(e => e.NextAttemptAt).HasDatabaseName("ix_push_deliveries_due");
+            entity.HasIndex(e => e.PushSubscriptionId).HasDatabaseName("ix_push_deliveries_subscription");
+            entity.HasOne<PushSubscription>().WithMany().HasForeignKey(e => e.PushSubscriptionId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_push_delivery_subscription");
         });
 
         modelBuilder.Entity<CampaignNotificationPref>(entity =>

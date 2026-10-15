@@ -4,6 +4,7 @@ using Lib.Net.Http.WebPush.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Roll6.DTO.Settings;
+using Roll6.Domain.Notifications;
 using Roll6.Infra.Interfaces.AppServices;
 
 namespace Roll6.Infra.AppServices;
@@ -26,7 +27,7 @@ public class WebPushSender : IPushSender
             return;
         PublicKey = settings.PublicKey;
         var subject = string.IsNullOrWhiteSpace(settings.Subject) ? "https://roll6.site" : settings.Subject;
-        _client = new PushServiceClient(new HttpClient { Timeout = TimeSpan.FromSeconds(15) })
+        _client = new PushServiceClient(new HttpClient { Timeout = PushPolicy.SEND_TIMEOUT })
         {
             DefaultAuthentication = new VapidAuthentication(settings.PublicKey, settings.PrivateKey) { Subject = subject }
         };
@@ -36,7 +37,7 @@ public class WebPushSender : IPushSender
 
     public string? PublicKey { get; }
 
-    public async Task<PushSendResult> SendAsync(PushTarget target, string payloadJson, string topic, bool urgent, TimeSpan timeToLive)
+    public async Task<PushSendResult> SendAsync(PushTarget target, string payloadJson, string topic, TimeSpan timeToLive)
     {
         if (_client == null)
             return PushSendResult.Failed;
@@ -46,7 +47,7 @@ public class WebPushSender : IPushSender
         var message = new PushMessage(payloadJson)
         {
             Topic = topic,
-            Urgency = urgent ? PushMessageUrgency.High : PushMessageUrgency.Normal,
+            Urgency = PushMessageUrgency.High,
             TimeToLive = (int)timeToLive.TotalSeconds
         };
         try

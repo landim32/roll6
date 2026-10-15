@@ -7,8 +7,8 @@ public enum NoticeKind
     Message = 1,
     /// <summary>N2: a character's action — the master only.</summary>
     Action = 2,
-    /// <summary>N3: "Falta apenas você…" — the players who still have to act.</summary>
-    Majority = 3,
+    /// <summary>N3: "Falta apenas Bruno e você" / "Falta só você" — the players who still have to act (074).</summary>
+    Pending = 3,
     /// <summary>N4: "Turno N terminado. Pode agir novamente" — the players.</summary>
     TurnFinished = 4,
     /// <summary>N5: "Você está com -3/13 PV" — the character's owner.</summary>
@@ -16,12 +16,14 @@ public enum NoticeKind
     /// <summary>N6: "Você está com 5/11 de Fadiga" — the character's owner.</summary>
     Fatigue = 6,
     /// <summary>N7: "Rodrigo está cutucando você" — the poked players.</summary>
-    Poke = 7
+    Poke = 7,
+    /// <summary>N7b: "Ana está cutucando você: todos já agiram" — the master (074).</summary>
+    PokeMaster = 8
 }
 
 /// <summary>
 /// A notice to deliver (043), enqueued by the domain service that owns the event right after its write succeeds and
-/// delivered in the background (push, or an in-app toast when the campaign is on screen).
+/// delivered in the background — since 074 always as a Web Push to every device of each recipient.
 /// </summary>
 public sealed record TableNotice
 {
@@ -37,9 +39,6 @@ public sealed record TableNotice
     public string? IconUrl { get; init; }
     /// <summary>Recipients; null = every participant of the campaign (master and owners of approved characters).</summary>
     public IReadOnlyCollection<long>? TargetUserIds { get; init; }
-
-    /// <summary>N1/N2 are skipped for whoever has the campaign's chat on screen; N3–N7 become an in-app toast there.</summary>
-    public bool IsPersonal => Kind is not (NoticeKind.Message or NoticeKind.Action);
 
     public string BodyFor(long userId) => BodyByUser != null && BodyByUser.TryGetValue(userId, out var body) ? body : Body;
 }

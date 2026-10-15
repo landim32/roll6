@@ -270,12 +270,18 @@ public static class Roll6Guide
 
         ## Notifications
         - Players and masters can turn on **notifications** on their phones/computers (Web Push, in the app only — there
-          is no tool for that). They get: chat messages of others (when not looking at the chat); the master also every
-          character's **action** with its text; each player "Falta apenas você…" when most characters already acted
-          (once per turn), "Turno N terminado. Pode agir novamente", their character's PV/Fadiga changes made by someone
-          else, and pokes. So `act_in_turn`, `finish_turn`, `process_turn` and changing PV/energy notify people.
+          is no tool for that). Every notification goes to **every** device of each recipient, whatever is open on any
+          screen (there is no in-app toast), with high priority, and is kept up to 12 hours for a device that is offline.
+        - Who gets what: chat messages of others; the master every **action** that is not his own (characters, and ally
+          NPCs acted by their commanders) with its text; once half of the approved characters acted, each **first**
+          action of a character tells every player still missing "Falta apenas Bruno e você" (or "Falta só você") — in
+          any mode, free mode included; "Turno N terminado. Pode agir novamente"; their character's PV/Fadiga changes made
+          by someone else; and pokes. So `act_in_turn`, `finish_turn`, `process_turn` and changing PV/energy notify people.
         - `poke_players` pokes everyone whose character hasn't acted in the turn (a gray chat line + a notification; once
-          a minute per person); `list_notification_settings` / `set_campaign_notifications` read and mute campaigns.
+          a minute per person); with nobody else missing, a player's poke goes to the master. `list_notification_settings`
+          / `set_campaign_notifications` read and mute campaigns.
+        - Testing (master): `simulate_notification` sends any kind to your own devices as a test, and
+          `preview_turn_notices` shows the "Falta…" each missing player would get now.
 
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Outside free mode (see "Free mode"), each character and

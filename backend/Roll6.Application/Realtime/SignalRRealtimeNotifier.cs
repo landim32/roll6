@@ -80,20 +80,6 @@ public class SignalRRealtimeNotifier : IRealtimeNotifier, INoticeChannel
         }
     }
 
-    public async Task SendNoticeAsync(long userId, long campaignId, NoticeInfo notice)
-    {
-        try
-        {
-            var connections = _connections.ConnectionsOf(userId, campaignId);
-            if (connections.Count > 0)
-                await _hub.Clients.Clients(connections).SendAsync(TableHub.NOTICE_METHOD, notice);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not send a {Kind} notice to user {UserId}", notice.Kind, userId);
-        }
-    }
-
     public async Task InboxChangedAsync(long userId)
     {
         try

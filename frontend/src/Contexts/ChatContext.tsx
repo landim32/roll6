@@ -98,7 +98,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { currentCampaign, isMaster } = useCampaign();
   const { myParticipations, currentSelection, party } = useCharacter();
   const { turnNo } = useTurn();
-  const { live, setPresence } = useRealtime();
+  const { live } = useRealtime();
   const [items, setItems] = useState<ChatItemInfo[]>([]);
   /** Open polls older than the loaded pages (050): they come with every page and are pinned without scrolling back. */
   const [extraPolls, setExtraPolls] = useState<ChatItemInfo[]>([]);
@@ -288,11 +288,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     return () => window.clearInterval(timer);
   }, [canRead, live, refreshRecent]);
 
-  // The server must know whether the chat is on screen (043): no push for what one is looking at.
-  useEffect(() => {
-    setPresence(tabVisible, visible);
-  }, [tabVisible, visible, setPresence]);
-
   useEffect(() => {
     const onVisibility = () => setTabVisible(document.visibilityState === 'visible');
     document.addEventListener('visibilitychange', onVisibility);
@@ -399,7 +394,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (campaignId === null) return { poked: 0, names: [] };
     const result = await pushService.poke(campaignId);
     if (result.item && campaignRef.current === campaignId) setItems((current) => mergeItems(current, [forViewer(result.item!)]));
-    return { poked: result.poked, names: result.names };
+    return { poked: result.poked, master: result.master, names: result.names };
   }, [campaignId, forViewer]);
 
   const startReply = useCallback((item: ChatItemInfo) => setReplyTo(item), []);

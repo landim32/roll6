@@ -1,18 +1,17 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 using Roll6.Domain.Models;
 using Roll6.Domain.Notifications;
-using Roll6.DTO.Push;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Application.Notifications;
 
 /// <summary>
-/// Delivers one notice (043): who receives it (participants with access now, never the actor, never who muted the
-/// campaign), and how — messages/actions are skipped for whoever has the chat on screen; personal notices become a
-/// toast in the user's window of that campaign, or a Web Push to every device of the user when it isn't on screen.
+/// Delivers one notice (043, 074): who receives it (participants with access now, never the actor, never who muted the
+/// campaign) and, for each of them, one push per registered device — whatever is open on any screen; there is no in-app
+/// toast. The notice goes into each recipient's inbox (the bell) and the pushes into the durable outbox, which
+/// <see cref="PushDeliveryWorker"/> sends.
 /// </summary>
 public class NoticeDispatcher
 {
@@ -26,11 +25,12 @@ public class NoticeDispatcher
     private readonly ICharacterRepository<Character> _characterRepository;
     private readonly ICampaignNotificationPrefRepository<CampaignNotificationPref> _prefRepository;
     private readonly IPushSubscriptionRepository<PushSubscription> _subscriptionRepository;
+    private readonly IPushDeliveryRepository<PushDelivery> _deliveryRepository;
     private readonly IPushSender _sender;
     private readonly IUserNotificationRepository<UserNotification> _inboxRepository;
-    private readonly IPresence _presence;
     private readonly INoticeChannel _channel;
-    private readonly ILogger<NoticeDispatcher> _logger;
+    private readonly PushDeliverySignal _signal;
+    private readonly TimeProvider _time;
 
     public NoticeDispatcher(
         ICampaignRepository<Campaign> campaignRepository,
@@ -38,22 +38,24 @@ public class NoticeDispatcher
         ICharacterRepository<Character> characterRepository,
         ICampaignNotificationPrefRepository<CampaignNotificationPref> prefRepository,
         IPushSubscriptionRepository<PushSubscription> subscriptionRepository,
+        IPushDeliveryRepository<PushDelivery> deliveryRepository,
         IUserNotificationRepository<UserNotification> inboxRepository,
         IPushSender sender,
-        IPresence presence,
         INoticeChannel channel,
-        ILogger<NoticeDispatcher> logger)
+        PushDeliverySignal signal,
+        TimeProvider time)
     {
         _campaignRepository = campaignRepository;
         _campaignCharacterRepository = campaignCharacterRepository;
         _characterRepository = characterRepository;
         _prefRepository = prefRepository;
         _subscriptionRepository = subscriptionRepository;
+        _deliveryRepository = deliveryRepository;
         _inboxRepository = inboxRepository;
         _sender = sender;
-        _presence = presence;
         _channel = channel;
-        _logger = logger;
+        _signal = signal;
+        _time = time;
     }
 
     public async Task DispatchAsync(TableNotice notice)
@@ -73,52 +75,43 @@ public class NoticeDispatcher
 
         var title = NoticeTexts.Title(notice.Speaker, campaign.Name);
         var url = UrlOf(campaign);
-        var pushUsers = new List<long>();
-        var delivered = new List<long>();
+        var kind = KindKey(notice.Kind);
+
+        // The bell lists every notice exactly as it was sent.
+        await _inboxRepository.InsertRangeAsync(recipients.Select(userId =>
+            UserNotification.Create(userId, campaign.CampaignId, kind, title, notice.BodyFor(userId), url)));
         foreach (var userId in recipients)
-        {
-            if (!notice.IsPersonal)
-            {
-                // Looking at the chat already: nothing to warn about.
-                if (!_presence.IsChatVisible(userId, campaign.CampaignId))
-                {
-                    pushUsers.Add(userId);
-                    delivered.Add(userId);
-                }
-            }
-            else if (_presence.IsCampaignVisible(userId, campaign.CampaignId))
-            {
-                await _channel.SendNoticeAsync(userId, campaign.CampaignId, new NoticeInfo
-                {
-                    Kind = KindKey(notice.Kind),
-                    CampaignId = campaign.CampaignId,
-                    Title = title,
-                    Body = notice.BodyFor(userId)
-                });
-                delivered.Add(userId);
-            }
-            else
-            {
-                pushUsers.Add(userId);
-                delivered.Add(userId);
-            }
-        }
+            await _channel.InboxChangedAsync(userId);
 
-        // The bell lists every notice exactly as it was sent (push or toast).
-        if (delivered.Count > 0)
-        {
-            await _inboxRepository.InsertRangeAsync(delivered.Select(userId =>
-                UserNotification.Create(userId, campaign.CampaignId, KindKey(notice.Kind), title, notice.BodyFor(userId), url)));
-            foreach (var userId in delivered)
-                await _channel.InboxChangedAsync(userId);
-        }
-
-        if (pushUsers.Count == 0 || !_sender.Enabled)
+        if (!_sender.Enabled)
             return;
-        var subscriptions = await _subscriptionRepository.ListByUsersAsync(pushUsers);
-        foreach (var subscription in subscriptions)
-            await PushAsync(subscription, notice, campaign, title);
+        var now = _time.GetUtcNow().UtcDateTime;
+        var devices = await _subscriptionRepository.ListByUsersAsync(recipients);
+        var deliveries = devices.Select(device => PushDelivery.Create(device.PushSubscriptionId,
+                Payload(title, notice.BodyFor(device.UserId), notice.IconUrl, $"campaign:{campaign.CampaignId}:{kind}", url, kind),
+                $"c{campaign.CampaignId}-{kind}", now))
+            .ToList();
+        if (deliveries.Count == 0)
+            return;
+        await _deliveryRepository.InsertRangeAsync(deliveries);
+        _signal.Pulse();
     }
+
+    /// <summary>
+    /// What the service worker shows. <c>renotify</c> is always on (074): a new notice that replaces an older one of
+    /// the same tag still sounds — before, a second chat message replaced the first in silence.
+    /// </summary>
+    public static string Payload(string title, string body, string? icon, string tag, string url, string kind) =>
+        JsonSerializer.Serialize(new
+        {
+            title,
+            body,
+            icon = icon ?? DEFAULT_ICON,
+            tag,
+            url,
+            kind,
+            renotify = true
+        }, JSON);
 
     /// <summary>The master and the owners of the campaign's approved characters, as they are now.</summary>
     private async Task<HashSet<long>> ParticipantsAsync(Campaign campaign)
@@ -130,50 +123,18 @@ public class NoticeDispatcher
         return users;
     }
 
-    private async Task PushAsync(PushSubscription subscription, TableNotice notice, Campaign campaign, string title)
-    {
-        var kind = KindKey(notice.Kind);
-        var chat = !notice.IsPersonal;
-        var payload = JsonSerializer.Serialize(new
-        {
-            title,
-            body = notice.BodyFor(subscription.UserId),
-            icon = notice.IconUrl ?? DEFAULT_ICON,
-            tag = chat ? $"campaign:{campaign.CampaignId}:chat" : $"campaign:{campaign.CampaignId}:{kind}",
-            url = UrlOf(campaign),
-            kind,
-            renotify = !chat
-        }, JSON);
-        // The topic also replaces an undelivered message of the same kind at the push service (≤ 32 url-safe chars).
-        var topic = $"c{campaign.CampaignId}-{(chat ? "chat" : kind)}";
-        var ttl = notice.Kind == NoticeKind.TurnFinished ? TimeSpan.FromHours(6) : chat ? TimeSpan.FromHours(1) : TimeSpan.FromHours(2);
-        var result = await _sender.SendAsync(new PushTarget(subscription.Endpoint, subscription.P256dh, subscription.Auth),
-            payload, topic, urgent: !chat, ttl);
-        switch (result)
-        {
-            case PushSendResult.Gone:
-                await _subscriptionRepository.DeleteAsync(subscription.PushSubscriptionId);
-                break;
-            case PushSendResult.Sent:
-                await _subscriptionRepository.TouchAsync(subscription.PushSubscriptionId, DateTime.UtcNow);
-                break;
-            default:
-                _logger.LogInformation("Push of a {Kind} notice to subscription {Id} was not delivered", kind, subscription.PushSubscriptionId);
-                break;
-        }
-    }
-
     private static string UrlOf(Campaign campaign) => $"/campaign/{campaign.Slug}?chat=1";
 
     public static string KindKey(NoticeKind kind) => kind switch
     {
         NoticeKind.Message => "message",
         NoticeKind.Action => "action",
-        NoticeKind.Majority => "majority",
+        NoticeKind.Pending => "pending",
         NoticeKind.TurnFinished => "turnFinished",
         NoticeKind.Life => "life",
         NoticeKind.Fatigue => "fatigue",
         NoticeKind.Poke => "poke",
+        NoticeKind.PokeMaster => "pokeMaster",
         _ => kind.ToString()
     };
 }

@@ -195,7 +195,8 @@ public partial class TurnService : ITurnService
         foreach (var previous in cancelled)
             await PublishUpdatedAsync(campaign, userId, previous);
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
-        await NotifyActionAsync(campaign, userId, actor.CharacterId, info.Description);
+        // 074: a replaced action is not a new one for "Falta…" (the missing list did not change).
+        await NotifyActionAsync(campaign, userId, actor.CharacterId, actor.MapNpcId, info.Description, firstAction: cancelled.Count == 0);
         return result;
     }
 

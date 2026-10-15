@@ -36,6 +36,9 @@ public static class McpToolCatalog
         "GET /api/push/key",
         "POST /api/push/subscription",
         "DELETE /api/push/subscription",
+        // 074: this browser's device list and its test push (login session only).
+        "GET /api/push/device",
+        "POST /api/push/test",
         // Marking the bell's notices as read is UI state (assistants list them with list_my_notifications).
         "PUT /api/push/inbox/read",
         // 040: link previews for crawlers (anonymous HTML fragment and picture), not for assistants.

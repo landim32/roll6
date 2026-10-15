@@ -21,7 +21,9 @@ public static class TurnTools
         What it does: records an action (free text, e.g. "attacks the goblin with the sword") for a piece's character or
         NPC occurrence in the current turn. It shows as a speech balloon over the piece and turns its status green. A
         new action cancels the actor's previous valid action of the turn ("Ação cancelada"), in any mode (free mode
-        included): an actor has one valid action per turn.
+        included): an actor has one valid action per turn. Notifications: the master gets every action that is not his
+        own; a character's first action of the turn, once half of the characters acted, tells each player still missing
+        "Falta apenas Bruno e você" / "Falta só você".
         Who can use it: a player for the piece of his own approved character or of an ally NPC he commands (its master
         character is his — update_campaign_npc); the master for any character or NPC piece.
         Objects can't act.

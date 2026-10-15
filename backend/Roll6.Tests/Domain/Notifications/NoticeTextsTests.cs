@@ -35,9 +35,11 @@ public class NoticeTextsTests
     [Fact]
     public void Bodies()
     {
-        NoticeTexts.Majority(Array.Empty<string>()).Should().Be("Falta apenas você");
-        NoticeTexts.Majority(new[] { "Bruno" }).Should().Be("Falta apenas você e Bruno");
-        NoticeTexts.Majority(new[] { "Bruno", "Ana" }).Should().Be("Falta apenas você, Bruno e Ana");
+        NoticeTexts.Pending(Array.Empty<string>()).Should().Be("Falta só você");
+        NoticeTexts.Pending(new[] { "Bruno" }).Should().Be("Falta apenas Bruno e você");
+        NoticeTexts.Pending(new[] { "Ana", "Bruno" }).Should().Be("Falta apenas Ana, Bruno e você");
+        NoticeTexts.PokeMaster("Ana").Should().Be("Ana está cutucando você: todos já agiram");
+        NoticeTexts.SimulationTitle("Aria · Tormento Vil").Should().Be("Teste · Aria · Tormento Vil");
         NoticeTexts.TurnFinished(12).Should().Be("Turno 12 terminado. Pode agir novamente");
         NoticeTexts.Life(-3, 13).Should().Be("Você está com -3/13 PV");
         NoticeTexts.Fatigue(5, 11).Should().Be("Você está com 5/11 de Fadiga");

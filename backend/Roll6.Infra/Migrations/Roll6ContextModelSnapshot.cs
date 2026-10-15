@@ -176,10 +176,6 @@ namespace Roll6.Infra.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("free_mode");
 
-                    b.Property<int?>("MajorityNotifiedTurn")
-                        .HasColumnType("integer")
-                        .HasColumnName("majority_notified_turn");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(260)
@@ -1097,6 +1093,61 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("npcs", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.PushDelivery", b =>
+                {
+                    b.Property<long>("PushDeliveryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("push_delivery_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("PushDeliveryId"));
+
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("payload");
+
+                    b.Property<long>("PushSubscriptionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("push_subscription_id");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("topic");
+
+                    b.HasKey("PushDeliveryId")
+                        .HasName("push_deliveries_pkey");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("ix_push_deliveries_due");
+
+                    b.HasIndex("PushSubscriptionId")
+                        .HasDatabaseName("ix_push_deliveries_subscription");
+
+                    b.ToTable("push_deliveries", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.PushSubscription", b =>
                 {
                     b.Property<long>("PushSubscriptionId")
@@ -1121,6 +1172,12 @@ namespace Roll6.Infra.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("endpoint");
+
+                    b.Property<int>("FailureCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("failure_count");
 
                     b.Property<DateTime?>("LastUsedAt")
                         .HasColumnType("timestamp without time zone")
@@ -1820,6 +1877,15 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("fk_user_npc");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.PushDelivery", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.PushSubscription", null)
+                        .WithMany()
+                        .HasForeignKey("PushSubscriptionId")
+                        .IsRequired()
+                        .HasConstraintName("fk_push_delivery_subscription");
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.PushSubscription", b =>

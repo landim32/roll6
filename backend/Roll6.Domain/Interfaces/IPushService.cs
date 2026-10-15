@@ -24,4 +24,16 @@ public interface IPushService
 
     /// <summary>Marks one notice (id) or all (null) as read.</summary>
     Task MarkInboxReadAsync(long userId, UserNotificationReadInfo info);
+
+    /// <summary>The user's devices that receive notifications (074).</summary>
+    Task<List<PushDeviceInfo>> ListDevicesAsync(long userId);
+
+    /// <summary>Sends a test push right now to one device (by endpoint) or to all of the user's (074).</summary>
+    Task<PushTestResultInfo> TestAsync(long userId, PushTestInfo info);
+
+    /// <summary>Master: sends to their own devices, right now, a notice of the given kind as the table would (074).</summary>
+    Task<PushTestResultInfo> SimulateAsync(long userId, long campaignId, NotificationSimulateInfo info);
+
+    /// <summary>Master: who is still missing in the turn and the "Falta…" each would get now (074).</summary>
+    Task<TurnNoticePreviewInfo> PreviewAsync(long userId, long campaignId);
 }

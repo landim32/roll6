@@ -33,48 +33,63 @@ public partial class TurnService
         }
     }
 
-    /// <summary>N2 to the master and, when this action makes the majority, N3 to who still has to act.</summary>
-    private Task NotifyActionAsync(Campaign campaign, long userId, long? characterId, string? description) =>
-        SafelyAsync(() => NotifyActionCoreAsync(campaign, userId, characterId, description));
+    /// <summary>
+    /// After an action is saved (074): N2 to the master for every action that is not his — a character's, or an ally
+    /// NPC's by its commander — and, when it is the character's first valid action of the turn, N3 to whoever is still
+    /// missing once the majority acted. In any mode, free mode included.
+    /// </summary>
+    private Task NotifyActionAsync(Campaign campaign, long userId, long? characterId, long? mapNpcId, string? description,
+        bool firstAction) =>
+        SafelyAsync(() => NotifyActionCoreAsync(campaign, userId, characterId, mapNpcId, description, firstAction));
 
-    private async Task NotifyActionCoreAsync(Campaign campaign, long userId, long? characterId, string? description)
+    private async Task NotifyActionCoreAsync(Campaign campaign, long userId, long? characterId, long? mapNpcId,
+        string? description, bool firstAction)
     {
-        if (characterId is not long id)
-            return;
-        var character = await _characterRepository.GetByIdAsync(id);
-        if (character == null)
-            return;
-        _queue.Enqueue(TableNotices.Action(campaign.CampaignId, userId, campaign.UserId, character.Name, description,
-            _imageStorage.GetUrl(character.Image)));
-        await NotifyMajorityAsync(campaign, userId, id);
+        if (userId != campaign.UserId)
+        {
+            var (name, image) = await ActorOfNoticeAsync(characterId, mapNpcId);
+            if (name != null)
+                _queue.Enqueue(TableNotices.Action(campaign.CampaignId, userId, campaign.UserId, name, description,
+                    _imageStorage.GetUrl(image)));
+        }
+        // NPCs don't owe a play: only characters count for "Falta…".
+        if (firstAction && characterId.HasValue)
+            await NotifyPendingAsync(campaign, userId);
     }
 
-    private async Task NotifyMajorityAsync(Campaign campaign, long userId, long actedCharacterId)
+    /// <summary>The name and picture a notice shows for the actor: the character's, or the instance's name and its NPC's picture.</summary>
+    private async Task<(string? Name, string? Image)> ActorOfNoticeAsync(long? characterId, long? mapNpcId)
     {
-        // 054: no "Falta apenas você…" in free mode; otherwise once per turn.
-        if (campaign.FreeMode || campaign.MajorityNotifiedTurn == campaign.CurrentTurn)
-            return;
+        if (characterId is long id)
+        {
+            var character = await _characterRepository.GetByIdAsync(id);
+            return (character?.Name, character?.Image);
+        }
+        if (mapNpcId is long instanceId && await _mapNpcRepository.GetByIdAsync(instanceId) is { } instance)
+        {
+            var npc = await _npcRepository.GetByIdAsync(instance.NpcId);
+            return (instance.Name, npc?.Image);
+        }
+        return (null, null);
+    }
+
+    /// <summary>N3 (074): "Falta apenas Bruno e você" / "Falta só você" to each player still missing, once the majority acted.</summary>
+    private async Task NotifyPendingAsync(Campaign campaign, long userId)
+    {
         var approved = (await _campaignCharacterRepository.ListByCampaignAsync(campaign.CampaignId, approvedOnly: true))
-            .Select(p => p.CharacterId).ToHashSet();
-        var actions = (await _repository.ListByCampaignTurnAsync(campaign.CampaignId, campaign.CurrentTurn))
-            .Where(e => e.TurnType == TurnType.Action && e.CharacterId is long c && approved.Contains(c))
-            .ToList();
-        var acted = actions.Select(e => e.CharacterId!.Value).ToHashSet();
-        var after = acted.Count;
-        // Acting again doesn't change the count; the first action of this character does.
-        var before = actions.Count(e => e.CharacterId == actedCharacterId) > 1 ? after : after - 1;
-        if (!Majority.Crossed(approved.Count, before, after))
+            .Select(p => p.CharacterId).Distinct().ToList();
+        if (approved.Count == 0)
             return;
-        // Once per turn, even with two actions arriving together.
-        if (!await _campaignRepository.TrySetMajorityNotifiedAsync(campaign.CampaignId, campaign.CurrentTurn))
-            return;
-        var missing = await _characterRepository.ListByIdsAsync(approved.Where(c => !acted.Contains(c)));
-        var owners = missing.Select(c => c.UserId).Distinct().ToList();
-        var names = (await _userRepository.ListByIdsAsync(owners))
-            .OrderBy(u => u.Name, StringComparer.CurrentCulture)
+        var acted = (await _repository.ListByCampaignTurnAsync(campaign.CampaignId, campaign.CurrentTurn))
+            .Where(e => e.TurnType == TurnType.Action && e.CharacterId.HasValue)
+            .Select(e => e.CharacterId!.Value)
+            .ToHashSet();
+        var owners = (await _characterRepository.ListByIdsAsync(approved)).ToDictionary(c => c.CharacterId, c => c.UserId);
+        var names = (await _userRepository.ListByIdsAsync(owners.Values.Distinct()))
             .ToDictionary(u => u.UserId, u => NoticeTexts.FirstName(u.Name));
-        if (names.Count > 0)
-            _queue.Enqueue(TableNotices.Majority(campaign.CampaignId, userId, names));
+        var bodies = Pending.Reminders(approved, acted, owners, names);
+        if (bodies.Count > 0)
+            _queue.Enqueue(TableNotices.Pending(campaign.CampaignId, userId, bodies));
     }
 
     /// <summary>N4 to the players of the campaign.</summary>
@@ -105,7 +120,8 @@ public partial class TurnService
 
     /// <summary>
     /// Pokes the players whose characters haven't acted in the turn (043, N7): a line in the chat ("Rodrigo cutucou Ana
-    /// e Bruno") and a notice to each of them. Master or approved participant; at most once a minute per person.
+    /// e Bruno") and a notice to each of them. When nobody else is missing, a player's poke goes to the master instead
+    /// (074, N7b: "Ana cutucou o mestre"). Master or approved participant; at most once a minute per person.
     /// </summary>
     public async Task<PokeResultInfo> PokeAsync(long userId, long campaignId)
     {
@@ -119,11 +135,9 @@ public partial class TurnService
         var missing = await _characterRepository.ListByIdsAsync(approved.Select(p => p.CharacterId).Where(c => !acted.Contains(c)).Distinct());
         var pokedIds = missing.Select(c => c.UserId).Where(u => u != userId).Distinct().ToList();
         if (pokedIds.Count == 0)
-            return new PokeResultInfo { Poked = 0 };
+            return campaign.UserId == userId ? new PokeResultInfo { Poked = 0 } : await PokeMasterAsync(campaign, userId);
 
-        var last = await _repository.LastPokeAtAsync(campaign.CampaignId, userId);
-        if (last.HasValue && DateTime.UtcNow - last.Value < POKE_COOLDOWN)
-            throw new ConflictException("Aguarde um minuto para cutucar de novo.");
+        await EnsurePokeCooldownAsync(campaign, userId);
 
         var users = await _userRepository.ListByIdsAsync(pokedIds.Append(userId).Distinct());
         var poker = NoticeTexts.FirstName(users.FirstOrDefault(u => u.UserId == userId)?.Name);
@@ -137,5 +151,28 @@ public partial class TurnService
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
         _queue.Enqueue(TableNotices.Poke(campaign.CampaignId, userId, string.IsNullOrEmpty(poker) ? "Alguém" : poker, pokedIds));
         return new PokeResultInfo { Poked = pokedIds.Count, Names = names, Item = item };
+    }
+
+    private async Task EnsurePokeCooldownAsync(Campaign campaign, long userId)
+    {
+        var last = await _repository.LastPokeAtAsync(campaign.CampaignId, userId);
+        if (last.HasValue && DateTime.UtcNow - last.Value < POKE_COOLDOWN)
+            throw new ConflictException("Aguarde um minuto para cutucar de novo.");
+    }
+
+    /// <summary>N7b (074): every character acted, so a player's poke asks the master to move on.</summary>
+    private async Task<PokeResultInfo> PokeMasterAsync(Campaign campaign, long userId)
+    {
+        await EnsurePokeCooldownAsync(campaign, userId);
+        var users = await _userRepository.ListByIdsAsync(new[] { userId });
+        var poker = NoticeTexts.FirstName(users.FirstOrDefault(u => u.UserId == userId)?.Name);
+        if (string.IsNullOrEmpty(poker))
+            poker = "Alguém";
+        var saved = await _repository.InsertAsync(Turn.Poke(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId,
+            poker, NoticeTexts.MASTER));
+        var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
+        _queue.Enqueue(TableNotices.PokeMaster(campaign.CampaignId, userId, poker, campaign.UserId));
+        return new PokeResultInfo { Poked = 1, Master = true, Names = new List<string> { NoticeTexts.MASTER }, Item = item };
     }
 }

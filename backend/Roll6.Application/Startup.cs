@@ -57,6 +57,7 @@ public static class Startup
         services.AddScoped<ITurnRepository<Turn>, TurnRepository>();
         services.AddScoped<IChatReadRepository<ChatRead>, ChatReadRepository>();
         services.AddScoped<IPushSubscriptionRepository<PushSubscription>, PushSubscriptionRepository>();
+        services.AddScoped<IPushDeliveryRepository<PushDelivery>, PushDeliveryRepository>();
         services.AddScoped<IChatReactionRepository<ChatReaction>, ChatReactionRepository>();
         services.AddScoped<IChatPollRepository<ChatPollOption, ChatPollVote>, ChatPollRepository>();
         services.AddScoped<ITurnWhisperRepository<TurnWhisperTarget>, TurnWhisperRepository>();
@@ -101,7 +102,6 @@ public static class Startup
         // Real-time table events (017): the hub only pushes; changes keep going through the REST API.
         services.AddSignalR();
         services.AddSingleton<TableConnections>();
-        services.AddSingleton<IPresence>(sp => sp.GetRequiredService<TableConnections>());
         services.AddSingleton<SignalRRealtimeNotifier>();
         services.AddSingleton<IRealtimeNotifier>(sp => sp.GetRequiredService<SignalRRealtimeNotifier>());
         services.AddSingleton<INoticeChannel>(sp => sp.GetRequiredService<SignalRRealtimeNotifier>());
@@ -113,6 +113,10 @@ public static class Startup
         services.AddScoped<NoticeDispatcher>();
         services.AddScoped<IPushService, PushService>();
         services.AddHostedService<NotificationWorker>();
+        // 074: pushes go through a durable outbox drained in parallel by its own worker.
+        services.AddSingleton<PushDeliverySignal>();
+        services.AddScoped<PushDeliveryRunner>();
+        services.AddHostedService<PushDeliveryWorker>();
 
         // Authentication
         // Authentication: the default scheme picks the API key (X-Api-Key header, 019) or the JWT per request, so

@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
+import { DeviceList } from './DeviceList';
+import { SimulatePanel } from './SimulatePanel';
 import { usePush } from '../../hooks/usePush';
+import { useCampaign } from '../../hooks/useCampaign';
 import { pushService } from '../../Services/pushService';
-import { PUSH_SUPPORT } from '../../lib/push';
+import { PUSH_SUPPORT, resultKey } from '../../lib/push';
 import type { CampaignNotificationInfo } from '../../types/push';
 
 interface NotificationsModalProps {
@@ -14,19 +17,45 @@ interface NotificationsModalProps {
 
 /**
  * "Notificações" (043): this device on/off — the browser's permission is asked only by the "Ativar" tap — and the
- * campaigns of the user's table, each one muted or not (valid on every device of the user).
+ * campaigns of the user's table, each one muted or not (valid on every device of the user). Since 074 also "Enviar
+ * teste" for this device, the list of the user's devices and, for the master of the current campaign, "Simular".
  */
 export const NotificationsModal = ({ open, onOpenChange }: NotificationsModalProps) => {
   const { t } = useTranslation();
-  const { support, available, permission, subscribed, busy, enable, disable } = usePush();
+  const { support, available, permission, subscribed, busy, enable, disable, endpoint } = usePush();
+  const { currentCampaign, isMaster } = useCampaign();
   const [campaigns, setCampaigns] = useState<CampaignNotificationInfo[] | null>(null);
   const [saving, setSaving] = useState<number | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [devicesKey, setDevicesKey] = useState(0);
 
   useEffect(() => {
     if (!open) return;
     setCampaigns(null);
+    setTestResult(null);
     pushService.listCampaigns().then(setCampaigns).catch(() => setCampaigns([]));
   }, [open]);
+
+  // Another device list after this one is turned on or off.
+  useEffect(() => {
+    setDevicesKey((key) => key + 1);
+  }, [subscribed, endpoint]);
+
+  /** 074: a push to this device right now; the answer says whether the push service took it. */
+  const onTest = async () => {
+    try {
+      setTesting(true);
+      setTestResult(null);
+      const answer = await pushService.test(endpoint);
+      setTestResult(t(resultKey(answer.devices[0]?.result ?? 'failed')));
+      setDevicesKey((key) => key + 1);
+    } catch (err) {
+      setTestResult(err instanceof Error ? err.message : t('common.unknownError'));
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const onEnable = async () => {
     try {
@@ -85,9 +114,14 @@ export const NotificationsModal = ({ open, onOpenChange }: NotificationsModalPro
           {t(subscribed ? 'notifications.on' : 'notifications.off')}
         </span>
         {subscribed ? (
-          <button type="button" className="btn btn-outline-secondary" onClick={() => { void onDisable(); }} disabled={busy}>
-            {t('notifications.disable')}
-          </button>
+          <>
+            <button type="button" className="btn btn-outline-secondary" onClick={() => { void onDisable(); }} disabled={busy}>
+              {t('notifications.disable')}
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => { void onTest(); }} disabled={busy || testing || !endpoint}>
+              {t('notifications.test.send')}
+            </button>
+          </>
         ) : (
           <button type="button" className="btn btn-primary" onClick={() => { void onEnable(); }} disabled={busy || available === null}>
             {t('notifications.enable')}
@@ -101,7 +135,13 @@ export const NotificationsModal = ({ open, onOpenChange }: NotificationsModalPro
     <Modal open={open} onOpenChange={onOpenChange} title={t('notifications.title')}>
       <h6>{t('notifications.device')}</h6>
       {deviceStatus()}
+      {testResult && <p className="small mt-2 mb-0" role="status">{testResult}</p>}
       <p className="small text-body-secondary mt-2 mb-3">{t('notifications.whatArrives')}</p>
+
+      <h6>{t('notifications.devices.title')}</h6>
+      <div className="mb-3">
+        <DeviceList endpoint={subscribed ? endpoint : null} reloadKey={devicesKey} />
+      </div>
 
       <h6>{t('notifications.campaigns')}</h6>
       {campaigns === null && <p className="text-body-secondary small">{t('common.loading')}</p>}
@@ -119,6 +159,13 @@ export const NotificationsModal = ({ open, onOpenChange }: NotificationsModalPro
           </li>
         ))}
       </ul>
+
+      {isMaster && currentCampaign && (
+        <>
+          <h6 className="mt-3">{t('notifications.simulate.title')}</h6>
+          <SimulatePanel campaignId={currentCampaign.campaignId} campaignName={currentCampaign.name} />
+        </>
+      )}
     </Modal>
   );
 };

@@ -12,10 +12,13 @@ public enum PushSendResult
     Failed
 }
 
-/// <summary>Sends one Web Push message (VAPID, aes128gcm). Never throws: failures come back as a result.</summary>
+/// <summary>
+/// Sends one Web Push message (VAPID, aes128gcm) with high urgency (074: normal urgency let dozing phones hold them for
+/// minutes). Never throws: failures come back as a result.
+/// </summary>
 public interface IPushSender
 {
     bool Enabled { get; }
     string? PublicKey { get; }
-    Task<PushSendResult> SendAsync(PushTarget target, string payloadJson, string topic, bool urgent, TimeSpan timeToLive);
+    Task<PushSendResult> SendAsync(PushTarget target, string payloadJson, string topic, TimeSpan timeToLive);
 }
