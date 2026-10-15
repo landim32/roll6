@@ -61,6 +61,43 @@ const armCorrection = (bone: Bone, name: string): Quaternion => {
   return new Quaternion().setFromUnitVectors(from.normalize(), new Vector3(...relaxed).normalize());
 };
 
+/**
+ * What a turn of an animation file needs to know about one bone of a skeleton at rest (055/059): the orientation of its
+ * parent relative to the model (P), its own rest rotation in the parent (L) and the upper arms' correction to the relaxed
+ * direction (C, identity for any other bone). A file's turn D becomes the local rotation `P⁻¹·(D·C)·P·L`; the roll6anime's
+ * pose editor (066) inverts it with the same frame, so the two directions never drift apart. `root` must be at rest.
+ */
+export interface RestFrame {
+  bone: Bone;
+  parent: Quaternion;
+  rest: Quaternion;
+  correction: Quaternion;
+}
+
+const restFrameOf = (bones: Map<string, Bone>, rootInverse: Quaternion, name: string): RestFrame | null => {
+  const bone = bones.get(name);
+  if (!bone) return null;
+  return {
+    bone,
+    // Orientations relative to the model (the scene the clip will drive), at rest.
+    parent: rootInverse.clone().multiply(worldQuaternion(bone.parent)),
+    rest: bone.quaternion.clone(),
+    correction: armCorrection(bone, name),
+  };
+};
+
+/** The rest frame of the bone `name` (without the Mixamo prefix) of a skeleton at rest; null when it has no such bone. */
+export const restFrame = (root: Object3D, name: string): RestFrame | null => {
+  root.updateMatrixWorld(true);
+  return restFrameOf(bonesByName(root), worldQuaternion(root).invert(), name);
+};
+
+/** The local rotation a file's turn (degrees, XYZ, in the character's frame) gives the bone of `frame`. */
+export const localRotation = (frame: RestFrame, [x, y, z]: readonly [number, number, number]): Quaternion => {
+  const turn = new Quaternion().setFromEuler(new Euler(MathUtils.degToRad(x), MathUtils.degToRad(y), MathUtils.degToRad(z), 'XYZ'));
+  return frame.parent.clone().invert().multiply(turn.multiply(frame.correction)).multiply(frame.parent).multiply(frame.rest);
+};
+
 /** A library clip for this skeleton, or null when it has none of the clip's bones. `height` is in the model's units. */
 export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number): AnimationClip | null => {
   root.updateMatrixWorld(true);
@@ -69,20 +106,14 @@ export const buildRoll6Clip = (clip: Roll6Clip, root: Object3D, height: number):
   const tracks: KeyframeTrack[] = [];
 
   for (const track of clip.tracks) {
-    const bone = bones.get(track.bone);
-    if (!bone) continue;
-    // Orientations relative to the model (the scene the clip will drive), at rest.
-    const parent = rootInverse.clone().multiply(worldQuaternion(bone.parent));
-    const parentInverse = parent.clone().invert();
-    const rest = bone.quaternion.clone();
-    const correction = armCorrection(bone, track.bone);
+    const frame = restFrameOf(bones, rootInverse, track.bone);
+    if (!frame) continue;
     const values: number[] = [];
-    for (const [x, y, z] of track.degrees) {
-      const turn = new Quaternion().setFromEuler(new Euler(MathUtils.degToRad(x), MathUtils.degToRad(y), MathUtils.degToRad(z), 'XYZ'));
-      const local = parentInverse.clone().multiply(turn.multiply(correction)).multiply(parent).multiply(rest);
+    for (const degrees of track.degrees) {
+      const local = localRotation(frame, degrees);
       values.push(local.x, local.y, local.z, local.w);
     }
-    tracks.push(new QuaternionKeyframeTrack(`${bone.name}.quaternion`, track.times, values));
+    tracks.push(new QuaternionKeyframeTrack(`${frame.bone.name}.quaternion`, track.times, values));
   }
 
   // The hips rise and fall: a vertical offset in the model's frame, moved into the hips' parent space.

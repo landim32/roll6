@@ -1,12 +1,14 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Windows.Threading;
 using Roll6Anime.Core.Animations;
 using Roll6Anime.Core.Claude;
 using Roll6Anime.Core.Markup;
 using Roll6Anime.Core.Settings;
+using Roll6Anime.Core.Upload;
 
 namespace Roll6Anime;
 
@@ -25,6 +27,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly ViewerBridge _viewer;
     private readonly Dispatcher _dispatcher;
     private readonly ConversationBook _book = new();
+    /// <summary>The versions each animation went through while the tool is open (066, Q2).</summary>
+    private readonly AnimationHistoryBook _histories = new();
     private FolderWatcher? _watcher;
     private AnimationEntry? _selected;
     private string? _modelPath;
@@ -33,6 +37,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _prompt = string.Empty;
     private bool _isRunning;
     private bool _capturing;
+    private bool _uploading;
     private CancellationTokenSource? _running;
     /// <summary>True while a request of the "nova animação" conversation runs: the next new file is adopted (FR-015).</summary>
     private bool _creating;
@@ -48,6 +53,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _viewer.ModelLoaded += OnModelLoaded;
         _viewer.ModelError += message => { ModelWarning = $"Não foi possível abrir o modelo: {message}"; };
         _viewer.AnimationError += message => { Status = message; };
+        _viewer.SaveRequested += SaveFromView;
+        _viewer.UndoRequested += Undo;
+        _viewer.RedoRequested += Redo;
         Conversation = _book.For(null);
         Attachments.CollectionChanged += (_, _) => { OnChanged(nameof(HasAttachments)); OnChanged(nameof(CanSend)); OnChanged(nameof(CanCapture)); };
     }
@@ -67,6 +75,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             OnChanged();
             OnChanged(nameof(SelectedError));
             OnChanged(nameof(ConversationTitle));
+            OnChanged(nameof(CanUpload));
+            OnChanged(nameof(UploadHint));
             if (_quietSelection)
                 return;
             Select(value);
@@ -121,7 +131,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsRunning
     {
         get => _isRunning;
-        private set { _isRunning = value; OnChanged(); OnChanged(nameof(CanSend)); OnChanged(nameof(CanEditPrompt)); OnChanged(nameof(CanCapture)); }
+        private set { _isRunning = value; OnChanged(); OnChanged(nameof(CanSend)); OnChanged(nameof(CanEditPrompt)); OnChanged(nameof(CanCapture)); ShowEditing(); }
     }
 
     public bool CanEditPrompt => !_isRunning;
@@ -131,6 +141,97 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public bool CanSend => !_isRunning && (!string.IsNullOrWhiteSpace(_prompt) || Attachments.Count > 0) && SendBlockedReason == null;
 
+    /// <summary>"Enviar ao Roll6" (067): an open animation whose current file is valid, and no send in progress.</summary>
+    public bool CanUpload => !_uploading && _selected is { IsValid: true, Content: not null };
+
+    /// <summary>What the button does, or why it cannot.</summary>
+    public string UploadHint =>
+        _uploading ? "Enviando ao Roll6…"
+        : _selected == null ? "Abra uma animação da lista para enviá-la ao Roll6"
+        : !_selected.IsValid ? "O arquivo está inválido: corrija-o antes de enviar"
+        : "Envia esta animação à biblioteca do Roll6: cria se ainda não existir, atualiza se já existir";
+
+    private bool Uploading
+    {
+        set { _uploading = value; OnChanged(nameof(CanUpload)); OnChanged(nameof(UploadHint)); }
+    }
+
+    /// <summary>
+    /// First step of "Enviar ao Roll6": finds out whether the open animation is already in the Roll6 (the animation this
+    /// file was sent to, else one of the user's with the same name). Null, with the reason in <see cref="Status"/>,
+    /// when there is no access or the Roll6 refused.
+    /// </summary>
+    public async Task<(UploadPlan Plan, AnimationEntry Entry)?> PlanUploadAsync()
+    {
+        if (!CanUpload || _selected is not { } entry)
+            return null;
+        var connection = Roll6Connection.Resolve(_settings.ClaudeWorkingDirectory);
+        if (connection == null)
+        {
+            Status = Roll6Connection.MISSING;
+            return null;
+        }
+        Uploading = true;
+        Status = "Consultando o Roll6…";
+        try
+        {
+            using var api = new Roll6Api(connection);
+            var plan = await new AnimationUploader(api).PlanAsync(entry.DisplayName, entry.Type is { } type ? (int)type : null,
+                _state.UploadOf(entry.FileName));
+            Status = null;
+            return (plan, entry);
+        }
+        catch (Exception ex) when (ex is Roll6Exception or HttpRequestException or TaskCanceledException)
+        {
+            Status = $"Não foi possível consultar o Roll6: {Describe(ex)}";
+            return null;
+        }
+        finally
+        {
+            Uploading = false;
+        }
+    }
+
+    /// <summary>Second step: creates or updates the animation with the confirmed name and type, and remembers the link.</summary>
+    public async Task UploadAsync(UploadPlan plan, AnimationEntry entry, string name, int type)
+    {
+        var connection = Roll6Connection.Resolve(_settings.ClaudeWorkingDirectory);
+        if (connection == null || entry.Content is not { } content)
+        {
+            Status = Roll6Connection.MISSING;
+            return;
+        }
+        Uploading = true;
+        Status = "Enviando ao Roll6…";
+        try
+        {
+            using var api = new Roll6Api(connection);
+            var sent = await new AnimationUploader(api).SendAsync(plan, name, type, content);
+            _state.RememberUpload(entry.FileName, sent.AnimationId);
+            _state.Save();
+            var done = plan.Creates
+                ? $"Animação \"{sent.Name}\" criada no Roll6 (id {sent.AnimationId}). No token: animation:{sent.AnimationId}."
+                : $"Animação \"{sent.Name}\" atualizada no Roll6 (id {sent.AnimationId}).";
+            Status = done;
+            Conversation.Messages.Add(new ConversationMessage(ConversationRole.Notice, done));
+        }
+        catch (Exception ex) when (ex is Roll6Exception or HttpRequestException or TaskCanceledException)
+        {
+            Status = $"O Roll6 não aceitou o envio: {Describe(ex)}";
+        }
+        finally
+        {
+            Uploading = false;
+        }
+    }
+
+    private static string Describe(Exception ex) => ex switch
+    {
+        TaskCanceledException => "o Roll6 não respondeu a tempo.",
+        HttpRequestException http => $"sem conexão ({http.Message}).",
+        _ => ex.Message,
+    };
+
     /// <summary>Lists and follows the folder, and reopens the last model (US1, US3, US4).</summary>
     public void Start()
     {
@@ -139,7 +240,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         else
         {
             foreach (var entry in AnimationFolder.List(_settings.AnimationsFolder))
+            {
+                Observe(entry);
                 Animations.Add(entry);
+            }
             _watcher = new FolderWatcher(_settings.AnimationsFolder);
             _watcher.FileSettled += name => _dispatcher.BeginInvoke(() => OnFileSettled(name));
             _watcher.FileRemoved += name => _dispatcher.BeginInvoke(() => OnFileRemoved(name));
@@ -174,6 +278,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private void Select(AnimationEntry? entry)
     {
         ShowConversation(_book.For(entry?.FileName));
+        ShowEditing();
+        ShowHistory();
         if (entry == null)
             _viewer.Clear();
         else if (entry.Content != null)
@@ -337,6 +443,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         var index = IndexOf(fileName);
         var previous = index >= 0 ? Animations[index] : null;
         var entry = AnimationFolder.Read(path, previous);
+        Observe(entry);
         var wasSelected = previous != null && ReferenceEquals(previous, _selected);
 
         if (index >= 0)
@@ -349,6 +456,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             // A valid version replaces what plays, from the same instant; an invalid one only shows its error.
             if (entry.IsValid)
                 _viewer.ShowAnimation(entry, keepTime: true);
+            ShowEditing();
+            ShowHistory();
         }
         else if (previous == null && _creating)
         {
@@ -365,6 +474,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (index < 0)
             return;
         var removed = Animations[index];
+        _histories.Remove(fileName);
         if (ReferenceEquals(removed, _selected))
         {
             _quietSelection = true;
@@ -381,6 +491,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         var index = IndexOf(oldName);
         _book.Rename(oldName, newName);
+        _histories.Rename(oldName, newName);
+        if (_state.UploadOf(oldName) is { } uploaded)
+        {
+            _state.Uploads.Remove(oldName.ToLowerInvariant());
+            _state.RememberUpload(newName, uploaded);
+            _state.Save();
+        }
         if (index < 0)
             return;
         var old = Animations[index];
@@ -399,12 +516,97 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _quietSelection = true;
         Animations.Clear();
         foreach (var entry in AnimationFolder.List(_settings.AnimationsFolder))
+        {
+            Observe(entry);
             Animations.Add(entry);
+        }
         SelectedAnimation = selectedName == null ? null : Animations.FirstOrDefault(entry =>
             string.Equals(entry.FileName, selectedName, StringComparison.OrdinalIgnoreCase));
         _quietSelection = false;
         if (_selected != null)
             _viewer.ShowAnimation(_selected, keepTime: true);
+    }
+
+    // ---------- Pose editor (066) ----------
+
+    private void Observe(AnimationEntry entry)
+    {
+        if (entry.Text != null)
+            _histories.For(entry.FileName).Observe(entry.Text);
+    }
+
+    /// <summary>Why the pose editor may not write now, or null when it may.</summary>
+    private string? EditingBlocked() =>
+        _isRunning ? "O Claude está trabalhando: espere o pedido terminar para editar."
+        : _selected == null ? "Abra uma animação para editar."
+        : !_selected.IsValid ? "O arquivo aberto está inválido: corrija-o antes de editar."
+        : null;
+
+    private void ShowEditing()
+    {
+        var reason = EditingBlocked();
+        _viewer.SendEditing(reason == null, reason);
+    }
+
+    private void ShowHistory()
+    {
+        var history = _selected == null ? null : _histories.For(_selected.FileName);
+        _viewer.SendHistory(history?.UndoCount ?? 0, history?.RedoCount ?? 0);
+    }
+
+    /// <summary>
+    /// The view turned a bone and sends the open file with that key (066): written only when it is the open file, the
+    /// Claude is not working and the Roll6's validation accepts it; the folder then shows the new version.
+    /// </summary>
+    public void SaveFromView(string fileName, System.Text.Json.JsonElement file)
+    {
+        if (EditingBlocked() is { } blocked)
+        {
+            _viewer.SendSaveError(blocked);
+            return;
+        }
+        if (!string.Equals(_selected!.FileName, fileName, StringComparison.OrdinalIgnoreCase))
+        {
+            _viewer.SendSaveError("A animação aberta mudou: gire o osso de novo.");
+            return;
+        }
+        try
+        {
+            if (AnimationWriter.Write(_selected.FullPath, file) is { } error)
+            {
+                _viewer.SendSaveError($"{error.Key}: {error.Message}");
+                Status = $"Rotação não gravada — {error.Key}: {error.Message}";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _viewer.SendSaveError($"Não foi possível gravar o arquivo: {ex.Message}");
+        }
+    }
+
+    /// <summary>Ctrl+Z: the open animation goes back to its previous version, exactly (066, Q2).</summary>
+    public void Undo() => WriteVersion(history => history.Undo());
+
+    /// <summary>Ctrl+Y: the version undone comes back.</summary>
+    public void Redo() => WriteVersion(history => history.Redo());
+
+    private void WriteVersion(Func<AnimationHistory, string?> step)
+    {
+        // An invalid version can still be undone; only a running request or no open file stop it.
+        if (_isRunning || _selected == null)
+            return;
+        var history = _histories.For(_selected!.FileName);
+        if (step(history) is not { } text)
+            return;
+        try
+        {
+            AnimationWriter.WriteText(_selected.FullPath, text);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Status = $"Não foi possível desfazer: {ex.Message}";
+        }
+        ShowHistory();
     }
 
     private void Replace(int index, AnimationEntry entry, bool select)
@@ -414,6 +616,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (select)
             SelectedAnimation = entry;
         _quietSelection = false;
+        OnChanged(nameof(CanUpload));
+        OnChanged(nameof(UploadHint));
     }
 
     private void Insert(AnimationEntry entry, bool select = false)

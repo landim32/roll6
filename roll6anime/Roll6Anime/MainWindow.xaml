@@ -27,8 +27,11 @@
                 <TextBlock Text="{Binding AnimationsFolder}" Foreground="{StaticResource Muted}" FontSize="11"
                            TextTrimming="CharacterEllipsis" ToolTip="{Binding AnimationsFolder}" />
             </StackPanel>
-            <Button DockPanel.Dock="Bottom" Content="Nova animação" Click="OnNewAnimation" Margin="12"
+            <Button DockPanel.Dock="Bottom" Content="Nova animação" Click="OnNewAnimation" Margin="12,6,12,12"
                     ToolTip="Nenhuma animação aberta: o próximo pedido ao Claude cria um arquivo novo" />
+            <Button DockPanel.Dock="Bottom" Content="Enviar ao Roll6" Click="OnUpload" Margin="12,12,12,0"
+                    IsEnabled="{Binding CanUpload}" ToolTip="{Binding UploadHint}" ToolTipService.ShowOnDisabled="True"
+                    AutomationProperties.Name="Enviar ao Roll6" />
             <ListBox ItemsSource="{Binding Animations}" SelectedItem="{Binding SelectedAnimation}" Margin="8,0,8,0"
                      Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      AutomationProperties.Name="Animações da pasta">

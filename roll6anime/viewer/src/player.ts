@@ -62,7 +62,10 @@ export class Player {
    * @param source the asset's scene the clips are built on, as the Roll6 does (same bone names as `model`).
    * @param height the model's height in its own units (the unit of `hipsLift`).
    */
-  private readonly source: Object3D;
+  /** The asset's scene, at rest: the clips are built on it, and the pose editor (066) reads the rest frames there. */
+  readonly source: Object3D;
+  /** The pose editor holds a bone (066): the mixer must not put the clip's pose back over it. */
+  private frozen = false;
   private readonly height: number;
 
   constructor(model: Object3D, source: Object3D, height: number) {
@@ -78,6 +81,7 @@ export class Player {
 
   /** Builds and plays `file`; returns an error text when the model has none of its bones. */
   setAnimation(file: AnimationFile, fileName: string, keepTime: boolean): string | null {
+    this.frozen = false;
     const clip = buildRoll6Clip(toRoll6Clip(file, `animation:${fileName}`), this.source, this.height);
     if (!clip) return 'O modelo não tem nenhum dos ossos desta animação.';
     const next = nextPlayback(this.state, clip.duration, keepTime);
@@ -97,6 +101,7 @@ export class Player {
 
   /** No animation: the model back in its rest pose, the bar disabled. */
   clear(): void {
+    this.frozen = false;
     this.mixer.stopAllAction();
     this.action = null;
     this.state = NO_PLAYBACK;
@@ -131,7 +136,20 @@ export class Player {
     this.mixer.update(0);
   }
 
+  /** Stops the mixer from posing the model until the next animation, `clear` or `thaw` (066). */
+  freeze(): void {
+    this.frozen = true;
+  }
+
+  /** Lets the mixer pose the model again, at the instant it was (the clip's pose comes back). */
+  thaw(): void {
+    if (!this.frozen) return;
+    this.frozen = false;
+    this.mixer.update(0);
+  }
+
   update(delta: number): void {
+    if (this.frozen) return;
     this.mixer.update(delta);
   }
 

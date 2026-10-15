@@ -28,6 +28,7 @@ public partial class MainWindow : Window
         _model.PropertyChanged += OnModelChanged;
         Follow(_model.Conversation);
         Loaded += OnLoaded;
+        PreviewKeyDown += OnWindowKey;
         Closed += (_, _) => _model.Dispose();
     }
 
@@ -57,6 +58,16 @@ public partial class MainWindow : Window
     }
 
     private void OnNewAnimation(object sender, RoutedEventArgs e) => _model.NewAnimation();
+
+    /// <summary>"Enviar ao Roll6" (067): asks the Roll6 whether the animation exists, confirms name and type, then sends.</summary>
+    private async void OnUpload(object sender, RoutedEventArgs e)
+    {
+        if (await _model.PlanUploadAsync() is not { } found)
+            return;
+        var dialog = new UploadWindow(found.Plan, found.Entry.FileName) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.ChosenType is { } type)
+            await _model.UploadAsync(found.Plan, found.Entry, dialog.ChosenName, type);
+    }
 
     private void OnNewConversation(object sender, RoutedEventArgs e) => _model.NewConversation();
 
@@ -93,6 +104,26 @@ public partial class MainWindow : Window
     {
         if ((sender as FrameworkElement)?.DataContext is PrintAttachment print)
             _model.RemoveAttachment(print);
+    }
+
+    /// <summary>
+    /// Ctrl+Z / Ctrl+Y outside a text box undo and redo the open animation's history (066); inside the prompt they stay
+    /// the text's own undo. The 3D view sends its own keys as messages.
+    /// </summary>
+    private void OnWindowKey(object sender, KeyEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.Control || Keyboard.FocusedElement is System.Windows.Controls.TextBox)
+            return;
+        if (e.Key == Key.Z)
+        {
+            _model.Undo();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Y)
+        {
+            _model.Redo();
+            e.Handled = true;
+        }
     }
 
     /// <summary>Enter sends, Shift+Enter breaks the line.</summary>

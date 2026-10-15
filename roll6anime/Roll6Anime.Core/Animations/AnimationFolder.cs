@@ -49,6 +49,7 @@ public static class AnimationFolder
         try
         {
             bytes = ReadBytes(path);
+            entry.Text = new System.Text.UTF8Encoding(false).GetString(bytes);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
