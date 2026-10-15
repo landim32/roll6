@@ -99,9 +99,14 @@ public static class Roll6Guide
           `reset_turn` only cancels the actor's actions and leaves the piece where it is.
         - Never changed by it: `process_turn` (still finishes the turn; the mode stays on), `set_current_turn`, the admin
           log tools, pokes, the chat, the campaign status rules (outside Active everything stays frozen) and the
-          occupancy rules (an occupied hex or a hex outside the grid is still refused).
+          occupancy rules of `move_map_token` (an occupied hex or a hex outside the grid is still refused).
+        - **Shared walk** (069): while it is on, a player walks his own standing character in the 3D view; everyone sees
+          it walk and its piece follows hex by hex (`move_map_token` with `walk: true`, current map only). The walk passes
+          through other pieces and may stop on an occupied hex — only walls of the 3D view and the map edge stop it.
         - When it goes **off**, the normal rules return from the next action or move of each actor: the next action
-          cancels every earlier valid action of the turn; moves are again one per turn and limited.
+          cancels every earlier valid action of the turn; moves are again one per turn and limited. Switching it off is
+          **refused (409) while pieces share a hex** on any map of the campaign; the error names them, so move them apart
+          first.
 
         ## Hex grid (maps)
         - Flat-top hexagons in a rectangle of `gridWidth` columns × `gridHeight` rows; odd columns are shifted half a

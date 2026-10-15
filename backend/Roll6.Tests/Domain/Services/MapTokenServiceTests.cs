@@ -1027,4 +1027,155 @@ public class MapTokenServiceTests
         // Facing up, the knight lying at (4, 4) also takes (4, 5).
         await _service.Invoking(s => s.MoveAsync(1, 70, new MapTokenPositionInfo { X = 4, Y = 5 })).Should().ThrowAsync<ConflictException>();
     }
+
+    // ---- 069: the shared walk ----
+
+    private void CampaignIsFreeOn(long? currentMapId = 30) =>
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign
+        {
+            CampaignId = 10, UserId = 1, Name = "C", CurrentTurn = 3, FreeMode = true, CurrentMapId = currentMapId
+        });
+
+    private static MapTokenPositionInfo Walk(int x, int y, int look = 0) => new() { X = x, Y = y, Look = look, Walk = true };
+
+    [Fact]
+    public async Task Walk_OntoAnotherPiece_MovesWithoutTurnEntry()
+    {
+        var piece = AriaPiece();
+        CampaignIsFreeOn();
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
+        {
+            piece, new() { MapTokenId = 99, MapId = 30, TokenId = 5, X = 4, Y = 4 }
+        });
+
+        var moved = await _service.MoveAsync(2, 42, Walk(4, 4, 2));
+
+        (moved.X, moved.Y, moved.Look).Should().Be((4, 4, 2));
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_UPSERTED)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Walk_OutsideFreeMode_Refuses()
+    {
+        AriaPiece();
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
+
+        (await _service.Invoking(s => s.MoveAsync(2, 42, Walk(3, 2))).Should().ThrowAsync<ConflictException>())
+            .Which.Message.Should().Be("Só é possível andar no modo livre.");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Walk_OnAnotherMapThanTheCurrent_Refuses()
+    {
+        AriaPiece();
+        CampaignIsFreeOn(currentMapId: 31);
+
+        (await _service.Invoking(s => s.MoveAsync(2, 42, Walk(3, 2))).Should().ThrowAsync<ConflictException>())
+            .Which.Message.Should().Be("Só é possível andar no mapa atual da campanha.");
+    }
+
+    [Theory]
+    [InlineData(1)]   // the master
+    [InlineData(3)]   // another player
+    public async Task Walk_SomeoneElsesCharacter_Refuses(long userId)
+    {
+        AriaPiece();
+        CampaignIsFreeOn();
+
+        (await _service.Invoking(s => s.MoveAsync(userId, 42, Walk(3, 2))).Should().ThrowAsync<UnauthorizedAccessException>())
+            .Which.Message.Should().Be("Você só pode andar com os seus personagens.");
+    }
+
+    [Fact]
+    public async Task Walk_LyingCharacter_Refuses()
+    {
+        AriaPiece();
+        CampaignIsFreeOn();
+        _campaignCharacterRepository.Setup(r => r.GetByIdAsync(APPROVED)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = APPROVED, CampaignId = 10, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved, Posture = Posture.Down
+        });
+
+        (await _service.Invoking(s => s.MoveAsync(2, 42, Walk(3, 2))).Should().ThrowAsync<ConflictException>())
+            .Which.Message.Should().Be("Um personagem caído não anda.");
+    }
+
+    [Fact]
+    public async Task Walk_OutsideTheGrid_Refuses()
+    {
+        AriaPiece();
+        CampaignIsFreeOn();
+
+        (await _service.Invoking(s => s.MoveAsync(2, 42, Walk(10, 2))).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("x");
+    }
+
+    [Fact]
+    public async Task Move_WithoutWalk_InFreeMode_StillRefusesOccupiedHex()
+    {
+        var piece = AriaPiece();
+        CampaignIsFreeOn();
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
+        {
+            piece, new() { MapTokenId = 99, MapId = 30, TokenId = 5, X = 4, Y = 4 }
+        });
+
+        await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 4, Y = 4, Look = 0 })).Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task CanWalk_OwnStandingCharacterOnCurrentMapInFreeMode()
+    {
+        AriaPiece();
+        CampaignIsFreeOn();
+
+        (await _service.CanWalkAsync(2, 42, 10)).Should().BeTrue();
+        (await _service.CanWalkAsync(1, 42, 10)).Should().BeFalse();   // the master
+        (await _service.CanWalkAsync(3, 42, 10)).Should().BeFalse();   // another player
+        (await _service.CanWalkAsync(2, 42, 11)).Should().BeFalse();   // another campaign
+        (await _service.CanWalkAsync(2, 404, 10)).Should().BeFalse();  // no piece
+    }
+
+    [Fact]
+    public async Task CanWalk_NotInFreeModeOrNotTheCurrentMap_IsFalse()
+    {
+        AriaPiece();
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
+        (await _service.CanWalkAsync(2, 42, 10)).Should().BeFalse();
+
+        CampaignIsFreeOn(currentMapId: 31);
+        (await _service.CanWalkAsync(2, 42, 10)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CanWalk_ObjectPiece_IsFalse()
+    {
+        CampaignIsFreeOn();
+        _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Baú" });
+
+        (await _service.CanWalkAsync(2, 40, 10)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ListOverlaps_NamesThePiecesSharingAHex()
+    {
+        var piece = AriaPiece();
+        _mapRepository.Setup(r => r.ListByCampaignPagedAsync(10, 0, int.MaxValue)).ReturnsAsync((new List<Map>
+        {
+            new() { MapId = 30, CampaignId = 10, MapModelId = 50, UserId = 1, Status = MapStatus.Active }
+        }, 1));
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken>
+        {
+            piece,
+            new() { MapTokenId = 99, MapId = 30, TokenId = 5, Name = "Baú", X = 2, Y = 2 },
+            new() { MapTokenId = 98, MapId = 30, TokenId = 5, Name = "Mesa", X = 6, Y = 6 }
+        });
+
+        var overlaps = await _service.ListOverlapsAsync(10);
+
+        overlaps.Should().HaveCount(1);
+        overlaps[0].Should().Equal("Aria", "Baú");
+    }
 }

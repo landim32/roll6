@@ -47,6 +47,11 @@ class MapTokenService {
     return this.send('PUT', `/${id}/position`, data);
   }
 
+  /** Writes where the own character's free-mode walk took the piece (069): other pieces don't block. */
+  async walkTo(id: number, x: number, y: number, look: number): Promise<MapTokenInfo> {
+    return this.send('PUT', `/${id}/position`, { x, y, look, walk: true });
+  }
+
   async changeToken(id: number, data: MapTokenTokenInfo): Promise<MapTokenInfo> {
     return this.send('PUT', `/${id}/token`, data);
   }

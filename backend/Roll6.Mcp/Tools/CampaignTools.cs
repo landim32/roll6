@@ -152,10 +152,14 @@ public static class CampaignTools
         Switching it never touches the turn: no confirmation, no finish, no cancellation — leaving free mode just brings
         the normal rules back from the next action or move of each actor. Connected participants see the change in
         real time.
+        Shared walk (069): while it is on, players walk their own standing character in the 3D view and its piece follows
+        hex by hex for everyone, passing through other pieces (it may stop on an occupied hex). Turning free mode off is
+        therefore refused while two pieces of the campaign share a hex: move them apart first (move_map_token).
         Who can use it: only the master, in any campaign status (outside Active the turn stays frozen anyway).
         Returns: the updated campaign (freeMode).
-        Common errors: 403 not the master, 404 not found.
-        Related tools: get_campaign, finish_turn, act_in_turn, move_map_token, reset_turn, set_campaign_status.
+        Common errors: 403 not the master, 404 not found, 409 on switching off while pieces share a hex ("Não é possível
+        sair do modo livre: Aria e Borin estão no mesmo hex." — the names say which pieces to move).
+        Related tools: get_campaign, finish_turn, act_in_turn, move_map_token, list_map_tokens, reset_turn, set_campaign_status.
         """)]
     public static Task<CallToolResult> SetCampaignFreeMode(
         Roll6ApiClient api,

@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef } from 'react';
 import RealtimeContext from '../Contexts/RealtimeContext';
-import type { TableEvent } from '../types/realtime';
+import type { TableEvent, WalkMessage } from '../types/realtime';
 
 /** Access the Realtime context. Throws if used outside RealtimeProvider. */
 export const useRealtime = () => {
@@ -18,6 +18,14 @@ export const useTableEvents = (handler: (event: TableEvent) => void) => {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
   useEffect(() => subscribe((event) => handlerRef.current(event)), [subscribe]);
+};
+
+/** Calls `handler` for every walk sample of another participant in the current campaign (069). */
+export const useWalkEvents = (handler: (message: WalkMessage) => void) => {
+  const { onWalk } = useRealtime();
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+  useEffect(() => onWalk((message) => handlerRef.current(message)), [onWalk]);
 };
 
 export default useRealtime;

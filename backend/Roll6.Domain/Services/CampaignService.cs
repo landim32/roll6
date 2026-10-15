@@ -27,6 +27,7 @@ public class CampaignService : ICampaignService
     private readonly ICampaignNotificationPrefRepository<CampaignNotificationPref> _notificationPrefRepository;
     private readonly IUserNotificationRepository<UserNotification> _inboxRepository;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly IMapTokenService _mapTokenService;
 
     public CampaignService(
         ICampaignRepository<Campaign> repository,
@@ -43,8 +44,10 @@ public class CampaignService : ICampaignService
         IChatReadRepository<ChatRead> chatReadRepository,
         IImageStorageAppService imageStorage,
         ICampaignNotificationPrefRepository<CampaignNotificationPref> notificationPrefRepository,
-        IUserNotificationRepository<UserNotification> inboxRepository)
+        IUserNotificationRepository<UserNotification> inboxRepository,
+        IMapTokenService mapTokenService)
     {
+        _mapTokenService = mapTokenService;
         _notificationPrefRepository = notificationPrefRepository;
         _inboxRepository = inboxRepository;
         _chatReadRepository = chatReadRepository;
@@ -147,17 +150,39 @@ public class CampaignService : ICampaignService
 
     /// <summary>
     /// Switches the free mode (054, master only, any status). Nothing of the turn changes with it; the table learns
-    /// through <c>campaign.changed</c>.
+    /// through <c>campaign.changed</c>. Leaving it is refused (409) while pieces of the campaign share a hex — the walk
+    /// of 069 lets them overlap, the turns don't (FR-012).
     /// </summary>
     public async Task<CampaignInfo> SetFreeModeAsync(long userId, long campaignId, CampaignFreeModeInfo info)
     {
         var campaign = await GetOwnedAsync(userId, campaignId);
         if (campaign.FreeMode == info.FreeMode)
             return await MapToDtoAsync(campaign);
+        if (!info.FreeMode)
+        {
+            var overlaps = await _mapTokenService.ListOverlapsAsync(campaignId);
+            if (overlaps.Count > 0)
+                throw new ConflictException(FreeModeOverlapMessage(overlaps));
+        }
         campaign.SetFreeMode(info.FreeMode);
         var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
         return result;
+    }
+
+    /// <summary>Longest message of the free-mode exit refusal; longer lists end in "…".</summary>
+    public const int OVERLAP_MESSAGE_MAX = 300;
+
+    /// <summary>
+    /// "Não é possível sair do modo livre: Aria e Borin; Guarda, Guarda 2 e Orc estão no mesmo hex." (069), cut at
+    /// <see cref="OVERLAP_MESSAGE_MAX"/> characters.
+    /// </summary>
+    public static string FreeModeOverlapMessage(IReadOnlyList<IReadOnlyList<string>> groups)
+    {
+        static string Join(IReadOnlyList<string> names) =>
+            names.Count < 2 ? string.Concat(names) : $"{string.Join(", ", names.Take(names.Count - 1))} e {names[^1]}";
+        var message = $"Não é possível sair do modo livre: {string.Join("; ", groups.Select(Join))} estão no mesmo hex.";
+        return message.Length <= OVERLAP_MESSAGE_MAX ? message : message[..(OVERLAP_MESSAGE_MAX - 1)].TrimEnd() + "…";
     }
 
     public async Task DeleteAsync(long userId, long campaignId)

@@ -7,10 +7,14 @@ import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useStoryCamera } from '../../hooks/useStoryCamera';
 import { useTurn } from '../../hooks/useTurn';
+import { useWalkEvents } from '../../hooks/useRealtime';
+import { useWalkSync } from '../../hooks/useWalkSync';
 import type { FollowedPiece, WalkOptions } from '../../hooks/useStoryCamera';
 import { chatBalloons, nextBalloonExpiry } from '../../lib/chatBubbles';
 import { isFreeMode } from '../../lib/freeMode';
-import { buildOccupancy } from '../../lib/occupancy';
+import { addSample, remotePose } from '../../lib/remoteWalk';
+import type { RemotePose, RemoteTrack } from '../../lib/remoteWalk';
+import { isOwnEcho } from '../../lib/walkSync';
 import { canWalk, walkerBlocker, walkerLook } from '../../lib/walker';
 import type { WalkerState } from '../../lib/walker';
 import { HEX_SIZE } from '../../lib/hexGrid';
@@ -99,6 +103,10 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   /** The figures as built from the pieces, before the walk moves the player's own (055). */
   const baseSprites = useRef<RenderSprite[]>([]);
   const walkerRef = useRef<WalkerState | null>(null);
+  /** The other participants walking (069): their samples, and where each one is drawn this frame. */
+  const remoteTracks = useRef(new Map<number, RemoteTrack>());
+  const remotePoses = useRef(new Map<number, RemotePose>());
+  const remoteFrame = useRef(0);
   const [walkHint, setWalkHint] = useState(false);
   const bubbleLayer = useRef<BubbleLayerHandle>(null);
   const [ready, setReady] = useState(false);
@@ -211,22 +219,38 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     }
   }, [ready, profile, modelLayerReady]);
 
-  // ---------- Walking the character in free mode (055): local only, nothing is sent ----------
+  // ---------- Walking the character in free mode (055), shared with the table (069) ----------
 
-  /** The figures handed to the raycaster, with the player's own moved to where the walk took it. */
+  /**
+   * The figures handed to the raycaster, with the player's own moved to where the walk took it and the other walkers
+   * where their samples put them this frame (069).
+   */
   const pushSprites = useCallback(() => {
     const walker = walkerRef.current;
     const ownId = ownPiece?.mapTokenId;
-    const sprites = walker && ownId !== undefined
-      ? baseSprites.current.map((sprite) => (sprite.id === ownId
-        ? { ...sprite, center: { x: walker.x, y: walker.z }, look: walkerLook(walker.yaw) }
-        : sprite))
+    const remote = remotePoses.current;
+    const sprites = (walker && ownId !== undefined) || remote.size > 0
+      ? baseSprites.current.map((sprite) => {
+        if (walker && sprite.id === ownId) return { ...sprite, center: { x: walker.x, y: walker.z }, look: walkerLook(walker.yaw) };
+        const pose = remote.get(sprite.id);
+        return pose ? { ...sprite, center: { x: pose.x, y: pose.z }, look: walkerLook(pose.yaw) } : sprite;
+      })
       : baseSprites.current;
     rendererRef.current?.setSprites(sprites);
   }, [ownPiece?.mapTokenId]);
 
+  // The own walk goes to the table (069): samples through the hub, the piece's hex and facing through the API.
+  const walkSync = useWalkSync({
+    mapTokenId: ownPiece?.mapTokenId ?? null,
+    space: ownPiece?.space ?? 1,
+    columns: draft.gridWidth,
+    rows: draft.gridHeight,
+  });
+  const syncWalk = walkSync.onWalker;
+
   const onWalker = useCallback((walker: WalkerState | null) => {
     walkerRef.current = walker;
+    syncWalk(walker);
     pushSprites();
     const ownId = ownPiece?.mapTokenId;
     const layer = modelLayerRef.current;
@@ -234,21 +258,82 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     if (walker) layer.setPose(ownId, { x: walker.x, y: walker.z }, walker.yaw);
     else if (followed) layer.setPose(ownId, followed.center, lookToYaw(followed.look));
     layer.setWalking(ownId, walker?.moving ?? false);
-  }, [pushSprites, ownPiece?.mapTokenId, followed]);
+  }, [pushSprites, ownPiece?.mapTokenId, followed, syncWalk]);
 
-  const occupancy = useMemo(() => buildOccupancy(pieces), [pieces]);
+  // Where the walk starts from (069): the piece's place, except when it is only this tab's own write coming back — the
+  // walk goes on from where it is instead of jumping back to the middle of the hex. Someone else moving or turning the
+  // piece changes it, and the walk starts again from there.
+  const [walkAnchor, setWalkAnchor] = useState('');
+  const ownX = ownPiece?.x;
+  const ownY = ownPiece?.y;
+  const ownLook = ownPiece?.look;
+  useEffect(() => {
+    if (ownX === undefined || ownY === undefined || ownLook === undefined) return;
+    if (isOwnEcho({ x: ownX, y: ownY, look: ownLook }, walkSync.lastSent.current)) return;
+    setWalkAnchor(`${ownX}|${ownY}|${ownLook}`);
+  }, [ownX, ownY, ownLook, walkSync.lastSent]);
+
   const walk = useMemo((): WalkOptions | null => {
-    if (!ready || !ownPiece || !followed) return null;
+    if (!ready || !ownPiece || !followed || !walkAnchor) return null;
     if (!canWalk({ freeMode, isGm: currentSelection === 'gm' || currentSelection === null, piece: ownPiece })) return null;
+    const [anchorX, anchorY, anchorLook] = walkAnchor.split('|').map(Number);
     return {
-      // Anything that changes the piece throws the walk away: it starts again from the piece.
-      key: `${draft.mapId}|${ownPiece.mapTokenId}|${ownPiece.x}|${ownPiece.y}|${ownPiece.look}|${ownPiece.posture}`,
-      center: followed.center,
-      look: ownPiece.look,
-      blocked: walkerBlocker(blocked, occupancy, ownPiece.mapTokenId),
+      // Anything that changes the piece throws the walk away: it starts again from the piece (but not its own echo).
+      key: `${draft.mapId}|${ownPiece.mapTokenId}|${walkAnchor}|${ownPiece.posture}`,
+      center: spriteSpec({ ...ownPiece, x: anchorX, y: anchorY, look: anchorLook }, HEX_SIZE).center,
+      look: anchorLook,
+      // 069: other pieces don't stop it; walls and the edge still do.
+      blocked: walkerBlocker(blocked),
       onWalker,
     };
-  }, [ready, ownPiece, followed, freeMode, currentSelection, draft.mapId, blocked, occupancy, onWalker]);
+  }, [ready, ownPiece, followed, freeMode, currentSelection, draft.mapId, blocked, onWalker, walkAnchor]);
+
+  // A new walk starts with nothing pending from the previous one.
+  const resetWalkSync = walkSync.reset;
+  const walkKey = walk?.key;
+  useEffect(() => { resetWalkSync(); }, [walkKey, resetWalkSync]);
+
+  // ---------- The other participants walking (069) ----------
+
+  const piecesRef = useRef(pieces);
+  piecesRef.current = pieces;
+  const tickRemote = useRef<() => void>(() => undefined);
+  tickRemote.current = () => {
+    const now = performance.now();
+    const layer = modelLayerRef.current;
+    for (const [id, track] of remoteTracks.current) {
+      const pose = remotePose(track, now);
+      if (pose) {
+        remotePoses.current.set(id, pose);
+        layer?.setPose(id, { x: pose.x, y: pose.z }, pose.yaw);
+        layer?.setWalking(id, pose.moving);
+        continue;
+      }
+      // The walk is over: the figure goes back to the piece, which holds the walker's last hex.
+      remoteTracks.current.delete(id);
+      remotePoses.current.delete(id);
+      const piece = piecesRef.current.find((p) => p.mapTokenId === id);
+      if (piece) layer?.setPose(id, spriteSpec(piece, HEX_SIZE).center, lookToYaw(piece.look));
+      layer?.setWalking(id, false);
+    }
+    pushSprites();
+    remoteFrame.current = remoteTracks.current.size > 0 ? requestAnimationFrame(() => tickRemote.current()) : 0;
+  };
+
+  useWalkEvents((message) => {
+    const own = ownPiece?.mapTokenId;
+    if (walkerRef.current && message.mapTokenId === own) return;
+    if (!piecesRef.current.some((p) => p.mapTokenId === message.mapTokenId)) return;
+    remoteTracks.current.set(message.mapTokenId, addSample(remoteTracks.current.get(message.mapTokenId), {
+      x: message.x, z: message.z, yaw: message.yaw, moving: message.moving, at: performance.now(),
+    }));
+    if (!remoteFrame.current) remoteFrame.current = requestAnimationFrame(() => tickRemote.current());
+  });
+
+  useEffect(() => () => {
+    if (remoteFrame.current) cancelAnimationFrame(remoteFrame.current);
+    remoteFrame.current = 0;
+  }, []);
   const walking = walk !== null;
 
   const camera = useStoryCamera({

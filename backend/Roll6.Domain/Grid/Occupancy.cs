@@ -36,6 +36,37 @@ public class Occupancy
         return occupancy;
     }
 
+    /// <summary>
+    /// The groups of pieces that share at least one hex (069: what keeps free mode on). Pieces linked through different
+    /// hexes (A with B on one, B with C on another) form one group. Groups come in the order of the first hex where they
+    /// meet (row, then column) and the pieces of a group in the order they were met.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<long>> Overlaps()
+    {
+        var parent = new Dictionary<long, long>();
+        long Find(long id)
+        {
+            while (parent[id] != id)
+                id = parent[id] = parent[parent[id]];
+            return id;
+        }
+        var order = new List<long>();
+        foreach (var (_, ids) in _hexes.Where(e => e.Value.Count > 1).OrderBy(e => e.Key.Y).ThenBy(e => e.Key.X))
+        {
+            foreach (var id in ids)
+                if (parent.TryAdd(id, id))
+                    order.Add(id);
+            for (var i = 1; i < ids.Count; i++)
+            {
+                var a = Find(ids[0]);
+                var b = Find(ids[i]);
+                if (a != b)
+                    parent[b] = a;
+            }
+        }
+        return order.GroupBy(Find).Select(g => (IReadOnlyList<long>)g.ToList()).ToList();
+    }
+
     /// <summary>The piece on the hex (the first one when pieces overlap), or null.</summary>
     public long? PieceAt(int x, int y) => _hexes.TryGetValue((x, y), out var ids) ? ids[0] : null;
 

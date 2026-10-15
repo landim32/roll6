@@ -1,9 +1,7 @@
-import { HEX_SIZE, pixelToHex } from './hexGrid';
+import { HEX_SIZE } from './hexGrid';
 import type { Point } from './hexGrid';
-import { isBlocked } from './occupancy';
-import type { Occupancy } from './occupancy';
 import { isLying } from './pieceDrawing';
-import { CAMERA_RADIUS, forwardOf, lookToYaw, orbitPose } from './storyCamera';
+import { forwardOf, lookToYaw, orbitPose } from './storyCamera';
 import type { CameraBlocked, CameraPose } from './storyCamera';
 import type { MapTokenInfo } from '../types/mapToken';
 
@@ -58,21 +56,11 @@ export const startWalker = (center: Point, look: number, distance = WALK_DISTANC
 const clampDistance = (distance: number): number => Math.min(WALK_DISTANCE_MAX, Math.max(WALK_DISTANCE_MIN, distance));
 
 /**
- * Where the character may not stand: the camera's rule (the walls of the 3D mask of any height and the edge of the map,
- * with a radius around the point) plus the hexes taken by the other pieces (their whole shapes); its own piece's hexes
- * are free, since the walk starts on them.
+ * Where the character may not stand: the camera's rule — the walls of the 3D mask of any height and the edge of the
+ * map, with a radius around the point. Since 069 the other pieces never stop it: the walk is shared and passes through
+ * them (it may stop on an occupied hex; leaving free mode is then refused until they are apart).
  */
-export const walkerBlocker = (wallsAndEdge: CameraBlocked, occupancy: Occupancy, ownId: number): CameraBlocked => {
-  const onPiece = (x: number, z: number): boolean => {
-    const hex = pixelToHex({ x, y: z }, HEX_SIZE);
-    return isBlocked(occupancy, hex.x, hex.y, ownId);
-  };
-  return (x, z) =>
-    wallsAndEdge(x, z)
-    || onPiece(x, z)
-    || onPiece(x + CAMERA_RADIUS, z) || onPiece(x - CAMERA_RADIUS, z)
-    || onPiece(x, z + CAMERA_RADIUS) || onPiece(x, z - CAMERA_RADIUS);
-};
+export const walkerBlocker = (wallsAndEdge: CameraBlocked): CameraBlocked => wallsAndEdge;
 
 /** One step of `dt` seconds: turn, then walk one axis at a time so it slides along an obstacle instead of stopping. */
 export const stepWalker = (state: WalkerState, input: WalkerInput, dt: number, blocked: CameraBlocked): WalkerState => {

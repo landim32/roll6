@@ -37,6 +37,24 @@ export interface TableEvent {
 }
 
 /** State of the real-time connection. */
+/** A sample of this tab's free-mode walk, sent through the hub (069). */
+export interface WalkSend {
+  mapTokenId: number;
+  /** Exact position in map px. */
+  x: number;
+  /** Map y, in map px. */
+  z: number;
+  /** Radians: 0 = north, clockwise. */
+  yaw: number;
+  moving: boolean;
+}
+
+/** Another participant's walk sample, relayed by the hub (069). */
+export interface WalkMessage extends WalkSend {
+  campaignId: number;
+  userId: number;
+}
+
 export const REALTIME_STATUS = {
   connected: 'connected',
   reconnecting: 'reconnecting',

@@ -108,6 +108,8 @@ export interface MapTokenPositionInfo {
   y: number;
   /** New facing (0–5); omitted keeps the current one. */
   look?: number;
+  /** A free-mode walk position (069): own standing character, current map, other pieces ignored. */
+  walk?: boolean;
 }
 
 export interface MapTokenPostureInfo {

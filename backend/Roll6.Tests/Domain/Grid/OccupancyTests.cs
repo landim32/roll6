@@ -79,4 +79,50 @@ public class OccupancyTests
         // A 7-hex shape never fits a 2 × 2 grid.
         Occupancy.Build(Array.Empty<PieceShape>()).FirstFree(0, 7, 2, 2).Should().BeNull();
     }
+
+    [Fact]
+    public void Overlaps_NoneWhenEveryHexHasOnePiece()
+    {
+        Occupancy.Build(new[] { new PieceShape(1, 1, 1, 0, 1), new PieceShape(2, 3, 1, 0, 1) }).Overlaps().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Overlaps_GroupsThePiecesOfAHex()
+    {
+        var groups = Occupancy.Build(new[]
+        {
+            new PieceShape(1, 2, 2, 0, 1), new PieceShape(2, 2, 2, 0, 1), new PieceShape(3, 2, 2, 0, 1), new PieceShape(4, 6, 6, 0, 1)
+        }).Overlaps();
+
+        groups.Should().HaveCount(1);
+        groups[0].Should().Equal(1, 2, 3);
+    }
+
+    [Fact]
+    public void Overlaps_CountsTheWholeShape()
+    {
+        // A 2-hex piece at (4, 4) facing up also takes (4, 5), where piece 2 stands.
+        var groups = Occupancy.Build(new[] { new PieceShape(1, 4, 4, 0, 2), new PieceShape(2, 4, 5, 0, 1) }).Overlaps();
+
+        groups.Should().ContainSingle().Which.Should().BeEquivalentTo(new long[] { 1, 2 });
+    }
+
+    [Fact]
+    public void Overlaps_SeparatePairsAndChains()
+    {
+        var pairs = Occupancy.Build(new[]
+        {
+            new PieceShape(1, 1, 1, 0, 1), new PieceShape(2, 1, 1, 0, 1), new PieceShape(3, 6, 6, 0, 1), new PieceShape(4, 6, 6, 0, 1)
+        }).Overlaps();
+        pairs.Should().HaveCount(2);
+        pairs[0].Should().Equal(1, 2);
+        pairs[1].Should().Equal(3, 4);
+
+        // A meets B on (4, 4); B (2 hexes) meets C on (4, 5): one group.
+        var chain = Occupancy.Build(new[]
+        {
+            new PieceShape(1, 4, 4, 0, 1), new PieceShape(2, 4, 4, 0, 2), new PieceShape(3, 4, 5, 0, 1)
+        }).Overlaps();
+        chain.Should().ContainSingle().Which.Should().BeEquivalentTo(new long[] { 1, 2, 3 });
+    }
 }

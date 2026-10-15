@@ -40,6 +40,15 @@ public sealed class MapLayout
         }
     }
 
+    /// <summary>The whole shape must be inside the grid (400 on x); other pieces don't matter (069: the free-mode walk).</summary>
+    public void EnsureInside(int x, int y, int look, int space)
+    {
+        if (HexGrid.Footprint(x, y, look, space).Any(h => !HexGrid.IsInsideGrid(h.X, h.Y, Columns, Rows)))
+            throw new DomainValidationException("x", space == 1
+                ? "A posição está fora da grid do mapa."
+                : "A peça não cabe na grid do mapa nessa posição.");
+    }
+
     /// <summary>The free hex nearest to the middle of the map for a new piece (052), or 409 when the map is full.</summary>
     public (int X, int Y) FirstFree(int look, int space) =>
         Occupancy.FirstFree(look, space, Columns, Rows)
