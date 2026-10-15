@@ -19,11 +19,11 @@ public static class NotificationTools
         gets a push notification "{your first name} está cutucando você" on every device and everyone sees a gray line
         in the chat, "{you} cutucou Ana e Bruno". When nobody else is missing, a player's poke goes to the master instead
         ("{you} está cutucando você: todos já agiram", chat line "{you} cutucou o mestre", master = true); the master's
-        poke with nobody missing sends nothing (poked = 0). The same person can poke at most once a minute per campaign.
+        poke with nobody missing sends nothing (poked = 0). The same person can poke at most once every 30 minutes per campaign.
         Who can use it: the campaign master or a player with an approved character in the campaign.
         Returns: { poked, master, names, item } — how many were poked, whether it was the master, their first names and
         the chat line (null when nobody).
-        Common errors: 403 no access to the campaign, 404 campaign not found, 409 "Aguarde um minuto para cutucar de novo.".
+        Common errors: 403 no access to the campaign, 404 campaign not found, 409 "Você só pode cutucar a cada 30 minutos. Tente de novo em 12 min." (the minutes left).
         Related tools: get_turn_state, list_chat_messages, finish_turn.
         """)]
     public static Task<CallToolResult> PokePlayers(

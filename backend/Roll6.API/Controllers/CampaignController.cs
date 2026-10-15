@@ -287,7 +287,7 @@ public class CampaignController : ApiControllerBase
 
     /// <summary>
     /// Pokes the players whose characters haven't acted in the turn (043): a line in the chat and a notification to each.
-    /// Master or approved participant; once a minute per person (409 otherwise).
+    /// Master or approved participant; once every 30 minutes per person (409 otherwise).
     /// </summary>
     [HttpPost("{id:long}/poke")]
     [ProducesResponseType(typeof(PokeResultInfo), StatusCodes.Status200OK)]
