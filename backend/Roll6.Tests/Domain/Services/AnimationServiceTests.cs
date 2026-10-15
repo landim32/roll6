@@ -161,6 +161,78 @@ public class AnimationServiceTests
     }
 
     [Fact]
+    public async Task Update_AllFieldsAndContent_ChangesEverythingInOneCall()
+    {
+        const string NEW_FILE = "fedcba9876543210fedcba9876543210.json";
+        _imageService.Setup(s => s.StoreAnimationAsync(It.IsAny<byte[]>())).ReturnsAsync(NEW_FILE);
+
+        var result = await _service.UpdateAsync(1, 10, new AnimationUpdateInfo { Name = "Ogro Parado", Type = 7, Content = VALID });
+
+        result.Name.Should().Be("Ogro Parado");
+        result.Type.Should().Be(7);
+        result.Duration.Should().Be(1.2);
+        result.Loop.Should().BeFalse();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Animation>(a => a.FileName == NEW_FILE && a.Name == "Ogro Parado")), Times.Once);
+        _imageService.Verify(s => s.DeleteAnimationAsync(FILE), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_OnlyContent_KeepsNameAndType()
+    {
+        var result = await _service.UpdateAsync(1, 10, new AnimationUpdateInfo { Content = VALID });
+
+        result.Name.Should().Be("Aceno");
+        result.Type.Should().Be(1);
+        result.Duration.Should().Be(1.2);
+        _imageService.Verify(s => s.StoreAnimationAsync(It.IsAny<byte[]>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_OnlyName_KeepsTypeAndFile()
+    {
+        var result = await _service.UpdateAsync(1, 10, new AnimationUpdateInfo { Name = "Aceno lento" });
+
+        result.Name.Should().Be("Aceno lento");
+        result.Type.Should().Be(1);
+        result.Duration.Should().Be(1);
+        _imageService.Verify(s => s.StoreAnimationAsync(It.IsAny<byte[]>()), Times.Never);
+        _imageService.Verify(s => s.DeleteAnimationAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_NullJsonContent_KeepsTheFile()
+    {
+        var nothing = JsonDocument.Parse("null").RootElement;
+
+        await _service.UpdateAsync(1, 10, new AnimationUpdateInfo { Type = 1, Content = nothing });
+
+        _imageService.Verify(s => s.StoreAnimationAsync(It.IsAny<byte[]>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_InvalidContent_ChangesNothing()
+    {
+        var bad = JsonDocument.Parse("""{ "format": "roll6-animation", "version": 2 }""").RootElement;
+
+        var act = () => _service.UpdateAsync(1, 10, new AnimationUpdateInfo { Name = "Novo", Content = bad });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("content.version");
+        _imageService.Verify(s => s.StoreAnimationAsync(It.IsAny<byte[]>()), Times.Never);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Animation>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_RetypeInUseWithContent_ConflictsBeforeStoring()
+    {
+        _tokenRepository.Setup(r => r.AnyUsesClipAsync("animation:10", true, false, false)).ReturnsAsync(true);
+
+        var act = () => _service.UpdateAsync(1, 10, new AnimationUpdateInfo { Type = 6, Content = VALID });
+
+        await act.Should().ThrowAsync<ConflictException>();
+        _imageService.Verify(s => s.StoreAnimationAsync(It.IsAny<byte[]>()), Times.Never);
+    }
+
+    [Fact]
     public async Task ReplaceContent_ByTheOwner_StoresTheNewFileAndRemovesTheOld()
     {
         const string NEW_FILE = "fedcba9876543210fedcba9876543210.json";
