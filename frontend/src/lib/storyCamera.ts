@@ -100,7 +100,11 @@ export const orbitPose = (
  * angle around it.
  */
 export const followPose = (target: Point, look: number, blocked: CameraBlocked, orbit = 0): CameraPose =>
-  orbitPose(target, lookToYaw(look), orbit, FOLLOW_DISTANCE, blocked);
+  followYawPose(target, lookToYaw(look), blocked, orbit);
+
+/** `followPose` for an exact direction (070: a piece left by a 3D walk faces its walk's direction). */
+export const followYawPose = (target: Point, yaw: number, blocked: CameraBlocked, orbit = 0): CameraPose =>
+  orbitPose(target, yaw, orbit, FOLLOW_DISTANCE, blocked);
 
 /**
  * One step of free navigation: turn, then walk/strafe one axis at a time so the camera slides along a wall instead of

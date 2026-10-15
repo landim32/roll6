@@ -1056,6 +1056,51 @@ public class MapTokenServiceTests
     }
 
     [Fact]
+    public async Task Walk_WithTheExactPoint_KeepsItForThe3dView()
+    {
+        AriaPiece();
+        CampaignIsFreeOn();
+        var info = Walk(4, 4, 2);
+        info.WalkX = 285.5;
+        info.WalkY = 315.25;
+        info.WalkYaw = 1.25;
+
+        var moved = await _service.MoveAsync(2, 42, info);
+
+        (moved.X, moved.Y, moved.Look).Should().Be((4, 4, 2));
+        (moved.WalkX, moved.WalkY, moved.WalkYaw).Should().Be(((double?)285.5, (double?)315.25, (double?)1.25));
+    }
+
+    [Fact]
+    public async Task Walk_PointOutsideTheHex_Refuses()
+    {
+        AriaPiece();
+        CampaignIsFreeOn();
+        var info = Walk(4, 4, 2);
+        info.WalkX = 360;
+        info.WalkY = 312;
+        info.WalkYaw = 0;
+
+        (await _service.Invoking(s => s.MoveAsync(2, 42, info)).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("walkX");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Move_WithoutWalk_ClearsTheWalkPoint()
+    {
+        var piece = AriaPiece();
+        CampaignIsFreeOn();
+        piece.WalkX = 125;
+        piece.WalkY = 100;
+        piece.WalkYaw = 1;
+
+        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 4, Y = 4, Look = 0 });
+
+        (moved.WalkX, moved.WalkY, moved.WalkYaw).Should().Be(((double?)null, (double?)null, (double?)null));
+    }
+
+    [Fact]
     public async Task Walk_OutsideFreeMode_Refuses()
     {
         AriaPiece();

@@ -109,6 +109,16 @@ public class MapTokenInfo
     [JsonPropertyName("look")]
     public int Look { get; set; }
 
+    /// <summary>Where a 3D walk left the figure inside its hex (map pixels) and its exact direction (radians); null = the middle of the hex, facing look (069).</summary>
+    [JsonPropertyName("walkX")]
+    public double? WalkX { get; set; }
+
+    [JsonPropertyName("walkY")]
+    public double? WalkY { get; set; }
+
+    [JsonPropertyName("walkYaw")]
+    public double? WalkYaw { get; set; }
+
     /// <summary>Posture of the character/NPC occurrence: 1 standing, 2 down, 3 out of combat; null for objects (031).</summary>
     [JsonPropertyName("posture")]
     public int? Posture { get; set; }

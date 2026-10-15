@@ -90,8 +90,10 @@ public static class MapTokenTools
         Walk (walk = true, free mode only): the position a player reached walking his own standing character in the 3D
         view — on the campaign's current map only, other pieces ignored (they may end up on the same hex), no turn entry,
         no Deslocamento. The master cannot walk pieces either; he moves them without walk. Leaving free mode is refused
-        while pieces share a hex.
-        Returns: the updated piece.
+        while pieces share a hex. walkX/walkY/walkYaw (all three, with walk) keep the exact point the figure stopped at
+        inside its hex (map pixels, 40 px hexes; it must round to x/y) and its direction in radians, so the 3D view draws it
+        there instead of the middle of the hex; the 2D map always draws the middle. Any move without them clears it.
+        Returns: the updated piece (walkX/walkY/walkYaw null = the middle of the hex).
         Common errors: 409 a hex of the piece's shape occupied or already moved this turn, 400 beyond the move or shape
         outside the grid (big pieces need their whole shape free at every step and turn), 403 not your piece. With walk:
         409 "Só é possível andar no modo livre." / "Só é possível andar no mapa atual da campanha." / "Um personagem
@@ -104,8 +106,14 @@ public static class MapTokenTools
         [Description("Destination column. " + McpDocs.X)] int x,
         [Description("Destination row. " + McpDocs.Y)] int y,
         [Description(McpDocs.LOOK_OPTIONAL)] int? look = null,
-        [Description("True = a free-mode walk position of your own standing character (ignores other pieces, current map only, no turn entry). Omit for a normal move.")] bool? walk = null) =>
-        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/position", new MapTokenPositionInfo { X = x, Y = y, Look = look, Walk = walk });
+        [Description("True = a free-mode walk position of your own standing character (ignores other pieces, current map only, no turn entry). Omit for a normal move.")] bool? walk = null,
+        [Description("With walk: exact horizontal point of the figure in map pixels; must lie in the hex x/y. Omit = the middle of the hex.")] double? walkX = null,
+        [Description("With walk: exact vertical point of the figure in map pixels; must lie in the hex x/y.")] double? walkY = null,
+        [Description("With walk: exact direction the figure faces, in radians (0 = up the map, clockwise).")] double? walkYaw = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/position", new MapTokenPositionInfo
+        {
+            X = x, Y = y, Look = look, Walk = walk, WalkX = walkX, WalkY = walkY, WalkYaw = walkYaw
+        });
 
     [McpServerTool(Name = "change_map_token_image", Title = "Change piece token", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/maptoken/{id}/token")]

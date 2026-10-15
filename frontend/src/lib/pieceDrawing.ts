@@ -1,4 +1,4 @@
-import { footprintLocal, hexCenter, hexCorners } from './hexGrid';
+import { footprintLocal, hexCenter, hexCorners, pixelToHex } from './hexGrid';
 import type { Point } from './hexGrid';
 import { tokenSpriteUrls } from './spriteView';
 import { modelScaleFactor } from './modelScale';
@@ -120,8 +120,10 @@ export interface SpriteSpec {
   look: number;
   /** Width of the figure (px): the width of the piece's shape on the map. */
   width: number;
-  /** Middle of the piece's shape on the map (px), where the figure stands. */
+  /** Middle of the piece's shape on the map (px), where the figure stands — or where a 3D walk left it (070). */
   center: Point;
+  /** Exact direction it faces (radians, 0 = up, clockwise): the walk's, else the `look`'s. */
+  yaw: number;
   /** Color of the placeholder shown when the piece has no image. */
   baseColor: string;
   /** The token's 3D model (055), drawn instead of the figure once it is loaded; null when it has none. */
@@ -138,7 +140,25 @@ export interface SpriteSpec {
  * piece) and facing the piece's `look` — which side of them the camera sees is decided per frame by the renderer.
  * Callers check `isShownIn3d` first.
  */
+/**
+ * Where a 3D walk left a standing piece (070): the exact point inside its hex and the exact direction, kept by the server
+ * so the figure is not pulled to the middle of the hex. Null when the piece has none, is lying or the point no longer
+ * falls in its hex (any other move clears it on the server).
+ */
+export const walkPose = (
+  token: Pick<MapTokenInfo, 'x' | 'y' | 'posture' | 'walkX' | 'walkY' | 'walkYaw'>,
+  size: number,
+): { center: Point; yaw: number } | null => {
+  const { walkX, walkY, walkYaw } = token;
+  if (walkX == null || walkY == null || walkYaw == null) return null;
+  if (token.posture !== POSTURE.standing) return null;
+  const hex = pixelToHex({ x: walkX, y: walkY }, size);
+  if (hex.x !== token.x || hex.y !== token.y) return null;
+  return { center: { x: walkX, y: walkY }, yaw: walkYaw };
+};
+
 export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
+  const walked = walkPose(token, size);
   const geometry = pieceGeometry(token.space, size);
   // Middle of the shape in the piece's frame, turned like TokenLayer: (look − 3) × 60°.
   const local = { x: geometry.box.x + geometry.box.width / 2, y: geometry.box.y + geometry.box.height / 2 };
@@ -155,7 +175,8 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     fallbackUrl: token.upImageUrl,
     look: token.look,
     width: geometry.box.width,
-    center,
+    center: walked?.center ?? center,
+    yaw: walked?.yaw ?? (((token.look % 6) + 6) % 6) * (Math.PI / 3),
     baseColor: BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR,
     modelUrl: token.modelFileUrl ?? null,
     modelClips: { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null, down: token.modelDownClip ?? null },

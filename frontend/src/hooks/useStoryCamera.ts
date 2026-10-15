@@ -3,7 +3,7 @@ import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent }
 import { HEX_SIZE } from '../lib/hexGrid';
 import type { Point } from '../lib/hexGrid';
 import { DRAG_TURN, easeBack, foldIntoCharacter, orbitBy } from '../lib/orbitCamera';
-import { followPose, FOV_STEP, initialCamera, stepCamera } from '../lib/storyCamera';
+import { followYawPose, FOV_STEP, initialCamera, lookToYaw, stepCamera } from '../lib/storyCamera';
 import type { CameraBlocked, CameraPose } from '../lib/storyCamera';
 import { startWalker, stepWalker, walkCamera, withDistance, zoomWalker } from '../lib/walker';
 import type { WalkerState } from '../lib/walker';
@@ -16,6 +16,8 @@ export interface FollowedPiece {
   mapTokenId: number;
   center: Point;
   look: number;
+  /** Exact direction (070), when a 3D walk left the piece facing between two sides; else `look`'s. */
+  yaw?: number;
 }
 
 /**
@@ -23,10 +25,15 @@ export interface FollowedPiece {
  * camera, which stays locked behind it. `key` says when to start again from the piece (the piece moved, turned or lay
  * down, another map or character): a new key throws the walk away. Nothing here leaves the browser.
  */
+/** The direction the camera follows a piece from: its exact one (070), else its side's. */
+const pieceYaw = (piece: FollowedPiece): number => piece.yaw ?? lookToYaw(piece.look);
+
 export interface WalkOptions {
   key: string;
   center: Point;
   look: number;
+  /** Exact direction to start from (070); else `look`'s. */
+  yaw?: number;
   /** Where the character may not stand (walls, edge, other pieces). */
   blocked: CameraBlocked;
   /** Called with every new state of the walk, and with null when it ends. */
@@ -119,7 +126,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   useEffect(() => {
     const piece = followedRef.current;
     orbitRef.current = 0;
-    if (piece) setPose(followPose(piece.center, piece.look, latest.current.blocked));
+    if (piece) setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked));
     else if (!poseRef.current) setPose(initialCamera(null, columns, rows, latest.current.blocked));
     // The piece went away: stay where the camera is, free.
     else setPose({ ...poseRef.current, attached: false });
@@ -129,13 +136,14 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   const followedX = followed?.center.x;
   const followedY = followed?.center.y;
   const followedLook = followed?.look;
+  const followedYaw = followed?.yaw;
   useEffect(() => {
     const piece = followedRef.current;
     if (!piece || !poseRef.current?.attached || walkerRef.current) return;
     // Someone moved or turned the piece: the camera goes back behind it (068).
     orbitRef.current = 0;
-    setPose(followPose(piece.center, piece.look, latest.current.blocked));
-  }, [followedX, followedY, followedLook, setPose]);
+    setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked));
+  }, [followedX, followedY, followedLook, followedYaw, setPose]);
 
   // Walls changed under the camera (map saved elsewhere): re-apply so nothing stands inside a wall.
   useEffect(() => {
@@ -144,7 +152,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
       return;
     }
     const piece = followedRef.current;
-    if (piece && poseRef.current?.attached) setPose(followPose(piece.center, piece.look, blocked, orbitRef.current));
+    if (piece && poseRef.current?.attached) setPose(followYawPose(piece.center, pieceYaw(piece), blocked, orbitRef.current));
   }, [blocked, setPose]);
 
   /** A new state of the walk: the camera goes behind it and the view hears about it. */
@@ -161,13 +169,13 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     const current = latest.current.walk;
     orbitRef.current = 0;
     if (current) {
-      setWalker(startWalker(current.center, current.look, walkDistance.current));
+      setWalker(startWalker(current.center, current.look, walkDistance.current, current.yaw));
       return;
     }
     if (!walkerRef.current) return;
     walkerRef.current = null;
     const piece = followedRef.current;
-    if (piece) setPose(followPose(piece.center, piece.look, latest.current.blocked));
+    if (piece) setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked));
     else if (poseRef.current) setPose({ ...poseRef.current, attached: false });
   }, [walkKey, setWalker, setPose]);
 
@@ -186,7 +194,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   const reattach = useCallback(() => {
     const piece = followedRef.current;
     orbitRef.current = 0;
-    if (piece) setPose(followPose(piece.center, piece.look, latest.current.blocked));
+    if (piece) setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked));
   }, [setPose]);
 
   // Re-apply on a new zoom, and once the scene exists.
@@ -317,7 +325,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     if (piece && pose.attached) {
       // Following the piece outside free mode: either button circles the camera around it (068).
       orbitRef.current = orbitBy(orbitRef.current, dx);
-      setPose(followPose(piece.center, piece.look, latest.current.blocked, orbitRef.current));
+      setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked, orbitRef.current));
       return;
     }
     setPose(stepCamera(pose, { turn: dx * DRAG_TURN }, latest.current.blocked));

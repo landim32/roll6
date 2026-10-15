@@ -23,4 +23,21 @@ public class MapTokenPositionInfo
     [JsonPropertyName("walk")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Walk { get; set; }
+
+    /// <summary>
+    /// With <c>walk</c>: the exact point the figure stopped at, in map pixels (it must lie in the hex x/y), and the
+    /// direction it faces in radians. The 3D view draws the piece there; the 2D map still draws it at the middle of the
+    /// hex. Omitted = the middle of the hex.
+    /// </summary>
+    [JsonPropertyName("walkX")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WalkX { get; set; }
+
+    [JsonPropertyName("walkY")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WalkY { get; set; }
+
+    [JsonPropertyName("walkYaw")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WalkYaw { get; set; }
 }

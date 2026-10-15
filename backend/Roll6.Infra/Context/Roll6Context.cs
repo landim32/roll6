@@ -192,6 +192,9 @@ public class Roll6Context : DbContext
             entity.Property(e => e.X).HasColumnName("x");
             entity.Property(e => e.Y).HasColumnName("y");
             entity.Property(e => e.Look).HasColumnName("look").HasDefaultValue(0).HasSentinel(int.MinValue);
+            entity.Property(e => e.WalkX).HasColumnName("walk_x");
+            entity.Property(e => e.WalkY).HasColumnName("walk_y");
+            entity.Property(e => e.WalkYaw).HasColumnName("walk_yaw");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.MapId)

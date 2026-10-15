@@ -66,6 +66,9 @@ public partial class MapTokenService
 
         mapToken.MoveTo(info.X, info.Y);
         mapToken.Face(look);
+        // The exact point inside the hex, so the 3D view never pulls the figure to the middle of it.
+        if (info.WalkX is double walkX && info.WalkY is double walkY && info.WalkYaw is double walkYaw)
+            mapToken.WalkTo(walkX, walkY, walkYaw);
         return await PublishPieceAsync(map, userId, await MapToDtoAsync(await _repository.UpdateAsync(mapToken)));
     }
 
