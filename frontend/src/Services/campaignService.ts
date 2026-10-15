@@ -61,6 +61,14 @@ class CampaignService {
     return this.handleResponse<CampaignInfo>(response);
   }
 
+  /** Master only (072): shows or hides the pending notice over the chat. Allowed in any status. */
+  async setPendingNotice(id: number, pendingNotice: boolean): Promise<CampaignInfo> {
+    const response = await fetch(`${API_BASE}/${id}/pending-notice`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ pendingNotice }),
+    });
+    return this.handleResponse<CampaignInfo>(response);
+  }
+
   async setCurrentMap(id: number, mapId: number | null): Promise<CampaignInfo> {
     const response = await fetch(`${API_BASE}/${id}/current-map`, {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ mapId }),

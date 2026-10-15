@@ -8,7 +8,7 @@ import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
 import { useCampaign } from '../../hooks/useCampaign';
-import { isFreeMode, showPending } from '../../lib/freeMode';
+import { showPending } from '../../lib/freeMode';
 import { hexCenter } from '../../lib/hexGrid';
 import { LAYOUT_MODE } from '../../lib/layoutMode';
 import { TURN_STATUS, characterStatus } from '../../lib/turnStatus';
@@ -35,8 +35,8 @@ export const PendingPlayers = () => {
     .map((member) => ({ member, status: characterStatus(entries, member.characterId) }))
     .filter(({ status }) => status !== TURN_STATUS.acted)), [turnNo, party, entries]);
 
-  // 049: nobody owes a play while the campaign is not active; 054: nor in free mode.
-  if (pending.length === 0 || !showPending(currentCampaign?.status, isFreeMode(currentCampaign))) return null;
+  // 049: nobody owes a play while the campaign is not active; 072: the master may hide the notice (free mode or not).
+  if (pending.length === 0 || !showPending(currentCampaign)) return null;
 
   const goTo = (member: CampaignCharacterInfo) => {
     const piece = draft.mapId === null ? undefined

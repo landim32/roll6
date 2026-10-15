@@ -870,6 +870,8 @@
     "rollLabel": "Rolou {{dice}}, total {{total}}",
     "showMovement": "Ver deslocamento",
     "showChanges": "Ver mudanças de status",
+    "pendingNotice": "Aviso de quem falta jogar",
+    "pendingNoticeHint": "Mostra ou esconde, para toda a mesa, as fotos piscando de quem ainda não jogou no turno",
     "pendingLabel": "Personagens que ainda não jogaram neste turno",
     "pendingNone": "{{name}}: ainda não moveu nem agiu — ver no mapa",
     "pendingMoved": "{{name}}: já moveu, falta agir — ver no mapa",

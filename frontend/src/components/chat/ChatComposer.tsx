@@ -50,7 +50,7 @@ export const ChatComposer = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const { party } = useCharacter();
-  const { currentCampaign, isMaster } = useCampaign();
+  const { currentCampaign, isMaster, setPendingNotice } = useCampaign();
   // 047: who the next entry is whispered to; empty = public. Cleared after every send (clarification B).
   const [recipients, setRecipients] = useState<WhisperRecipient[]>([]);
   const [mention, setMention] = useState<MentionMatch | null>(null);
@@ -248,6 +248,16 @@ export const ChatComposer = () => {
     }
   };
 
+  /** 072: the master shows or hides, for everyone, the pictures of who still owes a play. */
+  const pendingNotice = currentCampaign?.pendingNotice !== false;
+  const onTogglePending = async () => {
+    try {
+      await setPendingNotice(!pendingNotice);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    }
+  };
+
   /** 3d6 drawn by the server; whatever is typed becomes the roll's reason ("Ataque com espada"). */
   const onRoll = async () => {
     const reason = text.trim() || null;
@@ -348,6 +358,17 @@ export const ChatComposer = () => {
                     </span>
                     <span>{t('chat.showChanges')}</span>
                   </DropdownMenu.Item>
+                  {isMaster && (
+                    // 072: a campaign flag, so it changes the notice for the whole table, not only this screen.
+                    <DropdownMenu.Item className={`stm-chat-attach-item${pendingNotice ? ' is-on' : ''}`}
+                      onSelect={(event) => { event.preventDefault(); void onTogglePending(); }}
+                      aria-checked={pendingNotice} role="menuitemcheckbox" title={t('chat.pendingNoticeHint')}>
+                      <span className="stm-chat-attach-icon is-view">
+                        {pendingNotice ? <EyeIcon size={24} /> : <EyeSlashIcon size={24} />}
+                      </span>
+                      <span>{t('chat.pendingNotice')}</span>
+                    </DropdownMenu.Item>
+                  )}
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>

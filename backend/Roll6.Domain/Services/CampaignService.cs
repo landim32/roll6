@@ -100,6 +100,7 @@ public class CampaignService : ICampaignService
             Slug = row.Slug,
             Status = row.Status,
             FreeMode = row.FreeMode,
+            PendingNotice = row.PendingNotice,
             IsMaster = row.UserId == userId,
             CurrentMapId = row.CurrentMapId,
             CurrentMapName = row.CurrentMapName,
@@ -165,6 +166,21 @@ public class CampaignService : ICampaignService
                 throw new ConflictException(FreeModeOverlapMessage(overlaps));
         }
         campaign.SetFreeMode(info.FreeMode);
+        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
+        return result;
+    }
+
+    /// <summary>
+    /// Switches the pending notice over the chat (072, master, any status, free mode or not). The same value is a
+    /// no-op; a change reaches every screen through <c>campaign.changed</c>.
+    /// </summary>
+    public async Task<CampaignInfo> SetPendingNoticeAsync(long userId, long campaignId, CampaignPendingNoticeInfo info)
+    {
+        var campaign = await GetOwnedAsync(userId, campaignId);
+        if (campaign.PendingNotice == info.PendingNotice)
+            return await MapToDtoAsync(campaign);
+        campaign.SetPendingNotice(info.PendingNotice);
         var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
         return result;
@@ -286,6 +302,7 @@ public class CampaignService : ICampaignService
         Open = campaign.Open,
         Status = (int)campaign.Status,
         FreeMode = campaign.FreeMode,
+        PendingNotice = campaign.PendingNotice,
         CurrentTurn = campaign.CurrentTurn,
         CurrentMapId = campaign.CurrentMapId,
         CreatedAt = campaign.CreatedAt,

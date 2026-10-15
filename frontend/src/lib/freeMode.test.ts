@@ -18,11 +18,13 @@ describe('isFreeMode', () => {
 });
 
 describe('showPending', () => {
-  it('needs an active campaign out of free mode', () => {
-    expect(showPending(CAMPAIGN_STATUS.active, false)).toBe(true);
-    expect(showPending(CAMPAIGN_STATUS.active, true)).toBe(false);
-    expect(showPending(CAMPAIGN_STATUS.paused, false)).toBe(false);
-    expect(showPending(CAMPAIGN_STATUS.paused, true)).toBe(false);
+  it('needs an active campaign with the notice on, free mode or not', () => {
+    expect(showPending({ status: CAMPAIGN_STATUS.active })).toBe(true);
+    expect(showPending({ status: CAMPAIGN_STATUS.active, pendingNotice: true })).toBe(true);
+    expect(showPending({ status: CAMPAIGN_STATUS.active, pendingNotice: true, freeMode: true } as never)).toBe(true);
+    expect(showPending({ status: CAMPAIGN_STATUS.active, pendingNotice: false })).toBe(false);
+    expect(showPending({ status: CAMPAIGN_STATUS.paused, pendingNotice: true })).toBe(false);
+    expect(showPending(null)).toBe(false);
   });
 });
 

@@ -17,6 +17,8 @@ export interface CampaignInfo {
   currentTurn: number;
   /** Free mode (054) — see `lib/freeMode`. A missing value reads as false. */
   freeMode: boolean;
+  /** Pending notice over the chat (072) — see `lib/freeMode.showPending`. A missing value reads as true. */
+  pendingNotice?: boolean;
   /** Campaign map the master opened last; players follow it (017). */
   currentMapId: number | null;
   createdAt: string;
@@ -32,6 +34,8 @@ export interface CampaignTableInfo {
   status: number;
   /** Free mode (054). */
   freeMode: boolean;
+  /** Pending notice over the chat (072). */
+  pendingNotice?: boolean;
   isMaster: boolean;
   currentMapId: number | null;
   currentMapName: string | null;

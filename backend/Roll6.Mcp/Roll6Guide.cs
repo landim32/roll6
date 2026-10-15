@@ -111,6 +111,8 @@ public static class Roll6Guide
           cancels every earlier valid action of the turn; moves are again one per turn and limited. Switching it off is
           **refused (409) while pieces share a hex** on any map of the campaign; the error names them, so move them apart
           first.
+        - The pending notice over the chat (the pictures of who still owes a play) is a separate flag, `pendingNotice`
+          (`set_campaign_pending_notice`, master, any status, on by default). While on it also shows in free mode.
 
         ## Hex grid (maps)
         - Flat-top hexagons in a rectangle of `gridWidth` columns × `gridHeight` rows; odd columns are shifted half a

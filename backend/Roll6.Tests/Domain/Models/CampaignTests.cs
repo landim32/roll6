@@ -13,6 +13,18 @@ public class CampaignTests
     }
 
     [Fact]
+    public void SetPendingNotice_StartsOnAndToggles()
+    {
+        var campaign = new Campaign();
+        campaign.PendingNotice.Should().BeTrue();
+
+        campaign.SetPendingNotice(false);
+        campaign.PendingNotice.Should().BeFalse();
+        campaign.SetPendingNotice(true);
+        campaign.PendingNotice.Should().BeTrue();
+    }
+
+    [Fact]
     public void SetFreeMode_TogglesAndBumpsUpdatedAt()
     {
         var campaign = new Campaign { CampaignId = 10, UpdatedAt = DateTime.UtcNow.AddDays(-1) };

@@ -32,6 +32,8 @@ interface CampaignContextType {
   setCampaignStatus: (status: number) => Promise<CampaignInfo>;
   /** The master switches the free mode (054). Throws the API error (the previous value stays). Never touches the turn. */
   setFreeMode: (freeMode: boolean) => Promise<CampaignInfo>;
+  /** The master shows or hides the pending notice over the chat for everyone (072). Throws the API error. */
+  setPendingNotice: (pendingNotice: boolean) => Promise<CampaignInfo>;
   // State management
   selectCampaign: (campaign: CampaignInfo | null) => void;
   clearError: () => void;
@@ -159,10 +161,17 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
     return campaign;
   }, [currentCampaignId, selectCampaign, refreshTableCampaigns]);
 
+  const setPendingNotice = useCallback(async (pendingNotice: boolean): Promise<CampaignInfo> => {
+    if (currentCampaignId === null) throw new Error('no campaign');
+    const campaign = await campaignService.setPendingNotice(currentCampaignId, pendingNotice);
+    selectCampaign(campaign);
+    return campaign;
+  }, [currentCampaignId, selectCampaign]);
+
   const value = useMemo<CampaignContextType>(() => ({
     currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug,
-    refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, selectCampaign, clearError,
-  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, selectCampaign, clearError]);
+    refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, setPendingNotice, selectCampaign, clearError,
+  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, setPendingNotice, selectCampaign, clearError]);
 
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 };

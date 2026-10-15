@@ -167,6 +167,25 @@ public static class CampaignTools
         [Description("true = free mode on (several actions, unlimited unrecorded moves, no pending list); false = turn mode.")] bool freeMode) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/free-mode", new CampaignFreeModeInfo { FreeMode = freeMode });
 
+    [McpServerTool(Name = "set_campaign_pending_notice", Title = "Set campaign pending notice", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/campaign/{id}/pending-notice")]
+    [Description("""
+        What it does: shows or hides, in the app, the notice over the campaign chat — the blinking round pictures of
+        the characters that still owe their play this turn (red border: neither moved nor acted; yellow: only moved).
+        It is only a display flag of the campaign: it changes no rule, no turn and no notification. On by default; while
+        on, it also shows in free mode (where only actions count, since moves are not recorded). It never shows while
+        the campaign is not Active.
+        Who can use it: only the master, in any campaign status.
+        Returns: the updated campaign (pendingNotice).
+        Common errors: 403 not the master, 404 not found.
+        Related tools: get_campaign, set_campaign_free_mode, poke_players, get_turn_state.
+        """)]
+    public static Task<CallToolResult> SetCampaignPendingNotice(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("true = show the pending pictures over the chat; false = hide them for everyone.")] bool pendingNotice) =>
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/pending-notice", new CampaignPendingNoticeInfo { PendingNotice = pendingNotice });
+
     [McpServerTool(Name = "delete_campaign", Title = "Delete campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaign/{id}")]
     [Description($$"""

@@ -2098,5 +2098,20 @@ BEGIN
     VALUES ('20261015181236_AddCampaignNpcCategory', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015202650_AddCampaignPendingNotice') THEN
+    ALTER TABLE campaigns ADD pending_notice boolean NOT NULL DEFAULT TRUE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261015202650_AddCampaignPendingNotice') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261015202650_AddCampaignPendingNotice', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 
