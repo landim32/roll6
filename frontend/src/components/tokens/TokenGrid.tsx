@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { hasModelBadge, tokenBadge } from '../../lib/tokenBadge';
+import { tokenBadges } from '../../lib/tokenBadge';
 import type { TokenInfo } from '../../types/token';
 import { PencilIcon } from '../ui/icons';
 
@@ -19,9 +19,9 @@ interface TokenGridProps {
 }
 
 /**
- * Tokens in a 4-column grid (image or initial + name), paginated. Clicking a card picks the token. A badge over the
- * top-right corner of the image says how complete the token's art is (Full / 2.5D / Caído, 036), with a green "3D"
- * under it when the token has a 3D model; the optional pencil
+ * Tokens in a 4-column grid (image or initial + name), paginated. Clicking a card picks the token. Badges over the
+ * top-right corner of the image say which art the token has, each on its own — "Caído", "2.5D" (yellow while sides are
+ * missing) and "3D" (`lib/tokenBadge`); the optional pencil
  * floats over the top-left corner as a sibling button, so it never picks.
  */
 export const TokenGrid = ({ items, loading, busy, emptyText, onPick, onEdit, page, totalPages, onPage }: TokenGridProps) => {
@@ -37,20 +37,14 @@ export const TokenGrid = ({ items, loading, busy, emptyText, onPick, onEdit, pag
           <div className="col" key={token.tokenId}>
             <div className="stm-token-cell">
               {(() => {
-                const badge = tokenBadge(token);
-                const model = hasModelBadge(token);
-                return (badge || model) && (
+                const badges = tokenBadges(token);
+                return badges.length > 0 && (
                   <span className="stm-token-badges">
-                    {badge && (
-                      <span className={`stm-token-badge badge text-bg-${badge.variant}`} title={t(`tokens.badge.${badge.kind}Hint`)}>
+                    {badges.map((badge) => (
+                      <span key={badge.kind} className={`stm-token-badge badge text-bg-${badge.variant}`} title={t(`tokens.badge.${badge.kind}Hint`)}>
                         {t(`tokens.badge.${badge.kind}`)}
                       </span>
-                    )}
-                    {model && (
-                      <span className="stm-token-badge badge text-bg-success" title={t('tokens.badge.modelHint')}>
-                        {t('tokens.badge.model')}
-                      </span>
-                    )}
+                    ))}
                   </span>
                 );
               })()}

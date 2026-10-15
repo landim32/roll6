@@ -60,4 +60,23 @@ public class PromptImageTests
         content.GetArrayLength().Should().Be(1);
         content[0].GetProperty("text").GetString().Should().Be("oi");
     }
+
+    [Fact]
+    public void WithTheSkeletonTheCaptionSaysWhatTheLinesAre()
+    {
+        var caption = new ViewCapture(PNG, 0.5, 1, true, 0, 0, Skeleton: true).Caption("a.json");
+
+        caption.Should().EndWith("na altura do meio do corpo. Esqueleto visível: o modelo aparece semitransparente e as linhas são os ossos (âmbar = movimentados pela animação aberta, ciano = os demais).");
+        new ViewCapture(PNG, 0.5, 1, true, 0, 0).Caption("a.json").Should().NotContain("Esqueleto");
+    }
+
+    [Fact]
+    public void TheCaptionSaysTheKeyPose()
+    {
+        new ViewCapture(PNG, 0.5, 1, true, 0, 0, Pose: new CapturePose(3, 3, 5)).Caption("animacoes/a.json").Should()
+            .Contain("no instante 0,50 s de 1,00 s (pausada), na pose 3 de 5 (as poses são os instantes com chave no arquivo); câmera");
+        new ViewCapture(PNG, 0.6, 1, true, 0, 0, Pose: new CapturePose(2, 3, 5)).Caption("animacoes/a.json").Should()
+            .Contain("entre as poses 2 e 3 (de 5)");
+        new ViewCapture(PNG, 0.6, 1, true, 0, 0).Caption("animacoes/a.json").Should().NotContain("pose");
+    }
 }

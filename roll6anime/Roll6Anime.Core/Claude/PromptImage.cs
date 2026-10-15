@@ -4,6 +4,13 @@ using Roll6Anime.Core.Markup;
 
 namespace Roll6Anime.Core.Claude;
 
+/// <summary>The key pose of a print (1-based): on a pose when <c>From == To</c>, else between two of <c>Count</c>.</summary>
+public sealed record CapturePose(int From, int To, int Count)
+{
+    /// <summary>"na pose 3 de 5" or "entre as poses 2 e 3 (de 5)".</summary>
+    public string Describe() => From == To ? $"na pose {From} de {Count}" : $"entre as poses {From} e {To} (de {Count})";
+}
+
 /// <summary>A print of the 3D view attached to a request: the PNG and the text that says what it shows.</summary>
 public sealed record PromptImage(byte[] Png, string Caption)
 {
@@ -36,10 +43,14 @@ public sealed record PromptImage(byte[] Png, string Caption)
 /// <summary>
 /// What the 3D view reported when it was printed: the PNG, the animation's instant (null without an animation) and
 /// where the camera was, around the character (<c>Azimuth</c> 0° = in front, positive toward its left — the
-/// character's +X — up to ±180° behind; <c>Elevation</c> above the middle of the model).
+/// character's +X — up to ±180° behind; <c>Elevation</c> above the middle of the model) and whether the skeleton was
+/// showing (065).
 /// </summary>
-public sealed record ViewCapture(byte[] Png, double? Time, double? Duration, bool Paused, double Azimuth, double Elevation)
+public sealed record ViewCapture(byte[] Png, double? Time, double? Duration, bool Paused, double Azimuth, double Elevation, bool Skeleton = false, CapturePose? Pose = null)
 {
+    /// <summary>What the caption adds when the print shows the skeleton (065): what the lines and their colors are.</summary>
+    public const string SKELETON_NOTE = " Esqueleto visível: o modelo aparece semitransparente e as linhas são os ossos (âmbar = movimentados pela animação aberta, ciano = os demais).";
+
     private static readonly CultureInfo BRAZIL = CultureInfo.GetCultureInfo("pt-BR");
 
     /// <summary>The caption in Portuguese: which animation, which instant and from where the camera looks.</summary>
@@ -47,8 +58,9 @@ public sealed record ViewCapture(byte[] Png, double? Time, double? Duration, boo
     {
         var what = animationName == null || Time is not { } time || Duration is not { } duration
             ? "o modelo na pose de descanso, sem animação"
-            : $"a animação {animationName} no instante {Seconds(time)} de {Seconds(duration)}{(Paused ? " (pausada)" : " (tocando)")}";
-        return $"print da vista 3D do roll6anime: {what}; câmera {Camera()}.";
+            : $"a animação {animationName} no instante {Seconds(time)} de {Seconds(duration)}{(Paused ? " (pausada)" : " (tocando)")}"
+              + (Pose is { } pose ? $", {pose.Describe()} (as poses são os instantes com chave no arquivo)" : string.Empty);
+        return $"print da vista 3D do roll6anime: {what}; câmera {Camera()}." + (Skeleton ? SKELETON_NOTE : string.Empty);
     }
 
     private string Camera()

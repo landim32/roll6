@@ -26,7 +26,18 @@ Todas as mensagens são objetos JSON com `type`.
 | `modelError` | `message` (string) | O `.glb` não abriu (inválido, sem WebGL). |
 | `animationError` | `message` (string) | O clip não pôde ser montado, por exemplo porque o modelo não tem nenhum osso da animação. |
 | `captured` | `id`, `png` (base64 sem `data:`), `time`/`duration` (null sem animação), `paused`, `azimuth`, `elevation` (graus: 0 = de frente, positivo para a esquerda do personagem; acima do centro) | Resposta a `capture`. A casca monta a legenda (`ViewCapture.Caption`). |
+| `captured` (065) | + `skeleton` (boolean), `pose` (`{ from, to, count }`, 1-based, ou null) | O esqueleto estava visível (a legenda ganha `ViewCapture.SKELETON_NOTE`); a pose-chave do instante vai na legenda e escrita no canto do PNG ("Pose 2 de 5 · 0,3 s"). |
 | `captureFailed` | `id`, `message` | Sem modelo aberto. A casca desiste após 5 s sem resposta. |
+
+## Edição da pose (066)
+
+| Direção | `type` | Campos | Efeito |
+|---|---|---|---|
+| vista → casca | `saveAnimation` | `fileName`, `file` | A casca valida (`AnimationFormat.Parse`) e grava o arquivo aberto, se for ele e o Claude não estiver trabalhando. |
+| vista → casca | `undo`, `redo` | — | A casca grava a versão anterior/seguinte do histórico do arquivo aberto (texto exato). |
+| casca → vista | `saveError` | `message` | Gravação recusada: a vista devolve o osso à pose do arquivo e mostra a mensagem. |
+| casca → vista | `history` | `undo`, `redo` | Contagens dos botões ↶ ↷. |
+| casca → vista | `editing` | `enabled`, `reason` | Liga/desliga os anéis e ↶ ↷ (Claude trabalhando, sem animação, arquivo inválido). |
 
 ## Barra de tempo (dentro da vista)
 

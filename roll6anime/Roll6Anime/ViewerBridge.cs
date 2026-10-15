@@ -37,6 +37,10 @@ public sealed class ViewerBridge
     public event Action<bool>? ModelLoaded;
     public event Action<string>? ModelError;
     public event Action<string>? AnimationError;
+    /// <summary>The pose editor (066): the open file with a bone turned, to validate and write.</summary>
+    public event Action<string, JsonElement>? SaveRequested;
+    public event Action? UndoRequested;
+    public event Action? RedoRequested;
 
     public async Task InitializeAsync()
     {
@@ -74,6 +78,15 @@ public sealed class ViewerBridge
 
     /// <summary>No animation: the model at rest.</summary>
     public void Clear() => Post(new { type = "clear" });
+
+    /// <summary>A save of the pose editor was refused: the view puts the bone back and shows why (066).</summary>
+    public void SendSaveError(string message) => Post(new { type = "saveError", message });
+
+    /// <summary>How many steps the open animation's history can undo and redo (066).</summary>
+    public void SendHistory(int undo, int redo) => Post(new { type = "history", undo, redo });
+
+    /// <summary>Whether the pose editor may write now, and why not (066).</summary>
+    public void SendEditing(bool enabled, string? reason) => Post(new { type = "editing", enabled, reason });
 
     /// <summary>
     /// A print of the view as it is on screen (the pose of this instant, from this camera), with the instant and the
@@ -126,6 +139,16 @@ public sealed class ViewerBridge
             case "modelError":
                 ModelError?.Invoke(root.TryGetProperty("message", out var modelMessage) ? modelMessage.GetString() ?? string.Empty : string.Empty);
                 break;
+            case "saveAnimation":
+                if (root.TryGetProperty("fileName", out var saveName) && root.TryGetProperty("file", out var saveFile))
+                    SaveRequested?.Invoke(saveName.GetString() ?? string.Empty, saveFile.Clone());
+                break;
+            case "undo":
+                UndoRequested?.Invoke();
+                break;
+            case "redo":
+                RedoRequested?.Invoke();
+                break;
             case "animationError":
                 AnimationError?.Invoke(root.TryGetProperty("message", out var animationMessage) ? animationMessage.GetString() ?? string.Empty : string.Empty);
                 break;
@@ -135,7 +158,9 @@ public sealed class ViewerBridge
                         Convert.FromBase64String(root.GetProperty("png").GetString() ?? string.Empty),
                         Number(root, "time"), Number(root, "duration"),
                         root.TryGetProperty("paused", out var paused) && paused.ValueKind == JsonValueKind.True,
-                        Number(root, "azimuth") ?? 0, Number(root, "elevation") ?? 0));
+                        Number(root, "azimuth") ?? 0, Number(root, "elevation") ?? 0,
+                        root.TryGetProperty("skeleton", out var skeleton) && skeleton.ValueKind == JsonValueKind.True,
+                        PoseOf(root)));
                 break;
             case "captureFailed":
                 if (_captures.TryGetValue(root.GetProperty("id").GetInt32(), out var failed))
@@ -144,6 +169,11 @@ public sealed class ViewerBridge
                 break;
         }
     }
+
+    private static CapturePose? PoseOf(JsonElement root) =>
+        root.TryGetProperty("pose", out var pose) && pose.ValueKind == JsonValueKind.Object
+            ? new CapturePose(pose.GetProperty("from").GetInt32(), pose.GetProperty("to").GetInt32(), pose.GetProperty("count").GetInt32())
+            : null;
 
     private static double? Number(JsonElement root, string name) =>
         root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : null;

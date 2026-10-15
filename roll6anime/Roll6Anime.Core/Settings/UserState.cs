@@ -4,8 +4,8 @@ using System.Text.Json.Serialization;
 namespace Roll6Anime.Core.Settings;
 
 /// <summary>
-/// What the tool remembers between runs (062): only the last model opened, in
-/// <c>%LOCALAPPDATA%\roll6anime\state.json</c>. The only file the tool writes — never an animation (FR-009).
+/// What the tool remembers between runs (062): the last model opened and, since 067, which Roll6 animation each file
+/// was sent to, in <c>%LOCALAPPDATA%\roll6anime\state.json</c>.
 /// </summary>
 public class UserState
 {
@@ -13,6 +13,14 @@ public class UserState
 
     [JsonPropertyName("lastModel")]
     public string? LastModel { get; set; }
+
+    /// <summary>File name (lower case) → id of the Roll6 animation it was last sent to (067, "Enviar ao Roll6").</summary>
+    [JsonPropertyName("uploads")]
+    public Dictionary<string, long> Uploads { get; set; } = new();
+
+    public long? UploadOf(string fileName) => Uploads.TryGetValue(fileName.ToLowerInvariant(), out var id) ? id : null;
+
+    public void RememberUpload(string fileName, long animationId) => Uploads[fileName.ToLowerInvariant()] = animationId;
 
     /// <summary>The default folder: <c>%LOCALAPPDATA%\roll6anime</c>.</summary>
     public static string DefaultFolder =>

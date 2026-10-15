@@ -17,11 +17,14 @@ public record AnimationError(string Key, string Message)
 public class AnimationEntry
 {
     private static readonly CultureInfo PT_BR = CultureInfo.GetCultureInfo("pt-BR");
-    private static readonly string[] TYPE_LABELS = { "Parado", "Andando", "Correndo", "Agachado", "Derrotado", "Atacando", "Defendendo" };
+    /// <summary>The Roll6 names of the animation types 1-7.</summary>
+    public static readonly IReadOnlyList<string> TypeLabels = new[] { "Parado", "Andando", "Correndo", "Agachado", "Derrotado", "Atacando", "Defendendo" };
 
     public required string FileName { get; init; }
     public required string FullPath { get; init; }
     public string? Name { get; set; }
+    /// <summary>The file's exact text as last read (066: the version history keeps it byte for byte).</summary>
+    public string? Text { get; set; }
     public AnimationType? Type { get; set; }
     public double? Duration { get; set; }
     public bool? Loop { get; set; }
@@ -42,7 +45,7 @@ public class AnimationEntry
             if (Duration == null || Loop == null)
                 return string.Empty;
             var text = $"{Duration.Value.ToString("0.0#", PT_BR)} s · {(Loop.Value ? "repete" : "uma vez")}";
-            return Type is { } type ? $"{TYPE_LABELS[(int)type - 1]} · {text}" : text;
+            return Type is { } type ? $"{TypeLabels[(int)type - 1]} · {text}" : text;
         }
     }
 }
