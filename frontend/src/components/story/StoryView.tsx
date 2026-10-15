@@ -10,7 +10,7 @@ import { useTurn } from '../../hooks/useTurn';
 import { useWalkEvents } from '../../hooks/useRealtime';
 import { useWalkSync } from '../../hooks/useWalkSync';
 import type { FollowedPiece, WalkOptions } from '../../hooks/useStoryCamera';
-import { chatBalloons, nextBalloonExpiry } from '../../lib/chatBubbles';
+import { nextBalloonExpiry, storyBalloons } from '../../lib/chatBubbles';
 import { isFreeMode } from '../../lib/freeMode';
 import { addSample, remotePose } from '../../lib/remoteWalk';
 import type { RemotePose, RemoteTrack } from '../../lib/remoteWalk';
@@ -23,7 +23,7 @@ import { loadImage } from '../../lib/mapSnapshot';
 import { isLying, isModelShownIn3d, isShownIn3d, spriteSpec } from '../../lib/pieceDrawing';
 import { fitSprites } from '../../lib/spriteFit';
 import { SPRITE_VIEWS } from '../../lib/spriteView';
-import { lastActions, pieceKey } from '../../lib/turnStatus';
+import { pieceKey } from '../../lib/turnStatus';
 import type { SpriteSpec } from '../../lib/pieceDrawing';
 import { buildMaskGrid } from '../../lib/raycaster';
 import type { MapArea, MaskGrid } from '../../lib/raycaster';
@@ -143,14 +143,11 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     })() : null
   ), [ownPiece]);
 
-  // The speech balloons (036): what each actor last said in the turn in progress, for the standing pieces of this map
-  // that said something — the same text and the same key (`pieceKey`) the 2D map uses. Objects say nothing. In free mode
-  // (068) it is whatever each one last said in the chat — a message, a caption, a roll or an action — for 60 seconds from
-  // when it was sent; leaving free mode brings the turn's actions back at once.
+  // The balloons (036, 068, 073), in any mode, for the standing pieces of this map, keyed like the 2D map (`pieceKey`):
+  // the action of the turn in progress always shows; what an actor says in the chat (a message, a caption, a roll)
+  // takes its place for 60 seconds from when it was sent, while newer than the action. Objects say nothing.
   const bubbles = useMemo((): StoryBubble[] => {
-    const texts = freeMode
-      ? new Map([...chatBalloons(chatItems, balloonNow)].map(([key, balloon]) => [key, balloon.text]))
-      : lastActions(entries);
+    const texts = storyBalloons(chatItems, entries, balloonNow);
     if (texts.size === 0) return [];
     return pieces.reduce<StoryBubble[]>((list, piece) => {
       if (!isShownIn3d(piece)) return list;
@@ -158,20 +155,19 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
       const text = key ? texts.get(key) : undefined;
       return text ? [...list, { id: piece.mapTokenId, name: piece.name, text }] : list;
     }, []);
-  }, [freeMode, chatItems, balloonNow, entries, pieces]);
+  }, [chatItems, balloonNow, entries, pieces]);
 
-  // The clock of the balloons (068): read again when free mode starts and when the next balloon to expire is due — a
+  // The clock of the balloons (068): read again when the chat changes and when the next speech to expire is due — a
   // stale clock only means that wake-up comes at once.
   useEffect(() => {
-    if (freeMode) setBalloonNow(Date.now());
-  }, [freeMode]);
+    setBalloonNow(Date.now());
+  }, [chatItems]);
   useEffect(() => {
-    if (!freeMode) return;
     const next = nextBalloonExpiry(chatItems, balloonNow);
     if (next === null) return;
     const timer = window.setTimeout(() => setBalloonNow(Date.now()), Math.max(0, next - Date.now()) + 20);
     return () => window.clearTimeout(timer);
-  }, [freeMode, chatItems, balloonNow]);
+  }, [chatItems, balloonNow]);
 
   // A new saying has to show at once, and the renderer only draws when something moved.
   useEffect(() => {

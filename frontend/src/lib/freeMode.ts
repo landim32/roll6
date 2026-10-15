@@ -1,7 +1,7 @@
 /**
- * Free mode of a campaign (054): while the master keeps it on, every action of an actor stays valid (the map shows
- * the last one), character and NPC pieces move any number of times without the Deslocamento limit, nothing is
+ * Free mode of a campaign (054): while the master keeps it on, character and NPC pieces move any number of times without the Deslocamento limit, nothing is
  * recorded for those moves (so there is no trail), the turn finishes without a pending list and nobody is reminded.
+ * Actions stay one per actor and turn, as outside it (073).
  * The server decides all of that (`Campaign.FreeMode`); this module only decides what the screen offers.
  */
 import { isPlayable } from './campaignStatus';

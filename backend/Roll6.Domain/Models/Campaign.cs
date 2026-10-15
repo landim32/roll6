@@ -34,9 +34,9 @@ public class Campaign
     public int? MajorityNotifiedTurn { get; set; }
 
     /// <summary>
-    /// Free mode (054): while on, every action of an actor stays valid (the map shows the last one), character and
-    /// NPC pieces move any number of times without the Deslocamento limit and without a Movement entry, the turn
-    /// finishes without a pending list and no majority notice goes out. Switching it never touches the turn.
+    /// Free mode (054): while on, character and NPC pieces move any number of times without the Deslocamento limit and without a Movement entry, the turn
+    /// finishes without a pending list and no majority notice goes out. Switching it never touches the turn. Actions
+    /// stay one per actor and turn (073 removed the 054 exception).
     /// </summary>
     public bool FreeMode { get; set; }
 

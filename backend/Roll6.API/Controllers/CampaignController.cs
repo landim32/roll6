@@ -144,7 +144,7 @@ public class CampaignController : ApiControllerBase
         }
     }
 
-    /// <summary>Switches the campaign's free mode (054, master, any status): several valid actions per actor, unlimited unrecorded moves, no pending list.</summary>
+    /// <summary>Switches the campaign's free mode (054, master, any status): unlimited unrecorded moves, turn finished without the pending list.</summary>
     [HttpPut("{id:long}/free-mode")]
     [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> SetFreeMode(long id, [FromBody] CampaignFreeModeInfo info)

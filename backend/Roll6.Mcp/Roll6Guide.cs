@@ -95,20 +95,20 @@ public static class Roll6Guide
           `get_campaign_by_slug`, `list_my_table_campaigns`). It is a flag of the campaign: it stays on across turns
           until the master turns it off, and switching it never touches the turn (no confirmation, no finish, nothing
           cancelled or deleted).
-        - While it is **on**: every action of an actor stays valid (`act_in_turn` and `convert_chat_entry` cancel
-          nothing; the map balloon shows the last one, `get_turn_summary`/`get_turn_data` list them all, in order);
-          character and NPC pieces move any number of times per turn (`move_map_token`), without the Deslocamento limit
+        - While it is **on**: character and NPC pieces move any number of times per turn (`move_map_token`), without the Deslocamento limit
           and **without a Movement entry** — nothing is recorded, so there is no trail and the summary's positions are
           just where the pieces are; `finish_turn` finishes at once (no pending list); no "Falta apenas você…" notice;
           `reset_turn` only cancels the actor's actions and leaves the piece where it is.
+        - Actions are **not** changed by it: an actor has one valid action per turn in any mode, and a new action (or
+          `convert_chat_entry` to an action) cancels the previous one.
         - Never changed by it: `process_turn` (still finishes the turn; the mode stays on), `set_current_turn`, the admin
           log tools, pokes, the chat, the campaign status rules (outside Active everything stays frozen) and the
           occupancy rules of `move_map_token` (an occupied hex or a hex outside the grid is still refused).
         - **Shared walk** (069): while it is on, a player walks his own standing character in the 3D view; everyone sees
           it walk and its piece follows hex by hex (`move_map_token` with `walk: true`, current map only). The walk passes
           through other pieces and may stop on an occupied hex — only walls of the 3D view and the map edge stop it.
-        - When it goes **off**, the normal rules return from the next action or move of each actor: the next action
-          cancels every earlier valid action of the turn; moves are again one per turn and limited. Switching it off is
+        - When it goes **off**, the normal rules return from the next move of each actor: moves are again one per turn
+          and limited. Switching it off is
           **refused (409) while pieces share a hex** on any map of the campaign; the error names them, so move them apart
           first.
         - The pending notice over the chat (the pictures of who still owes a play) is a separate flag, `pendingNotice`
@@ -164,7 +164,8 @@ public static class Roll6Guide
           along them and as tall as a full wall (a low wall shows its lower part). Without it the walls take the colors of
           the map image, as before. Only the 3D view uses it.
         - The floor goes on past the edge of the map image with the color of its nearest edge, and the speech balloons of
-          the turn in progress appear over the figures in the 3D view (they are the turn's action texts, not new data).
+          the 3D view appear over the figures: the actor's action of the turn in progress always shows, and what it says in
+          the chat (message, caption, roll) replaces it for 60 seconds from the send, then the action comes back.
         - Tokens may have four **"2.5D" images**, one per side of the standing character: **`frontImage`** (seen from the
           front), **`rightImage`** (in profile, looking to the RIGHT of the image), **`leftImage`** (in profile, looking
           to the LEFT of the image) and **`backImage`** (seen from behind). "Right" and "left" are the character's own

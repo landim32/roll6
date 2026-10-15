@@ -142,9 +142,7 @@ public static class CampaignTools
     [McpServerTool(Name = "set_campaign_free_mode", Title = "Set campaign free mode", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/free-mode")]
     [Description("""
-        What it does: switches the campaign's free mode (054) on or off. While it is on: every action of a character or NPC
-        piece stays valid (act_in_turn and convert_chat_entry cancel nothing; the map balloon shows the last one, the
-        summary and the turn data list them all); character and NPC pieces move any number of times per turn, without
+        What it does: switches the campaign's free mode (054) on or off. While it is on: character and NPC pieces move any number of times per turn, without
         the Deslocamento limit and without a Movement entry (so there is no trail and nothing to undo); finish_turn
         finishes at once without the pending list; no "Falta apenas você…" notice goes out; reset_turn only cancels the
         actions and leaves the piece where it is. Nothing else changes: process_turn, set_current_turn, the turn number,
@@ -164,7 +162,7 @@ public static class CampaignTools
     public static Task<CallToolResult> SetCampaignFreeMode(
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
-        [Description("true = free mode on (several actions, unlimited unrecorded moves, no pending list); false = turn mode.")] bool freeMode) =>
+        [Description("true = free mode on (unlimited unrecorded moves, turn finished at once); false = turn mode.")] bool freeMode) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/free-mode", new CampaignFreeModeInfo { FreeMode = freeMode });
 
     [McpServerTool(Name = "set_campaign_pending_notice", Title = "Set campaign pending notice", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]

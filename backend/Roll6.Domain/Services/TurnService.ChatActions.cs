@@ -71,10 +71,8 @@ public partial class TurnService
                     .All(p => p.CampaignCharacterId != participation.CampaignCharacterId))
                 throw new Exceptions.DomainValidationException("to", "Coloque o personagem no mapa aberto para agir.");
             turn.ToAction(mapId);
-            // 054: in free mode the character keeps every valid action.
-            var cancelled = campaign.FreeMode
-                ? new List<Turn>()
-                : await CancelValidActionsAsync(campaign, characterId, null, except: turn.TurnId);
+            // 044/073: one valid action per character and turn, in any mode.
+            var cancelled = await CancelValidActionsAsync(campaign, characterId, null, except: turn.TurnId);
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 foreach (var previous in cancelled)

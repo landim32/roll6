@@ -198,8 +198,8 @@ public static class ChatTools
         What it does: to = "action" turns a text message a character said in the current turn into that character's
         action of the turn (its previous action becomes "Ação cancelada"; the master is notified like act_in_turn); to =
         "message" turns the character's valid action of the current turn back into a text message (the character no
-        longer has an action). The entry keeps its time, quote and reactions. A character has one valid action per turn —
-        except in free mode (set_campaign_free_mode), when converting to an action cancels nothing.
+        longer has an action). The entry keeps its time, quote and reactions. A character has one valid action per turn,
+        in any mode (free mode included).
         Who can use it: the character's owner or the campaign master.
         Returns: the updated item. {{ITEM}}
         Common errors: 400 not a text/action of a character, another turn, text over 2000 characters, the character has no

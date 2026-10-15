@@ -23,7 +23,7 @@ public class CampaignInfo
     [JsonPropertyName("currentTurn")]
     public int CurrentTurn { get; set; }
 
-    /// <summary>Free mode (054): several valid actions per actor, unlimited unrecorded moves, no pending list.</summary>
+    /// <summary>Free mode (054): unlimited unrecorded moves, turn finished without the pending list.</summary>
     [JsonPropertyName("freeMode")]
     public bool FreeMode { get; set; }
 

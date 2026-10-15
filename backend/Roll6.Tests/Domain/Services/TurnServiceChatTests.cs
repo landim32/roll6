@@ -541,7 +541,7 @@ public partial class TurnServiceChatTests
     }
 
     [Fact]
-    public async Task Convert_ToAction_InFreeMode_CancelsNothing()
+    public async Task Convert_ToAction_InFreeMode_CancelsPreviousAction()
     {
         _campaign.FreeMode = true;
         var text = AriaText(70);
@@ -558,8 +558,8 @@ public partial class TurnServiceChatTests
         await _service.ConvertAsync(PLAYER, 70, new ChatConvertInfo { To = "action" });
 
         text.IsValidAction.Should().BeTrue();
-        previous.IsCancelled.Should().BeFalse();
-        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 71)), Times.Never);
+        previous.IsCancelled.Should().BeTrue();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Turn>(t => t.TurnId == 71 && t.IsCancelled)), Times.Once);
         _campaign.FreeMode = false;
     }
 
