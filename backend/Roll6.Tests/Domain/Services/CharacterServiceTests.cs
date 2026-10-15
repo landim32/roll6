@@ -26,6 +26,7 @@ public class CharacterServiceTests
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
     private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
@@ -40,7 +41,18 @@ public class CharacterServiceTests
         _campaignCharacterRepository.Setup(r => r.ListCampaignIdsByCharacterAsync(It.IsAny<long>())).ReturnsAsync(new List<long>());
         _repository.Setup(r => r.GetByIdAsync(CHARACTER)).ReturnsAsync(() => new Character { CharacterId = CHARACTER, UserId = OWNER, Name = "Aria", Life = 12, Energy = 6 });
         _service = new CharacterService(_repository.Object, _campaignCharacterRepository.Object,
-            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object, _turnRepository.Object, _campaignRepository.Object, _notifier.Object);
+            _unitOfWork.Object, _userRepository.Object, _tokenRepository.Object, _mapTokenRepository.Object, _imageStorage.Object, _turnRepository.Object, _campaignRepository.Object, _campaignNpcRepository.Object, _notifier.Object);
+    }
+
+    [Fact]
+    public async Task Delete_ClearsTheMasterOfItsAlliesFirst()
+    {
+        _campaignNpcRepository.Setup(r => r.ClearMasterByCharacterAsync(CHARACTER)).ReturnsAsync(new List<long> { 10 });
+
+        await _service.DeleteAsync(OWNER, CHARACTER);
+
+        _campaignNpcRepository.Verify(r => r.ClearMasterByCharacterAsync(CHARACTER), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CAMPAIGN_NPCS_CHANGED && e.CampaignId == 10)), Times.Once);
     }
 
     [Fact]

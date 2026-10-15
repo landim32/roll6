@@ -1,6 +1,16 @@
 /** NPC types — mirror the backend Npc, CampaignNpc and MapNpc DTOs (feature 013). */
 import type { Posture } from './mapToken';
 
+/** Which side an NPC is on in a campaign (071). */
+export const NPC_CATEGORY = {
+  enemy: 1,
+  neutral: 2,
+  ally: 3,
+} as const;
+
+export type NpcCategory = typeof NPC_CATEGORY[keyof typeof NPC_CATEGORY];
+export const NPC_CATEGORIES: readonly NpcCategory[] = [NPC_CATEGORY.enemy, NPC_CATEGORY.neutral, NPC_CATEGORY.ally];
+
 /** NPC of the logged user's library. */
 export interface NpcInfo {
   npcId: number;
@@ -54,7 +64,18 @@ export interface CampaignNpcInfo {
   move: number;
   /** Active instances across the campaign's maps (051): how many pieces "Retirar da campanha" removes. */
   mapNpcCount: number;
+  /** Inimigo, Neutro or Aliado in this campaign (071). */
+  category: NpcCategory;
+  /** An ally's master character (071): its participation and character, null when none (or no longer approved). */
+  masterCampaignCharacterId: number | null;
+  masterCharacterId: number | null;
   createdAt: string;
+}
+
+/** Category and master of a campaign NPC (071); the master only for allies. */
+export interface CampaignNpcUpdateInfo {
+  category: NpcCategory;
+  masterCampaignCharacterId: number | null;
 }
 
 export interface CampaignNpcInsertInfo {

@@ -7,6 +7,7 @@ import { npcStatus, occurrenceStatus } from '../../lib/turnStatus';
 import { VitalBar } from './VitalBar';
 import { NPC_DRAG_TYPE } from '../../lib/mapTokens';
 import type { MapTokenInfo } from '../../types/mapToken';
+import { NPC_CATEGORY } from '../../types/npc';
 import type { CampaignNpcInfo } from '../../types/npc';
 import { PencilIcon, XIcon } from '../ui/icons';
 import { PostureBadge } from '../ui/PostureBadge';
@@ -21,6 +22,8 @@ interface NpcCardProps {
   /** Master only (051): pencil and X on each instance row. */
   onEditInstance?: (piece: MapTokenInfo) => void;
   onRemoveInstance?: (piece: MapTokenInfo) => void;
+  /** A smaller card under the card of the ally's master character (071). */
+  compact?: boolean;
 }
 
 /**
@@ -29,7 +32,7 @@ interface NpcCardProps {
  * turn, so each row carries its own turn circle (052); the circle on the NPC's name is only shown while it has no piece
  * on the open map (entries recorded for the NPC as a whole).
  */
-export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstance }: NpcCardProps) => {
+export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstance, compact = false }: NpcCardProps) => {
   const { t } = useTranslation();
   const { turnNo, entries } = useTurn();
   const { mapTokens } = useMapToken();
@@ -39,7 +42,7 @@ export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstan
   const allOut = occurrences.length > 0 && occurrences.every((token) => token.posture === POSTURE.outOfCombat);
   return (
     <li
-      className={`stm-party-card${draggable ? ' stm-party-draggable' : ''}`}
+      className={`stm-party-card${draggable ? ' stm-party-draggable' : ''}${compact ? ' stm-ally-card' : ''}`}
       draggable={draggable}
       onDragStart={draggable ? (event) => {
         event.dataTransfer.setData(NPC_DRAG_TYPE, String(npc.npcId));
@@ -47,12 +50,14 @@ export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstan
       } : undefined}
     >
       <span className={`d-inline-flex flex-shrink-0${allOut ? ' stm-grayscale' : ''}`}>
-        <CharacterAvatar name={npc.name} imageUrl={npc.imageUrl ?? npc.tokenImageUrl} size={32} />
+        <CharacterAvatar name={npc.name} imageUrl={npc.imageUrl ?? npc.tokenImageUrl} size={compact ? 24 : 32} />
       </span>
       <div className="stm-party-info">
         <div className="stm-party-name">
           {turnNo !== null && occurrences.length === 0 && <TurnStatusDot status={npcStatus(entries, npc.npcId, occurrenceIds)} />}
           <span title={npc.name}>{npc.name}</span>
+          {/* 071: enemies carry no mark; the panel tells allies apart. */}
+          {npc.category === NPC_CATEGORY.neutral && <span className="badge text-bg-secondary stm-npc-category">{t('npcs.category.2')}</span>}
           {onEdit && (
             <button type="button" className="btn btn-link btn-sm p-0 ms-auto" aria-label={t('npcs.edit', { name: npc.name })}
               title={t('npcs.edit', { name: npc.name })} onClick={onEdit}>

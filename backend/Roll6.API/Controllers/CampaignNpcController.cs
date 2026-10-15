@@ -31,6 +31,21 @@ public class CampaignNpcController : ApiControllerBase
         }
     }
 
+    /// <summary>Category (Inimigo/Neutro/Aliado) and, for allies, the master character of the NPC in the campaign (071).</summary>
+    [HttpPut("{id:long}")]
+    [ProducesResponseType(typeof(CampaignNpcInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Update(long id, [FromBody] CampaignNpcUpdateInfo info)
+    {
+        try
+        {
+            return Ok(await _service.UpdateAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Removes the NPC from the campaign and its occurrences from the campaign's maps.</summary>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

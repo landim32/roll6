@@ -39,6 +39,18 @@ public class CampaignNpcInfo
     [JsonPropertyName("mapNpcCount")]
     public int MapNpcCount { get; set; }
 
+    /// <summary>1 Inimigo, 2 Neutro, 3 Aliado (071): the panel the NPC shows in and whether it may have a master.</summary>
+    [JsonPropertyName("category")]
+    public int Category { get; set; } = 1;
+
+    /// <summary>The ally's master participation (071); null when none or no longer approved.</summary>
+    [JsonPropertyName("masterCampaignCharacterId")]
+    public long? MasterCampaignCharacterId { get; set; }
+
+    /// <summary>The character of that participation.</summary>
+    [JsonPropertyName("masterCharacterId")]
+    public long? MasterCharacterId { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 }

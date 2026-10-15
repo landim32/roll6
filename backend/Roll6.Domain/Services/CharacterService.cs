@@ -23,6 +23,7 @@ public class CharacterService : ICharacterService
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
     private readonly IImageStorageAppService _imageStorage;
     private readonly ICampaignRepository<Campaign> _campaignRepository;
+    private readonly ICampaignNpcRepository<CampaignNpc> _campaignNpcRepository;
 
     private readonly IRealtimeNotifier _notifier;
 
@@ -36,8 +37,10 @@ public class CharacterService : ICharacterService
         IImageStorageAppService imageStorage,
         ITurnRepository<Turn> turnRepository,
         ICampaignRepository<Campaign> campaignRepository,
+        ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
         IRealtimeNotifier notifier)
     {
+        _campaignNpcRepository = campaignNpcRepository;
         _campaignRepository = campaignRepository;
         _notifier = notifier;
         _turnRepository = turnRepository;
@@ -134,14 +137,19 @@ public class CharacterService : ICharacterService
     {
         await GetOwnedAsync(userId, characterId);
         var campaignIds = await _campaignCharacterRepository.ListCampaignIdsByCharacterAsync(characterId);
+        var cleared = new List<long>();
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
+            // 071: the allies it commanded lose their master before its participations go.
+            cleared = await _campaignNpcRepository.ClearMasterByCharacterAsync(characterId);
             await _mapTokenRepository.DeleteByCharacterAsync(characterId);
             await _turnRepository.DeleteByCharacterAsync(characterId);
             await _campaignCharacterRepository.DeleteByCharacterAsync(characterId);
             await _repository.DeleteAsync(characterId);
         });
         await PublishToCampaignsAsync(campaignIds, userId);
+        foreach (var campaignId in cleared ?? new List<long>())
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_NPCS_CHANGED, campaignId, userId));
     }
 
     /// <summary>

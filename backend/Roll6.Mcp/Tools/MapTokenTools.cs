@@ -80,7 +80,8 @@ public static class MapTokenTools
         in real time.
         Who can use it: the master (any piece, any distance); a player only the piece of his own approved character, once
         per turn, within the character's Deslocamento in this campaign (currentMove of get_participation — not the
-        character's own move, which only sets where the Deslocamento starts).
+        character's own move, which only sets where the Deslocamento starts), and the pieces of an ally NPC he commands
+        (update_campaign_npc), within that occurrence's Deslocamento (currentMove of list_map_npcs).
         Coordinates: x = column, y = row of the rectangular flat-top hex grid (odd columns shifted half a hex down),
         0-based, inside gridWidth × gridHeight of the map. look = side the piece faces, 0-5 clockwise from the top side
         (0 up, 1 up-right, 2 down-right, 3 down, 4 down-left, 5 up-left).
@@ -140,7 +141,7 @@ public static class MapTokenTools
         changes; an NPC's belongs to that occurrence. Never refused for lack of space: a piece that lies down over
         another one stays so until it moves. Recorded in the turn log like the other character/NPC changes; the same
         posture again changes nothing. Free-text status (update_participation / update_map_npc) is separate.
-        Who can use it: the character's owner or the master; NPC pieces only the master.
+        Who can use it: the character's owner or the master; NPC pieces the master or the player commanding the ally.
         {{RETURNS}}
         Common errors: 400 object piece or posture not 1-3, 403 not allowed, 404 piece not found, 409 character not approved.
         Related tools: list_map_tokens, update_participation, update_map_npc, process_turn.

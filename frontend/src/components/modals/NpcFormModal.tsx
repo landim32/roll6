@@ -6,13 +6,16 @@ import { Modal } from '../ui/Modal';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import type { ImageCrop } from '../ui/ImageCropper';
 import { NpcFormFields } from '../npcs/NpcFormFields';
+import { CampaignNpcFields } from '../npcs/CampaignNpcFields';
+import { useCharacter } from '../../hooks/useCharacter';
 import type { NpcTokenChoice } from '../npcs/NpcFormFields';
 import { useNpc } from '../../hooks/useNpc';
 import { imageService } from '../../Services/imageService';
 import { cropToFile } from '../../lib/cropImage';
 import { emptyNpcForm, toNpcForm, toNpcInsert, validateNpcForm } from '../../lib/npcForm';
 import type { NpcForm } from '../../lib/npcForm';
-import type { CampaignNpcInfo, NpcInfo } from '../../types/npc';
+import { NPC_CATEGORY } from '../../types/npc';
+import type { CampaignNpcInfo, NpcCategory, NpcInfo } from '../../types/npc';
 
 interface NpcFormModalProps {
   /** Campaign NPC whose pencil was clicked; null keeps the modal closed. */
@@ -20,10 +23,16 @@ interface NpcFormModalProps {
   onClose: () => void;
 }
 
-/** "Editar NPC" from the NPC panel: changes the library NPC and can remove it from the campaign (with confirmation). */
+/**
+ * "Editar NPC" from the NPC panel: changes the library NPC and can remove it from the campaign (with confirmation).
+ * Since 071 it also sets the NPC's category in this campaign and an ally's master character ("Nesta campanha").
+ */
 export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
   const { t } = useTranslation();
-  const { getNpc, updateNpc, removeFromCampaign } = useNpc();
+  const { getNpc, updateNpc, removeFromCampaign, updateCampaignNpc } = useNpc();
+  const { party } = useCharacter();
+  const [category, setCategory] = useState<NpcCategory>(NPC_CATEGORY.enemy);
+  const [master, setMaster] = useState<number | null>(null);
   const [saved, setSaved] = useState<NpcInfo | null>(null);
   const [pickingToken, setPickingToken] = useState(false);
   const [form, setForm] = useState<NpcForm>(emptyNpcForm);
@@ -40,6 +49,8 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
     setSaved(null);
     setCrop(null);
     setKeepImage(true);
+    setCategory(npc?.category ?? NPC_CATEGORY.enemy);
+    setMaster(npc?.masterCampaignCharacterId ?? null);
     let cancelled = false;
     getNpc(npcId)
       .then((loaded) => {
@@ -69,6 +80,10 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
         ? (await imageService.upload(await cropToFile(crop.src, crop.area, { rotation: crop.rotation, name: 'npc' }))).fileName
         : keepImage ? saved.image : null;
       const updated = await updateNpc(saved.npcId, toNpcInsert(form, image, token!.tokenId));
+      // 071: the category and the master belong to this campaign, saved apart from the library NPC.
+      if (npc && (category !== npc.category || master !== npc.masterCampaignCharacterId)) {
+        await updateCampaignNpc(npc.campaignNpcId, { category, masterCampaignCharacterId: category === NPC_CATEGORY.ally ? master : null });
+      }
       toast.success(t('toast.npcUpdated', { name: updated.name }));
       onClose();
     } catch (err) {
@@ -123,6 +138,15 @@ export const NpcFormModal = ({ npc, onClose }: NpcFormModalProps) => {
               onPickingTokenChange={setPickingToken}
               editing
             />
+            {npc && (
+              <CampaignNpcFields
+                idPrefix="npc-edit"
+                category={category}
+                master={master}
+                party={party}
+                onChange={(nextCategory, nextMaster) => { setCategory(nextCategory); setMaster(nextMaster); }}
+              />
+            )}
           </form>
         )}
       </Modal>

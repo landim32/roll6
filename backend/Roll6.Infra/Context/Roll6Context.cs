@@ -293,7 +293,13 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CampaignNpcId).HasColumnName("campaign_npc_id").UseIdentityAlwaysColumn();
             entity.Property(e => e.CampaignId).HasColumnName("campaign_id");
             entity.Property(e => e.NpcId).HasColumnName("npc_id");
+            entity.Property(e => e.Category).HasColumnName("category").HasConversion<int>()
+                .HasDefaultValue(NpcCategory.Enemy).HasSentinel((NpcCategory)0);
+            entity.Property(e => e.MasterCampaignCharacterId).HasColumnName("master_campaign_character_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.HasIndex(e => e.MasterCampaignCharacterId).HasDatabaseName("ix_campaign_npcs_master");
+            entity.HasOne<CampaignCharacter>().WithMany().HasForeignKey(e => e.MasterCampaignCharacterId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_npc_master");
             entity.HasIndex(e => new { e.CampaignId, e.NpcId })
                 .IsUnique()
                 .HasDatabaseName("ix_campaign_npcs_campaign_npc");

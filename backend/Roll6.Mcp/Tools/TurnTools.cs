@@ -22,7 +22,8 @@ public static class TurnTools
         NPC occurrence in the current turn. It shows as a speech balloon over the piece and turns its status green. A
         new action cancels the actor's previous valid action of the turn ("Ação cancelada") — unless the campaign is in
         free mode (set_campaign_free_mode), when every action stays valid and the map shows the last one.
-        Who can use it: a player for the piece of his own approved character; the master for any character or NPC piece.
+        Who can use it: a player for the piece of his own approved character or of an ally NPC he commands (its master
+        character is his — update_campaign_npc); the master for any character or NPC piece.
         Objects can't act.
         {{ENTRY}}
         Common errors: 403 not your piece / NPC by a player, 400 empty text (up to 2000 characters) or object piece, 404 not
@@ -162,7 +163,8 @@ public static class TurnTools
         its life/energy/status stay in the log) and moves the piece back to where it was before its move (if that hex is
         still free) — so it can move and act again. In free mode (set_campaign_free_mode) it only cancels the actions:
         no move is recorded there and the piece stays where it is. {{McpDocs.DESTRUCTIVE}}
-        Who can use it: a player for his own approved character's piece; the master for any character or NPC piece.
+        Who can use it: a player for his own approved character's piece or an ally NPC he commands; the master for any
+        character or NPC piece.
         Returns: { removed (entries deleted), reverted (false when the former hex was taken and the piece stayed) }.
         Common errors: 403 not your piece, 400 object piece, 404 not found.
         Related tools: get_turn_state.

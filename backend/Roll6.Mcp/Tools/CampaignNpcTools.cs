@@ -25,6 +25,35 @@ public static class CampaignNpcTools
         [Description("Id of the master's library NPC (npcId from list_my_npcs).")] long npcId) =>
         api.SendAsync(HttpMethod.Post, "/api/campaignnpc", new CampaignNpcInsertInfo { CampaignId = campaignId, NpcId = npcId });
 
+    [McpServerTool(Name = "update_campaign_npc", Title = "Classify campaign NPC", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/campaignnpc/{id}")]
+    [Description("""
+        What it does: sets the category of an NPC in a campaign — 1 Inimigo (enemy), 2 Neutro (neutral), 3 Aliado (ally)
+        — and, for allies only, its master character: an approved character of the campaign whose current owner then
+        commands every occurrence of the NPC in this campaign (act_in_turn, reset_turn, move_map_token, set_piece_posture,
+        and life/energy/status/posture through update_map_npc). Enemies and neutrals stay in the NPC panel; allies show on
+        the party's side (under their master character when they have one) and their pieces get the ally color. Any
+        category other than ally clears the master; the master is also cleared when that character is denied, removed
+        from the campaign or deleted. Same values = nothing changes.
+        Who can use it: only the master of the campaign, in any campaign status.
+        Returns: the campaign NPC (same fields as list_campaign_npcs, with category, masterCampaignCharacterId and
+        masterCharacterId).
+        Common errors: 400 category outside 1–3, 400 masterCampaignCharacterId on a non-ally ("Só aliados podem ter um
+        personagem-mestre.") or not an approved participation of this campaign, 403 not the master, 404 not found.
+        Related tools: list_campaign_npcs (campaignNpcId), list_campaign_characters (campaignCharacterId of approved
+        characters), list_map_tokens (npcCategory, commanderUserId).
+        """)]
+    public static Task<CallToolResult> UpdateCampaignNpc(
+        Roll6ApiClient api,
+        [Description("Id of the campaign NPC (campaignNpcId from list_campaign_npcs — not the npcId).")] long campaignNpcId,
+        [Description("1 Inimigo (enemy), 2 Neutro (neutral), 3 Aliado (ally).")] int category,
+        [Description("Only for allies: campaignCharacterId of an approved character of this campaign whose owner commands the ally. Omit or null = no master.")] long? masterCampaignCharacterId = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/campaignnpc/{campaignNpcId}", new CampaignNpcUpdateInfo
+        {
+            Category = category,
+            MasterCampaignCharacterId = masterCampaignCharacterId
+        });
+
     [McpServerTool(Name = "remove_npc_from_campaign", Title = "Remove NPC from campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaignnpc/{id}")]
     [Description($$"""

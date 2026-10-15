@@ -47,7 +47,11 @@ public static class Roll6Guide
           follows a changed NPC move only while untouched); its piece shows them with the NPC's sheet. `update_map_npc`
           changes one occurrence; `delete_map_npc` takes it off the map keeping the NPC in the campaign and everything it
           did in the chat and the turn summary under its name; `remove_npc_from_campaign` removes the NPC and all its
-          occurrences (history kept too).
+          occurrences (history kept too). Each campaign NPC has a **category** (071): Inimigo (default), Neutro or Aliado
+          (`update_campaign_npc`). Allies show on the party's side and, when the master gives one a **master character**
+          (an approved character of the campaign), the current owner of that character commands all its occurrences:
+          act, reset, move (within the occurrence's Deslocamento), posture, and life/energy/status. Name, Deslocamento,
+          removal and new occurrences stay with the master. Pieces carry `npcCategory` and `commanderUserId`.
         - **Map models**: the image + grid layout (a reusable map). A **campaign map** is a map model added to a
           campaign; its pieces live on the campaign map.
 

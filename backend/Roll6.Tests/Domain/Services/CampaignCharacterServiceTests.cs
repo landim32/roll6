@@ -32,6 +32,7 @@ public class CampaignCharacterServiceTests
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
     private readonly Mock<INotificationQueue> _queue = new();
     private readonly Mock<ITurnRepository<Turn>> _turnRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
@@ -64,10 +65,23 @@ public class CampaignCharacterServiceTests
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
             _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _tokenRepository.Object, _unitOfWork.Object,
-            _imageStorage.Object, _turnRepository.Object, _queue.Object, _notifier.Object);
+            _imageStorage.Object, _turnRepository.Object, _queue.Object, _campaignNpcRepository.Object, _notifier.Object);
     }
 
     private static CampaignCharacterRequestInfo Request(long campaignId) => new() { CampaignId = campaignId, CharacterId = CHARACTER };
+
+    [Fact]
+    public async Task Deny_And_Remove_ClearTheMasterOfItsAllies()
+    {
+        var participation = new CampaignCharacter { CampaignCharacterId = 70, CampaignId = 10, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved };
+        _repository.Setup(r => r.GetByIdAsync(70)).ReturnsAsync(participation);
+        _campaignNpcRepository.Setup(r => r.ClearMasterAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<long> { 10 });
+
+        await _service.RemoveAsync(MASTER_ID, 70);
+
+        _campaignNpcRepository.Verify(r => r.ClearMasterAsync(It.Is<IEnumerable<long>>(ids => ids.Single() == 70)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CAMPAIGN_NPCS_CHANGED && e.CampaignId == 10)), Times.Once);
+    }
 
     private void SetupParticipation(long id, long campaignId, CampaignCharacterStatus status) =>
         _repository.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(new CampaignCharacter

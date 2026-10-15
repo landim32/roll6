@@ -1,4 +1,4 @@
-import type { CampaignNpcInfo, CampaignNpcInsertInfo } from '../types/npc';
+import type { CampaignNpcInfo, CampaignNpcInsertInfo, CampaignNpcUpdateInfo } from '../types/npc';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
 const API_BASE = `${API_URL}/api/campaignnpc`;
@@ -27,6 +27,12 @@ class CampaignNpcService {
   /** Adds one of the master's NPCs to the campaign. */
   async add(data: CampaignNpcInsertInfo): Promise<CampaignNpcInfo> {
     const response = await fetch(API_BASE, { method: 'POST', headers: getHeaders(true), body: JSON.stringify(data) });
+    return this.handleResponse<CampaignNpcInfo>(response);
+  }
+
+  /** Category and, for allies, the master character of the NPC in the campaign (071; campaign master only). */
+  async update(id: number, data: CampaignNpcUpdateInfo): Promise<CampaignNpcInfo> {
+    const response = await fetch(`${API_BASE}/${id}`, { method: 'PUT', headers: getHeaders(true), body: JSON.stringify(data) });
     return this.handleResponse<CampaignNpcInfo>(response);
   }
 

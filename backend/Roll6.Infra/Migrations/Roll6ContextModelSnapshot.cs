@@ -350,11 +350,21 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("campaign_id");
 
+                    b.Property<int>("Category")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("category");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<long?>("MasterCampaignCharacterId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("master_campaign_character_id");
 
                     b.Property<long>("NpcId")
                         .HasColumnType("bigint")
@@ -362,6 +372,9 @@ namespace Roll6.Infra.Migrations
 
                     b.HasKey("CampaignNpcId")
                         .HasName("campaign_npcs_pkey");
+
+                    b.HasIndex("MasterCampaignCharacterId")
+                        .HasDatabaseName("ix_campaign_npcs_master");
 
                     b.HasIndex("NpcId");
 
@@ -1617,6 +1630,11 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("CampaignId")
                         .IsRequired()
                         .HasConstraintName("fk_campaign_campaign_npc");
+
+                    b.HasOne("Roll6.Domain.Models.CampaignCharacter", null)
+                        .WithMany()
+                        .HasForeignKey("MasterCampaignCharacterId")
+                        .HasConstraintName("fk_campaign_npc_master");
 
                     b.HasOne("Roll6.Domain.Models.Npc", null)
                         .WithMany()

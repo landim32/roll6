@@ -11,7 +11,7 @@ import { useRealtime, useTableEvents } from '../hooks/useRealtime';
 import { TABLE_EVENT } from '../types/realtime';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { ListQuery, PagedList } from '../types/common';
-import type { CampaignNpcInfo, MapNpcInfo, MapNpcUpdateInfo, NpcInfo, NpcInsertInfo } from '../types/npc';
+import type { CampaignNpcInfo, CampaignNpcUpdateInfo, MapNpcInfo, MapNpcUpdateInfo, NpcInfo, NpcInsertInfo } from '../types/npc';
 
 interface NpcContextType {
   // State
@@ -31,6 +31,8 @@ interface NpcContextType {
   addToCampaign: (npcId: number) => Promise<CampaignNpcInfo>;
   /** Also removes the NPC's pieces from the campaign's maps. */
   removeFromCampaign: (campaignNpcId: number) => Promise<void>;
+  /** Category (Inimigo/Neutro/Aliado) and an ally's master character in this campaign (071). */
+  updateCampaignNpc: (campaignNpcId: number, data: CampaignNpcUpdateInfo) => Promise<CampaignNpcInfo>;
   /** New occurrence (and piece) on the open campaign map; without a hex (052) the server picks a free one near the middle. */
   placeOnMap: (npcId: number, x?: number, y?: number) => Promise<MapNpcInfo>;
   /** Changes one instance on the map (051): name, current vitals, Deslocamento, status, posture. */
@@ -145,6 +147,14 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
     await refreshMapTokens();
   }, [run, refreshCampaignNpcs, refreshMapTokens]);
 
+  const updateCampaignNpc = useCallback(async (campaignNpcId: number, data: CampaignNpcUpdateInfo) => {
+    const result = await run(() => campaignNpcService.update(campaignNpcId, data));
+    await refreshCampaignNpcs();
+    // The pieces carry the category (color) and who commands them.
+    await refreshMapTokens();
+    return result;
+  }, [run, refreshCampaignNpcs, refreshMapTokens]);
+
   const placeOnMap = useCallback(async (npcId: number, x?: number, y?: number) => {
     const mapId = draft.mapId;
     if (mapId === null) throw new Error('no campaign map open');
@@ -172,7 +182,8 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
 
   const value: NpcContextType = {
     campaignNpcs, loading, error, refreshCampaignNpcs, clearError,
-    searchMyNpcs, getNpc, createNpc, updateNpc, addToCampaign, removeFromCampaign, placeOnMap, updateInstance, removeFromMap,
+    searchMyNpcs, getNpc, createNpc, updateNpc, addToCampaign, removeFromCampaign, updateCampaignNpc, placeOnMap, updateInstance,
+    removeFromMap,
   };
   return <NpcContext.Provider value={value}>{children}</NpcContext.Provider>;
 };

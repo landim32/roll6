@@ -3,6 +3,7 @@ import { isOutOfCombat, pieceGeometry, pieceImage } from './pieceDrawing';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import type { Posture } from '../types/mapToken';
 import { imageService } from '../Services/imageService';
+import { isAllyPiece } from './npcCategory';
 
 /** Rectangle in map pixels (the image may start above or to the left of the grid). */
 export interface SnapshotBounds {
@@ -36,6 +37,8 @@ export interface SnapshotToken {
   posture: Posture | null;
   /** Hexes the piece takes (1, 2, 3, 7 or 10). */
   space: number;
+  /** NPC pieces (071): Aliado draws the ally color. */
+  npcCategory?: number | null;
 }
 
 // Same as --stm-bg in styles/theme.css (038): a canvas can't read CSS variables, so the shared JPEG keeps it here.
@@ -57,6 +60,9 @@ const DISC: Record<number, { fill: string; stroke: string }> = {
 };
 
 const OBJECT_DISC = { fill: 'rgba(108, 117, 125, 0.35)', stroke: 'rgba(173, 181, 189, 0.6)' };
+
+/** Ally NPCs (071): teal, like `.is-ally` on the screen. */
+const ALLY_DISC = { fill: 'rgba(32, 201, 151, 0.35)', stroke: 'rgba(121, 223, 193, 0.85)' };
 
 /** Out of combat: the gray of the disc (the screen turns the whole piece gray with a CSS filter). */
 const OUT_DISC = { fill: 'rgba(128, 128, 128, 0.35)', stroke: 'rgba(190, 190, 190, 0.7)' };
@@ -233,7 +239,7 @@ const drawToken = (
   const radius = hexSize * 0.8;
   const mark = hexSize * 0.18;
   const out = isOutOfCombat(token);
-  const disc = out ? OUT_DISC : DISC[token.tokenType] ?? OBJECT_DISC;
+  const disc = out ? OUT_DISC : isAllyPiece(token) ? ALLY_DISC : DISC[token.tokenType] ?? OBJECT_DISC;
   const { sideways } = pieceImage(token);
   ctx.save();
   ctx.translate(center.x, center.y);

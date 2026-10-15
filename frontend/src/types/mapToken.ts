@@ -70,6 +70,10 @@ export interface MapTokenInfo {
   y: number;
   /** Hex side the piece faces, 0–5 clockwise from the top. */
   look: number;
+  /** NPC pieces (071): Inimigo 1, Neutro 2, Aliado 3 in the campaign; null for characters and objects. */
+  npcCategory?: number | null;
+  /** NPC pieces (071): the player commanding this ally (owner of its approved master character); null when none. */
+  commanderUserId?: number | null;
   /**
    * Where a 3D walk left the figure inside its hex (070): map px and the direction in radians (0 = up, clockwise). The 3D
    * view draws it there; the 2D map always draws the middle of the hex. Null/absent = the middle, facing `look`.

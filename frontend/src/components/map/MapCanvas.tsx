@@ -16,6 +16,7 @@ import { useTurn } from '../../hooks/useTurn';
 import { hexCenter, lookToward } from '../../lib/hexGrid';
 import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewHexes, previewOf } from '../../lib/movement';
 import { hasEntries, hasMoved, lastActions, movementTrails } from '../../lib/turnStatus';
+import { commandsNpc } from '../../lib/npcCategory';
 import type { ActTarget } from '../../lib/turnStatus';
 import { MAP_TOKEN_TYPE } from '../../types/mapToken';
 import type { MapTokenInfo } from '../../types/mapToken';
@@ -135,10 +136,13 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
     token.tokenType === MAP_TOKEN_TYPE.character
     && party.some((p) => p.campaignCharacterId === token.campaignCharacterId && p.characterOwnerId === session?.user.userId);
 
+  /** A player's own piece: his character, or an ally NPC he commands through its master character (071). */
+  const isOwnPiece = (token: MapTokenInfo): boolean => isOwnCharacter(token) || commandsNpc(token, session?.user.userId, false);
+
   /** Characters and NPCs move once per turn (016); objects move freely; in free mode (054) everyone does. */
   const canMove = (token: MapTokenInfo): boolean => {
     if (draft.mapId === null || !canPlaceOwn) return false;
-    if (!canPlace && !isOwnCharacter(token)) return false;
+    if (!canPlace && !isOwnPiece(token)) return false;
     return token.tokenType === MAP_TOKEN_TYPE.object || freeMode || !hasMoved(turnEntries, token);
   };
 
@@ -147,12 +151,12 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
     if (draft.mapId === null || turnNo === null || token.tokenType === MAP_TOKEN_TYPE.object) return false;
     // 049: acting and resetting only while the campaign plays (not even the master while preparing).
     if (!isPlayable(currentCampaign?.status)) return false;
-    return canPlace || isOwnCharacter(token);
+    return canPlace || isOwnPiece(token);
   };
 
-  /** Posture (031): the master on characters and NPCs, a player on his own characters. */
+  /** Posture (031): the master on characters and NPCs, a player on his own characters and commanded allies (071). */
   const canSetPosture = (token: MapTokenInfo): boolean =>
-    draft.mapId !== null && canPlaceOwn && token.tokenType !== MAP_TOKEN_TYPE.object && (canPlace || isOwnCharacter(token));
+    draft.mapId !== null && canPlaceOwn && token.tokenType !== MAP_TOKEN_TYPE.object && (canPlace || isOwnPiece(token));
 
   /** Movement mode: the path follows the hovered hex; in the facing phase the piece turns to the mouse. */
   const moveWithPointer = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -411,7 +415,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
           top={menu.top}
           token={menuToken ? { name: menuToken.name, imageUrl: menuToken.upImageUrl } : null}
           canManage={canPlace}
-          onEditNpc={menuToken && menuToken.mapNpcId !== null ? () => onEditNpc(menuToken) : undefined}
+          onEditNpc={menuToken && menuToken.mapNpcId !== null && (canPlace || isOwnPiece(menuToken)) ? () => onEditNpc(menuToken) : undefined}
           deleteLabel={menuToken && menuToken.mapNpcId !== null ? t('hexMenu.removeNpc') : undefined}
           onMove={menuToken && canMove(menuToken) ? () => movement.start(menuToken) : undefined}
           onAct={menuToken && canTakeTurn(menuToken)
