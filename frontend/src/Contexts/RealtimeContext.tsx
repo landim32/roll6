@@ -73,7 +73,9 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
   const applyCampaignEvent = useCallback((event: TableEvent) => {
     const campaign = campaignRef.current;
     if (!campaign || campaign.campaignId !== event.campaignId) return;
-    if (event.type === TABLE_EVENT.campaignChanged || event.type === TABLE_EVENT.mapCurrent || event.type === TABLE_EVENT.campaignDeleted)
+    // 078: maps.changed too — the master's combo lists the campaign's active maps.
+    if (event.type === TABLE_EVENT.campaignChanged || event.type === TABLE_EVENT.mapCurrent || event.type === TABLE_EVENT.campaignDeleted
+      || event.type === TABLE_EVENT.mapsChanged)
       void refreshRef.current();
     if (event.type === TABLE_EVENT.campaignChanged && event.data)
       selectRef.current({ ...(event.data as CampaignInfo) });

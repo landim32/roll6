@@ -93,6 +93,15 @@ public class CampaignService : ICampaignService
     public async Task<List<CampaignTableInfo>> ListTableAsync(long userId)
     {
         var rows = await _repository.ListTableAsync(userId);
+        // 078: the master's combo lists every playable map of the campaigns he masters; players get none.
+        var mastered = rows.Where(r => r.UserId == userId).Select(r => r.CampaignId).ToList();
+        var maps = (await _mapRepository.ListPlayableByCampaignsAsync(mastered))
+            .GroupBy(m => m.CampaignId)
+            .ToDictionary(g => g.Key, g => g
+                .OrderByDescending(m => m.IsCurrent)
+                .ThenBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(m => new TableMapInfo { MapId = m.MapId, Name = m.Name, Slug = m.Slug, Status = (int)m.Status })
+                .ToList());
         return rows.Select(row => new CampaignTableInfo
         {
             CampaignId = row.CampaignId,
@@ -104,7 +113,8 @@ public class CampaignService : ICampaignService
             IsMaster = row.UserId == userId,
             CurrentMapId = row.CurrentMapId,
             CurrentMapName = row.CurrentMapName,
-            CurrentMapSlug = row.CurrentMapSlug
+            CurrentMapSlug = row.CurrentMapSlug,
+            Maps = row.UserId == userId && maps.TryGetValue(row.CampaignId, out var list) ? list : new List<TableMapInfo>()
         }).ToList();
     }
 
@@ -250,20 +260,42 @@ public class CampaignService : ICampaignService
     public async Task<CampaignInfo> SetCurrentMapAsync(long userId, long campaignId, CampaignCurrentMapInfo info)
     {
         var campaign = await GetOwnedAsync(userId, campaignId);
+        Map? next = null;
         if (info.MapId is long mapId)
         {
-            var map = await _mapRepository.GetByIdAsync(mapId)
+            next = await _mapRepository.GetByIdAsync(mapId)
                 ?? throw new KeyNotFoundException("Mapa não encontrado.");
             // Only an active map can be the one the players follow (048: archived maps are refused too).
-            if (map.CampaignId != campaignId || map.Status != Enums.MapStatus.Active)
+            if (next.CampaignId != campaignId || !next.IsPlayable)
                 throw new DomainValidationException("mapId", "O mapa precisa ser um mapa ativo desta campanha.");
         }
-        if (campaign.CurrentMapId == info.MapId)
+        if (campaign.CurrentMapId == info.MapId && (next == null || next.IsCurrent))
             return await MapToDtoAsync(campaign);
 
-        campaign.SetCurrentMap(info.MapId);
-        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        // 078: the map's status says which one is current. The old one goes back to Active first (the unique index allows
+        // one Current per campaign), then the new one, then the campaign's pointer — all or nothing.
+        var previous = campaign.CurrentMapId is long previousId && previousId != info.MapId
+            ? await _mapRepository.GetByIdAsync(previousId)
+            : null;
+        Campaign saved = campaign;
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            if (previous is { IsCurrent: true })
+            {
+                previous.LeaveCurrent();
+                await _mapRepository.UpdateAsync(previous);
+            }
+            if (next is { IsCurrent: false })
+            {
+                next.MakeCurrent();
+                await _mapRepository.UpdateAsync(next);
+            }
+            campaign.SetCurrentMap(info.MapId);
+            saved = await _repository.UpdateAsync(campaign);
+        });
+        var result = await MapToDtoAsync(saved);
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_CURRENT, campaignId, userId, info.MapId));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAPS_CHANGED, campaignId, userId, info.MapId));
         return result;
     }
 

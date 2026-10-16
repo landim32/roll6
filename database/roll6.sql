@@ -2182,5 +2182,34 @@ BEGIN
     VALUES ('20261016113812_AddPollClosedAt', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261016174851_AddCurrentMapStatus') THEN
+    UPDATE maps m SET status = 4 FROM campaigns c WHERE c.current_map_id = m.map_id AND m.status = 1;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261016174851_AddCurrentMapStatus') THEN
+    UPDATE campaigns SET current_map_id = NULL WHERE current_map_id IS NOT NULL AND current_map_id NOT IN (SELECT map_id FROM maps WHERE status = 4);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261016174851_AddCurrentMapStatus') THEN
+    CREATE UNIQUE INDEX ix_maps_campaign_current ON maps (campaign_id) WHERE status = 4;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261016174851_AddCurrentMapStatus') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261016174851_AddCurrentMapStatus', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

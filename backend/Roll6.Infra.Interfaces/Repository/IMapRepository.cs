@@ -14,6 +14,9 @@ public interface IMapRepository<TModel> where TModel : class
 
     Task<TModel> UpdateAsync(TModel entity);
     Task<int> CountNotDeletedByCampaignAsync(long campaignId);
+
+    /// <summary>The Current and Active maps (078) of these campaigns, for the master's table combo.</summary>
+    Task<List<TModel>> ListPlayableByCampaignsAsync(IReadOnlyCollection<long> campaignIds);
     Task<List<long>> ListDeletedIdsByCampaignAsync(long campaignId);
     Task DeleteRangeAsync(IEnumerable<long> ids);
     Task<bool> ExistsByMapModelAsync(long mapModelId);

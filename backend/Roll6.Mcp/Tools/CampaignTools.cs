@@ -65,9 +65,12 @@ public static class CampaignTools
     [ApiOperation("GET", "/api/campaign/table")]
     [Description("""
         What it does: lists the campaigns where the current user is the master or has an approved character, each with
-        the active map the table follows (omitted when there is no current map or it is archived or deleted).
+        the map the table follows (omitted when there is no current map), its status, and — only for the campaigns the
+        user masters — every current and active map (current first, then by name), which the app's table combo offers
+        to the master; players follow only the current map.
         Who can use it: any authenticated user (the list is only their own table).
-        Returns: [{ campaignId, name, slug, isMaster, currentMapId, currentMapName, currentMapSlug }].
+        Returns: [{ campaignId, name, slug, status, freeMode, isMaster, currentMapId, currentMapName, currentMapSlug,
+        maps [{ mapId, name, slug, status (4 current, 1 active) }] }].
         Common errors: none.
         Related tools: get_campaign_by_slug, get_map_by_slug, set_current_map.
         """)]
@@ -203,8 +206,10 @@ public static class CampaignTools
     [ApiOperation("PUT", "/api/campaign/{id}/current-map")]
     [Description("""
         What it does: sets the campaign map every player follows in the app — their screens switch to it in real time
-        (the master's own screen does not move). This is the only way the current map changes: opening, creating or
-        editing maps never does, so the master can prepare another map while the table plays on the current one.
+        (the master's own screen does not move). The chosen map's status becomes 4 (current) and the previous current
+        map goes back to 1 (active); mapId null leaves the campaign with no current map. This is the only way the
+        current map changes: opening, creating or editing maps never does, so the master can prepare another map while
+        the table plays on the current one.
         Who can use it: only the master.
         Returns: the updated campaign (currentMapId).
         Common errors: 403 not the master, 404 map/campaign not found, 400 the map is not an active map of this campaign

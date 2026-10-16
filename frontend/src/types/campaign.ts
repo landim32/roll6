@@ -40,6 +40,17 @@ export interface CampaignTableInfo {
   currentMapId: number | null;
   currentMapName: string | null;
   currentMapSlug: string | null;
+  /** 078: the current and active maps of a campaign the user masters (current first); empty for players. */
+  maps?: TableMapInfo[];
+}
+
+/** A map in the table combo (078). */
+export interface TableMapInfo {
+  mapId: number;
+  name: string;
+  slug: string;
+  /** 4 current, 1 active. */
+  status: number;
 }
 
 /** Data to create a campaign. */

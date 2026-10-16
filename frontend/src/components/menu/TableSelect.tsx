@@ -15,7 +15,10 @@ interface TableSelectProps {
 
 /**
  * Single combo for the table: the trigger shows the open map over its campaign; the menu groups each campaign with
- * its active map below it (both open the table), then the windows for other campaigns and maps.
+ * its maps below it, then the windows for other campaigns and maps. 078: by the user's role in each campaign — the
+ * master sees his preparing/active campaigns with every current and active map (the current one marked "Atual"), a
+ * player only his active campaigns with their current map. Choosing a map only opens it ("Tornar atual" moves the
+ * players).
  */
 export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => {
   const { t } = useTranslation();
@@ -68,14 +71,29 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
                 {statusBadge(statusOf.get(entry.key))}
                 {freeBadge(freeOf.get(entry.key) === true)}
               </DropdownMenu.Item>
-              <DropdownMenu.Item
-                className={`dropdown-item stm-table-item stm-table-map${entry.mapActive ? ' active' : ''}${entry.mapLabel ? '' : ' fst-italic'}`}
-                aria-current={entry.mapActive ? 'true' : undefined}
-                onSelect={() => navigate(entry.mapPath)}
-              >
-                <MapIcon size={12} />
-                <span className="text-truncate">{entry.mapLabel ?? t('menu.noActiveMap')}</span>
-              </DropdownMenu.Item>
+              {entry.maps.map((map) => (
+                <DropdownMenu.Item
+                  key={map.key}
+                  className={`dropdown-item stm-table-item stm-table-map${map.active ? ' active' : ''}`}
+                  aria-current={map.active ? 'true' : undefined}
+                  onSelect={() => navigate(map.path)}
+                >
+                  <MapIcon size={12} />
+                  <span className="text-truncate">{map.label}</span>
+                  {entry.isMaster && map.isCurrent && (
+                    <span className="badge text-bg-info ms-auto flex-shrink-0">{t('menu.currentMap')}</span>
+                  )}
+                </DropdownMenu.Item>
+              ))}
+              {entry.maps.length === 0 && (
+                <DropdownMenu.Item
+                  className="dropdown-item stm-table-item stm-table-map fst-italic"
+                  onSelect={() => navigate(entry.campaignPath)}
+                >
+                  <MapIcon size={12} />
+                  <span className="text-truncate">{t('menu.noActiveMap')}</span>
+                </DropdownMenu.Item>
+              )}
             </div>
           ))}
           {entries.length > 0 && <DropdownMenu.Separator className="dropdown-divider my-1" />}

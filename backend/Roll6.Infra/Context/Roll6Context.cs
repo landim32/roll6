@@ -120,6 +120,8 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(260).IsRequired();
             entity.Property(e => e.Slug).HasColumnName("slug").HasMaxLength(Slug.MAX_LENGTH).IsRequired();
             entity.HasIndex(e => e.Slug).IsUnique().HasDatabaseName("ix_maps_slug");
+            // 078: at most one current map ("Atual", status 4) per campaign.
+            entity.HasIndex(e => e.CampaignId).IsUnique().HasFilter("status = 4").HasDatabaseName("ix_maps_campaign_current");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>().HasDefaultValue(MapStatus.Active).HasSentinel((MapStatus)0);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");

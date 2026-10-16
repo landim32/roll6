@@ -44,6 +44,8 @@ public class CampaignServiceTests
             new() { UserId = 2, Name = "Bruno" }
         });
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns<Func<Task>>(action => action());
+        _mapRepository.Setup(r => r.ListPlayableByCampaignsAsync(It.IsAny<IReadOnlyCollection<long>>())).ReturnsAsync(new List<Map>());
+        _mapRepository.Setup(r => r.UpdateAsync(It.IsAny<Map>())).ReturnsAsync((Map m) => m);
         _turnRepository.Setup(r => r.ListChatMediaAsync(It.IsAny<long>())).ReturnsAsync(new List<string>());
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
@@ -271,12 +273,70 @@ public class CampaignServiceTests
     public async Task SetCurrentMap_SameMap_DoesNotPublish()
     {
         _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
-        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Active });
+        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Current });
 
         await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 30 });
 
         _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
         Published(TableEventType.MAP_CURRENT, Times.Never());
+    }
+
+    // ---- 078: the map's status says which map is current ----
+
+    [Fact]
+    public async Task SetCurrentMap_SwapsCurrentAndActive_InOneTransaction()
+    {
+        var old = new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Current, Name = "A" };
+        var next = new Map { MapId = 31, CampaignId = 10, Status = MapStatus.Active, Name = "B" };
+        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
+        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(old);
+        _mapRepository.Setup(r => r.GetByIdAsync(31)).ReturnsAsync(next);
+        var saved = new List<(long, MapStatus)>();
+        _mapRepository.Setup(r => r.UpdateAsync(It.IsAny<Map>())).Callback((Map m) => saved.Add((m.MapId, m.Status))).ReturnsAsync((Map m) => m);
+
+        var result = await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 31 });
+
+        // The old one first: the unique index allows one Current per campaign.
+        saved.Should().Equal((30L, MapStatus.Active), (31L, MapStatus.Current));
+        result.CurrentMapId.Should().Be(31);
+        _unitOfWork.Verify(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>()), Times.Once);
+        Published(TableEventType.MAP_CURRENT, Times.Once());
+        Published(TableEventType.MAPS_CHANGED, Times.Once());
+    }
+
+    [Fact]
+    public async Task SetCurrentMap_None_LeavesTheOldOneActive()
+    {
+        var old = new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Current };
+        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
+        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(old);
+
+        var result = await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = null });
+
+        old.Status.Should().Be(MapStatus.Active);
+        result.CurrentMapId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ListTable_GivesTheMasterHisPlayableMaps_CurrentFirst_AndPlayersNone()
+    {
+        _repository.Setup(r => r.ListTableAsync(1)).ReturnsAsync(new List<CampaignTableRow>
+        {
+            new() { CampaignId = 10, UserId = 1, Name = "Tormento Vil", Slug = "tormento-vil", CurrentMapId = 31 },
+            new() { CampaignId = 9, UserId = 2, Name = "Outra", Slug = "outra", CurrentMapId = 40 }
+        });
+        _mapRepository.Setup(r => r.ListPlayableByCampaignsAsync(It.Is<IReadOnlyCollection<long>>(ids => ids.SequenceEqual(new[] { 10L }))))
+            .ReturnsAsync(new List<Map>
+            {
+                new() { MapId = 30, CampaignId = 10, Name = "Taberna 1", Slug = "taberna-1", Status = MapStatus.Active },
+                new() { MapId = 32, CampaignId = 10, Name = "Estrada 1", Slug = "estrada-1", Status = MapStatus.Active },
+                new() { MapId = 31, CampaignId = 10, Name = "Casa de apostas 1", Slug = "casa-de-apostas-1", Status = MapStatus.Current }
+            });
+
+        var result = await _service.ListTableAsync(1);
+
+        result[0].Maps.Select(m => (m.MapId, m.Status)).Should().Equal((31L, 4), (32L, 1), (30L, 1));
+        result[1].Maps.Should().BeEmpty();
     }
 
     [Fact]
