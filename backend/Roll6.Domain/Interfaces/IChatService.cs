@@ -29,6 +29,9 @@ public interface IChatService
     /// <summary>A text of a character → its action of the turn, or the valid action → text (044).</summary>
     Task<ChatItemInfo> ConvertAsync(long userId, long turnId, ChatConvertInfo info);
 
+    /// <summary>The master switches the voice of a message he wrote: to one of his approved characters, or to the master (079).</summary>
+    Task<ChatItemInfo> SetSpeakerAsync(long userId, long turnId, ChatSpeakerInfo info);
+
     /// <summary>A poll in the chat (045): a question and 2–12 options, asked like a message.</summary>
     Task<ChatItemInfo> CreatePollAsync(long userId, long campaignId, ChatPollCreateInfo info);
 

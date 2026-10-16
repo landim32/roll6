@@ -79,6 +79,14 @@ class ChatService {
     return this.handleResponse<ChatItemInfo>(response);
   }
 
+  /** The master switches the voice of a message he wrote: one of his characters, or null for the master (079). */
+  async setSpeaker(turnId: number, characterId: number | null): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/chat/${turnId}/speaker`, {
+      method: 'POST', headers: getHeaders(true), body: JSON.stringify({ characterId }),
+    });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
   /** The master closes a poll (077): no more votes, only the result. */
   async closePoll(turnId: number): Promise<ChatItemInfo> {
     const response = await fetch(`${API_URL}/api/chat/${turnId}/poll/close`, { method: 'POST', headers: getHeaders(true), body: '{}' });

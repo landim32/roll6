@@ -89,6 +89,8 @@ interface ChatContextType {
   convert: (item: ChatItemInfo, to: 'action' | 'message') => Promise<void>;
   /** The master closes a poll (077): it leaves the pinned list and shows only the result. */
   closePoll: (item: ChatItemInfo) => Promise<void>;
+  /** The master switches the voice of his own message: one of his characters, or null for the master (079). */
+  setSpeaker: (item: ChatItemInfo, characterId: number | null) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -430,6 +432,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     replace(await chatService.closePoll(item.turnId));
   }, [replace]);
 
+  const setSpeaker = useCallback(async (item: ChatItemInfo, characterId: number | null) => {
+    replace(await chatService.setSpeaker(item.turnId, characterId));
+  }, [replace]);
+
   const createPoll = useCallback(async (question: string, options: string[]) => {
     if (!speaker || campaignId === null) return;
     const item = await chatService.createPoll(campaignId, {
@@ -462,10 +468,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<ChatContextType>(() => ({
     items: flow, pinnedPolls: pinned, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters, loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert,
-    createPoll, vote, closePoll,
+    createPoll, vote, closePoll, setSpeaker,
   }), [flow, pinned, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters,
-    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert, createPoll, vote, closePoll]);
+    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert, createPoll, vote, closePoll, setSpeaker]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };

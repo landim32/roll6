@@ -11,7 +11,7 @@ import { ReactionsBadge } from './ReactionsBadge';
 import { ReplyQuote } from './ReplyQuote';
 import { CHAT_KIND } from '../../types/chat';
 import type { ChatItemInfo } from '../../types/chat';
-import { authorLabel, chatLabel, formatChanges, formatMovement, nameColor, rollTotal, shortName } from '../../lib/chatItems';
+import { authorLabel, chatLabel, formatChanges, formatMovement, isMasterVoice, nameColor, rollTotal, shortName } from '../../lib/chatItems';
 import { formatSeconds } from '../../lib/audioFormat';
 
 const MarkdownView = lazy(() => import('../ui/MarkdownView'));
@@ -214,8 +214,9 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
     default: {
       // Conversation: text, photo, recording, roll or poll (the poll's text is its question, shown by the card).
       const caption = item.kind !== CHAT_KIND.poll && item.text?.trim() ? item.text : null;
+      // 079: the master speaking as such gets the golden card.
       return row(
-        `stm-chat-message${own ? ' is-own' : ''}${continued ? ' is-continued' : ''}`,
+        `stm-chat-message${own ? ' is-own' : ''}${continued ? ' is-continued' : ''}${isMasterVoice(item) ? ' is-master' : ''}`,
         <>
           {!own && (
             <div className="stm-chat-avatar">

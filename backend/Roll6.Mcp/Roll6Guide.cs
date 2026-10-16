@@ -243,7 +243,9 @@ public static class Roll6Guide
           narrations) and a "Turno N finalizado" divider where each turn ended. The turn tools below read and write
           those same records, so `get_turn_summary` and `list_chat_messages` show the same turn.
         - `list_chat_messages` pages it (newest first page, `before`/`after` cursors); `send_chat_message` speaks as one
-          of your approved characters or, without `characterId`, as the master; `delete_chat_message` removes a message
+          of your approved characters or, without `characterId`, as the master (a message without a character is the
+          master's voice, highlighted in the app); the master who also plays switches the voice of his own message,
+          photo, recording or roll with `set_chat_speaker`; `delete_chat_message` removes a message
           (its author or the master) or a narration (the master). Conversation is not a turn record: it never shows in
           the turn summary, the turn data or the pending actions.
         - A character (or NPC occurrence) has **one valid action per turn**: acting again cancels the previous action, and

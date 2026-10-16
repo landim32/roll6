@@ -89,6 +89,19 @@ public class Turn
         return true;
     }
 
+    /// <summary>
+    /// The voice of a message, photo, recording or roll (079): the master (no character) or one of his characters. Keeps
+    /// the id, the times, the reply, the reactions and the whisper; the service checks who may and which character.
+    /// </summary>
+    public void SetSpeaker(long? characterId, string displayName, string? displayImage)
+    {
+        if (TurnType is not (TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll) || IsDeleted)
+            throw new DomainValidationException("characterId", "Só mensagens, fotos, áudios e rolagens mudam de voz.");
+        CharacterId = characterId;
+        DisplayName = displayName;
+        DisplayImage = displayImage;
+    }
+
     /// <summary>A vote or withdrawal on a poll (050) moves its place in the chat to <paramref name="now"/>.</summary>
     public void TouchChat(DateTime now)
     {

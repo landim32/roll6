@@ -97,6 +97,21 @@ public class ChatController : ApiControllerBase
         }
     }
 
+    /// <summary>The master switches the voice of a message he wrote: one of his characters, or null for the master (079).</summary>
+    [HttpPost("{id:long}/speaker")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetSpeaker(long id, [FromBody] ChatSpeakerInfo info)
+    {
+        try
+        {
+            return Ok(await _chatService.SetSpeakerAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>The master closes a poll (077): no more votes, never pinned again; only the result shows.</summary>
     [HttpPost("{id:long}/poll/close")]
     [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]

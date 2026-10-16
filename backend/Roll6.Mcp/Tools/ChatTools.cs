@@ -175,6 +175,25 @@ public static class ChatTools
         [Description("Optional: the voting character (yours, approved). Omit to vote as the master.")] long? characterId = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/chat/{turnId}/vote", new ChatPollVoteInfo { CharacterId = characterId, OptionId = optionId });
 
+    [McpServerTool(Name = "set_chat_speaker", Title = "Change a chat message's voice", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("POST", "/api/chat/{id}/speaker")]
+    [Description($$"""
+        What it does: switches the voice of a message, photo, recording or roll the master wrote himself: to one of his own
+        characters approved in the campaign (characterId), or back to the master (characterId omitted — shown as "Mestre
+        (GM) — name", in the app's golden card). The entry keeps its id, time, place, reply, reactions and whisper; the
+        name and picture become the new voice's. Any campaign status, any turn; nobody is notified.
+        Who can use it: only the campaign master, on entries he wrote.
+        Returns: the updated item. {{ITEM}}
+        Common errors: 403 not the master / not your entry / not your approved character; 400 not a message, photo,
+        recording or roll (polls, actions, narrations), deleted, or a whisper addressed to that character; 404 not found.
+        Related tools: list_chat_messages, send_chat_message, convert_chat_entry.
+        """)]
+    public static Task<CallToolResult> SetChatSpeaker(
+        Roll6ApiClient api,
+        [Description("Id of the entry (turnId from list_chat_messages).")] long turnId,
+        [Description("Optional: one of your characters approved in the campaign. Omit to speak as the master.")] long? characterId = null) =>
+        api.SendAsync(HttpMethod.Post, $"/api/chat/{turnId}/speaker", new ChatSpeakerInfo { CharacterId = characterId });
+
     [McpServerTool(Name = "close_chat_poll", Title = "Close a chat poll", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/chat/{id}/poll/close")]
     [Description($$"""

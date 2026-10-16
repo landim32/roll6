@@ -946,6 +946,8 @@
     "cancelReply": "Cancelar resposta",
     "toAction": "Transformar em ação",
     "toMessage": "Transformar em mensagem",
+    "speakAsMaster": "Falar como mestre",
+    "speakAs": "Falar como {{name}}",
     "actionCancelled": "Ação cancelada",
     "cancelActionTitle": "Cancelar ação",
     "cancelActionMessage": "A ação fica no chat como \"Ação cancelada\" e deixa de contar no turno. Continuar?",
