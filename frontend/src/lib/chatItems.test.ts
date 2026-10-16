@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isPollOpen } from './chatPoll';
 import {
   authorLabel, chatLabel, compareCursors, pinOpenPolls, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
 } from './chatItems';
@@ -238,6 +239,18 @@ describe('050: open polls pinned at the bottom', () => {
     expect(permissionsFor(poll(1, true, { userId: 9 }), viewer).canDelete).toBe(false);
     expect(permissionsFor(poll(1, true, { userId: 9 }), { ...viewer, isMaster: true }).canDelete).toBe(true);
     expect(permissionsFor(poll(1, true, { userId: 2, deleted: true }), viewer).canDelete).toBe(false);
+  });
+
+  it('077: only the master may close a poll, while it is open; a closed poll is never pinned', () => {
+    const viewer = { userId: 2, isMaster: false, currentTurn: 1, ownerOf: () => 2 };
+    const master = { ...viewer, isMaster: true };
+    expect(permissionsFor(poll(1, true, { userId: 2 }), viewer).canClosePoll).toBe(false);
+    expect(permissionsFor(poll(1, true), master).canClosePoll).toBe(true);
+    expect(permissionsFor(poll(1, true, { deleted: true }), master).canClosePoll).toBe(false);
+    const closed = poll(2, false, { poll: { question: 'q2', totalVotes: 0, open: false, closed: true, options: [] } });
+    expect(permissionsFor(closed, master).canClosePoll).toBe(false);
+    expect(permissionsFor(item(3, { kind: 'text' }), master).canClosePoll).toBe(false);
+    expect(pinOpenPolls([item(1), closed], (i) => isPollOpen(i.poll!, [80])).pinned).toEqual([]);
   });
 
   it('polls still do not group with messages', () => {

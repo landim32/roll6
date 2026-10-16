@@ -134,6 +134,10 @@ public class ChatItemInfo
     [JsonPropertyName("canConvert")]
     public string? CanConvert { get; set; }
 
+    /// <summary>The reader may close this poll (077): the campaign master, on a poll not deleted nor closed.</summary>
+    [JsonPropertyName("canClosePoll")]
+    public bool CanClosePoll { get; set; }
+
     /// <summary>A whisper (047) the reader may see: who it was whispered to. Null for public entries.</summary>
     [JsonPropertyName("whisper")]
     public ChatWhisperInfo? Whisper { get; set; }
@@ -173,6 +177,13 @@ public class ChatPollInfo
     /// </summary>
     [JsonPropertyName("open")]
     public bool Open { get; set; }
+
+    /// <summary>Closed by the master (077): no more votes, never pinned; only the result is shown.</summary>
+    [JsonPropertyName("closed")]
+    public bool Closed { get; set; }
+
+    [JsonPropertyName("closedAt")]
+    public DateTime? ClosedAt { get; set; }
 
     /// <summary>In the order the author wrote them.</summary>
     [JsonPropertyName("options")]

@@ -245,7 +245,9 @@ public partial class TurnServiceChatTests
         var votes = voted.Select(v => (long?)v).ToList();
         if (masterVoted) votes.Add(null);
 
-        TurnService.IsPollOpen(approved, votes).Should().Be(open);
+        TurnService.IsPollOpen(false, approved, votes).Should().Be(open);
+        // 077: a closed poll is never open.
+        TurnService.IsPollOpen(true, approved, votes).Should().BeFalse();
     }
 
     [Fact]
@@ -331,5 +333,84 @@ public partial class TurnServiceChatTests
 
         page.Items.Single().Cursor.Should().Be($"{poll.ChatAt.Ticks}_{POLL}");
         poll.ChatAt.Should().BeAfter(poll.CreatedAt);
+    }
+
+    // --- 077: the master closes a poll ---
+
+    [Fact]
+    public async Task ClosePoll_ByTheMaster_ClosesPublishesAndStopsPinning()
+    {
+        PollEntry();
+        Approved(ARIA, BRAM);
+        Votes(ARIA);
+        _repository.Setup(r => r.TryClosePollAsync(POLL, It.IsAny<DateTime>())).ReturnsAsync(true);
+
+        var item = await _service.ClosePollAsync(MASTER, POLL);
+
+        (item.Poll!.Closed, item.Poll.Open, item.CanClosePoll).Should().Be((true, false, false));
+        item.Poll.ClosedAt.Should().NotBeNull();
+        _repository.Verify(r => r.TryClosePollAsync(POLL, It.IsAny<DateTime>()), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_UPDATED)), Times.Once);
+    }
+
+    [Fact]
+    public async Task ClosePoll_ByAPlayer_Is403_AndAClosedPollChangesNothing()
+    {
+        var poll = PollEntry();
+        await _service.Invoking(s => s.ClosePollAsync(PLAYER, POLL)).Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("Apenas o mestre encerra a enquete.");
+
+        poll.PollClosedAt = DateTime.UtcNow.AddMinutes(-5);
+        var item = await _service.ClosePollAsync(MASTER, POLL);
+
+        item.Poll!.Closed.Should().BeTrue();
+        _repository.Verify(r => r.TryClosePollAsync(It.IsAny<long>(), It.IsAny<DateTime>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ClosePoll_DeletedOrNotAPoll_Is400()
+    {
+        PollEntry(deleted: true);
+        (await _service.Invoking(s => s.ClosePollAsync(MASTER, POLL)).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("turnId");
+
+        var text = Turn.Text(CAMPAIGN, MAP, 3, MASTER, null, "Mestre (GM) — Ana", null, "Oi");
+        text.TurnId = 64;
+        _repository.Setup(r => r.GetByIdAsync(64)).ReturnsAsync(text);
+        (await _service.Invoking(s => s.ClosePollAsync(MASTER, 64)).Should().ThrowAsync<DomainValidationException>())
+            .Which.Errors.Should().ContainKey("turnId");
+    }
+
+    [Fact]
+    public async Task Vote_OnAClosedPoll_Is409_AndSavesNothing()
+    {
+        var poll = PollEntry();
+        poll.PollClosedAt = DateTime.UtcNow;
+
+        await _service.Invoking(s => s.VoteAsync(PLAYER, POLL, new ChatPollVoteInfo { CharacterId = ARIA, OptionId = 1 }))
+            .Should().ThrowAsync<ConflictException>().WithMessage("A enquete foi encerrada.");
+        _chatPolls.Verify(r => r.SetVoteAsync(It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<ChatPollVote?>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Vote_ClosedWhileSaving_PropagatesTheRefusal()
+    {
+        PollEntry();
+        _chatPolls.Setup(r => r.SetVoteAsync(POLL, ARIA, It.IsAny<ChatPollVote?>(), It.IsAny<DateTime>()))
+            .ThrowsAsync(new ConflictException("A enquete foi encerrada."));
+
+        await _service.Invoking(s => s.VoteAsync(PLAYER, POLL, new ChatPollVoteInfo { CharacterId = ARIA, OptionId = 1 }))
+            .Should().ThrowAsync<ConflictException>().WithMessage("A enquete foi encerrada.");
+    }
+
+    [Fact]
+    public async Task CanClosePoll_OnlyForTheMaster_OnAnOpenPoll()
+    {
+        PollEntry();
+        Approved(ARIA);
+
+        (await _service.GetMessageAsync(MASTER, POLL)).CanClosePoll.Should().BeTrue();
+        (await _service.GetMessageAsync(PLAYER, POLL)).CanClosePoll.Should().BeFalse();
     }
 }

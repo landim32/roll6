@@ -10,7 +10,8 @@ namespace Roll6.Domain.Services;
 
 /// <summary>
 /// Polls in the chat (045): a conversation entry whose question is the description, with 2–12 options and one vote per
-/// approved character (plus one for the master as "Mestre"), moved or withdrawn at any time, like WhatsApp's polls.
+/// approved character (plus one for the master as "Mestre"), moved or withdrawn at any time, like WhatsApp's polls —
+/// until the master closes it (077): then it only shows the result.
 /// </summary>
 public partial class TurnService
 {
@@ -51,6 +52,8 @@ public partial class TurnService
             throw new DomainValidationException("optionId", "Esta mensagem não é uma enquete.");
         if (turn.IsDeleted)
             throw new DomainValidationException("optionId", "Esta enquete foi apagada.");
+        if (turn.IsPollClosed)
+            throw new ConflictException(POLL_CLOSED);
 
         if (info.CharacterId is long characterId)
         {
@@ -79,12 +82,33 @@ public partial class TurnService
         return await PublishUpdatedAsync(campaign, userId, turn);
     }
 
+    /// <summary>The refusal of a vote on a closed poll (077).</summary>
+    public const string POLL_CLOSED = "A enquete foi encerrada.";
+
+    /// <summary>
+    /// The master closes the poll (077, any campaign status): no more votes and never pinned again. It stays where its
+    /// last vote left it in the chat, and the same item reaches everyone through <c>chat.updated</c>. Closing again changes
+    /// nothing. No chat line and no notice.
+    /// </summary>
+    public async Task<ChatItemInfo> ClosePollAsync(long userId, long turnId)
+    {
+        var turn = await _repository.GetByIdAsync(turnId) ?? throw new KeyNotFoundException("Enquete não encontrada.");
+        var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
+        if (campaign.UserId != userId)
+            throw new UnauthorizedAccessException("Apenas o mestre encerra a enquete.");
+        if (!turn.ClosePoll(DateTime.UtcNow) || !await _repository.TryClosePollAsync(turn.TurnId, turn.PollClosedAt!.Value))
+            return (await MapChatAsync(campaign, userId, new List<Turn> { await _repository.GetByIdAsync(turn.TurnId) ?? turn })).Single();
+        return await PublishUpdatedAsync(campaign, userId, turn);
+    }
+
     /// <summary>
     /// Open (050): some approved character has no vote; the master's vote (no character) neither counts nor is needed,
-    /// and with no approved character there is no one missing.
+    /// and with no approved character there is no one missing. A closed poll (077) is never open.
     /// </summary>
-    public static bool IsPollOpen(IEnumerable<long> approvedCharacterIds, IEnumerable<long?> votedCharacterIds)
+    public static bool IsPollOpen(bool closed, IEnumerable<long> approvedCharacterIds, IEnumerable<long?> votedCharacterIds)
     {
+        if (closed)
+            return false;
         var voted = votedCharacterIds.OfType<long>().ToHashSet();
         return approvedCharacterIds.Any(id => !voted.Contains(id));
     }
@@ -110,7 +134,9 @@ public partial class TurnService
             {
                 Question = t.Description ?? string.Empty,
                 TotalVotes = pollVotes.Count,
-                Open = IsPollOpen(approved, pollVotes.Select(v => v.CharacterId)),
+                Open = IsPollOpen(t.IsPollClosed, approved, pollVotes.Select(v => v.CharacterId)),
+                Closed = t.IsPollClosed,
+                ClosedAt = t.PollClosedAt,
                 Options = options.Where(o => o.TurnId == t.TurnId).Select(o =>
                 {
                     var voters = pollVotes.Where(v => v.ChatPollOptionId == o.ChatPollOptionId).Select(v =>

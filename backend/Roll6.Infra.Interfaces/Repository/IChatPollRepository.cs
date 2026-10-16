@@ -11,7 +11,8 @@ public interface IChatPollRepository<TOption, TVote> where TOption : class where
     /// <summary>
     /// Replaces the voter's vote on the poll (characterId null = the master's): removes the one there is and saves
     /// <paramref name="vote"/> when given, and moves the poll's place in the chat to <paramref name="chatAt"/> (050), in
-    /// one transaction.
+    /// one transaction. A poll closed in the meantime (077) rolls everything back and throws the domain conflict
+    /// "A enquete foi encerrada.".
     /// </summary>
     Task SetVoteAsync(long turnId, long? characterId, TVote? vote, DateTime chatAt);
 }

@@ -87,6 +87,8 @@ interface ChatContextType {
   vote: (item: ChatItemInfo, optionId: number) => Promise<void>;
   /** Text → action of the character, or action → text (044). */
   convert: (item: ChatItemInfo, to: 'action' | 'message') => Promise<void>;
+  /** The master closes a poll (077): it leaves the pinned list and shows only the result. */
+  closePoll: (item: ChatItemInfo) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -424,6 +426,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     replace(await chatService.convert(item.turnId, to));
   }, [replace]);
 
+  const closePoll = useCallback(async (item: ChatItemInfo) => {
+    replace(await chatService.closePoll(item.turnId));
+  }, [replace]);
+
   const createPoll = useCallback(async (question: string, options: string[]) => {
     if (!speaker || campaignId === null) return;
     const item = await chatService.createPoll(campaignId, {
@@ -456,10 +462,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<ChatContextType>(() => ({
     items: flow, pinnedPolls: pinned, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters, loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert,
-    createPoll, vote,
+    createPoll, vote, closePoll,
   }), [flow, pinned, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters,
-    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert, createPoll, vote]);
+    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert, createPoll, vote, closePoll]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };

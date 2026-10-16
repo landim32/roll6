@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ChatLeftTextIcon, CopyIcon, EmojiLaughingFillIcon, EmojiLaughingIcon, HeartFillIcon, HeartIcon, LightningIcon, ReplyIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
+  ChatLeftTextIcon, CopyIcon, EmojiLaughingFillIcon, EmojiLaughingIcon, HeartFillIcon, HeartIcon, LightningIcon, ReplyIcon, StopCircleIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
 } from '../ui/icons';
 import { copyableText, reactionSummary } from '../../lib/chatItems';
 import { isPlayable } from '../../lib/campaignStatus';
@@ -19,6 +19,8 @@ export interface ChatItemActionsProps {
   onReply: () => void;
   onConvert: (to: 'action' | 'message') => void;
   onDelete: () => void;
+  /** The master closes the poll (077); only offered when `item.canClosePoll`. */
+  onClosePoll: () => void;
   /** Puts the text on the clipboard (only offered when the entry has text). */
   onCopy: (text: string) => void;
   onClose: () => void;
@@ -28,10 +30,10 @@ const BAR_HEIGHT = 56;
 
 /**
  * The bar that opens on holding a bubble (044): up to seven big buttons — Curtir, Amei, Gargalhada, Responder, Copiar,
- * Ação/Mensagem and Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
+ * Ação/Mensagem (077: or, on a poll, Encerrar enquete for the master) and Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
  * closes on a tap outside, a scroll or Esc.
  */
-export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onCopy, onClose }: ChatItemActionsProps) => {
+export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onClosePoll, onCopy, onClose }: ChatItemActionsProps) => {
   const { t } = useTranslation();
   // 049: items loaded before the campaign stopped playing still carry their old flag.
   const { currentCampaign } = useCampaign();
@@ -112,6 +114,11 @@ export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConv
         <button type="button" className="stm-chat-action" onClick={act(() => onConvert('message'))}
           title={t('chat.toMessage')} aria-label={t('chat.toMessage')}>
           <ChatLeftTextIcon size={24} />
+        </button>
+      )}
+      {item.canClosePoll && (
+        <button type="button" className="stm-chat-action" onClick={act(onClosePoll)} title={t('chat.closePoll')} aria-label={t('chat.closePoll')}>
+          <StopCircleIcon size={24} />
         </button>
       )}
       {item.canDelete && (

@@ -416,6 +416,8 @@ public class Roll6Context : DbContext
             entity.HasOne<Turn>().WithMany().HasForeignKey(e => e.ReplyToTurnId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_turn_reply");
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at").HasColumnType(TIMESTAMP);
+            entity.Property(e => e.PollClosedAt).HasColumnName("poll_closed_at").HasColumnType(TIMESTAMP);
+            entity.Ignore(e => e.IsPollClosed);
             entity.HasIndex(e => new { e.CampaignId, e.TurnNo }).HasDatabaseName("ix_turns_campaign_turn");
             entity.HasIndex(e => new { e.CampaignId, e.CreatedAt, e.TurnId }).HasDatabaseName("ix_turns_campaign_created");
             entity.HasIndex(e => new { e.CampaignId, e.ChatAt, e.TurnId }).HasDatabaseName("ix_turns_campaign_chat");

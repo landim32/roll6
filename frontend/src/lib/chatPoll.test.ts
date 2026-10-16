@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyVote, cleanOptions, isPollOpen, isPollDirty, isPollValid, moveOption, myVote, nextVote, normalizeOption, percent, pollCopyText,
-  removeOption, validatePoll, votesByRank, withTrailingEmpty, POLL_LIMITS,
+  removeOption, validatePoll, votesByRank, winningOptionIds, withTrailingEmpty, POLL_LIMITS,
 } from './chatPoll';
 import type { ChatPollInfo } from '../types/chat';
 
@@ -97,5 +97,24 @@ describe('050: isPollOpen', () => {
   it('falls back to the server without the party', () => {
     expect(isPollOpen({ ...poll(), open: true })).toBe(true);
     expect(isPollOpen(poll())).toBe(false);
+  });
+});
+
+describe('077: closed polls', () => {
+  it('a closed poll is never open, whoever is missing', () => {
+    expect(isPollOpen({ ...poll(), closed: true }, [80, 81])).toBe(false);
+    expect(isPollOpen({ ...poll(), closed: true, open: true })).toBe(false);
+  });
+
+  it('highlights every option tied at the top, none without votes', () => {
+    expect([...winningOptionIds(poll())]).toEqual([1, 2]);
+    const one = { ...poll(), options: poll().options.map((o) => (o.optionId === 3 ? { ...o, votes: 2 } : o)) };
+    expect([...winningOptionIds(one)]).toEqual([3]);
+    expect([...winningOptionIds({ ...poll(), options: poll().options.map((o) => ({ ...o, votes: 0 })) })]).toEqual([]);
+  });
+
+  it('copies a closed poll marked as closed', () => {
+    expect(pollCopyText({ ...poll(), closed: true }).split('\n')[0]).toBe('Para onde vamos? (encerrada)');
+    expect(pollCopyText(poll()).split('\n')[0]).toBe('Para onde vamos?');
   });
 });

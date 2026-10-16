@@ -5,7 +5,7 @@ import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { CheckIcon } from '../ui/icons';
 import { PollVotesModal } from './PollVotesModal';
 import { useChat } from '../../hooks/useChat';
-import { myVote, percent } from '../../lib/chatPoll';
+import { myVote, percent, winningOptionIds } from '../../lib/chatPoll';
 import type { ChatItemInfo } from '../../types/chat';
 
 /** At most this many voter pictures beside an option, like WhatsApp. */
@@ -14,7 +14,8 @@ const MAX_AVATARS = 3;
 /**
  * A poll in the chat (045), like WhatsApp's: the question, "Escolha uma opção", each option with a radio (filled on the
  * option the current speaker voted), the count, a bar of its share and up to three voters, and "Ver votos". Tapping an
- * option votes there; tapping the voted one withdraws the vote.
+ * option votes there; tapping the voted one withdraws the vote. Once the master closed it (077) it is only the result:
+ * "Enquete encerrada", no radios nor taps, and the most voted option(s) highlighted.
  */
 export const PollCard = ({ item }: { item: ChatItemInfo }) => {
   const { t } = useTranslation();
@@ -23,6 +24,8 @@ export const PollCard = ({ item }: { item: ChatItemInfo }) => {
   const poll = item.poll;
   if (!poll) return null;
   const mine = speaker ? myVote(poll, speaker.characterId) : null;
+  const closed = poll.closed === true;
+  const winners = closed ? winningOptionIds(poll) : new Set<number>();
 
   const tap = async (optionId: number) => {
     if (!speaker) {
@@ -37,19 +40,14 @@ export const PollCard = ({ item }: { item: ChatItemInfo }) => {
   };
 
   return (
-    <div className="stm-poll">
+    <div className={`stm-poll${closed ? ' is-closed' : ''}`}>
       <div className="stm-poll-question">{poll.question}</div>
-      <div className="stm-poll-hint">{t('chat.poll.chooseOne')}</div>
-      <div role="radiogroup" aria-label={poll.question}>
-        {poll.options.map((option) => {
-          const checked = option.optionId === mine;
-          return (
-            <button key={option.optionId} type="button" role="radio" aria-checked={checked}
-              className={`stm-poll-option${checked ? ' is-mine' : ''}`} disabled={item.deleted}
-              aria-label={t('chat.poll.vote', { option: option.text })}
-              onClick={(event) => { event.stopPropagation(); void tap(option.optionId); }}>
+      <div className="stm-poll-hint">{t(closed ? 'chat.poll.closed' : 'chat.poll.chooseOne')}</div>
+      {closed ? (
+        <ul className="stm-poll-results" aria-label={poll.question}>
+          {poll.options.map((option) => (
+            <li key={option.optionId} className={`stm-poll-option${winners.has(option.optionId) ? ' is-winner' : ''}`}>
               <span className="stm-poll-row">
-                <span className="stm-poll-radio" aria-hidden="true">{checked && <CheckIcon size={12} />}</span>
                 <span className="stm-poll-text">{option.text}</span>
                 {option.voters.length > 0 && (
                   <span className="stm-poll-voters" aria-hidden="true">
@@ -59,15 +57,44 @@ export const PollCard = ({ item }: { item: ChatItemInfo }) => {
                     ))}
                   </span>
                 )}
-                <span className="stm-poll-count">{option.votes}</span>
+                <span className="stm-poll-count" aria-label={t('chat.poll.votes', { count: option.votes })}>{option.votes}</span>
               </span>
               <span className="stm-poll-bar" aria-hidden="true">
                 <span style={{ width: `${percent(option.votes, poll.totalVotes)}%` }} />
               </span>
-            </button>
-          );
-        })}
-      </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div role="radiogroup" aria-label={poll.question}>
+          {poll.options.map((option) => {
+            const checked = option.optionId === mine;
+            return (
+              <button key={option.optionId} type="button" role="radio" aria-checked={checked}
+                className={`stm-poll-option${checked ? ' is-mine' : ''}`} disabled={item.deleted}
+                aria-label={t('chat.poll.vote', { option: option.text })}
+                onClick={(event) => { event.stopPropagation(); void tap(option.optionId); }}>
+                <span className="stm-poll-row">
+                  <span className="stm-poll-radio" aria-hidden="true">{checked && <CheckIcon size={12} />}</span>
+                  <span className="stm-poll-text">{option.text}</span>
+                  {option.voters.length > 0 && (
+                    <span className="stm-poll-voters" aria-hidden="true">
+                      {option.voters.slice(0, MAX_AVATARS).map((voter) => (
+                        <CharacterAvatar key={voter.characterId ?? 'master'}
+                          name={voter.characterId === null ? t('chat.poll.master') : voter.name} imageUrl={voter.imageUrl} size={18} />
+                      ))}
+                    </span>
+                  )}
+                  <span className="stm-poll-count">{option.votes}</span>
+                </span>
+                <span className="stm-poll-bar" aria-hidden="true">
+                  <span style={{ width: `${percent(option.votes, poll.totalVotes)}%` }} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <button type="button" className="stm-poll-footer" onClick={(event) => { event.stopPropagation(); setShowVotes(true); }}>
         {t('chat.poll.seeVotes')}
       </button>

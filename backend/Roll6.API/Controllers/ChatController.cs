@@ -97,6 +97,21 @@ public class ChatController : ApiControllerBase
         }
     }
 
+    /// <summary>The master closes a poll (077): no more votes, never pinned again; only the result shows.</summary>
+    [HttpPost("{id:long}/poll/close")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ClosePoll(long id)
+    {
+        try
+        {
+            return Ok(await _chatService.ClosePollAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>A character's text → its action of the current turn ("action"), or the valid action → text ("message") (044).</summary>
     [HttpPost("{id:long}/convert")]
     [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]

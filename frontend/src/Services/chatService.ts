@@ -79,6 +79,12 @@ class ChatService {
     return this.handleResponse<ChatItemInfo>(response);
   }
 
+  /** The master closes a poll (077): no more votes, only the result. */
+  async closePoll(turnId: number): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/chat/${turnId}/poll/close`, { method: 'POST', headers: getHeaders(true), body: '{}' });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
   /** A character's text → its action ('action'), or the action → text ('message') (044). */
   async convert(turnId: number, to: 'action' | 'message'): Promise<ChatItemInfo> {
     const response = await fetch(`${API_URL}/api/chat/${turnId}/convert`, {

@@ -1434,6 +1434,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("npc_id");
 
+                    b.Property<DateTime?>("PollClosedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("poll_closed_at");
+
                     b.Property<long?>("ReplyToTurnId")
                         .HasColumnType("bigint")
                         .HasColumnName("reply_to_turn_id");

@@ -45,10 +45,13 @@ public interface ITurnRepository<TModel> where TModel : class
         long viewerId, bool viewerIsMaster, IReadOnlyCollection<int>? turnTypes = null);
 
     /// <summary>
-    /// The campaign's open polls (050), oldest first: not deleted, with some approved character that has not voted (the
-    /// master's vote doesn't count). None while the campaign has no approved character.
+    /// The campaign's open polls (050), oldest first: not deleted, not closed (077), with some approved character that has
+    /// not voted (the master's vote doesn't count). None while the campaign has no approved character.
     /// </summary>
     Task<List<TModel>> ListOpenPollsAsync(long campaignId);
+
+    /// <summary>Closes the poll if it is still open (077); false when another request closed it first.</summary>
+    Task<bool> TryClosePollAsync(long turnId, DateTime at);
 
     /// <summary>The turn records (types 1–5, not deleted) of the given turns, in order.</summary>
     Task<List<TModel>> ListLogByTurnsAsync(long campaignId, IEnumerable<int> turnNos);
