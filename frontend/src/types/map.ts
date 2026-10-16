@@ -4,6 +4,8 @@
 export const MAP_STATUS_ACTIVE = 1;
 export const MAP_STATUS_ARCHIVED = 2;
 export const MAP_STATUS_DELETED = 3;
+/** "Atual" (078): the map the players follow; at most one per campaign, set only by "Tornar atual". */
+export const MAP_STATUS_CURRENT = 4;
 
 /** Campaign map as returned by the API (with the model's grid/image fields). */
 export interface MapInfo {

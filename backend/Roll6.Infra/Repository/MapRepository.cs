@@ -77,6 +77,15 @@ public class MapRepository : IMapRepository<Map>
         }
     }
 
+    public async Task<List<Map>> ListPlayableByCampaignsAsync(IReadOnlyCollection<long> campaignIds)
+    {
+        if (campaignIds.Count == 0)
+            return new List<Map>();
+        return await _context.Maps.AsNoTracking()
+            .Where(e => campaignIds.Contains(e.CampaignId) && (e.Status == MapStatus.Active || e.Status == MapStatus.Current))
+            .ToListAsync();
+    }
+
     public async Task<Map> UpdateAsync(Map entity)
     {
         var existing = await _context.Maps.FindAsync(entity.MapId)

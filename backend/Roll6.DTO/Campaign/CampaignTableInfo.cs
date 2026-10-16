@@ -43,4 +43,28 @@ public class CampaignTableInfo
     /// <summary>Slug of <see cref="CurrentMapId"/>. Null when there is no active current map.</summary>
     [JsonPropertyName("currentMapSlug")]
     public string? CurrentMapSlug { get; set; }
+
+    /// <summary>
+    /// 078: the Current and Active maps of the campaign, Current first then by name — only for campaigns the caller
+    /// masters (empty for players, who only follow the current map). Feeds the master's table combo.
+    /// </summary>
+    [JsonPropertyName("maps")]
+    public List<TableMapInfo> Maps { get; set; } = new();
+}
+
+/// <summary>A map in the table combo (078).</summary>
+public class TableMapInfo
+{
+    [JsonPropertyName("mapId")]
+    public long MapId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("slug")]
+    public string Slug { get; set; } = string.Empty;
+
+    /// <summary>1 Active, 4 Current.</summary>
+    [JsonPropertyName("status")]
+    public int Status { get; set; }
 }

@@ -717,6 +717,11 @@ namespace Roll6.Infra.Migrations
                     b.HasKey("MapId")
                         .HasName("maps_pkey");
 
+                    b.HasIndex("CampaignId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_maps_campaign_current")
+                        .HasFilter("status = 4");
+
                     b.HasIndex("MapModelId");
 
                     b.HasIndex("Slug")

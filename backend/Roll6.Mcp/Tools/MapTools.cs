@@ -12,7 +12,7 @@ public static class MapTools
     private const string RETURNS = """
         Returns: the map { mapId, campaignId, mapModelId, mapModelName, mapModelImageUrl, gridWidth, gridHeight, imageWidth,
         imageHeight, imageTop, imageLeft, hexSize, userId (master), sequence, name, slug (immutable URL slug),
-        status (1 active, 2 archived), createdAt, updatedAt }.
+        status (1 active, 2 archived, 4 current — the one map the players follow), createdAt, updatedAt }.
         """;
 
     [McpServerTool(Name = "get_map", Title = "Get map", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -63,10 +63,13 @@ public static class MapTools
     [ApiOperation("PUT", "/api/map/{id}")]
     [Description($$"""
         What it does: renames a campaign map and sets its status: 1 active or 2 archived (archived maps stay listed and
-        keep their pieces). To delete use delete_map.
+        keep their pieces). The current map (status 4) is made only by set_current_map: status 4 here is refused, the
+        current map can't be archived (make another map current first) and 1 on it keeps it current. To delete use
+        delete_map.
         Who can use it: only the master.
         {{RETURNS}}
-        Common errors: 403 not the master, 404 not found, 400 invalid name or status.
+        Common errors: 403 not the master, 404 not found, 400 invalid name or status ("Use “Tornar atual” para tornar um
+        mapa atual.", "Torne outro mapa atual antes de arquivar este.").
         Related tools: get_map.
         """)]
     public static Task<CallToolResult> UpdateMap(

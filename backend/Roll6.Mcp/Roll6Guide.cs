@@ -73,7 +73,8 @@ public static class Roll6Guide
           has adjusted it it follows the character's `move`. It never limits the master, and NPCs keep their own move.
         - The campaign's **current map** (`set_current_map`, master) is the map all players follow in the app. It changes
           only through that call (in the app, the master's "Tornar atual"); opening or editing other maps never moves the
-          players, and only an active map can be current.
+          players, and only an active map can be current. The current map has status 4 ("Atual"; at most one per
+          campaign), the previous one goes back to 1, and it can't be archived while current.
         - Every campaign and every campaign map has an immutable **slug** (built from the name, unique on the whole
           site; renaming does not change it). `get_campaign_by_slug` and `get_map_by_slug` open them.
           `list_my_table_campaigns` lists the campaigns where you are the master or have an approved character, each
