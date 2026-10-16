@@ -2769,6 +2769,12 @@ button.stm-chat-quote { cursor: pointer; }
   display: block; width: 100%; padding: 0.3rem 0 0; margin-top: 0.2rem; border: 0; border-top: 1px solid var(--stm-border);
   background: none; color: var(--stm-accent); font-weight: 600; font-size: 0.85rem;
 }
+/* 077: a poll the master closed shows only its result — no radios, the leaders in bold with the full green bar. */
+.stm-poll-results { list-style: none; margin: 0; padding: 0; }
+.stm-poll.is-closed .stm-poll-hint { font-weight: 600; }
+.stm-poll.is-closed .stm-poll-bar { margin-left: 0; }
+.stm-poll.is-closed .stm-poll-option:not(.is-winner) .stm-poll-bar > span { opacity: 0.55; }
+.stm-poll.is-closed .stm-poll-option.is-winner .stm-poll-text { font-weight: 700; }
 .stm-poll-editor-row { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.4rem; }
 .stm-poll-editor-row .form-control { flex: 1 1 auto; }
 .stm-poll-editor-row .btn { min-width: 40px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; }

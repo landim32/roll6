@@ -35,6 +35,9 @@ public interface IChatService
     /// <summary>Puts the voter's single vote on an option, moves it, or withdraws it (<c>optionId</c> null) (045).</summary>
     Task<ChatItemInfo> VoteAsync(long userId, long turnId, ChatPollVoteInfo info);
 
+    /// <summary>The master closes a poll (077): no more votes, never pinned again. Closing a closed poll changes nothing.</summary>
+    Task<ChatItemInfo> ClosePollAsync(long userId, long turnId);
+
     /// <summary>Rolls 3d6 in the chat (server-side draw) and publishes it like a message.</summary>
     Task<ChatItemInfo> RollAsync(long userId, long campaignId, ChatRollInfo info);
 

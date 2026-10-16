@@ -202,10 +202,18 @@ public class TurnRepository : ITurnRepository<Turn>
             .Where(p => p.CampaignId == campaignId && p.Status == CampaignCharacterStatus.Approved)
             .Select(p => p.CharacterId);
         return await _context.Turns.AsNoTracking()
-            .Where(e => e.CampaignId == campaignId && e.TurnType == TurnType.Poll && e.DeletedAt == null
+            .Where(e => e.CampaignId == campaignId && e.TurnType == TurnType.Poll && e.DeletedAt == null && e.PollClosedAt == null
                 && approved.Any(c => !_context.ChatPollVotes.Any(v => v.TurnId == e.TurnId && v.CharacterId == c)))
             .OrderBy(e => e.TurnId)
             .ToListAsync();
+    }
+
+    public async Task<bool> TryClosePollAsync(long turnId, DateTime at)
+    {
+        // The same row the vote's transaction updates (chat_at, only while open): a vote and a close never cross.
+        return await _context.Turns
+            .Where(e => e.TurnId == turnId && e.TurnType == TurnType.Poll && e.PollClosedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.PollClosedAt, at)) > 0;
     }
 
     public async Task<List<Turn>> ListLogByTurnsAsync(long campaignId, IEnumerable<int> turnNos)

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
 using Roll6.Infra.Context;
 using Roll6.Infra.Interfaces.Repository;
@@ -43,13 +44,23 @@ public class ChatPollRepository : IChatPollRepository<ChatPollOption, ChatPollVo
         return await _context.ChatPollOptions.AsNoTracking().FirstOrDefaultAsync(o => o.ChatPollOptionId == optionId);
     }
 
+    /// <summary>The refusal of a vote on a closed poll (077).</summary>
+    public const string POLL_CLOSED = "A enquete foi encerrada.";
+
     public async Task SetVoteAsync(long turnId, long? characterId, ChatPollVote? vote, DateTime chatAt)
     {
         for (var attempt = 1; ; attempt++)
         {
             await using var transaction = await _context.Database.BeginTransactionAsync();
+            // 077: the poll's row first, and only while it is open — it also waits for a close in progress.
+            var open = await _context.Turns.Where(t => t.TurnId == turnId && t.PollClosedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ChatAt, chatAt));
+            if (open == 0)
+            {
+                await transaction.RollbackAsync();
+                throw new ConflictException(POLL_CLOSED);
+            }
             await _context.ChatPollVotes.Where(v => v.TurnId == turnId && v.CharacterId == characterId).ExecuteDeleteAsync();
-            await _context.Turns.Where(t => t.TurnId == turnId).ExecuteUpdateAsync(s => s.SetProperty(t => t.ChatAt, chatAt));
             if (vote == null)
             {
                 await transaction.CommitAsync();

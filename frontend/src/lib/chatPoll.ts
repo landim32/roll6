@@ -89,9 +89,9 @@ export const votesByRank = (poll: ChatPollInfo) =>
     .sort((a, b) => b.option.votes - a.option.votes || a.index - b.index)
     .map(({ option }) => option);
 
-/** What "Copiar" puts on the clipboard for a poll: the question, then one line per option with its votes. */
+/** What "Copiar" puts on the clipboard for a poll: the question (077: "(encerrada)" once closed), then one line per option with its votes. */
 export const pollCopyText = (poll: ChatPollInfo): string =>
-  [poll.question, ...poll.options.map((o) => `• ${o.text} — ${o.votes} ${o.votes === 1 ? 'voto' : 'votos'}`)].join('\n');
+  [poll.closed ? `${poll.question} (encerrada)` : poll.question, ...poll.options.map((o) => `• ${o.text} — ${o.votes} ${o.votes === 1 ? 'voto' : 'votos'}`)].join('\n');
 
 /**
  * Open (050): some approved character of the campaign has not voted; the master's vote (characterId null) neither
@@ -99,7 +99,15 @@ export const pollCopyText = (poll: ChatPollInfo): string =>
  * own answer is used.
  */
 export const isPollOpen = (poll: ChatPollInfo, approvedCharacterIds?: readonly number[]): boolean => {
+  // 077: a poll the master closed is never open, whoever is missing.
+  if (poll.closed) return false;
   if (!approvedCharacterIds) return poll.open ?? false;
   const voted = new Set(poll.options.flatMap((o) => o.voters.map((v) => v.characterId)).filter((id): id is number => id !== null));
   return approvedCharacterIds.some((id) => !voted.has(id));
+};
+
+/** The most voted options of a poll (077, highlighted once closed): every option tied at the top; none while nobody voted. */
+export const winningOptionIds = (poll: ChatPollInfo): Set<number> => {
+  const top = Math.max(0, ...poll.options.map((o) => o.votes));
+  return new Set(top === 0 ? [] : poll.options.filter((o) => o.votes === top).map((o) => o.optionId));
 };

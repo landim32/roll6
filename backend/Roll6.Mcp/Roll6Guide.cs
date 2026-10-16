@@ -259,7 +259,8 @@ public static class Roll6Guide
           and the app pins open polls below everything else in the chat (`list_chat_messages` returns them in `openPolls`,
           loaded or not). Each vote or withdrawal moves the poll to that moment in the chat order, so once everyone has
           voted it stays right after what was said before the last vote. Its author or the master deletes a poll with
-          `delete_chat_message`.
+          `delete_chat_message`. The master may **close** a poll (`close_chat_poll`, any status): no more votes (409), never
+          open nor pinned again (`poll.closed`), only the result is shown; there is no reopening.
         - **Whispers**: `send_chat_message`, `roll_dice` and `act_in_turn` take `whisperCharacterIds` (approved characters,
           not your own) and/or `whisperMaster`. Only the author, the master (always) and the owners of those characters see
           it whole (`whisper.recipients`); everyone else doesn't get a whispered message at all, and gets a whispered action

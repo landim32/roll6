@@ -68,6 +68,27 @@ public class Turn
         set => _pollChatAt = value;
     }
 
+    /// <summary>When the master closed the poll (077): no more votes, never pinned again. Null while it is open.</summary>
+    public DateTime? PollClosedAt { get; set; }
+
+    public bool IsPollClosed => PollClosedAt.HasValue;
+
+    /// <summary>
+    /// Closes a poll (077; the master only, checked by the service). False when it was already closed — closing is final
+    /// and never moves the poll in the chat.
+    /// </summary>
+    public bool ClosePoll(DateTime now)
+    {
+        if (TurnType != TurnType.Poll)
+            throw new DomainValidationException("turnId", "Esta mensagem não é uma enquete.");
+        if (IsDeleted)
+            throw new DomainValidationException("turnId", "Esta enquete foi apagada.");
+        if (IsPollClosed)
+            return false;
+        PollClosedAt = now;
+        return true;
+    }
+
     /// <summary>A vote or withdrawal on a poll (050) moves its place in the chat to <paramref name="now"/>.</summary>
     public void TouchChat(DateTime now)
     {

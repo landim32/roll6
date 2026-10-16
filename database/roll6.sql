@@ -2167,5 +2167,20 @@ BEGIN
     VALUES ('20261015212235_AddPushDeliveries', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261016113812_AddPollClosedAt') THEN
+    ALTER TABLE turns ADD poll_closed_at timestamp without time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261016113812_AddPollClosedAt') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261016113812_AddPollClosedAt', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

@@ -14,13 +14,14 @@ public static class ChatTools
         displayName, displayImageUrl, authorLabel, text, description, before/after {x, y, look, lookName}, moved,
         movedTotal, changes [{field, label, before, after}], imageUrl, audioUrl, audioSeconds, audioType, deleted,
         canDelete, dice, cancelled, replyTo {key, turnId, displayName, kind, excerpt, deleted, cancelled, hidden},
-        reactions [{userId, name, kind like|love|laugh}], canReply, canReact, canConvert (action|message|null),
-        poll {question, totalVotes, open, options [{optionId, text, votes, voters [{characterId|null, name, imageUrl}]}]},
+        reactions [{userId, name, kind like|love|laugh}], canReply, canReact, canConvert (action|message|null), canClosePoll,
+        poll {question, totalVotes, open, closed, closedAt, options [{optionId, text, votes, voters [{characterId|null, name, imageUrl}]}]},
         whisper {master, recipients [{characterId|null, name, imageUrl}]} | null, whisperHidden }.
         kind is text | image | audio | roll | poll (what people said, rolled or asked; a roll has dice = the three faces
         and text = the optional reason; a poll has text = its question and poll = options with votes and voters — a
         null characterId is the master; open = true while some approved character has not voted — the master's vote
-        doesn't count — and the poll is pinned at the bottom of the chat until then), movement | action | actionResult | characterUpdate | narration (the turn
+        doesn't count — and the poll is pinned at the bottom of the chat until then; closed = true once the master closed
+        it with close_chat_poll: no more votes, never open, only the result), movement | action | actionResult | characterUpdate | narration (the turn
         records — text is the same line as get_turn_summary), poke ("Ana cutucou Bruno") or turnFinished (the divider
         "Turno N finalizado"). An action with cancelled = true was replaced, reset or deleted ("Ação cancelada") and no
         longer counts in the turn. whisper (when not null) means only its recipients, the author and the master see the
@@ -164,8 +165,8 @@ public static class ChatTools
         Who can use it: the owner of an approved character (as that character) or the campaign master (as "Mestre").
         Returns: the updated poll item. {{ITEM}}
         Common errors: 400 not a poll, deleted poll, option of another poll; 403 not your approved character / not the
-        master without a character; 404 entry not found.
-        Related tools: create_chat_poll, list_chat_messages.
+        master without a character; 404 entry not found; 409 "A enquete foi encerrada." (the master closed it).
+        Related tools: create_chat_poll, list_chat_messages, close_chat_poll.
         """)]
     public static Task<CallToolResult> VoteChatPoll(
         Roll6ApiClient api,
@@ -173,6 +174,23 @@ public static class ChatTools
         [Description("optionId from the poll's options; omit to withdraw the vote.")] long? optionId = null,
         [Description("Optional: the voting character (yours, approved). Omit to vote as the master.")] long? characterId = null) =>
         api.SendAsync(HttpMethod.Put, $"/api/chat/{turnId}/vote", new ChatPollVoteInfo { CharacterId = characterId, OptionId = optionId });
+
+    [McpServerTool(Name = "close_chat_poll", Title = "Close a chat poll", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("POST", "/api/chat/{id}/poll/close")]
+    [Description($$"""
+        What it does: closes a chat poll for good. From then on nobody votes, moves or withdraws a vote (409), the poll is
+        never open nor pinned at the bottom of the chat again (it stays where its last vote left it) and the app shows only
+        the result, with the most voted option highlighted. Closing writes no chat line and notifies nobody; closing a
+        closed poll changes nothing. There is no reopening.
+        Who can use it: only the campaign master, in any campaign status.
+        Returns: the poll item (poll.closed = true, poll.closedAt). {{ITEM}}
+        Common errors: 400 not a poll or a deleted poll, 403 not the master, 404 entry not found.
+        Related tools: list_chat_messages (kind = "poll"), get_chat_message, vote_chat_poll.
+        """)]
+    public static Task<CallToolResult> CloseChatPoll(
+        Roll6ApiClient api,
+        [Description("Id of the poll (turnId from list_chat_messages or create_chat_poll).")] long turnId) =>
+        api.SendAsync(HttpMethod.Post, $"/api/chat/{turnId}/poll/close", new { });
 
     [McpServerTool(Name = "react_to_chat_message", Title = "React to a chat entry", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/chat/{id}/reaction")]

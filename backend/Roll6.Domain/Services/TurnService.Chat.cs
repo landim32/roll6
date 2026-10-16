@@ -355,6 +355,8 @@ public partial class TurnService : IChatService
         item.WhisperHidden = whispers.Masked.Contains(t.TurnId);
         item.CanReply = t.CanReply && !item.WhisperHidden;
         item.CanReact = item.CanReply;
+        // 077: only the master closes a poll, while it is open.
+        item.CanClosePoll = isMaster && t.TurnType == TurnType.Poll && !t.IsDeleted && !t.IsPollClosed;
         var ownerId = t.CharacterId is long c && names.Characters.TryGetValue(c, out var character) ? character.UserId : (long?)null;
         var mayChange = isMaster || (ownerId.HasValue && ownerId == userId);
         var currentTurn = t.TurnNo == campaign.CurrentTurn;

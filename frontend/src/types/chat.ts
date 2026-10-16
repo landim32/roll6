@@ -81,6 +81,8 @@ export interface ChatItemInfo {
   canReact?: boolean;
   /** A character's text can become its action ('action'), its action can become text ('message'). */
   canConvert?: 'action' | 'message' | null;
+  /** The reader may close this poll (077): the master, on a poll not deleted nor closed. */
+  canClosePoll?: boolean;
   /** A whisper the reader may see (047): who it was whispered to. */
   whisper?: ChatWhisperInfo | null;
   /** A whispered action the reader is not in (047): its text is "está sussurrando!". */
@@ -143,6 +145,10 @@ export interface ChatPollInfo {
   totalVotes: number;
   /** Some approved character has not voted yet (050; the master's vote doesn't count): pinned at the bottom. */
   open?: boolean;
+  /** Closed by the master (077): no more votes, never pinned, only the result. */
+  closed?: boolean;
+  /** UTC without a zone. */
+  closedAt?: string | null;
   /** In the order the author wrote them. */
   options: ChatPollOptionInfo[];
 }

@@ -21,7 +21,7 @@ export const ChatMessageList = () => {
   const { session } = useAuth();
   const {
     items: allItems, pinnedPolls, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters, startReply,
-    react, convert,
+    react, convert, closePoll,
   } = useChat();
   // Moves and character changes show only when the user turned them on in the paperclip.
   const items = useMemo(() => filterChatItems(allItems, filters), [allItems, filters]);
@@ -196,6 +196,7 @@ export const ChatMessageList = () => {
           onReply={() => startReply(actions.item)}
           onConvert={(to) => run(() => convert(actions.item, to))}
           onDelete={() => setToDelete(actions.item)}
+          onClosePoll={() => run(() => closePoll(actions.item))}
           onCopy={(text) => { void copyToClipboard(text).then((ok) => (ok ? toast.success(t('chat.copied')) : toast.error(t('chat.copyFailed')))); }}
         />
       )}
