@@ -2,9 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ChatLeftTextIcon, CopyIcon, EmojiLaughingFillIcon, EmojiLaughingIcon, HeartFillIcon, HeartIcon, LightningIcon, ReplyIcon, StopCircleIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
+  ChatLeftTextIcon, CopyIcon, EmojiLaughingFillIcon, EmojiLaughingIcon, HeartFillIcon, HeartIcon, LightningIcon, PersonBadgeIcon, PersonFillIcon, ReplyIcon, StopCircleIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
 } from '../ui/icons';
 import { copyableText, reactionSummary } from '../../lib/chatItems';
+import type { VoiceSwitch } from '../../lib/chatItems';
 import { isPlayable } from '../../lib/campaignStatus';
 import { useCampaign } from '../../hooks/useCampaign';
 import { REACTION } from '../../types/chat';
@@ -21,6 +22,9 @@ export interface ChatItemActionsProps {
   onDelete: () => void;
   /** The master closes the poll (077); only offered when `item.canClosePoll`. */
   onClosePoll: () => void;
+  /** 079: the voice the master may switch his own message to ("Falar como …"), or null. */
+  voice?: VoiceSwitch | null;
+  onVoice?: () => void;
   /** Puts the text on the clipboard (only offered when the entry has text). */
   onCopy: (text: string) => void;
   onClose: () => void;
@@ -33,7 +37,7 @@ const BAR_HEIGHT = 56;
  * Ação/Mensagem (077: or, on a poll, Encerrar enquete for the master) and Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
  * closes on a tap outside, a scroll or Esc.
  */
-export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onClosePoll, onCopy, onClose }: ChatItemActionsProps) => {
+export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onClosePoll, voice = null, onVoice, onCopy, onClose }: ChatItemActionsProps) => {
   const { t } = useTranslation();
   // 049: items loaded before the campaign stopped playing still carry their old flag.
   const { currentCampaign } = useCampaign();
@@ -116,6 +120,14 @@ export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConv
           <ChatLeftTextIcon size={24} />
         </button>
       )}
+      {voice && onVoice && (() => {
+        const label = voice.to === 'master' ? t('chat.speakAsMaster') : t('chat.speakAs', { name: voice.name });
+        return (
+          <button type="button" className="stm-chat-action" onClick={act(onVoice)} title={label} aria-label={label}>
+            {voice.to === 'master' ? <PersonBadgeIcon size={24} /> : <PersonFillIcon size={24} />}
+          </button>
+        );
+      })()}
       {item.canClosePoll && (
         <button type="button" className="stm-chat-action" onClick={act(onClosePoll)} title={t('chat.closePoll')} aria-label={t('chat.closePoll')}>
           <StopCircleIcon size={24} />

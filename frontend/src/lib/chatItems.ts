@@ -251,3 +251,34 @@ export const replyExcerpt = (item: ChatItemInfo): string => {
     default: return cut;
   }
 };
+
+/** 079: the kinds of message that speak with a voice (the master's or a character's) and may switch it. */
+export const VOICE_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio, CHAT_KIND.roll]);
+
+/**
+ * The master speaking as such (079): a message, photo, recording or roll without a character — only the campaign master
+ * may speak without one, so the server's data already says it. Drawn in the golden card.
+ */
+export const isMasterVoice = (item: Pick<ChatItemInfo, 'kind' | 'characterId' | 'deleted'>): boolean =>
+  VOICE_KINDS.has(item.kind) && item.characterId === null && !item.deleted;
+
+/** What "Falar como…" offers (079): back to the master, or to the selected character. */
+export type VoiceSwitch = { to: 'master' } | { to: 'character'; characterId: number; name: string };
+
+export interface VoiceViewer {
+  userId: number | null;
+  isMaster: boolean;
+  /** The master's character selected in "Personagem atual", or null ("Mestre (GM)" or none). */
+  selected: { characterId: number; name: string } | null;
+}
+
+/**
+ * The voice switch of the hold menu (079): only the campaign master, on a message, photo, recording or roll he wrote
+ * himself — a character's goes back to the master; the master's goes to the selected character (Q3), if any.
+ */
+export const voiceSwitch = (item: ChatItemInfo, viewer: VoiceViewer): VoiceSwitch | null => {
+  if (!viewer.isMaster || viewer.userId === null || item.userId !== viewer.userId) return null;
+  if (!VOICE_KINDS.has(item.kind) || item.deleted || item.whisperHidden) return null;
+  if (item.characterId !== null) return { to: 'master' };
+  return viewer.selected ? { to: 'character', characterId: viewer.selected.characterId, name: viewer.selected.name } : null;
+};

@@ -6,7 +6,8 @@ import { ImageLightbox } from './ImageLightbox';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
-import { compareCursors, continuesPrevious } from '../../lib/chatItems';
+import { compareCursors, continuesPrevious, voiceSwitch } from '../../lib/chatItems';
+import { useCampaign } from '../../hooks/useCampaign';
 import { filterChatItems } from '../../lib/chatFilters';
 import { copyToClipboard } from '../../lib/clipboard';
 import type { ChatItemInfo } from '../../types/chat';
@@ -21,8 +22,9 @@ export const ChatMessageList = () => {
   const { session } = useAuth();
   const {
     items: allItems, pinnedPolls, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters, startReply,
-    react, convert, closePoll,
+    react, convert, closePoll, setSpeaker, speaker,
   } = useChat();
+  const { isMaster } = useCampaign();
   // Moves and character changes show only when the user turned them on in the paperclip.
   const items = useMemo(() => filterChatItems(allItems, filters), [allItems, filters]);
   /** "Novas mensagens" goes before the first unread item still shown (the first unread may be a hidden one). */
@@ -186,20 +188,30 @@ export const ChatMessageList = () => {
         danger
       />
       <ImageLightbox image={image} onClose={() => setImage(null)} />
-      {actions && (
-        <ChatItemActions
-          item={allItems.find((i) => i.key === actions.item.key) ?? pinnedPolls.find((i) => i.key === actions.item.key) ?? actions.item}
-          anchor={actions.anchor}
-          userId={userId}
-          onClose={() => setActions(null)}
-          onReact={(kind) => run(() => react(actions.item, kind))}
-          onReply={() => startReply(actions.item)}
-          onConvert={(to) => run(() => convert(actions.item, to))}
-          onDelete={() => setToDelete(actions.item)}
-          onClosePoll={() => run(() => closePoll(actions.item))}
-          onCopy={(text) => { void copyToClipboard(text).then((ok) => (ok ? toast.success(t('chat.copied')) : toast.error(t('chat.copyFailed')))); }}
-        />
-      )}
+      {actions && (() => {
+        const shown = allItems.find((i) => i.key === actions.item.key) ?? pinnedPolls.find((i) => i.key === actions.item.key) ?? actions.item;
+        // 079: the master who also plays may switch the voice of his own message — to the character selected now.
+        const selected = speaker?.characterId != null && speaker.participation
+          ? { characterId: speaker.characterId, name: speaker.participation.characterName }
+          : null;
+        const voice = voiceSwitch(shown, { userId, isMaster, selected });
+        return (
+          <ChatItemActions
+            item={shown}
+            voice={voice}
+            onVoice={() => run(() => setSpeaker(shown, voice?.to === 'character' ? voice.characterId : null))}
+            anchor={actions.anchor}
+            userId={userId}
+            onClose={() => setActions(null)}
+            onReact={(kind) => run(() => react(actions.item, kind))}
+            onReply={() => startReply(actions.item)}
+            onConvert={(to) => run(() => convert(actions.item, to))}
+            onDelete={() => setToDelete(actions.item)}
+            onClosePoll={() => run(() => closePoll(actions.item))}
+            onCopy={(text) => { void copyToClipboard(text).then((ok) => (ok ? toast.success(t('chat.copied')) : toast.error(t('chat.copyFailed')))); }}
+          />
+        );
+      })()}
     </div>
   );
 };

@@ -2806,3 +2806,15 @@ button.stm-chat-quote { cursor: pointer; }
 .stm-chat-message.is-whisper .stm-chat-bubble { background: rgba(245, 197, 24, 0.14); border: 1px solid rgba(245, 197, 24, 0.55); }
 .stm-chat-message.is-whisper-hidden .stm-chat-text { color: var(--bs-secondary-color); }
 .stm-whisper-footer { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.25rem; font-size: 0.7rem; color: #f5c518; }
+
+/* 079: the master speaking as such — a solid golden card with bold dark text (the whisper's yellow is pale and translucent). */
+.stm-chat-message.is-master .stm-chat-bubble { background: #f2c14e; color: #1a1300; font-weight: 700; }
+.stm-chat-message.is-master.is-own .stm-chat-bubble { background: #e8b23a; }
+.stm-chat-message.is-master .stm-chat-name { color: #5a3d00 !important; }
+.stm-chat-message.is-master .stm-chat-meta,
+.stm-chat-message.is-master .stm-chat-time { color: rgba(26, 19, 0, 0.7); }
+.stm-chat-message.is-master .stm-chat-bubble a { color: #3d2a00; text-decoration: underline; }
+.stm-chat-message.is-master .stm-chat-bubble .text-body-secondary { color: rgba(26, 19, 0, 0.7) !important; }
+.stm-chat-message.is-master .stm-chat-roll-total small { color: rgba(26, 19, 0, 0.7); }
+.stm-chat-message.is-master.is-whisper .stm-chat-bubble { border: 2px dashed #7a5a00; }
+.stm-chat-message.is-master .stm-whisper-footer { color: #3d2a00; }

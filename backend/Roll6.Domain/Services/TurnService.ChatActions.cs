@@ -124,6 +124,32 @@ public partial class TurnService
     }
 
     /// <summary>Publishes an entry that changed in place (044) and returns it as the caller sees it.</summary>
+    /// <summary>
+    /// The master who also plays switches the voice of a message, photo, recording or roll he wrote (079): to one of his
+    /// approved characters, or back to the master (characterId null). Any campaign status and any turn — it is
+    /// conversation, never a turn record. A whisper can't be switched to one of its own targets.
+    /// </summary>
+    public async Task<ChatItemInfo> SetSpeakerAsync(long userId, long turnId, ChatSpeakerInfo info)
+    {
+        var turn = await _repository.GetByIdAsync(turnId) ?? throw new KeyNotFoundException("Mensagem não encontrada.");
+        var campaign = await GetReadableCampaignAsync(userId, turn.CampaignId);
+        await EnsureVisibleAsync(campaign, userId, turn);
+        if (campaign.UserId != userId || turn.UserId != userId)
+            throw new UnauthorizedAccessException("Só o mestre muda a voz das próprias mensagens.");
+        if (turn.TurnType is not (TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll) || turn.IsDeleted)
+            throw new Exceptions.DomainValidationException("characterId", "Só mensagens, fotos, áudios e rolagens mudam de voz.");
+        if (turn.CharacterId == info.CharacterId)
+            return (await MapChatAsync(campaign, userId, new List<Turn> { turn })).Single();
+
+        var (characterId, name, image) = await SpeakerAsync(userId, campaign, info.CharacterId);
+        if (characterId is long id && turn.IsWhisper
+            && (await _whisperRepository.ListByTurnsAsync(new[] { turn.TurnId })).Any(t => t.CharacterId == id))
+            throw new Exceptions.DomainValidationException("characterId", "Este sussurro é para esse personagem.");
+        turn.SetSpeaker(characterId, name, image);
+        await _repository.UpdateAsync(turn);
+        return await PublishUpdatedAsync(campaign, userId, turn);
+    }
+
     private async Task<ChatItemInfo> PublishUpdatedAsync(Campaign campaign, long userId, Turn turn)
     {
         var fresh = await _repository.GetByIdAsync(turn.TurnId) ?? turn;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isPollOpen } from './chatPoll';
 import {
-  authorLabel, chatLabel, compareCursors, pinOpenPolls, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
+  authorLabel, chatLabel, compareCursors, isMasterVoice, voiceSwitch, pinOpenPolls, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
 import { CHAT_KIND } from '../types/chat';
@@ -255,5 +255,36 @@ describe('050: open polls pinned at the bottom', () => {
 
   it('polls still do not group with messages', () => {
     expect(continuesPrevious(item(1), poll(2, true))).toBe(false);
+  });
+});
+
+describe("079: the master's voice", () => {
+  it('is a message, photo, recording or roll without a character', () => {
+    for (const kind of ['text', 'image', 'audio', 'roll'] as const) {
+      expect(isMasterVoice(item(1, { kind, characterId: null }))).toBe(true);
+    }
+    expect(isMasterVoice(item(2, { kind: 'text', characterId: 80 }))).toBe(false);
+    expect(isMasterVoice(item(3, { kind: 'poll', characterId: null }))).toBe(false);
+    expect(isMasterVoice(item(4, { kind: 'narration', characterId: null }))).toBe(false);
+    expect(isMasterVoice(item(5, { kind: 'action', characterId: 80 }))).toBe(false);
+    expect(isMasterVoice(item(6, { kind: 'text', characterId: null, deleted: true }))).toBe(false);
+  });
+
+  const master = { userId: 1, isMaster: true, selected: { characterId: 85, name: 'Goran' } };
+
+  it('offers the master the other voice on his own message', () => {
+    expect(voiceSwitch(item(1, { kind: 'text', userId: 1, characterId: 85 }), master)).toEqual({ to: 'master' });
+    expect(voiceSwitch(item(2, { kind: 'roll', userId: 1, characterId: null }), master))
+      .toEqual({ to: 'character', characterId: 85, name: 'Goran' });
+    // With "Mestre (GM)" selected there is no character to switch to.
+    expect(voiceSwitch(item(3, { kind: 'text', userId: 1, characterId: null }), { ...master, selected: null })).toBeNull();
+  });
+
+  it("never for players, others' messages, polls, deleted or masked entries", () => {
+    expect(voiceSwitch(item(1, { kind: 'text', userId: 2, characterId: 80 }), { userId: 2, isMaster: false, selected: null })).toBeNull();
+    expect(voiceSwitch(item(2, { kind: 'text', userId: 2, characterId: 80 }), master)).toBeNull();
+    expect(voiceSwitch(item(3, { kind: 'poll', userId: 1, characterId: null }), master)).toBeNull();
+    expect(voiceSwitch(item(4, { kind: 'text', userId: 1, characterId: null, deleted: true }), master)).toBeNull();
+    expect(voiceSwitch(item(5, { kind: 'text', userId: 1, characterId: 85, whisperHidden: true }), master)).toBeNull();
   });
 });
