@@ -45,6 +45,32 @@ export const groupNpcs = (npcs: readonly CampaignNpcInfo[], partyIds: readonly n
   return groups;
 };
 
+/**
+ * The NPCs of the scene (076): an ally always (it travels with the party), an enemy or neutral only while it has at least
+ * one piece on the map open on screen — for players the campaign's current map (Q2 = A), for the master whatever map they
+ * opened; the rule is the same for both (Q1 = A). No open campaign map (`mapId` null) leaves only the allies. Pieces of
+ * another map, left over for an instant while a new map loads, are ignored. The input order is kept.
+ */
+export const onMap = (
+  npcs: readonly CampaignNpcInfo[],
+  pieces: readonly { tokenType: number; mapId: number; npcId: number | null }[],
+  mapId: number | null,
+): CampaignNpcInfo[] => {
+  const present = new Set<number>();
+  if (mapId !== null) {
+    for (const piece of pieces) {
+      if (piece.tokenType === MAP_TOKEN_TYPE.npc && piece.mapId === mapId && piece.npcId !== null) present.add(piece.npcId);
+    }
+  }
+  return npcs.filter((npc) => isAlly(npc) || present.has(npc.npcId));
+};
+
+/**
+ * What "Incluir NPC" does after an NPC joins the campaign (076, Q1 = A): with a map the master may place pieces on, it also
+ * gets a piece there (otherwise its card would never show, as the panel lists only the scene); else it only joins.
+ */
+export const afterAddAction = (canPlace: boolean): 'place' | 'join' => (canPlace ? 'place' : 'join');
+
 /** Whether this user commands the piece of an NPC (the campaign master always does). */
 export const commandsNpc = (piece: Pick<MapTokenInfo, 'tokenType' | 'commanderUserId'>, userId: number | null | undefined, isMaster: boolean): boolean =>
   piece.tokenType === MAP_TOKEN_TYPE.npc && (isMaster || (userId != null && piece.commanderUserId === userId));

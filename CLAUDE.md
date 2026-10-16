@@ -217,6 +217,16 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
     `toCategory`). `NpcPanel` shows only enemies and neutrals (all NPCs while the party is empty). `PartyPanel` puts
     each commanded ally as a compact `NpcCard` (`.stm-ally-card`) under its master character's card and the others in
     an "Aliados" group after the party (`.stm-allies-title`). Neutrals get a small "Neutro" badge.
+  - **Scene filter (076)**: the right panel lists only the enemies and neutrals with at least one piece on the map open on
+    screen (`lib/npcCategory.onMap(campaignNpcs, mapTokens, draft.mapId)`, before `groupNpcs`; allies always pass;
+    no open campaign map = no enemies/neutrals; pieces of another map are ignored during a switch) — the same rule for
+    master and players (for players the open map is always the current one); the title counts the filtered list and
+    an empty one says `npcs.emptyOnMap`. Map switches, piece events and `campaignNpcs.changed` refresh it with no new
+    wiring. Configurações › NPCs stays unfiltered. Because a card is how the master dragged an NPC onto the map,
+    "Incluir NPC" (`NpcPickerModal`, both tabs and the settings tab) now also places an NPC that joins the campaign on
+    the open map when `MapTokenContext.canPlace` (`afterAddAction`; `placeOnMap` without a hex = free hex nearest the
+    middle, 052): toast `toast.npcAddedPlaced`, warning `npcs.addedNotPlaced` when there is no room (it stays in the
+    campaign), info `npcs.addedNoMap` without a placeable map. No API, database or MCP change.
   - **Editing**: `components/npcs/CampaignNpcFields` ("Nesta campanha": Categoria + Personagem-mestre for allies) in
     `NpcFormModal`, saved with `NpcContext.updateCampaignNpc` (`campaignNpcService.update`).
   - **Colors**: ally pieces are teal (`ALLY_BASE_COLOR` `#20c997`, `baseColorOf`, `.is-ally`, `mapSnapshot`
@@ -434,6 +444,7 @@ cd .. && dotnet build Roll6Anime.sln && dotnet test Roll6Anime.Tests && dotnet r
 - PostgreSQL — `campaign_npcs.category integer not null default 1` (1 Inimigo, 2 Neutro, 3 Aliado) and `campaign_npcs.master_campaign_character_id bigint null` (FK `fk_campaign_npc_master`); migration `AddCampaignNpcCategory` + `database/migrations/071-npc-category.sql`. (071-npc-allies-master)
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + existing only. ASP.NET Core 8, EF Core 9 + Npgsql, `Lib.Net.Http.WebPush`, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, Bootstrap 5.3, i18next, sonner, Radix. **No new dependency.** (074-push-notifications-review)
 - PostgreSQL — new `push_deliveries` (durable push outbox), `push_subscriptions.failure_count`, drops `campaigns.majority_notified_turn`; migration `AddPushDeliveries` + `database/migrations/074-push-deliveries.sql`. (074-push-notifications-review)
+- TypeScript 5 / React 18 (frontend only) + existing only (React 18, i18next, sonner). **No new dependency.** No API, database or MCP change. (076-npc-panel-map-filter)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -445,6 +456,7 @@ cd .. && dotnet build Roll6Anime.sln && dotnet test Roll6Anime.Tests && dotnet r
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 076-npc-panel-map-filter: the NPC panel lists only the enemies and neutrals with a piece on the map open on screen (the current map for players), following map switches and pieces live; allies show on every map; "Incluir NPC" also places a newly included NPC on the open map (free hex near the middle, warning when there is no room). Frontend only (`lib/npcCategory.onMap`, `afterAddAction`)
 - 075-poke-cooldown-30min: "Cutucar" once every 30 minutes per person and campaign (was 1 minute); the 409 says how many minutes are left. MCP and guide texts only
 - 074-push-notifications-review: notifications reviewed — every push urgent, kept 12 h, sounding even when it replaces an older one, through a durable outbox drained in parallel (a dead device no longer delays anyone and is skipped after 5 failures); always pushed to every device (no presence, no in-app toast); the master gets every action (allies included); "Falta apenas Ana e você" / "Falta só você" on every first action after the majority, in any mode; a player's poke with nobody missing pokes the master; "Enviar teste", the device list and the master's "Simular" + preview. `push_deliveries`, `push_subscriptions.failure_count`, `majority_notified_turn` dropped (migration `AddPushDeliveries`); MCP `simulate_notification`, `preview_turn_notices` (113 operations / 114 tools)
 - 073-single-action-balloons: one valid action per actor and turn in any mode again (free mode no longer keeps several — a new action or a text converted to an action cancels the previous one); the 3D balloons, in any mode, always show the actor's action of the turn and, for 60 s after it says something in the chat (message, caption, roll) newer than the action, the speech instead (`lib/chatBubbles.storyBalloons`). No schema or endpoint change; MCP texts only

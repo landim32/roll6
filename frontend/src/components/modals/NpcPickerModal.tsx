@@ -10,8 +10,10 @@ import { NpcFormFields } from '../npcs/NpcFormFields';
 import type { NpcTokenChoice } from '../npcs/NpcFormFields';
 import { useNpc } from '../../hooks/useNpc';
 import { useMapEditor } from '../../hooks/useMapEditor';
+import { useMapToken } from '../../hooks/useMapToken';
 import { imageService } from '../../Services/imageService';
 import { cropToFile } from '../../lib/cropImage';
+import { afterAddAction } from '../../lib/npcCategory';
 import { emptyNpcForm, toNpcInsert, validateNpcForm } from '../../lib/npcForm';
 import type { NpcForm } from '../../lib/npcForm';
 import type { PagedList } from '../../types/common';
@@ -28,13 +30,16 @@ const SEARCH_DELAY_MS = 300;
 /**
  * "Incluir NPC": pick one of the master's NPCs ("Meus NPCs") or create a new one ("Novo NPC"); both join the campaign.
  * An NPC already in the campaign (052) adds another instance to the open campaign map instead — the server picks a free
- * hex near the middle — and is only unavailable while no campaign map is open.
+ * hex near the middle — and is only unavailable while no campaign map is open. Since 076 an NPC that joins also gets a
+ * piece on the open map the same way (the panel lists only the scene, so its card would never show otherwise); with no
+ * room it stays in the campaign with a warning, and without a map the master may place on it only joins.
  */
 export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
   const { t } = useTranslation();
   const { campaignNpcs, searchMyNpcs, createNpc, addToCampaign, placeOnMap } = useNpc();
   const { draft } = useMapEditor();
   const canPlace = draft.mapId !== null;
+  const { canPlace: canPlacePieces } = useMapToken();
   const [tab, setTab] = useState('mine');
   const [pickingToken, setPickingToken] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -77,6 +82,21 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
 
   const inCampaign = new Set(campaignNpcs.map((c) => c.npcId));
 
+  /** 076: joins the campaign and, where the master may place pieces, the open map too. */
+  const joinAndPlace = async (npc: NpcInfo) => {
+    await addToCampaign(npc.npcId);
+    if (afterAddAction(canPlacePieces) === 'join') {
+      toast.info(t('npcs.addedNoMap', { name: npc.name }));
+      return;
+    }
+    try {
+      await placeOnMap(npc.npcId);
+      toast.success(t('toast.npcAddedPlaced', { name: npc.name }));
+    } catch {
+      toast.warning(t('npcs.addedNotPlaced', { name: npc.name }));
+    }
+  };
+
   const add = async (npc: NpcInfo) => {
     setBusy(true);
     try {
@@ -84,8 +104,7 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
         const instance = await placeOnMap(npc.npcId);
         toast.success(t('toast.npcPlaced', { name: instance.name }));
       } else {
-        await addToCampaign(npc.npcId);
-        toast.success(t('toast.npcAdded', { name: npc.name }));
+        await joinAndPlace(npc);
       }
       onOpenChange(false);
     } catch (err) {
@@ -103,8 +122,7 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
     try {
       const image = crop ? (await imageService.upload(await cropToFile(crop.src, crop.area, { rotation: crop.rotation, name: 'npc' }))).fileName : null;
       const npc = await createNpc(toNpcInsert(form, image, token!.tokenId));
-      await addToCampaign(npc.npcId);
-      toast.success(t('toast.npcCreated', { name: npc.name }));
+      await joinAndPlace(npc);
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
