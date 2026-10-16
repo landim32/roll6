@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commandsNpc, groupNpcs, isAllyPiece, toCategory } from './npcCategory';
+import { afterAddAction, commandsNpc, groupNpcs, isAllyPiece, onMap, toCategory } from './npcCategory';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import { NPC_CATEGORY } from '../types/npc';
 import type { CampaignNpcInfo, NpcCategory } from '../types/npc';
@@ -8,6 +8,48 @@ const npc = (id: number, category: NpcCategory, master: number | null = null): C
   campaignNpcId: id, campaignId: 1, npcId: id, name: `NPC ${id}`, tokenId: 1, tokenImageUrl: null, imageUrl: null,
   life: 5, energy: 5, move: 5, mapNpcCount: 0, category, masterCampaignCharacterId: master, masterCharacterId: master ? master + 100 : null,
   createdAt: '',
+});
+
+// A piece of an NPC on a map (076); characters and objects carry no npcId.
+const piece = (npcId: number | null, mapId: number, tokenType: number = MAP_TOKEN_TYPE.npc) => ({ tokenType, mapId, npcId });
+
+describe('onMap (076)', () => {
+  it('keeps only the enemies and neutrals with a piece on the open map: the reported 20 → 8', () => {
+    const npcs = Array.from({ length: 20 }, (_, i) => npc(i + 1, i % 2 === 0 ? NPC_CATEGORY.enemy : NPC_CATEGORY.neutral));
+    // NPCs 1–8 on map 5 (the open one), 9–20 only on map 6 (the tavern).
+    const pieces = [...npcs.slice(0, 8).map((n) => piece(n.npcId, 5)), ...npcs.slice(8).map((n) => piece(n.npcId, 6))];
+
+    expect(onMap(npcs, pieces, 5).map((n) => n.npcId)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(onMap(npcs, pieces, 6)).toHaveLength(12);
+  });
+
+  it('keeps an NPC with two pieces once', () => {
+    expect(onMap([npc(1, NPC_CATEGORY.enemy)], [piece(1, 5), piece(1, 5)], 5)).toHaveLength(1);
+  });
+
+  it('ignores pieces of another map and pieces that are not NPCs', () => {
+    const npcs = [npc(1, NPC_CATEGORY.enemy), npc(2, NPC_CATEGORY.neutral)];
+    expect(onMap(npcs, [piece(1, 6), piece(2, 5, MAP_TOKEN_TYPE.character), piece(2, 5, MAP_TOKEN_TYPE.object)], 5)).toEqual([]);
+  });
+
+  it('without an open campaign map keeps only the allies', () => {
+    const npcs = [npc(1, NPC_CATEGORY.enemy), npc(2, NPC_CATEGORY.ally)];
+    expect(onMap(npcs, [piece(1, 5)], null).map((n) => n.npcId)).toEqual([2]);
+  });
+
+  it('keeps an ally on every map, with or without a piece; as a neutral it follows the map', () => {
+    const ally = npc(3, NPC_CATEGORY.ally, 70);
+    expect(onMap([ally], [], 5)).toEqual([ally]);
+    expect(onMap([ally], [piece(3, 6)], 5)).toEqual([ally]);
+    const neutral = { ...ally, category: NPC_CATEGORY.neutral, masterCampaignCharacterId: null };
+    expect(onMap([neutral], [piece(3, 6)], 5)).toEqual([]);
+    expect(onMap([neutral], [piece(3, 6)], 6)).toEqual([neutral]);
+  });
+
+  it('places a newly included NPC only where the master may place pieces', () => {
+    expect(afterAddAction(true)).toBe('place');
+    expect(afterAddAction(false)).toBe('join');
+  });
 });
 
 describe('groupNpcs', () => {

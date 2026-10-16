@@ -1,11 +1,13 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NpcCard } from './NpcCard';
 import { SidePanel } from './SidePanel';
 import { useCampaign } from '../../hooks/useCampaign';
+import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useNpc } from '../../hooks/useNpc';
 import { useCharacter } from '../../hooks/useCharacter';
-import { groupNpcs } from '../../lib/npcCategory';
+import { groupNpcs, onMap } from '../../lib/npcCategory';
 import type { MapTokenInfo } from '../../types/mapToken';
 import type { CampaignNpcInfo } from '../../types/npc';
 
@@ -22,15 +24,20 @@ interface NpcPanelProps {
 /**
  * Right-hand panel with the NPCs of the current campaign (014). Mirrors the party panel. The master edits,
  * drags and adds NPCs ("Incluir NPC" closes the list); approved players only see the cards. Since 071 only enemies and
- * neutrals are here: allies show on the party's side (while there is a party to show them under).
+ * neutrals are here: allies show on the party's side (while there is a party to show them under). Since 076 only the
+ * scene's: an enemy or neutral is listed while it has a piece on the map open on screen (`onMap`), and the count follows.
  */
 export const NpcPanel = ({ onAdd, onEdit, onEditInstance, onRemoveInstance, docked = false }: NpcPanelProps) => {
   const { t } = useTranslation();
   const { currentCampaign, isMaster } = useCampaign();
   const { campaignNpcs: allNpcs } = useNpc();
   const { party } = useCharacter();
-  const { canPlace } = useMapToken();
-  const campaignNpcs = party.length === 0 ? allNpcs : groupNpcs(allNpcs, party.map((p) => p.campaignCharacterId)).right;
+  const { canPlace, mapTokens } = useMapToken();
+  const { draft } = useMapEditor();
+  const campaignNpcs = useMemo(() => {
+    const scene = onMap(allNpcs, mapTokens, draft.mapId);
+    return party.length === 0 ? scene : groupNpcs(scene, party.map((p) => p.campaignCharacterId)).right;
+  }, [allNpcs, mapTokens, draft.mapId, party]);
 
   // Players get the list only when they may see it; with nothing to show there is no panel for them.
   if (!currentCampaign || (!isMaster && campaignNpcs.length === 0)) return null;
@@ -47,7 +54,7 @@ export const NpcPanel = ({ onAdd, onEdit, onEditInstance, onRemoveInstance, dock
         ? <button type="button" className="btn btn-outline-primary btn-sm w-100" onClick={onAdd}>{t('npcs.add')}</button>
         : undefined}
     >
-      {campaignNpcs.length === 0 && <li className="text-body-secondary small px-1">{t('npcs.empty')}</li>}
+      {campaignNpcs.length === 0 && <li className="text-body-secondary small px-1">{t('npcs.emptyOnMap')}</li>}
       {campaignNpcs.map((npc) => (
         <NpcCard
           key={npc.campaignNpcId}
