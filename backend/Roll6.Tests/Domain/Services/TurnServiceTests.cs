@@ -13,7 +13,7 @@ using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Tests.Domain.Services;
 
-public class TurnServiceTests
+public partial class TurnServiceTests
 {
     private const long MASTER = 1;
     private const long PLAYER = 2;

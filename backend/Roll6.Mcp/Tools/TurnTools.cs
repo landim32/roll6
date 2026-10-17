@@ -18,31 +18,38 @@ public static class TurnTools
     [McpServerTool(Name = "act_in_turn", Title = "Act in turn", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("POST", "/api/turn/action")]
     [Description($$"""
-        What it does: records an action (free text, e.g. "attacks the goblin with the sword") for a piece's character or
-        NPC occurrence in the current turn. It shows as a speech balloon over the piece and turns its status green. A
+        What it does: records an action (free text, e.g. "attacks the goblin with the sword") for a character or NPC
+        occurrence in the current turn. Name the actor in ONE of two ways: its piece (mapTokenId — a character or NPC
+        piece), or, for a character that has no piece on any map, the campaign and the character (campaignId +
+        characterId; NPCs always act through their piece). With a piece it shows as a speech balloon over it; without one
+        it shows only in the chat. Either way it turns the character's status green. A
         new action cancels the actor's previous valid action of the turn ("Ação cancelada"), in any mode (free mode
         included): an actor has one valid action per turn. Notifications: the master gets every action that is not his
         own; a character's first action of the turn, once half of the characters acted, tells each player still missing
         "Falta apenas Bruno e você" / "Falta só você".
-        Who can use it: a player for the piece of his own approved character or of an ally NPC he commands (its master
-        character is his — update_campaign_npc); the master for any character or NPC piece.
+        Who can use it: a player for his own approved character (by piece or by characterId) or the piece of an ally NPC
+        he commands (its master character is his — update_campaign_npc); the master for any character of the campaign or
+        any NPC piece.
         Objects can't act.
         {{ENTRY}}
-        Common errors: 403 not your piece / NPC by a player, 400 empty text (up to 2000 characters) or object piece, 404 not
-        found.
-        Related tools: list_map_tokens (mapTokenId), get_turn_state.
+        Common errors: 403 not your piece or character / NPC by a player, 400 empty text (up to 2000 characters), object
+        piece, or neither/both ways of naming the actor (key mapTokenId), 404 not found, 409 campaign not active.
+        Related tools: list_map_tokens (mapTokenId), list_campaign_characters (characterId), get_turn_state.
         """)]
     public static Task<CallToolResult> ActInTurn(
         Roll6ApiClient api,
-        [Description(McpDocs.MAP_TOKEN_ID + " Must be a character or NPC piece.")] long mapTokenId,
-        [Description("What the piece does, in plain text (required, up to 2000 characters). Example: \"Casts a fireball at the orcs\".")] string description,
+        [Description("What the actor does, in plain text (required, up to 2000 characters). Example: \"Casts a fireball at the orcs\".")] string description,
+        [Description(McpDocs.MAP_TOKEN_ID + " A character or NPC piece. Omit it to act by campaignId + characterId.")] long? mapTokenId = null,
+        [Description("For a character without a piece: the campaign (together with characterId). Omit when giving mapTokenId.")] long? campaignId = null,
+        [Description("For a character without a piece: the character approved in that campaign (together with campaignId).")] long? characterId = null,
         [Description("Optional: turnId of a chat entry this action answers (shown as a quote).")] long? replyToTurnId = null,
         [Description("Optional whisper (047): ids of characters approved in the campaign who may see it (not your own). Others don't get a whispered message at all; a whispered action shows them \"está sussurrando!\". The master always sees whispers.")] List<long>? whisperCharacterIds = null,
         [Description("Optional whisper (047): true to whisper to the master (not when you are the master).")] bool? whisperMaster = null) =>
         api.SendAsync(HttpMethod.Post, "/api/turn/action",
             new TurnActInfo
             {
-                MapTokenId = mapTokenId, Description = description, ReplyToTurnId = replyToTurnId,
+                MapTokenId = mapTokenId, CampaignId = campaignId, CharacterId = characterId, Description = description,
+                ReplyToTurnId = replyToTurnId,
                 WhisperCharacterIds = whisperCharacterIds, WhisperMaster = whisperMaster
             });
 

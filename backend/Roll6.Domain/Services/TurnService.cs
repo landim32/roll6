@@ -175,10 +175,29 @@ public partial class TurnService : ITurnService
 
     public async Task<TurnInfo> ActAsync(long userId, TurnActInfo info)
     {
-        var (piece, map, campaign) = await GetPieceAsync(info.MapTokenId);
-        var actor = await ResolveActorAsync(userId, piece, campaign);
+        Campaign campaign;
+        long? mapId;
+        (long? CharacterId, long? NpcId, long? MapNpcId) actor;
+        if (info.MapTokenId is long mapTokenId && info.CampaignId == null && info.CharacterId == null)
+        {
+            var (piece, map, pieceCampaign) = await GetPieceAsync(mapTokenId);
+            campaign = pieceCampaign;
+            actor = await ResolveActorAsync(userId, piece, campaign);
+            mapId = map.MapId;
+        }
+        else if (info.MapTokenId == null && info.CampaignId is long campaignId && info.CharacterId is long characterId)
+        {
+            // 080: a character of the campaign acts from the chat without a piece on any map.
+            campaign = await _campaignRepository.GetByIdAsync(campaignId)
+                ?? throw new KeyNotFoundException("Campanha não encontrada.");
+            actor = await ResolveCharacterActorAsync(userId, campaign, characterId);
+            mapId = campaign.CurrentMapId;
+        }
+        else
+            throw new DomainValidationException("mapTokenId",
+                "Informe a peça (mapTokenId) ou a campanha e o personagem (campaignId e characterId).");
         campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
-        var turn = Turn.Action(campaign.CampaignId, map.MapId, actor.CharacterId, actor.NpcId, actor.MapNpcId,
+        var turn = Turn.Action(campaign.CampaignId, mapId, actor.CharacterId, actor.NpcId, actor.MapNpcId,
             campaign.CurrentTurn, userId, info.Description);
         // 047: a whispered action still is the actor's action of the turn; only who reads its text changes.
         var whisper = await ResolveWhisperAsync(campaign, userId, actor.CharacterId, info.WhisperCharacterIds, info.WhisperMaster);
@@ -395,6 +414,21 @@ public partial class TurnService : ITurnService
             return (null, mapNpc.NpcId, mapNpc.MapNpcId);
         }
         throw new DomainValidationException("mapTokenId", "Objetos não participam de turnos.");
+    }
+
+    /// <summary>
+    /// 080: a character acting without a piece — the same checks as a character piece: its current owner with an approved
+    /// participation, or the campaign master for any participation of the campaign.
+    /// </summary>
+    private async Task<(long? CharacterId, long? NpcId, long? MapNpcId)> ResolveCharacterActorAsync(long userId, Campaign campaign, long characterId)
+    {
+        var participation = await _campaignCharacterRepository.GetAsync(campaign.CampaignId, characterId)
+            ?? throw new KeyNotFoundException("Participação não encontrada.");
+        var character = await _characterRepository.GetByIdAsync(characterId)
+            ?? throw new KeyNotFoundException("Personagem não encontrado.");
+        if (campaign.UserId != userId && (character.UserId != userId || participation.Status != CampaignCharacterStatus.Approved))
+            throw new UnauthorizedAccessException("Você só pode agir com os seus personagens.");
+        return (character.CharacterId, null, null);
     }
 
     private async Task<Campaign> GetReadableCampaignAsync(long userId, long campaignId)

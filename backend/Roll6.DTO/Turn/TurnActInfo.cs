@@ -2,11 +2,23 @@ using System.Text.Json.Serialization;
 
 namespace Roll6.DTO.Turn;
 
-/// <summary>"Agir": an action of the piece's character or NPC occurrence in the current turn.</summary>
+/// <summary>
+/// "Agir": an action in the current turn. Give either the piece (<see cref="MapTokenId"/>: its character or NPC occurrence)
+/// or, since 080, the campaign and the character (<see cref="CampaignId"/> + <see cref="CharacterId"/>) for a character
+/// that has no piece on the map.
+/// </summary>
 public class TurnActInfo
 {
     [JsonPropertyName("mapTokenId")]
-    public long MapTokenId { get; set; }
+    public long? MapTokenId { get; set; }
+
+    /// <summary>080: the campaign of a character acting without a piece (with <see cref="CharacterId"/>).</summary>
+    [JsonPropertyName("campaignId")]
+    public long? CampaignId { get; set; }
+
+    /// <summary>080: the character acting without a piece (with <see cref="CampaignId"/>).</summary>
+    [JsonPropertyName("characterId")]
+    public long? CharacterId { get; set; }
 
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;

@@ -22,6 +22,7 @@ import { chatService } from '../../Services/chatService';
 import { imageService } from '../../Services/imageService';
 import { audioExtension, canRecord } from '../../lib/audioFormat';
 import { isPlayable } from '../../lib/campaignStatus';
+import { actionTarget } from '../../lib/chatComposer';
 
 /** Longest message (backend Turn.MAX_TEXT) and action (Turn.MAX_DESCRIPTION). */
 const MAX_TEXT = 4000;
@@ -64,6 +65,8 @@ export const ChatComposer = () => {
     : null;
   // 049: only an active campaign takes actions (and pokes); the conversation always goes on.
   const playable = isPlayable(currentCampaign?.status);
+  // 080: a character acts with or without a piece — by the piece on the open map when there is one, else by itself.
+  const target = actionTarget(currentCampaign?.campaignId ?? null, participation, piece);
   const acting = playable && mode === 'act' && !!participation;
   const max = acting ? MAX_ACTION : MAX_TEXT;
   const disabled = !speaker;
@@ -114,10 +117,10 @@ export const ChatComposer = () => {
     const value = text.trim();
     if (!value || busy || disabled) return;
     if (acting) {
-      if (!piece) return;
+      if (!target) return;
       try {
         setBusy(true);
-        await act(piece.mapTokenId, value, replyTo?.turnId ?? null, whisperPayload(recipients));
+        await act(target, value, replyTo?.turnId ?? null, whisperPayload(recipients));
         setRecipients([]);
         cancelReply();
         setText('');
@@ -376,9 +379,9 @@ export const ChatComposer = () => {
             {participation && playable && (
               // The action switch: on, the field turns red and sending records the turn's action; off, a message.
               <button type="button" className={`stm-chat-field-btn stm-chat-act-switch${acting ? ' is-on' : ''}`}
-                role="switch" aria-checked={acting} disabled={busy || (!acting && !piece)}
+                role="switch" aria-checked={acting} disabled={busy || (!acting && !target)}
                 onClick={() => setMode(acting ? 'talk' : 'act')}
-                title={!piece && !acting ? t('chat.placeToAct') : t(acting ? 'chat.actOff' : 'chat.actOn')}
+                title={t(acting ? 'chat.actOff' : 'chat.actOn')}
                 aria-label={t('chat.actSwitch')}>
                 <LightningIcon size={22} />
               </button>
@@ -389,7 +392,7 @@ export const ChatComposer = () => {
           <AudioRecorder disabled={busy} onSend={onSendAudio} onActiveChange={onRecordingChange} />
         ) : (
           <button type="button" className={`btn ${acting ? 'btn-danger' : 'btn-primary'} stm-chat-send`} onClick={() => { void submit(); }}
-            disabled={busy || !text.trim() || (acting && !piece)}
+            disabled={busy || !text.trim() || (acting && !target)}
             title={acting ? t('chat.sendAction') : t('chat.send')} aria-label={acting ? t('chat.sendAction') : t('chat.send')}>
             {acting ? <LightningIcon size={22} /> : <SendIcon size={22} />}
           </button>
