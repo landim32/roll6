@@ -7,6 +7,7 @@ import './styles/app.css';
 import './i18n';
 import { App } from './App';
 import { AnimationProvider } from './Contexts/AnimationContext';
+import { WeaponProvider } from './Contexts/WeaponContext';
 import { AuthProvider } from './Contexts/AuthContext';
 import { CampaignProvider } from './Contexts/CampaignContext';
 import { ChatProvider } from './Contexts/ChatContext';
@@ -39,15 +40,17 @@ createRoot(document.getElementById('root')!).render(
                   <MapEditorProvider>
                     <TokenProvider>
                       <AnimationProvider>
-                        <MapTokenProvider>
-                          <NpcProvider>
-                            <TurnProvider>
-                              <ChatProvider>
-                                <App />
-                              </ChatProvider>
-                            </TurnProvider>
-                          </NpcProvider>
-                        </MapTokenProvider>
+                        <WeaponProvider>
+                          <MapTokenProvider>
+                            <NpcProvider>
+                              <TurnProvider>
+                                <ChatProvider>
+                                  <App />
+                                </ChatProvider>
+                              </TurnProvider>
+                            </NpcProvider>
+                          </MapTokenProvider>
+                        </WeaponProvider>
                       </AnimationProvider>
                     </TokenProvider>
                   </MapEditorProvider>

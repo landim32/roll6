@@ -6,6 +6,7 @@ using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Realtime;
 using Roll6.DTO.Token;
+using Roll6.DTO.Weapon;
 using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
@@ -20,6 +21,7 @@ public class TokenLibraryServiceTests
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Mock<IAnimationRepository<Animation>> _animationRepository = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<IWeaponRepository<Weapon>> _weaponRepository = new();
     private readonly TokenLibraryService _service;
 
     public TokenLibraryServiceTests()
@@ -29,7 +31,7 @@ public class TokenLibraryServiceTests
         _mapTokenRepository.Setup(r => r.ListCampaignIdsByTokenAsync(It.IsAny<long>())).ReturnsAsync(new List<long>());
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string>())).Returns((string? name) => name == null ? null : "https://x/" + name);
         _service = new TokenLibraryService(_repository.Object, _mapTokenRepository.Object, _characterRepository.Object, _npcRepository.Object, _imageStorage.Object,
-            _animationRepository.Object, _notifier.Object);
+            _animationRepository.Object, _weaponRepository.Object, _notifier.Object);
     }
 
     private const string DOWN_IMAGE = "0123456789abcdef0123456789abcdef.png";
@@ -469,5 +471,119 @@ public class TokenLibraryServiceTests
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
         _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    private const string MODEL = "0123456789abcdef0123456789abcdef.glb";
+    private const string SWORD_FILE = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.glb";
+
+    private void WithWeapons(params long[] ids) =>
+        _weaponRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync((IEnumerable<long> wanted) => ids.Where(wanted.Contains)
+                .Select(id => new Weapon { WeaponId = id, UserId = 2, Name = $"Arma {id}", ModelFile = SWORD_FILE }).ToList());
+
+    [Fact]
+    public async Task Create_WithWeaponsInBothHands_SavesAndReadsThem()
+    {
+        WithWeapons(7, 8);
+
+        var result = await _service.CreateAsync(1, new TokenInsertInfo
+        {
+            Name = "Guerreiro",
+            ModelFile = MODEL,
+            RightWeapon = new TokenWeaponInfo { WeaponId = 7, Grip = new WeaponGripInfo { Rz = 90, Scale = 120 } },
+            LeftWeapon = new TokenWeaponInfo { WeaponId = 8 }
+        });
+
+        result.RightWeapon!.WeaponId.Should().Be(7);
+        result.RightWeapon.Name.Should().Be("Arma 7");
+        result.RightWeapon.ModelFileUrl.Should().Be("https://x/" + SWORD_FILE);
+        result.RightWeapon.Grip!.Rz.Should().Be(90);
+        result.RightWeapon.Grip.Scale.Should().Be(120);
+        result.LeftWeapon!.WeaponId.Should().Be(8);
+        result.LeftWeapon.Grip!.Scale.Should().Be(100);
+        _repository.Verify(r => r.InsertAsync(It.Is<Token>(t => t.RightWeaponId == 7 && t.LeftWeaponId == 8 && t.LeftWeaponGrip == null)));
+    }
+
+    [Fact]
+    public async Task Create_SameWeaponInBothHands_IsAccepted()
+    {
+        WithWeapons(7);
+
+        var result = await _service.CreateAsync(1, new TokenInsertInfo
+        {
+            Name = "Duas adagas",
+            ModelFile = MODEL,
+            RightWeapon = new TokenWeaponInfo { WeaponId = 7 },
+            LeftWeapon = new TokenWeaponInfo { WeaponId = 7 }
+        });
+
+        result.RightWeapon!.WeaponId.Should().Be(7);
+        result.LeftWeapon!.WeaponId.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Create_UnknownWeapon_IsRefusedKeyedByHand()
+    {
+        WithWeapons(7);
+
+        var act = () => _service.CreateAsync(1, new TokenInsertInfo
+        {
+            Name = "Guerreiro",
+            ModelFile = MODEL,
+            RightWeapon = new TokenWeaponInfo { WeaponId = 7 },
+            LeftWeapon = new TokenWeaponInfo { WeaponId = 99 }
+        });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("leftWeapon.weaponId");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<Token>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_GripOutOfRange_IsRefused()
+    {
+        WithWeapons(7);
+
+        var act = () => _service.CreateAsync(1, new TokenInsertInfo
+        {
+            Name = "Guerreiro",
+            ModelFile = MODEL,
+            RightWeapon = new TokenWeaponInfo { WeaponId = 7, Grip = new WeaponGripInfo { X = 3 } }
+        });
+
+        (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("rightWeapon.grip.x");
+    }
+
+    [Fact]
+    public async Task Create_WithoutModel_DropsTheWeapons()
+    {
+        WithWeapons(7);
+
+        var result = await _service.CreateAsync(1, new TokenInsertInfo
+        {
+            Name = "Baú",
+            RightWeapon = new TokenWeaponInfo { WeaponId = 7 }
+        });
+
+        result.RightWeapon.Should().BeNull();
+        _weaponRepository.Verify(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_OmittedHand_IsEmptied()
+    {
+        WithWeapons(7, 8);
+        _repository.Setup(r => r.GetByIdAsync(9)).ReturnsAsync(new Token
+        {
+            TokenId = 9, UserId = 1, Name = "Guerreiro", ModelFile = MODEL, RightWeaponId = 7, LeftWeaponId = 8
+        });
+        _repository.Setup(r => r.UpdateAsync(It.IsAny<Token>())).ReturnsAsync((Token t) => t);
+
+        var result = await _service.UpdateAsync(1, 9, new TokenInsertInfo
+        {
+            Name = "Guerreiro", ModelFile = MODEL, RightWeapon = new TokenWeaponInfo { WeaponId = 7 }
+        });
+
+        result.RightWeapon!.WeaponId.Should().Be(7);
+        result.LeftWeapon.Should().BeNull();
     }
 }

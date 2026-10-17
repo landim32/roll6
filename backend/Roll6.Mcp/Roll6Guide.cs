@@ -241,6 +241,26 @@ public static class Roll6Guide
         - Errors come back keyed: `content`, `content.format`, `content.version`, `content.duration`, `content.loop`,
           `content.tracks`, `content.tracks[i].bone|times|degrees`, `content.hipsLift.times|values|of`.
 
+        ## Weapons
+        - The **weapon library** is shared like tokens and animations: create_weapon (a name + a .glb uploaded with
+          upload_token_model), list_weapons, get_weapon; only the owner runs update_weapon (name and/or file — same id, so
+          every token holding it shows the new file) or delete_weapon (refused with 409 while any token holds it; the stored
+          file is kept).
+        - A token with a 3D model holds **one weapon per hand**: rightWeapon / leftWeapon on create_token / update_token,
+          each { weaponId, grip? }. The same weapon may be in both hands (two daggers). Without modelFile the hands are
+          emptied; update_token empties a hand it does not get.
+        - The 3D view hangs the weapon on the model's **Mixamo hand bone** (RightHand / LeftHand, with or without
+          "mixamorig"), in the middle of the palm, so it follows every animation, the lying pose and the model's size
+          (modelScale). A model without those bones shows no weapon (the binding stays saved). Weapons never show in the 2D
+          map or on the 2.5D figures, and they change no rule.
+        - Put the weapon file's **origin at the handle**: that point goes to the palm. Whatever the file's unit, the weapon
+          starts with its longest side at half the character's height.
+        - **grip** belongs to the token and the hand (other tokens may hold the same weapon differently): x, y, z = offset
+          in fractions of the character's height (−0.5…0.5), rx, ry, rz = rotation in degrees (−180…180, Euler XYZ), both
+          in the hand bone's frame (on Mixamo rigs +Y points along the fingers); scale = percent of the default size
+          (10…400, steps of 5). Omit it for the default (all 0, scale 100). Errors: `rightWeapon.weaponId`,
+          `leftWeapon.grip.scale`…
+
         ## Chat
         - Each campaign has one **chat**, and it is the campaign's whole timeline: what the players and the master say
           (text, photo, audio), **every turn record** (moves, actions, action results, character/NPC changes,

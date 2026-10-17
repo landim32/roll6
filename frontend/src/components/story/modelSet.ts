@@ -8,12 +8,16 @@ import type { ModelClipChoices } from '../../lib/modelAnimations';
 import type { Roll6Clip } from '../../lib/roll6Clips';
 import { instantiate, loadModel } from './loadModel';
 import type { ModelAsset } from './loadModel';
+import { createWeaponHands, sameHandWeapons } from './weaponHands';
+import type { WeaponHandsSync } from './weaponHands';
+import type { HandWeapons } from '../../types/weapon';
 
 /**
  * The 3D models of the pieces (055–063) inside the 3D scene (081): one clone per piece, standing on the ground under it
  * like the figure it replaces (`lib/modelFit`), with its own animation mixer — idle, walk for a piece someone walks, and
  * since 058 the death played once (or laid on its back without one) for a piece that is down or out of combat. The scene
  * draws them with the terrain and the figures, so the depth buffer hides whatever stands behind something else.
+ * Since 082 a model may hold a library weapon in each hand (`weaponHands`), hung on its hand bones.
  */
 export interface ModelSpec {
   id: number;
@@ -30,6 +34,8 @@ export interface ModelSpec {
   lying: boolean;
   /** Size of the token's model (063) as a factor of its automatic height; missing = 1. */
   scale?: number;
+  /** The weapons in the model's hands (082) with the token's grips; missing = none. */
+  weapons?: HandWeapons;
 }
 
 export interface ModelSet {
@@ -54,6 +60,8 @@ interface Drawn {
   /** The death (058): played once, clamped on its last frame. */
   down: AnimationAction | null;
   walking: boolean;
+  /** The weapons this model holds (082). */
+  hands: WeaponHandsSync;
 }
 
 const FADE_SECONDS = 0.25;
@@ -87,7 +95,20 @@ export const createModelSet = (
     events.onChange();
   };
 
+  /** The model's height in its own units: the unit the weapons' grips are measured in (082). */
+  const heightOf = (asset: ModelAsset) => asset.bounds.max[1] - asset.bounds.min[1];
+
+  const holdWeapons = (entry: Drawn) => {
+    if (entry.object && entry.asset) entry.hands.sync(entry.object, heightOf(entry.asset), entry.spec.weapons);
+  };
+
+  const newHands = () => createWeaponHands((model) => {
+    castShadows(model);
+    events.onChange();
+  });
+
   const remove = (entry: Drawn) => {
+    entry.hands.reset();
     entry.mixer?.stopAllAction();
     if (entry.object) scene.remove(entry.object);
   };
@@ -150,6 +171,7 @@ export const createModelSet = (
       requestLibrary(entry);
       scene.add(object);
       place(entry);
+      holdWeapons(entry);
       events.onReady(entry.spec.id);
     }).catch(() => {
       if (!disposed && drawn.get(entry.spec.id) === entry) events.onFailed(entry.spec.id);
@@ -171,6 +193,7 @@ export const createModelSet = (
           if (entry) remove(entry);
           const fresh: Drawn = {
             spec, asset: null, object: null, mixer: null, idle: null, walk: null, down: null, walking: entry?.walking ?? false,
+            hands: newHands(),
           };
           drawn.set(spec.id, fresh);
           load(fresh);
@@ -179,7 +202,9 @@ export const createModelSet = (
           // Down ↔ out of combat is still lying: nothing plays again (058). Standing → lying plays the fall.
           const fell = !entry.spec.lying && spec.lying;
           const rose = entry.spec.lying && !spec.lying;
+          const armed = !sameHandWeapons(entry.spec.weapons, spec.weapons);
           entry.spec = spec;
+          if (armed) holdWeapons(entry);
           if (changed || fell || rose) animate(entry, fell);
           if (changed) requestLibrary(entry);
           place(entry);

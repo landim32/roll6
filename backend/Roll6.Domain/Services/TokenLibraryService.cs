@@ -3,6 +3,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
 using Roll6.Domain.Realtime;
+using Roll6.Domain.Weapons;
 using Roll6.DTO.Common;
 using Roll6.DTO.Realtime;
 using Roll6.DTO.Token;
@@ -19,6 +20,7 @@ public class TokenLibraryService : ITokenLibraryService
     private readonly INpcRepository<Npc> _npcRepository;
     private readonly IImageStorageAppService _imageStorage;
     private readonly IAnimationRepository<Animation> _animationRepository;
+    private readonly IWeaponRepository<Weapon> _weaponRepository;
     private readonly IRealtimeNotifier _notifier;
 
     public TokenLibraryService(
@@ -28,8 +30,10 @@ public class TokenLibraryService : ITokenLibraryService
         INpcRepository<Npc> npcRepository,
         IImageStorageAppService imageStorage,
         IAnimationRepository<Animation> animationRepository,
+        IWeaponRepository<Weapon> weaponRepository,
         IRealtimeNotifier notifier)
     {
+        _weaponRepository = weaponRepository;
         _notifier = notifier;
         _animationRepository = animationRepository;
         _npcRepository = npcRepository;
@@ -44,7 +48,7 @@ public class TokenLibraryService : ITokenLibraryService
         var (items, total) = await _repository.ListPagedAsync(query.Search, query.Skip, query.PageSize, ownerUserId);
         return new PagedList<TokenInfo>
         {
-            Items = items.Select(MapToDto).ToList(),
+            Items = await MapToDtoAsync(items),
             Page = query.Page,
             PageSize = query.PageSize,
             TotalCount = total
@@ -53,7 +57,7 @@ public class TokenLibraryService : ITokenLibraryService
 
     public async Task<TokenInfo> GetByIdAsync(long tokenId)
     {
-        return MapToDto(await GetTokenAsync(tokenId));
+        return await MapToDtoAsync(await GetTokenAsync(tokenId));
     }
 
     public async Task<TokenInfo> CreateAsync(long userId, TokenInsertInfo info)
@@ -62,9 +66,11 @@ public class TokenLibraryService : ITokenLibraryService
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
         token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale);
+        token.UpdateWeapons(TokenWeapons.ToHand(info.RightWeapon), TokenWeapons.ToHand(info.LeftWeapon));
         await CheckLibraryAnimationsAsync(token);
+        await CheckWeaponsAsync(token);
         token.CreatedAt = token.UpdatedAt;
-        return MapToDto(await _repository.InsertAsync(token));
+        return await MapToDtoAsync(await _repository.InsertAsync(token));
     }
 
     /// <summary>
@@ -77,8 +83,10 @@ public class TokenLibraryService : ITokenLibraryService
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
         token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale);
+        token.UpdateWeapons(TokenWeapons.ToHand(info.RightWeapon), TokenWeapons.ToHand(info.LeftWeapon));
         await CheckLibraryAnimationsAsync(token);
-        var saved = MapToDto(await _repository.UpdateAsync(token));
+        await CheckWeaponsAsync(token);
+        var saved = await MapToDtoAsync(await _repository.UpdateAsync(token));
         foreach (var campaignId in await _mapTokenRepository.ListCampaignIdsByTokenAsync(tokenId))
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
         return saved;
@@ -127,6 +135,19 @@ public class TokenLibraryService : ITokenLibraryService
         }
     }
 
+    /// <summary>The weapons chosen for the hands (082) must exist; the same weapon may be in both hands.</summary>
+    private async Task CheckWeaponsAsync(Token token)
+    {
+        var ids = TokenWeapons.IdsOf(new[] { token }).ToList();
+        if (ids.Count == 0)
+            return;
+        var found = (await _weaponRepository.ListByIdsAsync(ids)).Select(weapon => weapon.WeaponId).ToHashSet();
+        if (token.RightWeaponId is { } right && !found.Contains(right))
+            throw new DomainValidationException("rightWeapon.weaponId", WeaponService.NOT_FOUND);
+        if (token.LeftWeaponId is { } left && !found.Contains(left))
+            throw new DomainValidationException("leftWeapon.weaponId", WeaponService.NOT_FOUND);
+    }
+
     private async Task<Token> GetTokenAsync(long tokenId)
     {
         return await _repository.GetByIdAsync(tokenId)
@@ -141,7 +162,19 @@ public class TokenLibraryService : ITokenLibraryService
         return token;
     }
 
-    private TokenInfo MapToDto(Token token) => new()
+    private async Task<TokenInfo> MapToDtoAsync(Token token) => (await MapToDtoAsync(new List<Token> { token })).Single();
+
+    /// <summary>The tokens with the weapons of their hands (082), loaded in one query.</summary>
+    private async Task<List<TokenInfo>> MapToDtoAsync(List<Token> tokens)
+    {
+        var ids = TokenWeapons.IdsOf(tokens).ToList();
+        var weapons = ids.Count == 0
+            ? new Dictionary<long, Weapon>()
+            : (await _weaponRepository.ListByIdsAsync(ids)).ToDictionary(weapon => weapon.WeaponId);
+        return tokens.Select(token => MapToDto(token, weapons)).ToList();
+    }
+
+    private TokenInfo MapToDto(Token token, IReadOnlyDictionary<long, Weapon> weapons) => new()
     {
         TokenId = token.TokenId,
         UserId = token.UserId,
@@ -167,6 +200,8 @@ public class TokenLibraryService : ITokenLibraryService
         ModelWalkClip = token.ModelWalkClip,
         ModelDownClip = token.ModelDownClip,
         ModelScale = token.ModelScale,
+        RightWeapon = TokenWeapons.Read(token.RightWeaponId, token.RightWeaponGrip, weapons, _imageStorage.GetUrl),
+        LeftWeapon = TokenWeapons.Read(token.LeftWeaponId, token.LeftWeaponGrip, weapons, _imageStorage.GetUrl),
         CreatedAt = token.CreatedAt,
         UpdatedAt = token.UpdatedAt
     };

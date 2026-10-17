@@ -23,6 +23,7 @@ public class Roll6Context : DbContext
     public DbSet<Map> Maps { get; set; }
     public DbSet<Token> Tokens { get; set; }
     public DbSet<Animation> Animations { get; set; }
+    public DbSet<Weapon> Weapons { get; set; }
     public DbSet<MapToken> MapTokens { get; set; }
     public DbSet<Character> Characters { get; set; }
     public DbSet<CampaignCharacter> CampaignCharacters { get; set; }
@@ -156,6 +157,17 @@ public class Roll6Context : DbContext
             entity.Property(e => e.ModelWalkClip).HasColumnName("model_walk_clip").HasMaxLength(260);
             entity.Property(e => e.ModelDownClip).HasColumnName("model_down_clip").HasMaxLength(260);
             entity.Property(e => e.ModelScale).HasColumnName("model_scale").HasDefaultValue(100).HasSentinel(0);
+            // Weapons in the model's hands (082): the weapon of each hand and its grip as JSON.
+            entity.Property(e => e.RightWeaponId).HasColumnName("right_weapon_id");
+            entity.Property(e => e.LeftWeaponId).HasColumnName("left_weapon_id");
+            entity.Property(e => e.RightWeaponGrip).HasColumnName("right_weapon_grip").HasColumnType("jsonb");
+            entity.Property(e => e.LeftWeaponGrip).HasColumnName("left_weapon_grip").HasColumnType("jsonb");
+            entity.HasOne<Weapon>().WithMany().HasForeignKey(e => e.RightWeaponId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_token_right_weapon");
+            entity.HasOne<Weapon>().WithMany().HasForeignKey(e => e.LeftWeaponId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_token_left_weapon");
+            entity.HasIndex(e => e.RightWeaponId).HasDatabaseName("ix_tokens_right_weapon");
+            entity.HasIndex(e => e.LeftWeaponId).HasDatabaseName("ix_tokens_left_weapon");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_token");
@@ -177,6 +189,20 @@ public class Roll6Context : DbContext
             entity.HasIndex(e => e.UserId).HasDatabaseName("ix_animations_user");
             entity.HasIndex(e => e.AnimationType).HasDatabaseName("ix_animations_type");
             HasOwner(entity, "fk_animation_user");
+        });
+
+        modelBuilder.Entity<Weapon>(entity =>
+        {
+            entity.ToTable("weapons");
+            entity.HasKey(e => e.WeaponId).HasName("weapons_pkey");
+            entity.Property(e => e.WeaponId).HasColumnName("weapon_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(Weapon.MAX_NAME).IsRequired();
+            entity.Property(e => e.ModelFile).HasColumnName("model_file").HasMaxLength(260).IsRequired();
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.HasIndex(e => e.UserId).HasDatabaseName("ix_weapons_user");
+            HasOwner(entity, "fk_weapon_user");
         });
 
         modelBuilder.Entity<MapToken>(entity =>

@@ -51,7 +51,42 @@
     "logout": "Sair",
     "apiKeys": "Chaves de API",
     "viewQuality": "Qualidade do 3D",
-    "animations": "Animações"
+    "animations": "Animações",
+    "weapons": "Armas"
+  },
+  "weapons": {
+    "title": "Armas",
+    "tab": {
+      "mine": "Minhas",
+      "search": "Buscar",
+      "upload": "Enviar"
+    },
+    "file": "Arquivo da arma (.glb)",
+    "fileHelp": "Um modelo 3D glTF binário de até 20 MB. Deixe a origem do arquivo no cabo da arma: é esse ponto que fica na palma da mão.",
+    "fileNotGlb": "Escolha um arquivo .glb (glTF binário).",
+    "fileTooLarge": "A arma deve ter no máximo 20 MB.",
+    "chooseFile": "Escolha o arquivo da arma.",
+    "name": "Nome",
+    "send": "Enviar arma",
+    "sending": "Enviando…",
+    "uploaded": "Arma enviada.",
+    "updated": "Arma salva.",
+    "deleted": "Arma excluída.",
+    "edit": "Editar arma",
+    "replaceFile": "Trocar o arquivo (opcional)",
+    "replaceHelp": "A arma continua a mesma: todos os tokens que a seguram passam a mostrar o arquivo novo.",
+    "searchPlaceholder": "Buscar arma pelo nome",
+    "empty": "Nenhuma arma encontrada.",
+    "owner": "de {{name}}",
+    "previewLabel": "Prévia da arma {{name}}",
+    "editLabel": "Editar {{name}}",
+    "deleteLabel": "Excluir {{name}}",
+    "delete": "Excluir",
+    "confirmDeleteTitle": "Excluir arma",
+    "confirmDelete": "Excluir a arma \"{{name}}\"? Não é possível excluir uma arma que algum token segura.",
+    "loading": "Carregando a arma…",
+    "noFile": "Nenhum arquivo.",
+    "loadFailed": "Não foi possível abrir esta arma."
   },
   "animations": {
     "title": "Animações",
@@ -248,6 +283,37 @@
     "tabSprites": "2,5D",
     "tab3d": "3D",
     "tabAnimation": "Animação",
+    "tabWeapons": "Armas",
+    "weapons": {
+      "help": "A arma fica presa à mão do modelo e acompanha todas as animações. A pegada é deste token: ajustar aqui não muda outros tokens que usam a mesma arma.",
+      "needsModel": "Escolha um modelo 3D na aba \"3D\" para colocar armas nas mãos dele.",
+      "handLabel": "Mão",
+      "hand": {
+        "right": "Mão direita",
+        "left": "Mão esquerda"
+      },
+      "weaponOf": {
+        "right": "Arma da mão direita",
+        "left": "Arma da mão esquerda"
+      },
+      "none": "Nenhuma",
+      "other": "{{name}} — {{owner}}",
+      "refreshTitle": "Ler de novo a biblioteca de armas",
+      "noHands": "Este modelo não tem a mão no padrão do Mixamo (osso RightHand/LeftHand), então não segura armas. Uma arma já salva continua guardada no token.",
+      "loadFailed": "Não foi possível abrir esta arma.",
+      "grip": "Pegada",
+      "gripHint": "Posição em % da altura do personagem, giro em graus.",
+      "gripReset": "Voltar ao padrão",
+      "field": {
+        "x": "Posição X",
+        "y": "Posição Y",
+        "z": "Posição Z",
+        "rx": "Giro X",
+        "ry": "Giro Y",
+        "rz": "Giro Z",
+        "scale": "Tamanho"
+      }
+    },
     "model": {
       "help": "Um modelo 3D (.glb, até 20 MB) aparece na vista 3D no lugar das imagens 2,5D, em pé e animado. A frente do modelo deve olhar para a frente do arquivo.",
       "pick": "Escolher arquivo .glb",

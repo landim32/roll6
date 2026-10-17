@@ -18,6 +18,7 @@ import { TurnSummaryModal } from '../modals/TurnSummaryModal';
 import { CampaignSettingsModal } from '../modals/CampaignSettingsModal';
 import { ApiKeysModal } from '../modals/ApiKeysModal';
 import { AnimationsModal } from '../animations/AnimationsModal';
+import { WeaponsModal } from '../weapons/WeaponsModal';
 import { NotificationsModal } from '../notifications/NotificationsModal';
 import { ViewQualityModal } from '../story/ViewQualityModal';
 import type { MapInfo } from '../../types/map';
@@ -60,6 +61,7 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
   const [animationsOpen, setAnimationsOpen] = useState(false);
+  const [weaponsOpen, setWeaponsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
 
@@ -107,13 +109,15 @@ export const TopMenu = ({ onOpenCampaign, onOpenMap, onSave, guard }: TopMenuPro
       <div className="ms-auto d-flex align-items-center gap-2">
         <UserMenu onEdit={() => setEditOpen(true)} onChangePassword={() => setPasswordOpen(true)}
           onApiKeys={() => setApiKeysOpen(true)} onNotifications={() => setNotificationsOpen(true)}
-          onViewQuality={() => setQualityOpen(true)} onAnimations={() => setAnimationsOpen(true)} onLogout={onLogout} />
+          onViewQuality={() => setQualityOpen(true)} onAnimations={() => setAnimationsOpen(true)}
+          onWeapons={() => setWeaponsOpen(true)} onLogout={onLogout} />
         <NotificationBell onOpenTurn={setSummaryTurn} />
       </div>
       <EditUserModal open={editOpen} onOpenChange={setEditOpen} />
       <ChangePasswordModal open={passwordOpen} onOpenChange={setPasswordOpen} />
       <ApiKeysModal open={apiKeysOpen} onOpenChange={setApiKeysOpen} />
       <AnimationsModal open={animationsOpen} onOpenChange={setAnimationsOpen} />
+      <WeaponsModal open={weaponsOpen} onOpenChange={setWeaponsOpen} />
       <NotificationsModal open={notificationsOpen} onOpenChange={setNotificationsOpen} />
       <ViewQualityModal open={qualityOpen} onOpenChange={setQualityOpen} />
       {isMaster && <ManageCharactersModal open={manageOpen} onOpenChange={setManageOpen} />}

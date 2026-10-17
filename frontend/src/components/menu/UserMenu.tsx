@@ -15,16 +15,18 @@ interface UserMenuProps {
   onViewQuality: () => void;
   /** "Animações" (059): the animation library. */
   onAnimations: () => void;
+  /** "Armas" (082): the weapon library. */
+  onWeapons: () => void;
   onLogout: () => void;
 }
 
 /**
  * User name in the top menu (a person icon on phones, where the name broke the two-row menu) opening
- * "Editar / Trocar senha / Chaves de API / Notificações / Qualidade do 3D / Animações / Sair".
+ * "Editar / Trocar senha / Chaves de API / Notificações / Qualidade do 3D / Animações / Armas / Sair".
  * Radix handles Esc, outside click and keyboard navigation (research R1); `modal={false}` keeps it from competing with
  * the Radix Dialog opened by the items, which run after the menu closes (onSelect).
  */
-export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications, onViewQuality, onAnimations, onLogout }: UserMenuProps) => {
+export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications, onViewQuality, onAnimations, onWeapons, onLogout }: UserMenuProps) => {
   const { t } = useTranslation();
   const { session } = useAuth();
   const { canInstall, install } = useInstall();
@@ -46,6 +48,7 @@ export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications,
           <DropdownMenu.Item className="dropdown-item" onSelect={onNotifications}>{t('notifications.menu')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onViewQuality}>{t('userMenu.viewQuality')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onAnimations}>{t('userMenu.animations')}</DropdownMenu.Item>
+          <DropdownMenu.Item className="dropdown-item" onSelect={onWeapons}>{t('userMenu.weapons')}</DropdownMenu.Item>
           {canInstall && (
             <DropdownMenu.Item className="dropdown-item d-flex align-items-center gap-2" onSelect={() => { void install(); }}>
               <DownloadIcon size={14} /> {t('install.menu')}

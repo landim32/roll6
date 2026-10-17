@@ -1260,6 +1260,14 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("left_image");
 
+                    b.Property<string>("LeftWeaponGrip")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("left_weapon_grip");
+
+                    b.Property<long?>("LeftWeaponId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("left_weapon_id");
+
                     b.Property<string>("ModelDownClip")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
@@ -1297,6 +1305,14 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("right_image");
 
+                    b.Property<string>("RightWeaponGrip")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("right_weapon_grip");
+
+                    b.Property<long?>("RightWeaponId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("right_weapon_id");
+
                     b.Property<string>("UpImage")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
@@ -1320,6 +1336,12 @@ namespace Roll6.Infra.Migrations
 
                     b.HasKey("TokenId")
                         .HasName("tokens_pkey");
+
+                    b.HasIndex("LeftWeaponId")
+                        .HasDatabaseName("ix_tokens_left_weapon");
+
+                    b.HasIndex("RightWeaponId")
+                        .HasDatabaseName("ix_tokens_right_weapon");
 
                     b.HasIndex("UserId");
 
@@ -1633,6 +1655,52 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("user_notifications", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.Weapon", b =>
+                {
+                    b.Property<long>("WeaponId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("weapon_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("WeaponId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ModelFile")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("model_file");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("WeaponId")
+                        .HasName("weapons_pkey");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_weapons_user");
+
+                    b.ToTable("weapons", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.Animation", b =>
                 {
                     b.HasOne("Roll6.Domain.Models.User", null)
@@ -1908,6 +1976,16 @@ namespace Roll6.Infra.Migrations
 
             modelBuilder.Entity("Roll6.Domain.Models.Token", b =>
                 {
+                    b.HasOne("Roll6.Domain.Models.Weapon", null)
+                        .WithMany()
+                        .HasForeignKey("LeftWeaponId")
+                        .HasConstraintName("fk_token_left_weapon");
+
+                    b.HasOne("Roll6.Domain.Models.Weapon", null)
+                        .WithMany()
+                        .HasForeignKey("RightWeaponId")
+                        .HasConstraintName("fk_token_right_weapon");
+
                     b.HasOne("Roll6.Domain.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -1981,6 +2059,15 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("fk_user_user_notification");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.Weapon", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_weapon_user");
                 });
 #pragma warning restore 612, 618
         }

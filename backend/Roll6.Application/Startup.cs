@@ -48,6 +48,7 @@ public static class Startup
         services.AddScoped<IMapRepository<Map>, MapRepository>();
         services.AddScoped<ITokenRepository<Token>, TokenRepository>();
         services.AddScoped<IAnimationRepository<Animation>, AnimationRepository>();
+        services.AddScoped<IWeaponRepository<Weapon>, WeaponRepository>();
         services.AddScoped<IMapTokenRepository<MapToken>, MapTokenRepository>();
         services.AddScoped<ICharacterRepository<Character>, CharacterRepository>();
         services.AddScoped<ICampaignCharacterRepository<CampaignCharacter>, CampaignCharacterRepository>();
@@ -83,6 +84,7 @@ public static class Startup
         services.AddScoped<IPageMetaService, PageMetaService>();
         services.AddScoped<ITokenLibraryService, TokenLibraryService>();
         services.AddScoped<IAnimationService, AnimationService>();
+        services.AddScoped<IWeaponService, WeaponService>();
         services.AddScoped<IMapTokenService, MapTokenService>();
         services.AddScoped<ICharacterService, CharacterService>();
         services.AddScoped<ICampaignCharacterService, CampaignCharacterService>();

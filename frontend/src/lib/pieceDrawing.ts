@@ -2,6 +2,8 @@ import { footprintLocal, hexCenter, hexCorners, pixelToHex } from './hexGrid';
 import type { Point } from './hexGrid';
 import { tokenSpriteUrls } from './spriteView';
 import { modelScaleFactor } from './modelScale';
+import { handWeaponsOf } from './weaponGrip';
+import type { HandWeapons } from '../types/weapon';
 import { isAllyPiece } from './npcCategory';
 import type { ModelClipChoices } from './modelAnimations';
 import type { ViewImages } from './spriteView';
@@ -139,6 +141,8 @@ export interface SpriteSpec {
   modelClips: ModelClipChoices;
   /** Size of that model (063) as a factor of its automatic height; 1 = as before. */
   modelScale: number;
+  /** The weapons in that model's hands (082), with the token's grips. */
+  modelWeapons: HandWeapons;
 }
 
 /**
@@ -188,5 +192,6 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     modelUrl: token.modelFileUrl ?? null,
     modelClips: { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null, down: token.modelDownClip ?? null },
     modelScale: modelScaleFactor(token.modelScale),
+    modelWeapons: handWeaponsOf(token),
   };
 };

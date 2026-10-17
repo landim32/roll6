@@ -68,6 +68,18 @@ public class MapTokenRepository : IMapTokenRepository<MapToken>
             .ToListAsync();
     }
 
+    public async Task<List<long>> ListCampaignIdsByWeaponAsync(long weaponId)
+    {
+        return await (
+                from piece in _context.MapTokens.AsNoTracking()
+                join token in _context.Tokens.AsNoTracking() on piece.TokenId equals token.TokenId
+                join map in _context.Maps.AsNoTracking() on piece.MapId equals map.MapId
+                where (token.RightWeaponId == weaponId || token.LeftWeaponId == weaponId) && map.Status != MapStatus.Deleted
+                select map.CampaignId)
+            .Distinct()
+            .ToListAsync();
+    }
+
     public async Task DeleteByMapIdsAsync(IEnumerable<long> mapIds)
     {
         var idList = mapIds.ToList();

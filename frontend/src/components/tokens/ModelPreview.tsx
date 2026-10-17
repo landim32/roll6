@@ -13,6 +13,10 @@ import { LYING_TILT } from '../../lib/modelFit';
 import { previewFraming } from '../../lib/modelScale';
 import { instantiate, loadModel } from '../story/loadModel';
 import type { ModelAsset } from '../story/loadModel';
+import { handsOf } from '../story/attachWeapons';
+import type { WeaponHands } from '../story/attachWeapons';
+import { createWeaponHands } from '../story/weaponHands';
+import type { HandWeapons } from '../../types/weapon';
 
 /** What the preview found in the file, for the animation selects of the form (056). */
 export interface ModelPreviewInfo {
@@ -62,6 +66,10 @@ interface ModelPreviewProps {
    * the model grows or shrinks on it and the camera moves back for a bigger one to fit. Default 1.
    */
   scale?: number;
+  /** The weapons in the model's hands (082) with the token's grips; a grip change re-places them at once. */
+  weapons?: HandWeapons;
+  /** After the model opens: which hands can hold a weapon (Mixamo hand bones). */
+  onHands?: (hands: WeaponHands) => void;
 }
 
 /** Height of the model in the preview's units, and how fast the stage turns by itself (radians per second). */
@@ -79,7 +87,7 @@ const CAMERA_TARGET_Y = 0.95;
  * the form (056), so the user sees each choice at once. Without a death the down state shows the model laid on its back,
  * as the 3D view does. Its own small three.js scene, loaded lazily with the tab, released when it closes.
  */
-export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1 }, ref) => {
+export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1, weapons, onHands }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** The action the preview shows now (057): the timeline's subject; null when that state has no animation. */
   const current = useRef<AnimationAction | null>(null);
@@ -105,8 +113,12 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const sizerRef = useRef<Group | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
   const scaleRef = useRef(scale);
-  const callbacks = useRef({ onLoaded, onClips, onError });
-  callbacks.current = { onLoaded, onClips, onError };
+  const callbacks = useRef({ onLoaded, onClips, onError, onHands });
+  callbacks.current = { onLoaded, onClips, onError, onHands };
+  /** The weapons in the model's hands (082) and the model's height in its own units (their grips' unit). */
+  const weaponsRef = useRef(weapons);
+  const handsRef = useRef(createWeaponHands(() => undefined));
+  const heightRef = useRef(1);
 
   /** Builds the actions for the current choices and plays the current state; tells the form what they are. */
   const applyClips = (choices: ModelClipChoices) => {
@@ -260,6 +272,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const weaponHands = handsRef.current;
     let renderer: WebGLRenderer;
     try {
       renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -320,6 +333,10 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       modelRef.current = model;
       assetRef.current = asset;
       mixerRef.current = new AnimationMixer(model);
+      heightRef.current = Math.max(1e-6, maxY - minY);
+      weaponHands.reset();
+      weaponHands.sync(model, heightRef.current, weaponsRef.current);
+      callbacks.current.onHands?.(handsOf(model));
       callbacks.current.onLoaded({ clipNames: asset.clipNames, boneNames: asset.boneNames });
       applyRef.current(clipsRef.current);
     }).catch(() => {
@@ -342,6 +359,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       cancelled = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      weaponHands.reset();
       mixerRef.current?.stopAllAction();
       mixerRef.current = null;
       assetRef.current = null;
@@ -365,6 +383,13 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     scaleRef.current = scale;
     applySize(scale);
   }, [scale]);
+
+  // Other weapons or grips (082): the loaded model holds them at once, without loading again.
+  useEffect(() => {
+    if (weaponsRef.current === weapons) return;
+    weaponsRef.current = weapons;
+    if (modelRef.current) handsRef.current.sync(modelRef.current, heightRef.current, weapons);
+  }, [weapons]);
 
   // Another animation chosen for a state: the actions are built again (the model stays where it is).
   useEffect(() => {
