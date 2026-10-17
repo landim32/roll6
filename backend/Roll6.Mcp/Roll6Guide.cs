@@ -290,7 +290,9 @@ public static class Roll6Guide
         ## Turns
         - A campaign is always in turn `N` (`get_turn_state`). Outside free mode (see "Free mode"), each character and
           each NPC occurrence can **move once** per turn (moving records a Movement entry) and has **one valid action**
-          (`act_in_turn`, text — a new one cancels the previous).
+          (`act_in_turn`, text — a new one cancels the previous). A character acts **with or without a piece**:
+          `act_in_turn` takes its piece (`mapTokenId`) or, for a character not on any map, `campaignId` + `characterId`
+          (balloons only show over pieces); NPC occurrences always act through their piece.
         - `reset_turn` deletes a piece's entries of the current turn and moves it back if the former hex is free.
         - Every entry records who made it (`userId`/`userName`); moves record the movement points spent (`moved`); any
           change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the

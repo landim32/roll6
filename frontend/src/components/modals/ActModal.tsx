@@ -45,7 +45,7 @@ export const ActModal = ({ open, piece, onClose }: ActModalProps) => {
     if (!piece || !text.trim()) return;
     try {
       setSaving(true);
-      await act(piece.mapTokenId, text.trim());
+      await act({ mapTokenId: piece.mapTokenId }, text.trim());
       toast.success(t('toast.actionRecorded'));
       onClose();
     } catch (err) {

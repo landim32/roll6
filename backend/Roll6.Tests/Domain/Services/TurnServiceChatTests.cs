@@ -646,13 +646,42 @@ public partial class TurnServiceChatTests
     }
 
     [Fact]
-    public async Task Convert_TextToAction_WithoutAPiece_Is400()
+    public async Task Convert_TextToAction_WithoutAPiece_Works()
     {
-        AriaText(71);
+        // 080: a character acts from the chat with or without a piece; the action stays on the current map.
+        var text = AriaText(71);
         _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken>());
 
-        await _service.Invoking(s => s.ConvertAsync(PLAYER, 71, new ChatConvertInfo { To = "action" }))
-            .Should().ThrowAsync<DomainValidationException>();
+        await _service.ConvertAsync(PLAYER, 71, new ChatConvertInfo { To = "action" });
+
+        (text.IsValidAction, text.MapId).Should().Be((true, (long?)MAP));
+        _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Convert_TextToAction_WithoutACurrentMap_Works_AndGoesBack()
+    {
+        _campaign.CurrentMapId = null;
+        var text = AriaText(74);
+
+        await _service.ConvertAsync(PLAYER, 74, new ChatConvertInfo { To = "action" });
+        text.IsValidAction.Should().BeTrue();
+
+        await _service.ConvertAsync(PLAYER, 74, new ChatConvertInfo { To = "message" });
+        text.TurnType.Should().Be(TurnType.Text);
+        _campaign.CurrentMapId = MAP;
+    }
+
+    [Fact]
+    public async Task DeleteAnActionWithoutAMap_CancelsIt()
+    {
+        var action = Turn.Action(CAMPAIGN, null, ARIA, null, null, 3, PLAYER, "Vasculho");
+        action.TurnId = 76;
+        _repository.Setup(r => r.GetByIdAsync(76)).ReturnsAsync(action);
+
+        await _service.DeleteMessageAsync(PLAYER, 76);
+
+        action.IsCancelled.Should().BeTrue();
     }
 
     [Fact]

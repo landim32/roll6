@@ -67,10 +67,8 @@ public partial class TurnService
         var to = info.To?.Trim().ToLowerInvariant();
         if (to == "action")
         {
-            if (campaign.CurrentMapId is not long mapId || (await _mapTokenRepository.ListByMapAsync(mapId))
-                    .All(p => p.CampaignCharacterId != participation.CampaignCharacterId))
-                throw new Exceptions.DomainValidationException("to", "Coloque o personagem no mapa aberto para agir.");
-            turn.ToAction(mapId);
+            // 080: a character acts with or without a piece; the action is kept on the current map, if any.
+            turn.ToAction(campaign.CurrentMapId);
             // 044/073: one valid action per character and turn, in any mode.
             var cancelled = await CancelValidActionsAsync(campaign, characterId, null, except: turn.TurnId);
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
