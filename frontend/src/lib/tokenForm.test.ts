@@ -47,6 +47,20 @@ describe('toTokenInsert', () => {
     expect(toTokenInsert(form(), 'a.png', null, undefined, { ...model, modelFile: null, modelScale: 150 }).modelScale).toBe(100);
   });
 
+  it('sends the weapons of both hands with their grips (082), none without a model', () => {
+    const grip = { x: 0, y: 0.02, z: 0, rx: 0, ry: 0, rz: 90, scale: 120 };
+    const model = {
+      modelFile: 'm.glb', modelIdleClip: null, modelWalkClip: null, modelDownClip: null,
+      rightWeapon: { weaponId: 7, grip }, leftWeapon: null,
+    };
+    expect(toTokenInsert(form(), 'a.png', null, undefined, model)).toMatchObject({
+      rightWeapon: { weaponId: 7, grip }, leftWeapon: null,
+    });
+    expect(toTokenInsert(form(), 'a.png', null, undefined, { ...model, modelFile: null })).toMatchObject({
+      rightWeapon: null, leftWeapon: null,
+    });
+  });
+
   it('drops the animation choices when there is no model', () => {
     const sent = toTokenInsert(form(), 'a.png', null, undefined, {
       modelFile: null, modelIdleClip: 'none', modelWalkClip: 'animation:4', modelDownClip: 'none',
@@ -58,7 +72,7 @@ describe('toTokenInsert', () => {
     expect(toTokenInsert(form({ name: ' Goblin ', description: '  ', upSpace: '1', downSpace: '' }), 'a.png', null)).toEqual({
       name: 'Goblin', description: null, upSpace: 1, downSpace: null, upImage: 'a.png', downImage: null,
       frontImage: null, rightImage: null, leftImage: null, backImage: null, modelFile: null, modelIdleClip: null, modelWalkClip: null, modelDownClip: null,
-      modelScale: 100,
+      modelScale: 100, rightWeapon: null, leftWeapon: null,
     });
     expect(toTokenInsert(form({ downSpace: '2' }), null, 'b.png').downSpace).toBe(2);
   });

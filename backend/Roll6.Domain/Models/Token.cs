@@ -1,5 +1,6 @@
 using Roll6.Domain.Enums;
 using Roll6.Domain.Validation;
+using Roll6.Domain.Weapons;
 
 namespace Roll6.Domain.Models;
 
@@ -42,6 +43,14 @@ public class Token
     /// model.
     /// </summary>
     public int ModelScale { get; set; } = Guard.MODEL_SCALE_DEFAULT;
+    /// <summary>The library weapon held in the right hand of the 3D model (082); null = none. Only with a model.</summary>
+    public long? RightWeaponId { get; set; }
+    /// <summary>The library weapon held in the left hand (082); null = none. The same weapon may be in both hands.</summary>
+    public long? LeftWeaponId { get; set; }
+    /// <summary>How the right hand holds its weapon (082, <see cref="WeaponGrip"/> as JSON); null = default.</summary>
+    public string? RightWeaponGrip { get; set; }
+    /// <summary>How the left hand holds its weapon (082); null = default.</summary>
+    public string? LeftWeaponGrip { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -81,6 +90,25 @@ public class Token
         ModelWalkClip = ModelFile == null ? null : Guard.ModelClip(walkClip, "modelWalkClip");
         ModelDownClip = ModelFile == null ? null : Guard.ModelClip(downClip, "modelDownClip");
         ModelScale = ModelFile == null ? Guard.MODEL_SCALE_DEFAULT : Guard.ModelScale(scale, "modelScale");
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// The weapons in the model's hands (082), one per hand (Q2 = B), each with its own grip (Q1 = B). Called after
+    /// <see cref="UpdateModel"/>: without a model both hands are emptied, and a hand without a weapon keeps no grip.
+    /// The PUT of a token replaces every field, so a hand left out is emptied.
+    /// </summary>
+    public void UpdateWeapons(TokenHand? right, TokenHand? left)
+    {
+        if (ModelFile == null)
+        {
+            right = null;
+            left = null;
+        }
+        RightWeaponId = right?.WeaponId;
+        RightWeaponGrip = right?.Grip?.Validate("rightWeapon").ToJson();
+        LeftWeaponId = left?.WeaponId;
+        LeftWeaponGrip = left?.Grip?.Validate("leftWeapon").ToJson();
         UpdatedAt = DateTime.UtcNow;
     }
 

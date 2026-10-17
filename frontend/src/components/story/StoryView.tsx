@@ -508,6 +508,7 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
       ? [{
         id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: spec.yaw,
         ground: pieceGround(terrain, spec.center), clips: spec.modelClips, lying: isLying(piece), scale: spec.modelScale,
+        weapons: spec.modelWeapons,
       }]
       : [];
   }), [pieces, terrain]);

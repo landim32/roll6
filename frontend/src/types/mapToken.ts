@@ -1,4 +1,5 @@
 /** Map token types — pieces on a campaign map; mirror the backend MapToken DTOs. */
+import type { TokenWeapon } from './weapon';
 
 /**
  * Piece type (backend MapTokenType); constants because `enum` is not allowed. NPC pieces come from the NPC
@@ -48,6 +49,9 @@ export interface MapTokenInfo {
   modelDownClip?: string | null;
   /** Size of the token's model in the 3D view (063): percent of its automatic height; missing = 100. */
   modelScale?: number;
+  /** Weapons in the token model's hands (082); missing/null = none. */
+  rightWeapon?: TokenWeapon | null;
+  leftWeapon?: TokenWeapon | null;
   downImageUrl: string | null;
   campaignCharacterId: number | null;
   characterId: number | null;

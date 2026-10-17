@@ -145,7 +145,8 @@ export const alignSkeletonToMesh = (scene: Object3D): number => {
   return applied;
 };
 
-const readBytes = async (url: string): Promise<ArrayBuffer> => {
+/** The bytes of a model URL: a stored `.glb` through the API (the bucket sends no CORS headers), anything else as it is. */
+export const readModelBytes = async (url: string): Promise<ArrayBuffer> => {
   const stored = storedModelName(url);
   if (stored) {
     const bytes = await modelService.fetchStored(stored);
@@ -182,7 +183,7 @@ export const loadModel = (url: string): Promise<ModelAsset> => {
   const key = storedModelName(url) ?? url;
   let pending = cache.get(key);
   if (!pending) {
-    pending = readBytes(url).then(parseModel);
+    pending = readModelBytes(url).then(parseModel);
     cache.set(key, pending);
   }
   return pending;

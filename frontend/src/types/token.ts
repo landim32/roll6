@@ -1,4 +1,5 @@
 /** Token library types — mirror the backend Token DTOs. */
+import type { TokenWeapon, TokenWeaponWrite } from './weapon';
 
 /** A library token (standing/lying images and the space each state takes). */
 export interface TokenInfo {
@@ -37,6 +38,9 @@ export interface TokenInfo {
   modelDownClip?: string | null;
   /** Size of the model in the 3D view (063): percent of its automatic height, 25–400; missing = 100. */
   modelScale?: number;
+  /** Weapons in the model's hands (082): name, file URL and grip; missing/null = none. */
+  rightWeapon?: TokenWeapon | null;
+  leftWeapon?: TokenWeapon | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,6 +65,9 @@ export interface TokenInsertInfo {
   modelDownClip: string | null;
   /** Size of the model (063), 25–400 in steps of 5; the PUT resets it to 100 when omitted. */
   modelScale: number;
+  /** Weapons in the model's hands (082): `weaponId` + grip; the PUT empties a hand it doesn't get. */
+  rightWeapon: TokenWeaponWrite | null;
+  leftWeapon: TokenWeaponWrite | null;
 }
 
 /** Result of POST /api/model (055): the stored `.glb` name and a temporary URL. */

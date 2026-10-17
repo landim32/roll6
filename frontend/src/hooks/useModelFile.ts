@@ -4,7 +4,9 @@ import { AUTO_CLIPS, parseClipChoice } from '../lib/modelAnimations';
 import { MODEL_SCALE } from '../lib/modelScale';
 import type { AnimationState, ModelClipChoice, ModelClipChoices } from '../lib/modelAnimations';
 import type { ResolvedModel } from '../lib/tokenForm';
+import { DEFAULT_GRIP, clampGrip } from '../lib/weaponGrip';
 import type { TokenInfo } from '../types/token';
+import type { Hand, TokenWeapon, WeaponGrip } from '../types/weapon';
 
 /** The "3D" tab of the token form (055): a newly picked `.glb`, or the saved model kept or removed, and its animations (056, the death since 058). */
 export interface ModelFileState {
@@ -20,15 +22,31 @@ export interface ModelFileState {
   clips: ModelClipChoices;
   /** Size of the model in the 3D view (063), percent: kept when the file is swapped, 100 when it is removed. */
   scale: number;
+  /** The weapon in each hand (082) with its grip: kept when the file is swapped, emptied when the model is removed. */
+  weapons: TokenWeapons;
   pick: (file: File) => void;
   /** Removes the model: the picked file and the saved one. */
   remove: () => void;
   setInvalid: (invalid: boolean) => void;
   setClip: (state: AnimationState, choice: ModelClipChoice) => void;
   setScale: (scale: number) => void;
+  /** Puts a library weapon in a hand (default grip when the hand was empty or held another weapon), or empties it. */
+  setWeapon: (hand: Hand, weapon: Pick<TokenWeapon, 'weaponId' | 'name' | 'modelFileUrl'> | null) => void;
+  setGrip: (hand: Hand, grip: WeaponGrip) => void;
   /** What to send: uploads the picked file, keeps the saved one, or null — with the chosen animations. */
   resolve: () => Promise<ResolvedModel>;
 }
+
+export type TokenWeapons = Record<Hand, TokenWeapon | null>;
+
+const NO_WEAPONS: TokenWeapons = { right: null, left: null };
+
+const savedWeapons = (token: TokenInfo | null): TokenWeapons => {
+  if (!token?.modelFile) return NO_WEAPONS;
+  const read = (weapon: TokenWeapon | null | undefined): TokenWeapon | null =>
+    weapon ? { ...weapon, grip: clampGrip(weapon.grip) } : null;
+  return { right: read(token.rightWeapon), left: read(token.leftWeapon) };
+};
 
 /** A saved choice as the form keeps it: one it does not know (e.g. the former "roll6", 061) is automatic. */
 const known = (choice: ModelClipChoice | undefined): ModelClipChoice =>
@@ -53,6 +71,7 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
   const [clips, setClips] = useState<ModelClipChoices>(() => savedClips(token));
   const [scale, setScale] = useState(() => savedScale(token));
+  const [weapons, setWeapons] = useState<TokenWeapons>(() => savedWeapons(token));
 
   useEffect(() => {
     if (!active) return;
@@ -61,6 +80,7 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
     setInvalid(false);
     setClips(savedClips(token));
     setScale(savedScale(token));
+    setWeapons(savedWeapons(token));
   }, [active, token]);
 
   // The picked file as a URL for the preview, released when another is picked or the form goes away.
@@ -86,6 +106,23 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
     setInvalid(false);
     setClips(AUTO_CLIPS);
     setScale(MODEL_SCALE.standard);
+    setWeapons(NO_WEAPONS);
+  }, []);
+
+  const setWeapon = useCallback((hand: Hand, weapon: Pick<TokenWeapon, 'weaponId' | 'name' | 'modelFileUrl'> | null) => {
+    setWeapons((prev) => {
+      if (!weapon) return prev[hand] ? { ...prev, [hand]: null } : prev;
+      const current = prev[hand];
+      if (current?.weaponId === weapon.weaponId) return { ...prev, [hand]: { ...current, ...weapon } };
+      return { ...prev, [hand]: { ...weapon, grip: DEFAULT_GRIP } };
+    });
+  }, []);
+
+  const setGrip = useCallback((hand: Hand, grip: WeaponGrip) => {
+    setWeapons((prev) => {
+      const current = prev[hand];
+      return current ? { ...prev, [hand]: { ...current, grip: clampGrip(grip) } } : prev;
+    });
   }, []);
 
   const setClip = useCallback((state: AnimationState, choice: ModelClipChoice) => {
@@ -94,11 +131,18 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
 
   const resolve = useCallback(async (): Promise<ResolvedModel> => {
     const modelFile = picked ? (await modelService.upload(picked)).fileName : keepsSaved ? token?.modelFile ?? null : null;
-    return { modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down, modelScale: scale };
-  }, [picked, keepsSaved, token, clips, scale]);
+    const write = (weapon: TokenWeapon | null) => (weapon ? { weaponId: weapon.weaponId, grip: weapon.grip } : null);
+    return {
+      modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down, modelScale: scale,
+      rightWeapon: write(weapons.right), leftWeapon: write(weapons.left),
+    };
+  }, [picked, keepsSaved, token, clips, scale, weapons]);
 
   const previewUrl = pickedUrl ?? (keepsSaved ? token?.modelFileUrl ?? null : null);
-  return { picked, previewUrl, keepsSaved, invalid, clips, scale, pick, remove, setInvalid, setClip, setScale, resolve };
+  return {
+    picked, previewUrl, keepsSaved, invalid, clips, scale, weapons, pick, remove, setInvalid, setClip, setScale, setWeapon, setGrip,
+    resolve,
+  };
 };
 
 export default useModelFile;

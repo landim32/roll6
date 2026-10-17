@@ -85,6 +85,14 @@ public class TokenInfo
     [JsonPropertyName("modelScale")]
     public int ModelScale { get; set; } = 100;
 
+    /// <summary>Weapon in the model's right hand (082): name, file URL and grip; null = none.</summary>
+    [JsonPropertyName("rightWeapon")]
+    public Weapon.TokenWeaponInfo? RightWeapon { get; set; }
+
+    /// <summary>Weapon in the model's left hand (082); null = none.</summary>
+    [JsonPropertyName("leftWeapon")]
+    public Weapon.TokenWeaponInfo? LeftWeapon { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

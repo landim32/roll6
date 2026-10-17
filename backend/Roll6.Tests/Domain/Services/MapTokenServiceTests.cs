@@ -25,6 +25,7 @@ public class MapTokenServiceTests
     private readonly Mock<IMapNpcRepository<MapNpc>> _mapNpcRepository = new();
     private readonly Mock<INpcRepository<Npc>> _npcRepository = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<IWeaponRepository<Weapon>> _weaponRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Mock<ICampaignNpcRepository<CampaignNpc>> _campaignNpcRepository = new();
     private readonly MapTokenService _service;
@@ -50,7 +51,7 @@ public class MapTokenServiceTests
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string>())).Returns((string? name) => name == null ? null : "https://x/" + name);
         _service = new MapTokenService(_repository.Object, _mapRepository.Object, _mapModelRepository.Object, _tokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _turnRepository.Object, _campaignRepository.Object,
-            _unitOfWork.Object, _imageStorage.Object, _campaignNpcRepository.Object, _notifier.Object);
+            _unitOfWork.Object, _imageStorage.Object, _campaignNpcRepository.Object, _weaponRepository.Object, _notifier.Object);
     }
 
     [Fact]

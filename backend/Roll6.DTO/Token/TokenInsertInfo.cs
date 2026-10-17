@@ -66,4 +66,12 @@ public class TokenInsertInfo
     /// </summary>
     [JsonPropertyName("modelScale")]
     public int? ModelScale { get; set; }
+
+    /// <summary>Weapon in the model's right hand (082): weaponId + optional grip. Omitted on PUT = empty hand; ignored without modelFile.</summary>
+    [JsonPropertyName("rightWeapon")]
+    public Weapon.TokenWeaponInfo? RightWeapon { get; set; }
+
+    /// <summary>Weapon in the model's left hand (082); same rules as rightWeapon.</summary>
+    [JsonPropertyName("leftWeapon")]
+    public Weapon.TokenWeaponInfo? LeftWeapon { get; set; }
 }

@@ -64,11 +64,12 @@ public static class ImageTools
         the height of a figure of the piece's size, feet on the floor, facing the piece's look (the model's +Z is its
         front). Animations: clips named like "idle"/"parado" and "walk"/"caminhar" in the file are used; otherwise the
         model stands still, unless the token picks a library animation (Mixamo bone names — Hips, Spine, Head, LeftUpLeg…
-        with or without "mixamorig:").
+        with or without "mixamorig:"). The same upload stores a library weapon's model (082): pass its fileName to
+        create_weapon / update_weapon (put the weapon's origin at the handle).
         Who can use it: any authenticated user.
         Returns: { fileName, url }. Save fileName (e.g. "3f2a…c9.glb"); url is temporary (expires) — never store it.
         Common errors: 400 invalid base64, not a glTF 2.0 binary, or larger than 20 MB.
-        Related tools: create_token, update_token, get_token.
+        Related tools: create_token, update_token, get_token, create_weapon.
         """)]
     public static async Task<CallToolResult> UploadTokenModel(
         Roll6ApiClient api,

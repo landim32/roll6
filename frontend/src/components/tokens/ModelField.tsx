@@ -5,6 +5,13 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useAnimation } from '../../hooks/useAnimation';
 import { useAuth } from '../../hooks/useAuth';
+import { useWeapon } from '../../hooks/useWeapon';
+import { weaponService } from '../../Services/weaponService';
+import { handWeaponsOf } from '../../lib/weaponGrip';
+import { HAND, HANDS } from '../../types/weapon';
+import type { Hand } from '../../types/weapon';
+import type { WeaponHands } from '../story/attachWeapons';
+import { WeaponGripFields } from './WeaponGripFields';
 import type { ModelFileState } from '../../hooks/useModelFile';
 import { animationService } from '../../Services/animationService';
 import type { AnimationInfo } from '../../types/animation';
@@ -37,9 +44,10 @@ interface ModelFieldProps {
   /**
    * Which tab shows it (060): "model" = the "3D" tab (pick or remove the `.glb`, seen in its rest pose — the T-pose of
    * the rig); "animation" = the "Animação" tab (the state, the animated preview with its timeline and "Gerar imagem",
-   * and the animation of that state with "Atualizar" for the library).
+   * and the animation of that state with "Atualizar" for the library); "weapons" (082) = the "Armas" tab (the animated
+   * preview with the weapon of each hand, chosen from the library, and its grip).
    */
-  section: 'model' | 'animation';
+  section: 'model' | 'animation' | 'weapons';
 }
 
 /**
@@ -72,6 +80,13 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   /** Names of chosen library animations that are not in the loaded lists (another user's, beyond the first page). */
   const [chosenNames, setChosenNames] = useState<Record<number, string>>({});
   const mixamo = info !== null && isMixamoSkeleton(info.boneNames);
+  /** "Armas" (082): the hand being edited, which hands the model has, and the library's weapons. */
+  const [hand, setHand] = useState<Hand>(HAND.right);
+  const [hands, setHands] = useState<WeaponHands | null>(null);
+  const { choices: weaponChoices, loadChoices, refreshChoices } = useWeapon();
+  const [refreshingWeapons, setRefreshingWeapons] = useState(false);
+  const { weapons, setWeapon, setGrip } = state;
+  const heldWeapons = useMemo(() => handWeaponsOf({ rightWeapon: weapons.right, leftWeapon: weapons.left }), [weapons]);
 
   // A new model to show: wait for the preview to say what it found.
   useEffect(() => {
@@ -79,8 +94,14 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
     setSources(null);
     setDeforms(false);
     setShown('idle');
+    setHands(null);
     setLoading(previewUrl !== null);
   }, [previewUrl]);
+
+  // The weapon selects (082) read the library once, when the "Armas" tab first shows.
+  useEffect(() => {
+    if (section === 'weapons') loadChoices();
+  }, [section, loadChoices]);
 
   const options = useMemo(
     () => (info
@@ -217,11 +238,47 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   };
 
   const animating = section === 'animation';
+  /** The "Animação" and "Armas" tabs show the model moving, with the state select and the timeline (082). */
+  const live = section !== 'model';
+  const arming = section === 'weapons';
+
+  /** "Atualizar" (082): reads the weapon library again. */
+  const refreshWeapons = async () => {
+    setRefreshingWeapons(true);
+    try {
+      await refreshChoices();
+    } finally {
+      setRefreshingWeapons(false);
+    }
+  };
+
+  const heldWeapon = weapons[hand];
+  const handReady = hands !== null && hands[hand];
+  /** The weapons offered for a hand: the library's, plus the held one when it is not in the loaded list. */
+  const weaponOptions = heldWeapon && !weaponChoices.some((item) => item.weaponId === heldWeapon.weaponId)
+    ? [{ weaponId: heldWeapon.weaponId, name: heldWeapon.name ?? `#${heldWeapon.weaponId}`, userId, ownerName: null }, ...weaponChoices]
+    : weaponChoices;
+
+  /** A weapon picked for the hand: its name and file come from the library (or are read when not loaded). */
+  const pickWeapon = async (value: string) => {
+    if (!value) {
+      setWeapon(hand, null);
+      return;
+    }
+    const weaponId = Number(value);
+    const found = weaponChoices.find((item) => item.weaponId === weaponId)
+      ?? await weaponService.get(weaponId).catch(() => null);
+    if (!found) {
+      toast.error(t('tokens.weapons.loadFailed'));
+      return;
+    }
+    setWeapon(hand, { weaponId: found.weaponId, name: found.name, modelFileUrl: found.modelFileUrl });
+  };
 
   // The card stays at the same place in both sections, so switching tabs keeps the loaded model (060).
   return (
     <div className="stm-model-field">
-      {animating ? (
+      {live ? (
         <div className="mb-2">
           {previewUrl ? (
             <>
@@ -238,7 +295,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
               </select>
             </>
           ) : (
-            <div className="form-text">{t('tokens.model.animationNeedsModel')}</div>
+            <div className="form-text">{t(arming ? 'tokens.weapons.needsModel' : 'tokens.model.animationNeedsModel')}</div>
           )}
         </div>
       ) : (
@@ -260,7 +317,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
           {previewUrl && <div className="form-text mb-2">{t('tokens.model.restPose')}</div>}
         </div>
       )}
-      <div className="stm-model-card" hidden={animating && !previewUrl}>
+      <div className="stm-model-card" hidden={live && !previewUrl}>
         <div className="stm-model-stage">
           {previewUrl ? (
             <Suspense fallback={<div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}>
@@ -268,9 +325,11 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 ref={previewRef}
                 url={previewUrl}
                 shown={shown}
-                animated={animating}
+                animated={live}
                 clips={clips}
                 scale={modelScaleFactor(scale)}
+                weapons={heldWeapons}
+                onHands={setHands}
                 label={t('tokens.model.previewLabel', { name: name || '—' })}
                 onLoaded={(found) => { setLoading(false); setInfo(found); setInvalid(false); }}
                 onClips={(found, stretched) => { setSources(found); setDeforms(stretched); }}
@@ -282,7 +341,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
           )}
           {previewUrl && loading && !error && <div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}
         </div>
-        {animating && previewUrl && (
+        {live && previewUrl && (
           <ModelTimeline
             preview={previewRef}
             disabled={loading || !!error}
@@ -315,7 +374,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
           </div>
         )}
       </div>
-      {!animating && previewUrl && (
+      {section === 'model' && previewUrl && (
         <div className="stm-model-scale mt-3">
           <label htmlFor={`${id}-scale`} className="form-label small mb-1 d-flex justify-content-between">
             <span>{t('tokens.model.scale')}</span>
@@ -374,6 +433,57 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
             <div className="form-text">{t('tokens.model.playing', { source: sourceLabel(sources[shown], shown) })}</div>
           )}
           <div className="form-text">{t('tokens.model.animationsHelp')}</div>
+        </div>
+      )}
+      {arming && previewUrl && (
+        <div className="stm-weapon-choice mt-3">
+          <div className="btn-group btn-group-sm mb-2" role="group" aria-label={t('tokens.weapons.handLabel')}>
+            {HANDS.map((value) => (
+              <button key={value} type="button" aria-pressed={hand === value}
+                className={`btn ${hand === value ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setHand(value)}>
+                {t(`tokens.weapons.hand.${value}`)}
+              </button>
+            ))}
+          </div>
+          <label htmlFor={`${id}-weapon`} className="form-label small mb-1 d-block">
+            {t(`tokens.weapons.weaponOf.${hand}`)}
+          </label>
+          <div className="d-flex gap-2">
+            <select
+              id={`${id}-weapon`}
+              className="form-select form-select-sm"
+              value={heldWeapon ? String(heldWeapon.weaponId) : ''}
+              disabled={!handReady}
+              onChange={(e) => { void pickWeapon(e.target.value); }}
+            >
+              <option value="">{t('tokens.weapons.none')}</option>
+              {weaponOptions.map((item) => (
+                <option key={item.weaponId} value={item.weaponId}>
+                  {item.userId === userId || !item.ownerName
+                    ? item.name
+                    : t('tokens.weapons.other', { name: item.name, owner: item.ownerName })}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
+              onClick={() => { void refreshWeapons(); }}
+              disabled={refreshingWeapons}
+              title={t('tokens.weapons.refreshTitle')}
+              aria-label={t('tokens.weapons.refreshTitle')}
+            >
+              <ArrowClockwiseIcon size={14} /> <span className="d-none d-sm-inline">{t('tokens.model.refresh')}</span>
+            </button>
+          </div>
+          {hands !== null && !hands[hand] && (
+            <div className="alert alert-warning small mt-2 mb-0">{t('tokens.weapons.noHands')}</div>
+          )}
+          {heldWeapon && (
+            <WeaponGripFields id={`${id}-grip-${hand}`} grip={heldWeapon.grip} disabled={!handReady}
+              onChange={(grip) => setGrip(hand, grip)} />
+          )}
+          <div className="form-text">{t('tokens.weapons.help')}</div>
         </div>
       )}
       {animating && isStatic && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.static')}</div>}

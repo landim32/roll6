@@ -10,6 +10,7 @@ using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 using Roll6.Domain.Npcs;
+using Roll6.Domain.Weapons;
 
 namespace Roll6.Domain.Services;
 
@@ -33,6 +34,7 @@ public partial class MapTokenService : IMapTokenService
     private readonly ICampaignRepository<Campaign> _campaignRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IImageStorageAppService _imageStorage;
+    private readonly IWeaponRepository<Weapon> _weaponRepository;
     private readonly IRealtimeNotifier _notifier;
 
     public MapTokenService(
@@ -49,8 +51,10 @@ public partial class MapTokenService : IMapTokenService
         IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
         ICampaignNpcRepository<CampaignNpc> campaignNpcRepository,
+        IWeaponRepository<Weapon> weaponRepository,
         IRealtimeNotifier notifier)
     {
+        _weaponRepository = weaponRepository;
         _notifier = notifier;
         _npcCommand = new NpcCommandLoader(campaignNpcRepository, campaignCharacterRepository, characterRepository);
         _turnRepository = turnRepository;
@@ -335,6 +339,11 @@ public partial class MapTokenService : IMapTokenService
 
         var tokens = (await _tokenRepository.ListByIdsAsync(mapTokens.Select(e => e.TokenId).Distinct()))
             .ToDictionary(e => e.TokenId);
+        // 082: the weapons in the hands of the pieces' tokens, in one query.
+        var weaponIds = TokenWeapons.IdsOf(tokens.Values).ToList();
+        var weapons = weaponIds.Count == 0
+            ? new Dictionary<long, Weapon>()
+            : (await _weaponRepository.ListByIdsAsync(weaponIds)).ToDictionary(e => e.WeaponId);
         var participationIds = mapTokens.Where(e => e.CampaignCharacterId.HasValue).Select(e => e.CampaignCharacterId!.Value).Distinct().ToList();
         var participations = new Dictionary<long, CampaignCharacter>();
         var characters = new Dictionary<long, Character>();
@@ -383,6 +392,8 @@ public partial class MapTokenService : IMapTokenService
                 ModelWalkClip = token?.ModelWalkClip,
                 ModelDownClip = token?.ModelDownClip,
                 ModelScale = token?.ModelScale ?? Validation.Guard.MODEL_SCALE_DEFAULT,
+                RightWeapon = TokenWeapons.Read(token?.RightWeaponId, token?.RightWeaponGrip, weapons, _imageStorage.GetUrl),
+                LeftWeapon = TokenWeapons.Read(token?.LeftWeaponId, token?.LeftWeaponGrip, weapons, _imageStorage.GetUrl),
                 CampaignCharacterId = mapToken.CampaignCharacterId,
                 Name = mapToken.Name,
                 TokenType = (int)mapToken.TokenType,
