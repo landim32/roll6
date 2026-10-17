@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BALLOON_CEILING, MAX_SCALE, MIN_SCALE, REFERENCE_DEPTH, SCREEN_MARGIN, bubblePlacement, orderByProximity,
 } from './storyBubbles';
-import type { FrameSprite } from './raycastFrame';
+import type { FrameSprite } from './storyBubbles';
 
 const FRAME = { frameWidth: 64, frameHeight: 36 };
 const CANVAS = { width: 640, height: 360 };   // ten times the frame, so canvas px = frame px × 10

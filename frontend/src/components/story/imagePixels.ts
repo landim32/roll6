@@ -1,6 +1,6 @@
-import type { PixelBuffer } from '../../lib/raycastFrame';
+import type { PixelBuffer } from '../../lib/pixelBuffer';
 
-export type { PixelBuffer } from '../../lib/raycastFrame';
+export type { PixelBuffer } from '../../lib/pixelBuffer';
 
 /**
  * Reads an image into pixels, scaled down so its longest side is at most `maxSide`. Null when the canvas can't be read

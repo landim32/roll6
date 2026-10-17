@@ -42,7 +42,7 @@ const EYE_Y = 8;
 /**
  * Share of the crop's height, measured from its bottom edge (where the feet are), at which the silhouette's eyes are:
  * 56% when the silhouette is 60% of the crop. The 3D camera is placed at this height of a figure, so it looks at the
- * face of a character that fits the silhouette (see `EYE_HEIGHT` in lib/raycaster).
+ * face of a character that fits the silhouette (see `EYE_HEIGHT` in lib/maskGrid).
  */
 export const FACE_HEIGHT_SHARE = (SILHOUETTE_SHARE * (VIEW_BOX.height - EYE_Y)) / VIEW_BOX.height;
 

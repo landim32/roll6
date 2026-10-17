@@ -1,3 +1,5 @@
+import { clampPitch } from './storyCamera';
+
 // The pose around the character lives in `storyCamera` (its `followPose` is the orbit 0 case); re-exported here.
 export { orbitPose } from './storyCamera';
 
@@ -6,8 +8,9 @@ export { orbitPose } from './storyCamera';
  * is its angle around the character, relative to where the character faces — 0 behind it, π in front, looking at its
  * face. Dragging changes the orbit without turning the character; the orbit stays while the character stands still
  * and eases back to 0 once it walks or turns ("Only when moving", the game's default following style); a right drag
- * first turns the character to where the camera looks. Sideways only (clarification Q1 = A: the raycaster never
- * tilts). Pure, so every rule is unit-tested. Units: map px and radians, yaw 0 = north, clockwise.
+ * first turns the character to where the camera looks. Since 081 the vertical drag tilts the camera up and down
+ * (`pitchBy`), within the camera's limits. Pure, so every rule is unit-tested. Units: map px and radians, yaw 0 =
+ * north, clockwise.
  */
 
 /** Radians per horizontally dragged pixel (the drag of before). */
@@ -36,3 +39,6 @@ export const easeBack = (orbit: number, dt: number): number => {
   const next = orbit * Math.exp(-dt / ORBIT_RETURN_TAU);
   return Math.abs(next) < ORBIT_SNAP ? 0 : next;
 };
+
+/** The vertical drag (081): `dy` screen pixels down tilt the camera up — the scene follows the finger — within its limits. */
+export const pitchBy = (pitch: number, dy: number): number => clampPitch(pitch + dy * DRAG_TURN);

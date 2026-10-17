@@ -1,4 +1,4 @@
-import type { PixelBuffer } from './raycastFrame';
+import type { PixelBuffer } from './pixelBuffer';
 import { SPRITE_VIEWS } from './spriteView';
 import type { SpriteView, ViewImages } from './spriteView';
 

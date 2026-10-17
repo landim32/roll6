@@ -1,7 +1,8 @@
 /**
- * Quality of the 3D view (053, issue #31): the one place that says what each level costs and draws. "Padrão" is the
- * view exactly as it was before 053 — the same frame width, the same figure images, the same filter — so whoever never
- * touches the setting sees no change; "Alta" and "Ultra" buy sharper figures with more work for the device.
+ * Quality of the 3D view (053, issue #31; redefined for the 3D scene of 081): the one place that says what each level
+ * costs and draws. Lighter to sharper: "Padrão" draws at the screen's own resolution without smoothing, with pixelated
+ * figures like the old view; "Alta" smooths the edges and the figures; "Ultra" draws finer still and casts shadows.
+ * The walls, the terrain, the movement and the balloons are the same on every level.
  *
  * The choice is remembered on this device only (localStorage `roll6:3d-quality`), never shared with the table nor sent
  * to the API, and cleared on logout like the other screen preferences. Every storage access is guarded: it may be
@@ -9,11 +10,11 @@
  */
 
 export const VIEW_QUALITY = {
-  /** The view of today: frame up to 480 columns, figures read at 256 px, nearest-neighbour. */
+  /** Resolution 1×, no smoothing, pixelated figures: light on any device. */
   standard: 'standard',
-  /** Finer frame, figures at the size they are saved, bilinear with reduced copies by distance. */
+  /** Up to 1.5× the resolution, smooth edges, smooth figures. */
   high: 'high',
-  /** Alta + the figures drawn on a screen-size layer over the frame. */
+  /** Up to 2× the resolution, smooth edges and shadows cast by the light. */
   ultra: 'ultra',
 } as const;
 
@@ -22,24 +23,28 @@ export type ViewQuality = (typeof VIEW_QUALITY)[keyof typeof VIEW_QUALITY];
 /** The levels from the lightest to the sharpest — the order the chooser lists them in. */
 export const QUALITY_ORDER: readonly ViewQuality[] = [VIEW_QUALITY.standard, VIEW_QUALITY.high, VIEW_QUALITY.ultra];
 
-/** How the figures are sampled: the nearest texel (the retro look) or bilinear over reduced copies (`lib/mipmap`). */
+/** How the figures are sampled: the nearest texel (the retro look) or smooth, with reduced copies by distance. */
 export type SpriteSampling = 'nearest' | 'smooth';
 
 export interface QualityProfile {
-  /** Widest the world frame gets (one ray per column); it is never wider than the screen. */
-  columns: number;
-  /** Longest side (px) the figures' images are read at. 480 is the size they are saved at — more would only cost memory. */
+  /** Most device pixels drawn per screen pixel (the screen's own ratio is used up to this). */
+  maxPixelRatio: number;
+  /** Smooth the edges of the terrain and the models (multisampling). */
+  antialias: boolean;
+  figureSampling: SpriteSampling;
+  /** Sharpness of textures seen at a slant (the floor far away). */
+  anisotropy: number;
+  /** Size of the light's shadow map; 0 = no cast shadows (the soft spot under each piece stays). */
+  shadowMap: number;
+  /** Longest side (px) the figures' images are read at. 480 is the size they are saved at. */
   spriteMaxSide: number;
-  spriteSampling: SpriteSampling;
-  /** The figures leave the small frame for a transparent layer the size of the screen, composed over the blown-up frame. */
-  figureLayer: boolean;
 }
 
-/** The only numbers of the levels. `standard` must stay what `raycastRenderer`/`StoryView` hard-coded before 053. */
+/** The only numbers of the levels. */
 export const QUALITY_PROFILES: Record<ViewQuality, QualityProfile> = {
-  standard: { columns: 480, spriteMaxSide: 256, spriteSampling: 'nearest', figureLayer: false },
-  high: { columns: 720, spriteMaxSide: 480, spriteSampling: 'smooth', figureLayer: false },
-  ultra: { columns: 960, spriteMaxSide: 480, spriteSampling: 'smooth', figureLayer: true },
+  standard: { maxPixelRatio: 1, antialias: false, figureSampling: 'nearest', anisotropy: 1, shadowMap: 0, spriteMaxSide: 256 },
+  high: { maxPixelRatio: 1.5, antialias: true, figureSampling: 'smooth', anisotropy: 4, shadowMap: 0, spriteMaxSide: 480 },
+  ultra: { maxPixelRatio: 2, antialias: true, figureSampling: 'smooth', anisotropy: 8, shadowMap: 2048, spriteMaxSide: 480 },
 };
 
 export const VIEW_QUALITY_STORAGE_KEY = 'roll6:3d-quality';

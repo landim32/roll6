@@ -152,12 +152,16 @@ public static class Roll6Guide
           the piece may overlap another one until it moves.
 
         ## 3D view
-        - Every map can be seen in 3D in the web app (a button on the map): a Wolfenstein 3D style view — walls drawn as
-          vertical columns, the map image as the floor — with a camera behind the chosen character. The viewer only
-          observes; pieces still move through the 2D map. The camera is in the app: tools change data, not the camera.
+        - Every map can be seen in 3D in the web app (a button on the map): a real 3D scene built from the mask — blocks
+          as tall as its tones, the map image on the floor and on the blocks' tops — with a camera behind the chosen
+          character that turns and looks up and down. In free mode a player walks his character there: it climbs by
+          itself a block up to about its waist (tones lighter than ~70% gray) and is stopped by anything taller, so a tall
+          stage needs a staircase of tones. Otherwise the viewer only observes; pieces still move through the 2D map. The
+          camera is in the app: tools change data, not the camera.
         - **`maskImage`** (from `upload_image`) is an image of the **same proportion as the map `image`** covering the same
-          area. Its tone is the wall height: **black = a wall of full height, white = empty space, a gray in between = a
-          lower wall** (50% gray = half the height, so one sees over it; very light grays count as empty). A mask that is
+          area. Its tone is the height: **black = a wall of full height, white = floor, a gray in between = a lower block**
+          (50% gray = half the height; very light grays count as floor). Pieces in the 3D view stand on top of the block
+          under them. A mask that is
           only black and white behaves exactly as before. It only affects the 3D view — never the 2D map or the pieces,
           which may stand on wall areas. Without it the 3D view has no walls.
         - **`backgroundImage`** is a 360° panorama shown behind the walls, like a sky; a narrow image repeats.

@@ -3,7 +3,7 @@
  * the wall (036) — black is a wall of full height, white is empty space and a gray in between is a lower wall the
  * camera can see over. Before 036 the mask was read as black and white only, and a mask that is still only black and
  * white gives exactly the same walls as it did then. Pure rules shared by the map registration (proportion check and
- * gray preview) and the raycaster (`lib/raycaster.buildMaskGrid`).
+ * gray preview) and the 3D scene (`lib/maskGrid.buildMaskGrid`, `lib/terrain`).
  */
 
 export interface ImageSize {

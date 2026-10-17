@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_FIT, MIN_FIT, figureRows, fitSprites } from './spriteFit';
-import type { PixelBuffer } from './raycastFrame';
+import type { PixelBuffer } from './pixelBuffer';
 import { EMPTY_VIEWS } from './spriteView';
 import type { ViewImages } from './spriteView';
 

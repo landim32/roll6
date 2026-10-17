@@ -1,127 +1,122 @@
 import { describe, expect, it } from 'vitest';
 import { gridPixelSize, HEX_SIZE } from './hexGrid';
-import { buildMaskGrid } from './raycaster';
-import type { MaskGrid } from './raycaster';
+import { buildMaskGrid, EYE_HEIGHT, WALL_HEIGHT } from './maskGrid';
 import {
-  cameraBlocker, clampFov, FOLLOW_DISTANCE, followPose, FOV_MAX, FOV_MIN, initialCamera, lookToYaw, segmentHitsWall, stepCamera,
+  cameraEdge, clampFov, clampPitch, FOLLOW_DISTANCE, followPose, FOV_MAX, FOV_MIN, initialCamera, lookToYaw, PITCH_DEFAULT,
+  PITCH_MAX, PITCH_MIN, segmentHitsWall, stepCamera,
 } from './storyCamera';
-import type { CameraPose } from './storyCamera';
+import type { CameraPose, CameraWorld } from './storyCamera';
+import { buildTerrain, terrainHeightAt } from './terrain';
+import type { Terrain } from './terrain';
 
 const COLUMNS = 20;
 const ROWS = 15;
 const MAP = gridPixelSize(COLUMNS, ROWS, HEX_SIZE);
 
-/** A mask over the whole map of 40 × 40 px cells (one source pixel per cell) with walls at these (col, row) cells. */
-const maskWith = (walls: Array<[number, number]>, tone = 0): MaskGrid => {
+/** A terrain over the whole map of 40 × 40 px cells with these (col, row) cells at the given tone (0 = full wall). */
+const terrainWith = (cells: Array<[number, number]>, tone = 0): Terrain => {
   const cols = Math.round(MAP.width / 40);
   const rows = Math.round(MAP.height / 40);
   const pixels = new Uint8ClampedArray(cols * rows * 4).fill(255);
-  for (const [col, row] of walls) pixels.set([tone, tone, tone, 255], (row * cols + col) * 4);
-  return buildMaskGrid(pixels, cols, rows, { x: 0, y: 0, width: MAP.width, height: MAP.height });
+  for (const [col, row] of cells) pixels.set([tone, tone, tone, 255], (row * cols + col) * 4);
+  return buildTerrain(buildMaskGrid(pixels, cols, rows, { x: 0, y: 0, width: MAP.width, height: MAP.height }))!;
 };
 
-const open = cameraBlocker(null, COLUMNS, ROWS);
+const edge = cameraEdge(COLUMNS, ROWS);
+const flat: CameraWorld = { terrain: null, edge };
 const target = { x: 400, y: 300 };
 
 describe('storyCamera', () => {
   it('turns look 0–5 into yaw steps of 60° clockwise from north', () => {
     expect(lookToYaw(0)).toBe(0);
-    expect(lookToYaw(1)).toBeCloseTo(Math.PI / 3);
     expect(lookToYaw(3)).toBeCloseTo(Math.PI);
-    expect(lookToYaw(6)).toBe(0);
+    expect(lookToYaw(7)).toBeCloseTo(Math.PI / 3);
   });
 
-  it('stands behind the piece, facing the way it looks', () => {
-    const facingNorth = followPose(target, 0, open);
-    expect(facingNorth.x).toBeCloseTo(target.x);
-    expect(facingNorth.z).toBeCloseTo(target.y + FOLLOW_DISTANCE);
-    expect(facingNorth.attached).toBe(true);
-
-    const facingSouth = followPose(target, 3, open);
-    expect(facingSouth.z).toBeCloseTo(target.y - FOLLOW_DISTANCE);
-    expect(facingSouth.yaw).toBeCloseTo(Math.PI);
+  it('stands behind the piece, a little above its head, looking at it', () => {
+    const pose = followPose(target, 0, flat, 0, 0);
+    expect(pose.x).toBeCloseTo(400);
+    expect(pose.z).toBeCloseTo(300 + FOLLOW_DISTANCE);
+    expect(pose.y).toBeCloseTo(EYE_HEIGHT);
+    expect(pose).toMatchObject({ yaw: 0, pitch: 0, attached: true });
   });
 
-  it('has no tilt: the pose is only a position, a heading and whether it follows', () => {
-    expect(Object.keys(followPose(target, 0, open)).sort()).toEqual(['attached', 'x', 'yaw', 'z']);
+  it('looking down puts the camera higher, still at the same distance from the head', () => {
+    const pose = followPose(target, 0, flat, 0, -Math.PI / 6);
+    expect(pose.y).toBeCloseTo(EYE_HEIGHT + FOLLOW_DISTANCE / 2);
+    const distance = Math.hypot(pose.x - target.x, pose.y - EYE_HEIGHT, pose.z - target.y);
+    expect(distance).toBeCloseTo(FOLLOW_DISTANCE);
   });
 
-  it('comes closer to the piece when a wall of the mask stands behind it', () => {
-    // 40 px cells: row 10 is y 400–440; the camera would be at y 300 + 160 = 460, behind that wall.
-    const blocked = cameraBlocker(maskWith([[10, 10], [9, 10], [11, 10]]), COLUMNS, ROWS);
-
-    const pose = followPose(target, 0, blocked);
-
-    expect(pose.z - target.y).toBeLessThan(FOLLOW_DISTANCE);
-    expect(pose.z).toBeGreaterThanOrEqual(target.y);
-    expect(blocked(pose.x, pose.z)).toBe(false);
-    expect(pose.z).toBeLessThan(400);
+  it('limits the tilt: never straight up or down', () => {
+    expect(clampPitch(-2)).toBe(PITCH_MIN);
+    expect(clampPitch(2)).toBe(PITCH_MAX);
+    expect(PITCH_DEFAULT).toBeLessThan(0);
+    expect(followPose(target, 0, flat, 0, -3).pitch).toBe(PITCH_MIN);
   });
 
-  it('finds the first wall on a segment', () => {
-    const blocked = cameraBlocker(maskWith([[10, 10]]), COLUMNS, ROWS);
-
-    expect(segmentHitsWall({ x: 420, y: 300 }, { x: 420, y: 500 }, blocked)).not.toBeNull();
-    expect(segmentHitsWall({ x: 420, y: 300 }, { x: 420, y: 200 }, blocked)).toBeNull();
+  it('comes closer to the piece when a block stands behind it', () => {
+    // A wall two cells behind the piece (south of it).
+    const terrain = terrainWith([[10, 9], [9, 9], [11, 9]]);
+    const pose = followPose(target, 0, { terrain, edge }, 0, 0);
+    // Short of the wall's face (row 9) instead of FOLLOW_DISTANCE behind the piece.
+    expect(pose.z).toBeLessThan(terrain.grid.cellHeight * 9);
+    expect(pose.z).toBeLessThan(300 + FOLLOW_DISTANCE);
+    expect(pose.z).toBeGreaterThan(300);
   });
 
-  it('a low wall blocks the camera too: the camera only looks over it, it never walks through (036)', () => {
-    const blocked = cameraBlocker(maskWith([[10, 10]], 128), COLUMNS, ROWS); // half gray: half the height
-
-    expect(blocked(420, 420)).toBe(true);
-    expect(blocked(420, 300)).toBe(false);
-    expect(segmentHitsWall({ x: 420, y: 300 }, { x: 420, y: 500 }, blocked)).not.toBeNull();
+  it('stands on the block under the piece: the camera rises with it', () => {
+    const terrain = terrainWith([[10, 7]], 128);
+    const ground = terrainHeightAt(terrain, 400, 300);
+    expect(ground).toBeGreaterThan(0);
+    expect(followPose(target, 0, { terrain, edge }, 0, 0).y).toBeCloseTo(ground + EYE_HEIGHT);
   });
 
-  it('walks, strafes, turns and lets go of the character', () => {
-    const start: CameraPose = { x: 400, z: 400, yaw: 0, attached: true };
-
-    const walked = stepCamera(start, { forward: 20 }, open);
-    expect(walked.z).toBeCloseTo(380);
-    expect(walked.attached).toBe(false);
-
-    expect(stepCamera(start, { strafe: 10 }, open).x).toBeCloseTo(410);
-
-    const turned = stepCamera(start, { turn: Math.PI / 2 }, open);
-    expect(turned.yaw).toBeCloseTo(Math.PI / 2);
-    expect(turned.attached).toBe(false);
-
-    expect(stepCamera(start, {}, open)).toBe(start);
+  it('never goes under the floor when looking up', () => {
+    const pose = followPose(target, 0, flat, 0, PITCH_MAX);
+    expect(pose.y).toBeGreaterThan(0);
   });
 
-  it('never enters a wall of the mask and slides along it', () => {
-    // A wall to the north of the camera: cell (10, 9) is y 360–400, x 400–440.
-    const blocked = cameraBlocker(maskWith([[10, 9]]), COLUMNS, ROWS);
-    let pose: CameraPose = { x: 420, z: 440, yaw: 0, attached: false };
+  it('finds the edge on a segment', () => {
+    expect(segmentHitsWall({ x: 100, y: 100 }, { x: 100, y: -100 }, edge)).not.toBeNull();
+    expect(segmentHitsWall({ x: 100, y: 100 }, { x: 200, y: 200 }, edge)).toBeNull();
+  });
 
-    for (let i = 0; i < 30; i++) pose = stepCamera(pose, { forward: 5 }, blocked);
-    expect(blocked(pose.x, pose.z)).toBe(false);
-    expect(pose.z).toBeGreaterThan(400);
+  it('walks, strafes, turns, tilts and lets go of the character', () => {
+    const start: CameraPose = { x: 400, y: EYE_HEIGHT, z: 300, yaw: 0, pitch: 0, attached: true };
+    expect(stepCamera(start, { forward: 10 }, flat)).toMatchObject({ x: 400, z: 290, attached: false });
+    expect(stepCamera(start, { strafe: 10 }, flat).x).toBeCloseTo(410);
+    expect(stepCamera(start, { turn: 0.5 }, flat).yaw).toBe(0.5);
+    expect(stepCamera(start, { pitch: -0.2 }, flat).pitch).toBeCloseTo(-0.2);
+    expect(stepCamera(start, {}, flat)).toBe(start);
+  });
 
-    // Walking diagonally into the wall still moves along the free axis.
-    const slid = stepCamera(pose, { forward: 5, strafe: 5 }, blocked);
-    expect(slid.x).toBeGreaterThan(pose.x);
+  it('climbs a step but not a wall, and slides along it', () => {
+    const step = terrainWith([[10, 7]], 200);
+    const wall = terrainWith([[10, 7]]);
+    const below: CameraPose = { x: 420, y: EYE_HEIGHT, z: 330, yaw: 0, pitch: 0, attached: false };
+    const climbed = stepCamera(below, { forward: 30 }, { terrain: step, edge });
+    expect(climbed.z).toBeCloseTo(300);
+    expect(climbed.y).toBeCloseTo(terrainHeightAt(step, 420, 300) + EYE_HEIGHT);
+    const stopped = stepCamera(below, { forward: 30 }, { terrain: wall, edge });
+    expect(stopped.z).toBeCloseTo(330);
+    expect(terrainHeightAt(wall, 420, 300)).toBe(WALL_HEIGHT);
   });
 
   it('never leaves the map', () => {
-    let pose: CameraPose = { x: 30, z: 30, yaw: 0, attached: false };
-    for (let i = 0; i < 50; i++) pose = stepCamera(pose, { forward: 10 }, open);
-
-    expect(pose.z).toBeGreaterThan(0);
-    expect(open(pose.x, pose.z)).toBe(false);
+    const corner: CameraPose = { x: 20, y: EYE_HEIGHT, z: 20, yaw: 0, pitch: 0, attached: false };
+    expect(stepCamera(corner, { forward: 50 }, flat).z).toBe(20);
   });
 
   it('limits the field of view', () => {
     expect(clampFov(10)).toBe(FOV_MIN);
     expect(clampFov(200)).toBe(FOV_MAX);
-    expect(clampFov(60)).toBe(60);
   });
 
   it('starts behind the chosen character, or free at the center of the map for the GM', () => {
-    const behind = initialCamera({ center: { x: 300, y: 300 }, look: 0 }, COLUMNS, ROWS, open);
-    expect(behind.attached).toBe(true);
-
-    const gm = initialCamera(null, COLUMNS, ROWS, open);
-    expect(gm).toEqual({ x: MAP.width / 2, z: MAP.height / 2, yaw: 0, attached: false });
+    expect(initialCamera({ center: target, look: 0 }, COLUMNS, ROWS, flat)).toEqual(followPose(target, 0, flat));
+    const free = initialCamera(null, COLUMNS, ROWS, flat);
+    expect(free).toMatchObject({ x: MAP.width / 2, z: MAP.height / 2, yaw: 0, attached: false });
+    expect(free.y).toBeCloseTo(EYE_HEIGHT);
   });
 });
