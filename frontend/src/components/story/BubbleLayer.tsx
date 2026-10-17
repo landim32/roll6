@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { bubblePlacement, orderByProximity } from '../../lib/storyBubbles';
-import type { FrameResult } from './raycastRenderer';
+import type { FrameResult } from '../../lib/storyBubbles';
 
 /** A figure with something to say in the turn in progress. */
 export interface StoryBubble {

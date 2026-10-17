@@ -632,17 +632,17 @@
       "ultra": "Ultra"
     },
     "levelHint": {
-      "standard": "A vista de sempre, leve em qualquer aparelho.",
-      "high": "Quadro mais fino e figuras mais nítidas. Custo moderado.",
-      "ultra": "Figuras no tamanho da tela, com bordas suaves. Só para aparelhos fortes."
+      "standard": "Leve em qualquer aparelho: resolução da tela, sem suavizar as bordas, figuras pixeladas.",
+      "high": "Bordas suaves e figuras mais nítidas. Custo moderado.",
+      "ultra": "A mais nítida, com sombras projetadas pela luz. Só para aparelhos fortes."
     },
-    "costHint": "Níveis mais altos exigem mais do processador.",
+    "costHint": "Níveis mais altos exigem mais do processador e da placa de vídeo.",
     "batteryHint": "No celular, gastam mais bateria."
   },
   "raycast": {
     "tab": "3D",
     "mask": "Máscara 3D",
-    "maskHint": "Preto = parede alta, branco = vazio, cinza = parede mais baixa (vê-se por cima dela). Mesma proporção da imagem do mapa. Só aparece na vista 3D.",
+    "maskHint": "Branco = chão, preto = parede alta, cinza = bloco mais baixo. Tons claros (até uns 70% de cinza) são degraus que o personagem sobe; mais escuros barram — faça uma escada de tons para subir mais alto. Mesma proporção da imagem do mapa. Só aparece na vista 3D.",
     "maskRatio": "A máscara ({{mask}}) não tem a proporção da imagem do mapa ({{map}}).",
     "maskNeedsImage": "Envie primeiro a imagem do mapa.",
     "maskMismatch": "A imagem do mapa mudou de proporção: troque ou remova a Máscara 3D.",

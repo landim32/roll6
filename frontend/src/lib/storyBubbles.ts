@@ -1,11 +1,31 @@
 import { HEX_SIZE } from './hexGrid';
-import type { FrameSprite } from './raycastFrame';
 
 /**
  * Where the speech balloons of the turn go over the 3D figures (036). The frame is drawn small and blown up on the
  * canvas, so the balloons are HTML over it: these functions only turn what the frame drew into canvas pixels — text
  * stays sharp and nothing here touches the DOM.
  */
+
+/** Where one piece with a balloon landed in the frame just drawn (canvas px of the frame). */
+export interface FrameSprite {
+  id: number;
+  /** Center of the figure. */
+  screenX: number;
+  /** Top of the figure: the balloon hangs over it. */
+  top: number;
+  bottom: number;
+  /** Distance from the camera along the view: the balloon's size and the order of the ones that overlap. */
+  depth: number;
+  /** In front of the camera and not behind a block of the terrain. */
+  headVisible: boolean;
+}
+
+/** What the 3D scene tells the balloons after each frame (081). */
+export interface FrameResult {
+  frameWidth: number;
+  frameHeight: number;
+  sprites: FrameSprite[];
+}
 
 /** Distance at which a balloon is shown at its normal size (about six hexes from the camera). */
 export const REFERENCE_DEPTH = 6 * HEX_SIZE;
@@ -45,7 +65,7 @@ const clamp = (value: number, min: number, max: number): number => Math.min(max,
 /**
  * The balloon of one drawn figure: its anchor in canvas pixels, its scale by distance, pushed back inside the canvas so
  * it never leaves the screen, and under the head when it does not fit above it. Null when the head is hidden behind a
- * wall (FR-018) — the balloon goes away with the figure.
+ * block (FR-018) — the balloon goes away with the figure.
  */
 export const bubblePlacement = (
   sprite: FrameSprite,

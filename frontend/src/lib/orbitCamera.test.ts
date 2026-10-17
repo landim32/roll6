@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DRAG_TURN, easeBack, foldIntoCharacter, normalizeOrbit, orbitBy, orbitPose } from './orbitCamera';
-import { FOLLOW_DISTANCE, followPose, forwardOf } from './storyCamera';
+import { DRAG_TURN, easeBack, foldIntoCharacter, normalizeOrbit, orbitBy, orbitPose, pitchBy } from './orbitCamera';
+import { FOLLOW_DISTANCE, followPose, forwardOf, PITCH_DEFAULT, PITCH_MAX, PITCH_MIN } from './storyCamera';
+import type { CameraWorld } from './storyCamera';
 import { startWalker, walkCamera } from './walker';
 
-const open = () => false;
+const open: CameraWorld = { terrain: null, edge: () => false };
 const target = { x: 400, y: 400 };
 
 describe('orbit angles', () => {
@@ -47,9 +48,17 @@ describe('easeBack', () => {
   });
 });
 
+describe('pitchBy', () => {
+  it('tilts with the vertical drag, within the limits (081)', () => {
+    expect(pitchBy(0, 20)).toBeCloseTo(20 * DRAG_TURN);
+    expect(pitchBy(0, -10000)).toBe(PITCH_MIN);
+    expect(pitchBy(0, 10000)).toBe(PITCH_MAX);
+  });
+});
+
 describe('orbitPose', () => {
   it('is the camera behind the character at orbit 0', () => {
-    const pose = orbitPose(target, 0, 0, 100, open);
+    const pose = orbitPose(target, 0, 0, 0, 0, 100, open);
     expect(pose.x).toBeCloseTo(400);
     expect(pose.z).toBeCloseTo(500);
     expect(pose.yaw).toBe(0);
@@ -57,7 +66,7 @@ describe('orbitPose', () => {
   });
 
   it('looks at the face from in front at orbit π', () => {
-    const pose = orbitPose(target, 0, Math.PI, 100, open);
+    const pose = orbitPose(target, 0, 0, Math.PI, 0, 100, open);
     // The character faces north (−y); the camera stands north of it, looking south at it.
     expect(pose.x).toBeCloseTo(400);
     expect(pose.z).toBeCloseTo(300);
@@ -67,17 +76,16 @@ describe('orbitPose', () => {
     expect(pose.z + ahead.y * 100).toBeCloseTo(target.y);
   });
 
-  it('comes closer in front of a wall instead of passing it', () => {
-    const wall = (_x: number, z: number) => z < 340;
-    const pose = orbitPose(target, 0, Math.PI, 100, wall);
+  it('comes closer in front of the edge instead of passing it', () => {
+    const pose = orbitPose(target, 0, 0, Math.PI, 0, 100, { terrain: null, edge: (_x, z) => z < 340 });
     expect(pose.z).toBeGreaterThanOrEqual(340);
     expect(pose.z).toBeLessThan(400);
   });
 
-  it('keeps followPose and walkCamera as before at orbit 0, and orbits them otherwise', () => {
-    expect(followPose(target, 0, open)).toEqual(orbitPose(target, 0, 0, FOLLOW_DISTANCE, open));
+  it('keeps followPose and walkCamera as orbit 0, and orbits them otherwise', () => {
+    expect(followPose(target, 0, open)).toEqual(orbitPose(target, 0, 0, 0, PITCH_DEFAULT, FOLLOW_DISTANCE, open));
     const walker = startWalker(target, 0);
-    expect(walkCamera(walker, open)).toEqual(orbitPose(target, 0, 0, walker.distance, open));
+    expect(walkCamera(walker, open)).toEqual(orbitPose(target, 0, 0, 0, PITCH_DEFAULT, walker.distance, open));
     expect(walkCamera(walker, open, Math.PI).z).toBeLessThan(target.y);
     expect(followPose(target, 0, open, Math.PI / 2).x).toBeLessThan(target.x);
   });

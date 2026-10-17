@@ -401,21 +401,6 @@ body,
   pointer-events: none;
 }
 
-/* The 3D models (055): a WebGL canvas over the raycaster's, stretched like its frame and never in the way of the pointer. */
-.stm-story-models {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  pointer-events: none;
-  image-rendering: pixelated;
-}
-
-.stm-story-models[hidden] {
-  display: none;
-}
-
 /* The free mode hint when the walk starts (055). */
 .stm-story-walk-hint {
   position: absolute;

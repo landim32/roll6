@@ -2,15 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import { HEX_SIZE } from '../lib/hexGrid';
 import type { Point } from '../lib/hexGrid';
-import { DRAG_TURN, easeBack, foldIntoCharacter, orbitBy } from '../lib/orbitCamera';
-import { followYawPose, FOV_STEP, initialCamera, lookToYaw, stepCamera } from '../lib/storyCamera';
-import type { CameraBlocked, CameraPose } from '../lib/storyCamera';
+import { DRAG_TURN, easeBack, foldIntoCharacter, orbitBy, pitchBy } from '../lib/orbitCamera';
+import { clampPitch, followYawPose, FOV_STEP, initialCamera, lookToYaw, PITCH_DEFAULT, stepCamera } from '../lib/storyCamera';
+import type { CameraPose, CameraWorld } from '../lib/storyCamera';
 import { startWalker, stepWalker, walkCamera, withDistance, zoomWalker } from '../lib/walker';
 import type { WalkerState } from '../lib/walker';
 
-/** Walking speed (map px per second) and turning speed (radians per second). */
+/** Walking speed (map px per second), turning and tilting speed (radians per second). */
 const WALK_SPEED = 5 * HEX_SIZE;
 const TURN_SPEED = 1.8;
+const PITCH_KEY_SPEED = 1.2;
 
 export interface FollowedPiece {
   mapTokenId: number;
@@ -20,22 +21,20 @@ export interface FollowedPiece {
   yaw?: number;
 }
 
-/**
- * Walking the chosen character in free mode (055): while set, every movement input moves the character instead of the
- * camera, which stays locked behind it. `key` says when to start again from the piece (the piece moved, turned or lay
- * down, another map or character): a new key throws the walk away. Nothing here leaves the browser.
- */
 /** The direction the camera follows a piece from: its exact one (070), else its side's. */
 const pieceYaw = (piece: FollowedPiece): number => piece.yaw ?? lookToYaw(piece.look);
 
+/**
+ * Walking the chosen character in free mode (055): while set, every movement input moves the character instead of the
+ * camera, which stays locked behind it. `key` says when to start again from the piece (the piece moved, turned or lay
+ * down, another map or character): a new key throws the walk away. The terrain it walks on is the camera's world.
+ */
 export interface WalkOptions {
   key: string;
   center: Point;
   look: number;
   /** Exact direction to start from (070); else `look`'s. */
   yaw?: number;
-  /** Where the character may not stand (walls, edge, other pieces). */
-  blocked: CameraBlocked;
   /** Called with every new state of the walk, and with null when it ends. */
   onWalker: (walker: WalkerState | null) => void;
 }
@@ -45,7 +44,8 @@ interface UseStoryCameraOptions {
   apply: (pose: CameraPose) => void;
   /** The scene exists: the current pose is applied as soon as it does. */
   active: boolean;
-  blocked: CameraBlocked;
+  /** The terrain of the 3D mask and the edge of the map (081). */
+  world: CameraWorld;
   columns: number;
   rows: number;
   /** The chosen character's piece on this map, or null (GM, no piece). */
@@ -62,13 +62,17 @@ const isTyping = (target: EventTarget | null): boolean => {
   return element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
 };
 
-/** Keys held down → walk/strafe/turn axes (−1, 0, 1). */
+const KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+/** Keys held down → walk/strafe/turn/tilt axes (−1, 0, 1). */
 const axes = (keys: Set<string>) => {
   const has = (...codes: string[]) => codes.some((code) => keys.has(code));
   return {
     forward: (has('KeyW', 'ArrowUp') ? 1 : 0) - (has('KeyS', 'ArrowDown') ? 1 : 0),
     strafe: (has('KeyD') ? 1 : 0) - (has('KeyA') ? 1 : 0),
     turn: (has('KeyE', 'ArrowRight') ? 1 : 0) - (has('KeyQ', 'ArrowLeft') ? 1 : 0),
+    // 081: R looks up, F looks down.
+    pitch: (has('KeyR') ? 1 : 0) - (has('KeyF') ? 1 : 0),
   };
 };
 
@@ -89,12 +93,13 @@ const mouseModeOf = (event: { buttons: number; pointerType: string }): MouseMode
  * Camera of the 3D view (034): starts behind the chosen character and follows its piece. Around the character it works
  * like World of Warcraft's (068): a left drag (one finger) circles the camera around it without turning it, and the
  * camera stays there while the character stands still; when it walks or turns the camera eases back behind it; a right
- * drag turns the character to where the camera looks, and both buttons walk forward. Sideways only — it never tilts.
- * Keyboard (W/A/S/D, Q/E, arrows) and the touch joystick walk the character in free mode (055) or, otherwise, walk and
- * turn the camera freely (letting go of the character; the free camera still turns with the drag); the wheel and a
- * pinch zoom. Every rule lives in the pure `lib/storyCamera`, `lib/orbitCamera` and `lib/walker`.
+ * drag turns the character to where the camera looks, and both buttons walk forward. Since 081 the vertical part of
+ * any drag — and the keys R/F — tilt the camera up and down. Keyboard (W/A/S/D, Q/E, arrows) and the touch joystick
+ * walk the character in free mode (055) — on the terrain, up steps, never up taller blocks — or, otherwise, walk and
+ * turn the camera freely (letting go of the character); the wheel and a pinch zoom. Every rule lives in the pure
+ * `lib/storyCamera`, `lib/orbitCamera` and `lib/walker`.
  */
-export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed, fov, setFov, walk = null }: UseStoryCameraOptions) => {
+export const useStoryCamera = ({ apply, active, world, columns, rows, followed, fov, setFov, walk = null }: UseStoryCameraOptions) => {
   const poseRef = useRef<CameraPose | null>(null);
   const [attached, setAttached] = useState(false);
   const keys = useRef(new Set<string>());
@@ -102,14 +107,16 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   const drag = useRef<{ x: number; y: number } | null>(null);
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<number | null>(null);
-  const latest = useRef({ apply, blocked, fov, setFov, walk });
-  latest.current = { apply, blocked, fov, setFov, walk };
+  const latest = useRef({ apply, world, fov, setFov, walk });
+  latest.current = { apply, world, fov, setFov, walk };
   /** The walk in progress (055), or null. */
   const walkerRef = useRef<WalkerState | null>(null);
   /** The camera distance chosen while walking, kept when the walk starts again from the piece. */
   const walkDistance = useRef<number | undefined>(undefined);
   /** The camera's angle around the character (068): 0 = behind it. */
   const orbitRef = useRef(0);
+  /** How far up or down the camera around the character looks (081). */
+  const pitchRef = useRef(PITCH_DEFAULT);
   /** What the mouse buttons held over the view do (068). */
   const mouse = useRef<MouseMode>(null);
 
@@ -119,6 +126,9 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     setAttached((prev) => (prev === pose.attached ? prev : pose.attached));
   }, []);
 
+  const follow = useCallback((piece: FollowedPiece) =>
+    followYawPose(piece.center, pieceYaw(piece), latest.current.world, orbitRef.current, pitchRef.current), []);
+
   // Start, and go to the new character whenever the chosen one changes (FR-010a/b/d).
   const followedId = followed?.mapTokenId ?? null;
   const followedRef = useRef(followed);
@@ -126,11 +136,12 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   useEffect(() => {
     const piece = followedRef.current;
     orbitRef.current = 0;
-    if (piece) setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked));
-    else if (!poseRef.current) setPose(initialCamera(null, columns, rows, latest.current.blocked));
+    pitchRef.current = PITCH_DEFAULT;
+    if (piece) setPose(follow(piece));
+    else if (!poseRef.current) setPose(initialCamera(null, columns, rows, latest.current.world));
     // The piece went away: stay where the camera is, free.
     else setPose({ ...poseRef.current, attached: false });
-  }, [followedId, columns, rows, setPose]);
+  }, [followedId, columns, rows, setPose, follow]);
 
   // While attached, follow the piece when it moves or turns (someone else may move it, 017).
   const followedX = followed?.center.x;
@@ -142,24 +153,25 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     if (!piece || !poseRef.current?.attached || walkerRef.current) return;
     // Someone moved or turned the piece: the camera goes back behind it (068).
     orbitRef.current = 0;
-    setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked));
-  }, [followedX, followedY, followedLook, followedYaw, setPose]);
+    pitchRef.current = PITCH_DEFAULT;
+    setPose(follow(piece));
+  }, [followedX, followedY, followedLook, followedYaw, setPose, follow]);
 
-  // Walls changed under the camera (map saved elsewhere): re-apply so nothing stands inside a wall.
+  // The terrain changed under the camera (another mask, map saved elsewhere): re-apply so nothing stands inside a block.
   useEffect(() => {
     if (walkerRef.current) {
-      setPose(walkCamera(walkerRef.current, blocked, orbitRef.current));
+      setPose(walkCamera(walkerRef.current, world, orbitRef.current, pitchRef.current));
       return;
     }
     const piece = followedRef.current;
-    if (piece && poseRef.current?.attached) setPose(followYawPose(piece.center, pieceYaw(piece), blocked, orbitRef.current));
-  }, [blocked, setPose]);
+    if (piece && poseRef.current?.attached) setPose(follow(piece));
+  }, [world, setPose, follow]);
 
   /** A new state of the walk: the camera goes behind it and the view hears about it. */
   const setWalker = useCallback((walker: WalkerState) => {
     walkerRef.current = walker;
     walkDistance.current = walker.distance;
-    setPose(walkCamera(walker, latest.current.blocked, orbitRef.current));
+    setPose(walkCamera(walker, latest.current.world, orbitRef.current, pitchRef.current));
     latest.current.walk?.onWalker(walker);
   }, [setPose]);
 
@@ -168,16 +180,17 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   useEffect(() => {
     const current = latest.current.walk;
     orbitRef.current = 0;
+    pitchRef.current = PITCH_DEFAULT;
     if (current) {
-      setWalker(startWalker(current.center, current.look, walkDistance.current, current.yaw));
+      setWalker(startWalker(current.center, current.look, walkDistance.current, current.yaw, latest.current.world.terrain));
       return;
     }
     if (!walkerRef.current) return;
     walkerRef.current = null;
     const piece = followedRef.current;
-    if (piece) setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked));
+    if (piece) setPose(follow(piece));
     else if (poseRef.current) setPose({ ...poseRef.current, attached: false });
-  }, [walkKey, setWalker, setPose]);
+  }, [walkKey, setWalker, setPose, follow]);
 
   // Tell the view the walk ended, also when the component goes away.
   useEffect(() => {
@@ -194,19 +207,39 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
   const reattach = useCallback(() => {
     const piece = followedRef.current;
     orbitRef.current = 0;
-    if (piece) setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked));
-  }, [setPose]);
+    pitchRef.current = PITCH_DEFAULT;
+    if (piece) setPose(follow(piece));
+  }, [setPose, follow]);
 
   // Re-apply on a new zoom, and once the scene exists.
   useEffect(() => {
     if (active && poseRef.current) latest.current.apply(poseRef.current);
   }, [fov, active]);
 
+  /** Tilts the camera by `delta` radians, wherever it is (081). */
+  const tilt = useCallback((delta: number) => {
+    const pose = poseRef.current;
+    if (!pose || delta === 0) return;
+    const walker = walkerRef.current;
+    if (walker) {
+      pitchRef.current = clampPitch(pitchRef.current + delta);
+      setWalker(walker);
+      return;
+    }
+    const piece = followedRef.current;
+    if (piece && pose.attached) {
+      pitchRef.current = clampPitch(pitchRef.current + delta);
+      setPose(follow(piece));
+      return;
+    }
+    setPose(stepCamera(pose, { pitch: delta }, latest.current.world));
+  }, [setPose, setWalker, follow]);
+
   // Keyboard + joystick, one step per animation frame.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
-      if (!['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) return;
+      if (!KEYS.includes(event.code)) return;
       // A window opened over the map keeps its own keys.
       if (document.querySelector('[role="dialog"]')) return;
       keys.current.add(event.code);
@@ -227,6 +260,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
       const pose = poseRef.current;
       if (!pose) return;
       const held = axes(keys.current);
+      if (held.pitch !== 0) tilt(held.pitch * PITCH_KEY_SPEED * dt);
       const walker = walkerRef.current;
       const walking = latest.current.walk;
       if (walker && walking) {
@@ -241,15 +275,17 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
         const orbit = input.forward !== 0 || input.turn !== 0 ? easeBack(orbitRef.current, dt) : orbitRef.current;
         const orbitChanged = orbit !== orbitRef.current;
         orbitRef.current = orbit;
-        const next = stepWalker(walker, input, dt, walking.blocked);
-        if (orbitChanged || next.x !== walker.x || next.z !== walker.z || next.yaw !== walker.yaw || next.moving !== walker.moving) setWalker(next);
+        // Stepped every frame, even without input: the feet still climb onto a step or fall off a ledge (081).
+        const next = stepWalker(walker, input, dt, latest.current.world);
+        if (orbitChanged || next.x !== walker.x || next.z !== walker.z || next.y !== walker.y || next.yaw !== walker.yaw
+          || next.moving !== walker.moving) setWalker(next);
         return;
       }
       const forward = (held.forward - joystick.current.y) * WALK_SPEED * dt;
       const strafe = (held.strafe + joystick.current.x) * WALK_SPEED * dt;
       const turn = held.turn * TURN_SPEED * dt;
       if (forward === 0 && strafe === 0 && turn === 0) return;
-      setPose(stepCamera(pose, { forward, strafe, turn }, latest.current.blocked));
+      setPose(stepCamera(poseRef.current ?? pose, { forward, strafe, turn }, latest.current.world));
     };
     frame = requestAnimationFrame(tick);
     return () => {
@@ -258,7 +294,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [setPose, setWalker]);
+  }, [setPose, setWalker, tilt]);
 
   /**
    * A new combination of mouse buttons (068). Entering "steer" or "walk" while walking turns the character to where
@@ -274,7 +310,7 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     setWalker({ ...walker, yaw: folded.yaw });
   }, [setWalker]);
 
-  // Mouse/finger drag circles the character (or turns the free camera); two fingers pinch the zoom.
+  // Mouse/finger drag circles the character (or turns the free camera) and tilts it; two fingers pinch the zoom.
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.focus();
@@ -307,10 +343,12 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     if (!drag.current || !pose) return;
     // A second button pressed (or released) during a drag only shows in a move: pointerdown fires for the first one.
     if (event.pointerType === 'mouse') setMouse(mouseModeOf(event));
-    // Only the horizontal drag turns the camera: it never looks up or down (034, 068 Q1 = A).
     const dx = event.clientX - drag.current.x;
+    const dy = event.clientY - drag.current.y;
     drag.current = { x: event.clientX, y: event.clientY };
-    if (dx === 0) return;
+    if (dx === 0 && dy === 0) return;
+    // 081: the vertical part of the drag tilts the camera.
+    if (dy !== 0) pitchRef.current = pitchBy(pitchRef.current, dy);
     const walker = walkerRef.current;
     if (walker) {
       // Right drag: the character turns and the camera stays behind it; left drag: the camera circles it (068).
@@ -325,11 +363,11 @@ export const useStoryCamera = ({ apply, active, blocked, columns, rows, followed
     if (piece && pose.attached) {
       // Following the piece outside free mode: either button circles the camera around it (068).
       orbitRef.current = orbitBy(orbitRef.current, dx);
-      setPose(followYawPose(piece.center, pieceYaw(piece), latest.current.blocked, orbitRef.current));
+      setPose(follow(piece));
       return;
     }
-    setPose(stepCamera(pose, { turn: dx * DRAG_TURN }, latest.current.blocked));
-  }, [setPose, setWalker, setMouse]);
+    setPose(stepCamera(pose, { turn: dx * DRAG_TURN, pitch: dy * DRAG_TURN }, latest.current.world));
+  }, [setPose, setWalker, setMouse, follow]);
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLCanvasElement>) => {
     touches.current.delete(event.pointerId);

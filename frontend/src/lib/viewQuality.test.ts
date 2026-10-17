@@ -19,25 +19,27 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('quality profiles (053)', () => {
-  it('"Padrão" is exactly the view of before 053 (FR-002)', () => {
-    expect(QUALITY_PROFILES.standard).toEqual({ columns: 480, spriteMaxSide: 256, spriteSampling: 'nearest', figureLayer: false });
+describe('quality profiles (053, redefined by 081)', () => {
+  it('"Padrão" is light: native resolution, no smoothing, pixelated figures, no cast shadows', () => {
+    expect(QUALITY_PROFILES.standard).toMatchObject({ maxPixelRatio: 1, antialias: false, figureSampling: 'nearest', shadowMap: 0 });
   });
 
-  it('lists the levels from the lightest to the sharpest, each frame finer than the last', () => {
+  it('lists the levels from the lightest to the sharpest, each at least as fine as the last', () => {
     expect(QUALITY_ORDER).toEqual([VIEW_QUALITY.standard, VIEW_QUALITY.high, VIEW_QUALITY.ultra]);
     for (let i = 1; i < QUALITY_ORDER.length; i++) {
-      expect(QUALITY_PROFILES[QUALITY_ORDER[i]].columns).toBeGreaterThan(QUALITY_PROFILES[QUALITY_ORDER[i - 1]].columns);
-      expect(QUALITY_PROFILES[QUALITY_ORDER[i]].spriteMaxSide).toBeGreaterThanOrEqual(QUALITY_PROFILES[QUALITY_ORDER[i - 1]].spriteMaxSide);
+      const before = QUALITY_PROFILES[QUALITY_ORDER[i - 1]];
+      const profile = QUALITY_PROFILES[QUALITY_ORDER[i]];
+      expect(profile.maxPixelRatio).toBeGreaterThan(before.maxPixelRatio);
+      expect(profile.anisotropy).toBeGreaterThan(before.anisotropy);
+      expect(profile.shadowMap).toBeGreaterThanOrEqual(before.shadowMap);
+      expect(profile.spriteMaxSide).toBeGreaterThanOrEqual(before.spriteMaxSide);
     }
   });
 
-  it('never reads the figures above the size they are saved at, and the layer always samples smoothly', () => {
-    for (const level of QUALITY_ORDER) {
-      const profile = QUALITY_PROFILES[level];
-      expect(profile.spriteMaxSide).toBeLessThanOrEqual(480);
-      if (profile.figureLayer) expect(profile.spriteSampling).toBe('smooth');
-    }
+  it('casts shadows only on "Ultra" and never reads figures above their saved size', () => {
+    expect(QUALITY_PROFILES.ultra.shadowMap).toBeGreaterThan(0);
+    expect(QUALITY_PROFILES.high.shadowMap).toBe(0);
+    for (const level of QUALITY_ORDER) expect(QUALITY_PROFILES[level].spriteMaxSide).toBeLessThanOrEqual(480);
   });
 });
 
