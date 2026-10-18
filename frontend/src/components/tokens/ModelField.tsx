@@ -7,10 +7,10 @@ import { useAnimation } from '../../hooks/useAnimation';
 import { useAuth } from '../../hooks/useAuth';
 import { useWeapon } from '../../hooks/useWeapon';
 import { weaponService } from '../../Services/weaponService';
-import { handWeaponsOf } from '../../lib/weaponGrip';
-import { HAND, HANDS } from '../../types/weapon';
-import type { Hand } from '../../types/weapon';
-import type { WeaponHands } from '../story/attachWeapons';
+import { GRIP_RANGES, clampGrip, isDefaultFine, socketWeaponsOf } from '../../lib/weaponGrip';
+import { SOCKET, SOCKETS, SOCKET_KEY } from '../../types/weapon';
+import type { Socket } from '../../types/weapon';
+import type { SocketAvailabilities } from '../story/socketAnchors';
 import { WeaponGripFields } from './WeaponGripFields';
 import type { ModelFileState } from '../../hooks/useModelFile';
 import { animationService } from '../../Services/animationService';
@@ -22,7 +22,7 @@ import {
 } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ClipOption } from '../../lib/modelAnimations';
 import { ModelTimeline } from './ModelTimeline';
-import { ArrowClockwiseIcon, CameraIcon } from '../ui/icons';
+import { ArrowClockwiseIcon, CameraIcon, ChevronDownIcon, ChevronUpIcon } from '../ui/icons';
 import type { ModelPreviewHandle, ModelPreviewInfo } from './ModelPreview';
 
 const ModelPreview = lazy(() => import('./ModelPreview'));
@@ -44,8 +44,8 @@ interface ModelFieldProps {
   /**
    * Which tab shows it (060): "model" = the "3D" tab (pick or remove the `.glb`, seen in its rest pose — the T-pose of
    * the rig); "animation" = the "Animação" tab (the state, the animated preview with its timeline and "Gerar imagem",
-   * and the animation of that state with "Atualizar" for the library); "weapons" (082) = the "Armas" tab (the animated
-   * preview with the weapon of each hand, chosen from the library, and its grip).
+   * and the animation of that state with "Atualizar" for the library); "weapons" (082/083) = the "Armas" tab (the
+   * animated preview with the weapon of each socket, chosen from the library, its size and the fine adjustment).
    */
   section: 'model' | 'animation' | 'weapons';
 }
@@ -80,13 +80,15 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   /** Names of chosen library animations that are not in the loaded lists (another user's, beyond the first page). */
   const [chosenNames, setChosenNames] = useState<Record<number, string>>({});
   const mixamo = info !== null && isMixamoSkeleton(info.boneNames);
-  /** "Armas" (082): the hand being edited, which hands the model has, and the library's weapons. */
-  const [hand, setHand] = useState<Hand>(HAND.right);
-  const [hands, setHands] = useState<WeaponHands | null>(null);
+  /** "Armas" (083): the socket being edited, which sockets the model offers, and the library's weapons. */
+  const [socket, setSocket] = useState<Socket>(SOCKET.rightHand);
+  const [sockets, setSockets] = useState<SocketAvailabilities | null>(null);
+  /** The "Ajuste fino" block is collapsed by default (083, FR-012). */
+  const [fineOpen, setFineOpen] = useState(false);
   const { choices: weaponChoices, loadChoices, refreshChoices } = useWeapon();
   const [refreshingWeapons, setRefreshingWeapons] = useState(false);
   const { weapons, setWeapon, setGrip } = state;
-  const heldWeapons = useMemo(() => handWeaponsOf({ rightWeapon: weapons.right, leftWeapon: weapons.left }), [weapons]);
+  const heldWeapons = useMemo(() => socketWeaponsOf({ weapons: SOCKETS.map((s) => weapons[s]).filter((w) => w !== null) }), [weapons]);
 
   // A new model to show: wait for the preview to say what it found.
   useEffect(() => {
@@ -94,7 +96,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
     setSources(null);
     setDeforms(false);
     setShown('idle');
-    setHands(null);
+    setSockets(null);
     setLoading(previewUrl !== null);
   }, [previewUrl]);
 
@@ -252,17 +254,18 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
     }
   };
 
-  const heldWeapon = weapons[hand];
-  const handReady = hands !== null && hands[hand];
-  /** The weapons offered for a hand: the library's, plus the held one when it is not in the loaded list. */
+  const heldWeapon = weapons[socket];
+  const availability = sockets?.[socket] ?? null;
+  const socketReady = availability !== null && availability.available;
+  /** The weapons offered for a socket: the library's, plus the held one when it is not in the loaded list. */
   const weaponOptions = heldWeapon && !weaponChoices.some((item) => item.weaponId === heldWeapon.weaponId)
-    ? [{ weaponId: heldWeapon.weaponId, name: heldWeapon.name ?? `#${heldWeapon.weaponId}`, userId, ownerName: null }, ...weaponChoices]
+    ? [{ weaponId: heldWeapon.weaponId, name: heldWeapon.name ?? `#${heldWeapon.weaponId}`, userId, ownerName: null, gripPoint: heldWeapon.gripPoint, pose: heldWeapon.pose }, ...weaponChoices]
     : weaponChoices;
 
-  /** A weapon picked for the hand: its name and file come from the library (or are read when not loaded). */
+  /** A weapon picked for the socket: its name, file, grip point and pose come from the library (or are read when not loaded). */
   const pickWeapon = async (value: string) => {
     if (!value) {
-      setWeapon(hand, null);
+      setWeapon(socket, null);
       return;
     }
     const weaponId = Number(value);
@@ -272,7 +275,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
       toast.error(t('tokens.weapons.loadFailed'));
       return;
     }
-    setWeapon(hand, { weaponId: found.weaponId, name: found.name, modelFileUrl: found.modelFileUrl });
+    setWeapon(socket, { weaponId: found.weaponId, name: found.name, modelFileUrl: found.modelFileUrl, gripPoint: found.gripPoint, pose: found.pose });
   };
 
   // The card stays at the same place in both sections, so switching tabs keeps the loaded model (060).
@@ -329,7 +332,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 clips={clips}
                 scale={modelScaleFactor(scale)}
                 weapons={heldWeapons}
-                onHands={setHands}
+                onSockets={setSockets}
                 label={t('tokens.model.previewLabel', { name: name || '—' })}
                 onLoaded={(found) => { setLoading(false); setInfo(found); setInvalid(false); }}
                 onClips={(found, stretched) => { setSources(found); setDeforms(stretched); }}
@@ -437,23 +440,23 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
       )}
       {arming && previewUrl && (
         <div className="stm-weapon-choice mt-3">
-          <div className="btn-group btn-group-sm mb-2" role="group" aria-label={t('tokens.weapons.handLabel')}>
-            {HANDS.map((value) => (
-              <button key={value} type="button" aria-pressed={hand === value}
-                className={`btn ${hand === value ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setHand(value)}>
-                {t(`tokens.weapons.hand.${value}`)}
+          <div className="btn-group btn-group-sm mb-2 flex-wrap" role="group" aria-label={t('tokens.weapons.socketLabel')}>
+            {SOCKETS.map((value) => (
+              <button key={value} type="button" aria-pressed={socket === value}
+                className={`btn ${socket === value ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setSocket(value)}>
+                {t(`tokens.weapons.socket.${SOCKET_KEY[value]}`)}
               </button>
             ))}
           </div>
           <label htmlFor={`${id}-weapon`} className="form-label small mb-1 d-block">
-            {t(`tokens.weapons.weaponOf.${hand}`)}
+            {t('tokens.weapons.weaponOf', { socket: t(`tokens.weapons.socketName.${SOCKET_KEY[socket]}`) })}
           </label>
           <div className="d-flex gap-2">
             <select
               id={`${id}-weapon`}
               className="form-select form-select-sm"
               value={heldWeapon ? String(heldWeapon.weaponId) : ''}
-              disabled={!handReady}
+              disabled={!socketReady}
               onChange={(e) => { void pickWeapon(e.target.value); }}
             >
               <option value="">{t('tokens.weapons.none')}</option>
@@ -476,12 +479,46 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
               <ArrowClockwiseIcon size={14} /> <span className="d-none d-sm-inline">{t('tokens.model.refresh')}</span>
             </button>
           </div>
-          {hands !== null && !hands[hand] && (
-            <div className="alert alert-warning small mt-2 mb-0">{t('tokens.weapons.noHands')}</div>
+          {availability !== null && !availability.available && (
+            <div className="alert alert-warning small mt-2 mb-0">{t('tokens.weapons.unavailable.noBone', { bone: availability.bone ?? '' })}</div>
+          )}
+          {availability !== null && availability.available && availability.reason === 'noFingers' && heldWeapon && (
+            <div className="alert alert-warning small mt-2 mb-0">{t('tokens.weapons.unavailable.noFingers')}</div>
           )}
           {heldWeapon && (
-            <WeaponGripFields id={`${id}-grip-${hand}`} grip={heldWeapon.grip} disabled={!handReady}
-              onChange={(grip) => setGrip(hand, grip)} />
+            <div className="mt-2">
+              <label htmlFor={`${id}-size-${socket}`} className="form-label small mb-0 d-flex justify-content-between">
+                <span>{t('tokens.weapons.size')}</span>
+                <output htmlFor={`${id}-size-${socket}`} className="fw-semibold">{`${heldWeapon.grip.scale}%`}</output>
+              </label>
+              <input
+                id={`${id}-size-${socket}`}
+                type="range"
+                className="form-range"
+                min={GRIP_RANGES.scale.min}
+                max={GRIP_RANGES.scale.max}
+                step={GRIP_RANGES.scale.step}
+                value={heldWeapon.grip.scale}
+                disabled={!socketReady}
+                aria-valuetext={`${heldWeapon.grip.scale}%`}
+                onChange={(e) => setGrip(socket, clampGrip({ ...heldWeapon.grip, scale: Number(e.target.value) }))}
+              />
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 d-inline-flex align-items-center gap-1"
+                aria-expanded={fineOpen}
+                aria-controls={`${id}-fine-${socket}`}
+                onClick={() => setFineOpen((open) => !open)}
+              >
+                {fineOpen ? <ChevronUpIcon size={12} /> : <ChevronDownIcon size={12} />}
+                {t('tokens.weapons.fine')}
+                {!isDefaultFine(heldWeapon.grip) && <span className="badge text-bg-secondary">{t('tokens.weapons.fineAdjusted')}</span>}
+              </button>
+              <div id={`${id}-fine-${socket}`} hidden={!fineOpen}>
+                <WeaponGripFields id={`${id}-grip-${socket}`} grip={heldWeapon.grip} disabled={!socketReady}
+                  onChange={(grip) => setGrip(socket, grip)} />
+              </div>
+            </div>
           )}
           <div className="form-text">{t('tokens.weapons.help')}</div>
         </div>

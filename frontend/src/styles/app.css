@@ -390,6 +390,20 @@ body,
   margin-top: 0.5rem;
 }
 
+/* Weapon editor (083): the legend of the stage's reference — up (green), right (red), the grip marker (gold). */
+.stm-weapon-legend {
+  display: inline-block;
+  width: 0.65em;
+  height: 0.65em;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+.stm-weapon-legend-up { background: #1fd67a; }
+.stm-weapon-legend-right { background: #ff5a5a; }
+.stm-weapon-legend-front { background: #4ea3ff; }
+.stm-weapon-legend-grip { background: #f2c14e; }
+.stm-weapon-editable { cursor: crosshair; }
+
 .stm-model-stage-note {
   position: absolute;
   inset: 0;

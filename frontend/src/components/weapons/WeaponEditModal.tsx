@@ -3,10 +3,12 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useWeapon } from '../../hooks/useWeapon';
-import type { WeaponInfo } from '../../types/weapon';
+import type { GripPoint, WeaponInfo, WeaponPose } from '../../types/weapon';
 import { Modal } from '../ui/Modal';
 import { usePickedUrl } from '../../hooks/usePickedUrl';
 import { MAX_WEAPON_NAME, checkWeaponFile } from '../../lib/weaponFile';
+import { DEFAULT_GRIP_POINT, DEFAULT_POSE, clampGripPoint, normalizePose, sameGripPoint, samePose } from '../../lib/weaponPose';
+import { WeaponPoseFields } from './WeaponPoseFields';
 import { WeaponStage } from './WeaponStage';
 
 interface WeaponEditModalProps {
@@ -16,8 +18,9 @@ interface WeaponEditModalProps {
 }
 
 /**
- * "Editar arma" (082): the name and, optionally, a new file for one of the user's weapons. The weapon keeps its id, so
- * every token holding it shows the new file (and open tables reload their pieces).
+ * "Editar arma" (082): the name, optionally a new file, and since 083 the standard pose (90° steps) and the grip point
+ * picked on the editable stage, for one of the user's weapons. The weapon keeps its id, so every token carrying it shows
+ * the change (and open tables reload their pieces). Only what changed is sent.
  */
 export const WeaponEditModal = ({ weapon, onClose, onSaved }: WeaponEditModalProps) => {
   const { t } = useTranslation();
@@ -25,6 +28,8 @@ export const WeaponEditModal = ({ weapon, onClose, onSaved }: WeaponEditModalPro
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [pose, setPose] = useState<WeaponPose>(DEFAULT_POSE);
+  const [gripPoint, setGripPoint] = useState<GripPoint>(DEFAULT_GRIP_POINT);
   const [saving, setSaving] = useState(false);
   const [inputKey, setInputKey] = useState(0);
   const pickedUrl = usePickedUrl(file);
@@ -34,6 +39,8 @@ export const WeaponEditModal = ({ weapon, onClose, onSaved }: WeaponEditModalPro
     setName(weapon.name);
     setFile(null);
     setFileError(null);
+    setPose(normalizePose(weapon.pose));
+    setGripPoint(clampGripPoint(weapon.gripPoint));
     setInputKey((key) => key + 1);
   }, [weapon]);
 
@@ -52,7 +59,12 @@ export const WeaponEditModal = ({ weapon, onClose, onSaved }: WeaponEditModalPro
     if (!weapon) return;
     setSaving(true);
     try {
-      await update(weapon, { name: name.trim(), file });
+      await update(weapon, {
+        name: name.trim(),
+        file,
+        gripPoint: sameGripPoint(gripPoint, clampGripPoint(weapon.gripPoint)) ? undefined : gripPoint,
+        pose: samePose(pose, normalizePose(weapon.pose)) ? undefined : pose,
+      });
       toast.success(t('weapons.updated'));
       onSaved();
       onClose();
@@ -75,7 +87,9 @@ export const WeaponEditModal = ({ weapon, onClose, onSaved }: WeaponEditModalPro
       )}>
       <form id="weapon-edit-form" onSubmit={(event) => { void submit(event); }}>
         <div className="mb-3">
-          <WeaponStage url={pickedUrl ?? weapon?.modelFileUrl ?? null} name={name} />
+          <WeaponStage url={pickedUrl ?? weapon?.modelFileUrl ?? null} name={name} editable pose={pose} gripPoint={gripPoint}
+            onPickGrip={setGripPoint} />
+          <WeaponPoseFields pose={pose} gripPoint={gripPoint} onPose={setPose} onGripPoint={setGripPoint} />
         </div>
         <div className="mb-3">
           <label className="form-label" htmlFor="weapon-edit-name">{t('weapons.name')}</label>

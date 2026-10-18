@@ -24,6 +24,14 @@ public class WeaponInfo
     [JsonPropertyName("modelFileUrl")]
     public string? ModelFileUrl { get; set; }
 
+    /// <summary>Where the hand holds it (083), fractions of the bounding box; always filled on reads.</summary>
+    [JsonPropertyName("gripPoint")]
+    public WeaponGripPointInfo GripPoint { get; set; } = new();
+
+    /// <summary>The standard pose (083), multiples of 90°; always filled on reads.</summary>
+    [JsonPropertyName("pose")]
+    public WeaponPoseInfo Pose { get; set; } = new();
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

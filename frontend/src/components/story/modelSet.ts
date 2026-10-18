@@ -8,16 +8,17 @@ import type { ModelClipChoices } from '../../lib/modelAnimations';
 import type { Roll6Clip } from '../../lib/roll6Clips';
 import { instantiate, loadModel } from './loadModel';
 import type { ModelAsset } from './loadModel';
-import { createWeaponHands, sameHandWeapons } from './weaponHands';
-import type { WeaponHandsSync } from './weaponHands';
-import type { HandWeapons } from '../../types/weapon';
+import { measureSockets } from './socketAnchors';
+import { createWeaponSockets, sameSocketWeapons } from './weaponSockets';
+import type { WeaponSocketsSync } from './weaponSockets';
+import type { SocketWeapons } from '../../types/weapon';
 
 /**
  * The 3D models of the pieces (055–063) inside the 3D scene (081): one clone per piece, standing on the ground under it
  * like the figure it replaces (`lib/modelFit`), with its own animation mixer — idle, walk for a piece someone walks, and
  * since 058 the death played once (or laid on its back without one) for a piece that is down or out of combat. The scene
  * draws them with the terrain and the figures, so the depth buffer hides whatever stands behind something else.
- * Since 082 a model may hold a library weapon in each hand (`weaponHands`), hung on its hand bones.
+ * Since 082 a model may carry library weapons (`weaponSockets`), hung on the bones of its sockets (083).
  */
 export interface ModelSpec {
   id: number;
@@ -34,8 +35,8 @@ export interface ModelSpec {
   lying: boolean;
   /** Size of the token's model (063) as a factor of its automatic height; missing = 1. */
   scale?: number;
-  /** The weapons in the model's hands (082) with the token's grips; missing = none. */
-  weapons?: HandWeapons;
+  /** The weapons in the model's sockets (083) with the token's grips; missing = none. */
+  weapons?: SocketWeapons;
 }
 
 export interface ModelSet {
@@ -60,8 +61,8 @@ interface Drawn {
   /** The death (058): played once, clamped on its last frame. */
   down: AnimationAction | null;
   walking: boolean;
-  /** The weapons this model holds (082). */
-  hands: WeaponHandsSync;
+  /** The weapons this model carries (082/083). */
+  hands: WeaponSocketsSync;
 }
 
 const FADE_SECONDS = 0.25;
@@ -102,7 +103,7 @@ export const createModelSet = (
     if (entry.object && entry.asset) entry.hands.sync(entry.object, heightOf(entry.asset), entry.spec.weapons);
   };
 
-  const newHands = () => createWeaponHands((model) => {
+  const newHands = () => createWeaponSockets((model) => {
     castShadows(model);
     events.onChange();
   });
@@ -163,6 +164,8 @@ export const createModelSet = (
     loadModel(url).then((asset) => {
       if (disposed || drawn.get(entry.spec.id) !== entry || entry.spec.url !== url) return;
       const object = instantiate(asset);
+      // The sockets are measured on the rest pose, before the mixer moves a bone (083).
+      measureSockets(object);
       entry.asset = asset;
       entry.object = object;
       entry.mixer = new AnimationMixer(object);
@@ -202,7 +205,7 @@ export const createModelSet = (
           // Down ↔ out of combat is still lying: nothing plays again (058). Standing → lying plays the fall.
           const fell = !entry.spec.lying && spec.lying;
           const rose = entry.spec.lying && !spec.lying;
-          const armed = !sameHandWeapons(entry.spec.weapons, spec.weapons);
+          const armed = !sameSocketWeapons(entry.spec.weapons, spec.weapons);
           entry.spec = spec;
           if (armed) holdWeapons(entry);
           if (changed || fell || rose) animate(entry, fell);

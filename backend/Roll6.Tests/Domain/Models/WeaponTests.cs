@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
+using Roll6.Domain.Weapons;
 
 namespace Roll6.Tests.Domain.Models;
 
@@ -20,6 +21,37 @@ public class WeaponTests
         weapon.CreatedAt.Should().Be(weapon.UpdatedAt);
         weapon.IsOwnedBy(3).Should().BeTrue();
         weapon.IsOwnedBy(4).Should().BeFalse();
+        weapon.GripPoint.Should().Be(WeaponGripPoint.Default);
+        weapon.Pose.Should().Be(WeaponPose.Default);
+    }
+
+    [Fact]
+    public void Create_WithGripPointAndPose_StoresThemNormalized()
+    {
+        var weapon = Weapon.Create(3, "Espada", FILE, new WeaponGripPoint(0.5, 0.1, 0.5), new WeaponPose(-90, 360, 270));
+
+        weapon.GripPoint.Should().Be(new WeaponGripPoint(0.5, 0.1, 0.5));
+        weapon.Pose.Should().Be(new WeaponPose(270, 0, 270));
+    }
+
+    [Fact]
+    public void SetPose_NotAStep_ThrowsKeyedByField()
+    {
+        var weapon = Weapon.Create(3, "Espada", FILE);
+
+        var act = () => weapon.SetPose(new WeaponPose(0, 45, 0));
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("pose.ry");
+    }
+
+    [Fact]
+    public void SetGripPoint_OutsideTheBox_ThrowsKeyedByField()
+    {
+        var weapon = Weapon.Create(3, "Espada", FILE);
+
+        var act = () => weapon.SetGripPoint(new WeaponGripPoint(0.5, 0.5, 1.5));
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("gripPoint.z");
     }
 
     [Theory]

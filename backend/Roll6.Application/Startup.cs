@@ -49,6 +49,7 @@ public static class Startup
         services.AddScoped<ITokenRepository<Token>, TokenRepository>();
         services.AddScoped<IAnimationRepository<Animation>, AnimationRepository>();
         services.AddScoped<IWeaponRepository<Weapon>, WeaponRepository>();
+        services.AddScoped<ITokenWeaponRepository<TokenWeapon>, TokenWeaponRepository>();
         services.AddScoped<IMapTokenRepository<MapToken>, MapTokenRepository>();
         services.AddScoped<ICharacterRepository<Character>, CharacterRepository>();
         services.AddScoped<ICampaignCharacterRepository<CampaignCharacter>, CampaignCharacterRepository>();

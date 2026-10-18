@@ -5,10 +5,11 @@ using Roll6.Domain.Exceptions;
 namespace Roll6.Domain.Weapons;
 
 /// <summary>
-/// How a token holds a weapon in one hand (082), adjusted per token and per hand (Q1 = B: never stored on the weapon).
-/// Position in fractions of the character's height and rotation in degrees (Euler XYZ), both in the hand bone's frame;
-/// size in percent of the default size (the weapon's longest side = half the character's height). Mirrored by the
-/// frontend's <c>lib/weaponGrip.ts</c> — change both together.
+/// How a token carries a weapon in one socket (082, sockets since 083), adjusted per token and per socket (never stored on
+/// the weapon). <c>Scale</c> is the size, in percent of the default (the weapon's longest side = half the character's
+/// height); position (fractions of the character's height) and rotation (degrees, Euler XYZ) are the optional fine
+/// adjustment from the socket's own place, in the socket's frame (X = edge, Y = up, Z = face). Mirrored by the frontend's
+/// <c>lib/weaponGrip.ts</c> — change both together.
 /// </summary>
 public sealed record WeaponGrip
 {
@@ -81,6 +82,3 @@ public sealed record WeaponGrip
                 "O giro da arma deve ficar entre -180° e 180°.");
     }
 }
-
-/// <summary>One hand of a token (082): the library weapon it holds and how (null grip = default).</summary>
-public sealed record TokenHand(long WeaponId, WeaponGrip? Grip);

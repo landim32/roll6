@@ -67,11 +67,11 @@ public class TokenInsertInfo
     [JsonPropertyName("modelScale")]
     public int? ModelScale { get; set; }
 
-    /// <summary>Weapon in the model's right hand (082): weaponId + optional grip. Omitted on PUT = empty hand; ignored without modelFile.</summary>
-    [JsonPropertyName("rightWeapon")]
-    public Weapon.TokenWeaponInfo? RightWeapon { get; set; }
-
-    /// <summary>Weapon in the model's left hand (082); same rules as rightWeapon.</summary>
-    [JsonPropertyName("leftWeapon")]
-    public Weapon.TokenWeaponInfo? LeftWeapon { get; set; }
+    /// <summary>
+    /// The weapons in the model's sockets (083): { socket (1 right hand, 2 left hand, 3 back, 4 right holster, 5 left
+    /// holster), weaponId, grip? } each. Omitted or empty = none (the PUT replaces the whole set); ignored without
+    /// modelFile. The same weapon may be in several sockets; the same socket only once.
+    /// </summary>
+    [JsonPropertyName("weapons")]
+    public List<Weapon.TokenWeaponInfo>? Weapons { get; set; }
 }

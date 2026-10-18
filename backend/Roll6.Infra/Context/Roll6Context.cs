@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Models;
 using Roll6.Domain.Slugs;
+using Roll6.Domain.Weapons;
 
 namespace Roll6.Infra.Context;
 
@@ -24,6 +25,7 @@ public class Roll6Context : DbContext
     public DbSet<Token> Tokens { get; set; }
     public DbSet<Animation> Animations { get; set; }
     public DbSet<Weapon> Weapons { get; set; }
+    public DbSet<TokenWeapon> TokenWeapons { get; set; }
     public DbSet<MapToken> MapTokens { get; set; }
     public DbSet<Character> Characters { get; set; }
     public DbSet<CampaignCharacter> CampaignCharacters { get; set; }
@@ -157,17 +159,6 @@ public class Roll6Context : DbContext
             entity.Property(e => e.ModelWalkClip).HasColumnName("model_walk_clip").HasMaxLength(260);
             entity.Property(e => e.ModelDownClip).HasColumnName("model_down_clip").HasMaxLength(260);
             entity.Property(e => e.ModelScale).HasColumnName("model_scale").HasDefaultValue(100).HasSentinel(0);
-            // Weapons in the model's hands (082): the weapon of each hand and its grip as JSON.
-            entity.Property(e => e.RightWeaponId).HasColumnName("right_weapon_id");
-            entity.Property(e => e.LeftWeaponId).HasColumnName("left_weapon_id");
-            entity.Property(e => e.RightWeaponGrip).HasColumnName("right_weapon_grip").HasColumnType("jsonb");
-            entity.Property(e => e.LeftWeaponGrip).HasColumnName("left_weapon_grip").HasColumnType("jsonb");
-            entity.HasOne<Weapon>().WithMany().HasForeignKey(e => e.RightWeaponId)
-                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_token_right_weapon");
-            entity.HasOne<Weapon>().WithMany().HasForeignKey(e => e.LeftWeaponId)
-                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_token_left_weapon");
-            entity.HasIndex(e => e.RightWeaponId).HasDatabaseName("ix_tokens_right_weapon");
-            entity.HasIndex(e => e.LeftWeaponId).HasDatabaseName("ix_tokens_left_weapon");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_token");
@@ -199,10 +190,36 @@ public class Roll6Context : DbContext
             entity.Property(e => e.UserId).HasColumnName("user_id");
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(Weapon.MAX_NAME).IsRequired();
             entity.Property(e => e.ModelFile).HasColumnName("model_file").HasMaxLength(260).IsRequired();
+            // Grip point and standard pose (083). The pose columns have no database default so an explicit 0 is always
+            // written (an int default would need a sentinel); the column default lives in the migration for old rows.
+            entity.Property(e => e.GripX).HasColumnName("grip_x").HasDefaultValue(WeaponGripPoint.CENTER);
+            entity.Property(e => e.GripY).HasColumnName("grip_y").HasDefaultValue(WeaponGripPoint.CENTER);
+            entity.Property(e => e.GripZ).HasColumnName("grip_z").HasDefaultValue(WeaponGripPoint.CENTER);
+            entity.Property(e => e.PoseRx).HasColumnName("pose_rx");
+            entity.Property(e => e.PoseRy).HasColumnName("pose_ry");
+            entity.Property(e => e.PoseRz).HasColumnName("pose_rz");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasIndex(e => e.UserId).HasDatabaseName("ix_weapons_user");
             HasOwner(entity, "fk_weapon_user");
+        });
+
+        modelBuilder.Entity<TokenWeapon>(entity =>
+        {
+            // The weapons in the sockets of a token's 3D model (083): one row per token and socket.
+            entity.ToTable("token_weapons");
+            entity.HasKey(e => e.TokenWeaponId).HasName("token_weapons_pkey");
+            entity.Property(e => e.TokenWeaponId).HasColumnName("token_weapon_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.TokenId).HasColumnName("token_id");
+            entity.Property(e => e.Socket).HasColumnName("socket").HasConversion<int>();
+            entity.Property(e => e.WeaponId).HasColumnName("weapon_id");
+            entity.Property(e => e.Grip).HasColumnName("grip").HasColumnType("jsonb");
+            entity.HasOne<Token>().WithMany().HasForeignKey(e => e.TokenId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_token_token_weapon");
+            entity.HasOne<Weapon>().WithMany().HasForeignKey(e => e.WeaponId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_weapon_token_weapon");
+            entity.HasIndex(e => new { e.TokenId, e.Socket }).IsUnique().HasDatabaseName("ix_token_weapons_token_socket");
+            entity.HasIndex(e => e.WeaponId).HasDatabaseName("ix_token_weapons_weapon");
         });
 
         modelBuilder.Entity<MapToken>(entity =>

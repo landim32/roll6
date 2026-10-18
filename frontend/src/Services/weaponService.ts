@@ -36,7 +36,7 @@ class WeaponService {
     return this.handleResponse<WeaponInfo>(response);
   }
 
-  /** Renames and/or points the weapon to a new file (owner only). */
+  /** Renames, points the weapon to a new file and/or sets its grip point and pose (083; owner only). */
   async update(id: number, data: WeaponUpdateInfo): Promise<WeaponInfo> {
     const response = await fetch(`${API_BASE}/${id}`, { method: 'PUT', headers: getHeaders(true), body: JSON.stringify(data) });
     return this.handleResponse<WeaponInfo>(response);

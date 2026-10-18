@@ -243,23 +243,34 @@ public static class Roll6Guide
 
         ## Weapons
         - The **weapon library** is shared like tokens and animations: create_weapon (a name + a .glb uploaded with
-          upload_token_model), list_weapons, get_weapon; only the owner runs update_weapon (name and/or file — same id, so
-          every token holding it shows the new file) or delete_weapon (refused with 409 while any token holds it; the stored
-          file is kept).
-        - A token with a 3D model holds **one weapon per hand**: rightWeapon / leftWeapon on create_token / update_token,
-          each { weaponId, grip? }. The same weapon may be in both hands (two daggers). Without modelFile the hands are
-          emptied; update_token empties a hand it does not get.
-        - The 3D view hangs the weapon on the model's **Mixamo hand bone** (RightHand / LeftHand, with or without
-          "mixamorig"), in the middle of the palm, so it follows every animation, the lying pose and the model's size
-          (modelScale). A model without those bones shows no weapon (the binding stays saved). Weapons never show in the 2D
-          map or on the 2.5D figures, and they change no rule.
-        - Put the weapon file's **origin at the handle**: that point goes to the palm. Whatever the file's unit, the weapon
-          starts with its longest side at half the character's height.
-        - **grip** belongs to the token and the hand (other tokens may hold the same weapon differently): x, y, z = offset
-          in fractions of the character's height (−0.5…0.5), rx, ry, rz = rotation in degrees (−180…180, Euler XYZ), both
-          in the hand bone's frame (on Mixamo rigs +Y points along the fingers); scale = percent of the default size
-          (10…400, steps of 5). Omit it for the default (all 0, scale 100). Errors: `rightWeapon.weaponId`,
-          `leftWeapon.grip.scale`…
+          upload_token_model, plus an optional gripPoint and pose), list_weapons, get_weapon; only the owner runs
+          update_weapon (name, file, gripPoint and/or pose — same id, so every token carrying it shows the change) or
+          delete_weapon (refused with 409 while any token carries it; the stored file is kept).
+        - **Grip point and standard pose** live on the weapon (083). gripPoint = where the hand holds it, as fractions of
+          the file's bounding box (0…1 per axis; omit = the middle). pose = the rotation, in **90° steps** (Euler XYZ, each
+          angle a multiple of 90, stored 0…270), after which the model stands with its **tip along +Y** ("cima"), its
+          **edge or attack side along +X** ("direita") and its **outer face along +Z** ("frente": a shield's face, the
+          side away from the body). The file's origin and orientation do not matter. Whatever the file's unit, the
+          weapon starts with its longest side at half the character's height.
+        - A token with a 3D model carries weapons in **five fixed sockets**: weapons on create_token / update_token, a list
+          of { socket, weaponId, grip? } — socket 1 right hand, 2 left hand (the grip point in the middle of the palm, the
+          tip leaving the fist on the thumb side, the edge toward the knuckles, the face toward the back of the hand — the
+          left hand mirrors the weapon across its flat plane to get there, so a shield faces outward in either hand),
+          3 back (behind the torso, diagonal, handle above the right shoulder, running to the left hip), 4 right holster,
+          5 left holster (beside the hips, tip down). The same weapon may be in several sockets (a sword in the hand and
+          another copy on the back); the same socket only once. Without modelFile the list is dropped; update_token
+          replaces the whole list, so a socket it does not get is emptied.
+        - The 3D view finds each socket on the model's **Mixamo bones** (hands: RightHand / LeftHand and the finger bones
+          for the orientation; back: Spine2; holsters: Hips), builds a frame with the same meaning on every model and
+          aligns the weapon's grip point and pose to it, so it follows every animation, the lying pose and the model's
+          size (modelScale). A socket whose bones are missing shows nothing (the binding stays saved); a hand without
+          finger bones is approximate. Weapons never show in the 2D map or on the 2.5D figures, and they change no rule.
+        - **grip** belongs to the token and the socket: scale = percent of the default size (10…400, steps of 5) — normally
+          the only thing to adjust; x, y, z (fractions of the character's height, −0.5…0.5) and rx, ry, rz (degrees,
+          −180…180, Euler XYZ) are the optional **fine adjustment** from the socket's own place, in the socket's frame
+          (X = edge, Y = up, Z = face), for rigs that stray from the pattern. Omit it for the default (all 0, scale 100).
+          Errors: `weapons[i].socket` (unknown or repeated), `weapons[i].weaponId`, `weapons[i].grip.scale`…
+        - The 082 bindings (rightWeapon / leftWeapon) became sockets 1 and 2 with their size kept.
 
         ## Chat
         - Each campaign has one **chat**, and it is the campaign's whole timeline: what the players and the master say

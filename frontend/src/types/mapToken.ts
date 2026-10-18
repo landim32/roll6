@@ -49,9 +49,8 @@ export interface MapTokenInfo {
   modelDownClip?: string | null;
   /** Size of the token's model in the 3D view (063): percent of its automatic height; missing = 100. */
   modelScale?: number;
-  /** Weapons in the token model's hands (082); missing/null = none. */
-  rightWeapon?: TokenWeapon | null;
-  leftWeapon?: TokenWeapon | null;
+  /** Weapons in the token model's sockets (083), ordered by socket; missing = none. */
+  weapons?: TokenWeapon[] | null;
   downImageUrl: string | null;
   campaignCharacterId: number | null;
   characterId: number | null;

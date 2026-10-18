@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { modelService } from '../Services/modelService';
 import { weaponService } from '../Services/weaponService';
 import type { ListQuery, PagedList } from '../types/common';
-import type { WeaponInfo } from '../types/weapon';
+import type { GripPoint, WeaponInfo, WeaponPose } from '../types/weapon';
 
 /** Weapons offered to the token form's hand selects (the user's own first, then the others'). */
 export const WEAPON_CHOICES = 100;
@@ -18,11 +18,19 @@ interface WeaponContextType {
   refreshChoices: () => Promise<void>;
   /** Paged library ("Minhas" with `mine`, "Buscar" without), filtered by name. */
   search: (query: ListQuery) => Promise<PagedList<WeaponInfo>>;
-  /** Uploads the `.glb` (`POST /api/model`) and creates the weapon. */
-  upload: (name: string, file: File) => Promise<WeaponInfo>;
-  /** Renames and/or replaces the file (uploaded first) of an own weapon. */
-  update: (weapon: WeaponInfo, change: { name?: string; file?: File | null }) => Promise<WeaponInfo>;
+  /** Uploads the `.glb` (`POST /api/model`) and creates the weapon with its grip point and standard pose (083). */
+  upload: (name: string, file: File, gripPoint?: GripPoint, pose?: WeaponPose) => Promise<WeaponInfo>;
+  /** Renames, replaces the file (uploaded first), and/or sets the grip point and pose of an own weapon (083). */
+  update: (weapon: WeaponInfo, change: WeaponChange) => Promise<WeaponInfo>;
   remove: (weapon: WeaponInfo) => Promise<void>;
+}
+
+/** What "Editar arma" may change; a field left out (or undefined) keeps its value. */
+export interface WeaponChange {
+  name?: string;
+  file?: File | null;
+  gripPoint?: GripPoint;
+  pose?: WeaponPose;
 }
 
 const WeaponContext = createContext<WeaponContextType | undefined>(undefined);
@@ -61,16 +69,16 @@ export const WeaponProvider = ({ children }: { children: ReactNode }) => {
 
   const search = useCallback((query: ListQuery) => weaponService.list(query), []);
 
-  const upload = useCallback(async (name: string, file: File) => {
+  const upload = useCallback(async (name: string, file: File, gripPoint?: GripPoint, pose?: WeaponPose) => {
     const stored = await modelService.upload(file);
-    const created = await weaponService.create({ name, modelFile: stored.fileName });
+    const created = await weaponService.create({ name, modelFile: stored.fileName, gripPoint, pose });
     await refreshIfLoaded();
     return created;
   }, [refreshIfLoaded]);
 
-  const update = useCallback(async (weapon: WeaponInfo, change: { name?: string; file?: File | null }) => {
+  const update = useCallback(async (weapon: WeaponInfo, change: WeaponChange) => {
     const modelFile = change.file ? (await modelService.upload(change.file)).fileName : undefined;
-    const saved = await weaponService.update(weapon.weaponId, { name: change.name, modelFile });
+    const saved = await weaponService.update(weapon.weaponId, { name: change.name, modelFile, gripPoint: change.gripPoint, pose: change.pose });
     await refreshIfLoaded();
     return saved;
   }, [refreshIfLoaded]);

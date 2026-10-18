@@ -65,7 +65,8 @@ public static class ImageTools
         front). Animations: clips named like "idle"/"parado" and "walk"/"caminhar" in the file are used; otherwise the
         model stands still, unless the token picks a library animation (Mixamo bone names — Hips, Spine, Head, LeftUpLeg…
         with or without "mixamorig:"). The same upload stores a library weapon's model (082): pass its fileName to
-        create_weapon / update_weapon (put the weapon's origin at the handle).
+        create_weapon / update_weapon (the file's origin and orientation do not matter: the weapon's gripPoint and pose
+        say where the hand holds it and how it stands).
         Who can use it: any authenticated user.
         Returns: { fileName, url }. Save fileName (e.g. "3f2a…c9.glb"); url is temporary (expires) — never store it.
         Common errors: 400 invalid base64, not a glTF 2.0 binary, or larger than 20 MB.

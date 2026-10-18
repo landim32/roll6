@@ -10,4 +10,12 @@ public class WeaponInsertInfo
 
     [JsonPropertyName("modelFile")]
     public string ModelFile { get; set; } = string.Empty;
+
+    /// <summary>Where the hand holds it (083); omitted = the middle of the model.</summary>
+    [JsonPropertyName("gripPoint")]
+    public WeaponGripPointInfo? GripPoint { get; set; }
+
+    /// <summary>The standard pose (083), multiples of 90°; omitted = the file as is.</summary>
+    [JsonPropertyName("pose")]
+    public WeaponPoseInfo? Pose { get; set; }
 }

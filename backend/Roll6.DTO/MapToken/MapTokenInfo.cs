@@ -57,13 +57,9 @@ public class MapTokenInfo
     [JsonPropertyName("modelScale")]
     public int ModelScale { get; set; } = 100;
 
-    /// <summary>Weapon in the model's right hand (082): name, file URL and grip; null = none.</summary>
-    [JsonPropertyName("rightWeapon")]
-    public Weapon.TokenWeaponInfo? RightWeapon { get; set; }
-
-    /// <summary>Weapon in the model's left hand (082); null = none.</summary>
-    [JsonPropertyName("leftWeapon")]
-    public Weapon.TokenWeaponInfo? LeftWeapon { get; set; }
+    /// <summary>The weapons in the sockets of the piece's token (083), ordered by socket; empty = none.</summary>
+    [JsonPropertyName("weapons")]
+    public List<Weapon.TokenWeaponInfo> Weapons { get; set; } = new();
 
     /// <summary>Participation of a Character token (its name/vitals/status/sheet are shown).</summary>
     [JsonPropertyName("campaignCharacterId")]

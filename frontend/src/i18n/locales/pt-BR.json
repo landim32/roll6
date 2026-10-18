@@ -62,7 +62,7 @@
       "upload": "Enviar"
     },
     "file": "Arquivo da arma (.glb)",
-    "fileHelp": "Um modelo 3D glTF binário de até 20 MB. Deixe a origem do arquivo no cabo da arma: é esse ponto que fica na palma da mão.",
+    "fileHelp": "Um modelo 3D glTF binário de até 20 MB. A origem e a orientação do arquivo não importam: você marca a pega e a pose padrão na prévia.",
     "fileNotGlb": "Escolha um arquivo .glb (glTF binário).",
     "fileTooLarge": "A arma deve ter no máximo 20 MB.",
     "chooseFile": "Escolha o arquivo da arma.",
@@ -86,7 +86,23 @@
     "confirmDelete": "Excluir a arma \"{{name}}\"? Não é possível excluir uma arma que algum token segura.",
     "loading": "Carregando a arma…",
     "noFile": "Nenhum arquivo.",
-    "loadFailed": "Não foi possível abrir esta arma."
+    "loadFailed": "Não foi possível abrir esta arma.",
+    "pose": {
+      "title": "Pose padrão e pega",
+      "hint": "Gire até a ponta ficar para cima (seta verde) e o gume para a direita (seta vermelha); num escudo, a face externa para a frente (seta azul). Clique no modelo para marcar onde a mão segura.",
+      "angles": "X {{rx}}° · Y {{ry}}° · Z {{rz}}°",
+      "tiltUp": "Inclinar para cima (90°)",
+      "tiltDown": "Inclinar para baixo (90°)",
+      "turnLeft": "Girar para a esquerda (90°)",
+      "turnRight": "Girar para a direita (90°)",
+      "rollLeft": "Rolar para a esquerda (90°)",
+      "rollRight": "Rolar para a direita (90°)",
+      "gripCenter": "Pega no meio",
+      "legendUp": "cima",
+      "legendRight": "direita",
+      "legendFront": "frente",
+      "legendGrip": "pega"
+    }
   },
   "animations": {
     "title": "Animações",
@@ -285,24 +301,36 @@
     "tabAnimation": "Animação",
     "tabWeapons": "Armas",
     "weapons": {
-      "help": "A arma fica presa à mão do modelo e acompanha todas as animações. A pegada é deste token: ajustar aqui não muda outros tokens que usam a mesma arma.",
-      "needsModel": "Escolha um modelo 3D na aba \"3D\" para colocar armas nas mãos dele.",
-      "handLabel": "Mão",
-      "hand": {
-        "right": "Mão direita",
-        "left": "Mão esquerda"
+      "help": "A arma é alinhada pela pega e pela pose padrão dela, definidas na biblioteca: normalmente só o tamanho precisa de ajuste. O tamanho e o ajuste fino são deste token: mudar aqui não muda outros tokens que usam a mesma arma.",
+      "needsModel": "Escolha um modelo 3D na aba \"3D\" para colocar armas nos encaixes dele.",
+      "socketLabel": "Encaixe",
+      "socket": {
+        "rightHand": "Mão D.",
+        "leftHand": "Mão E.",
+        "back": "Costas",
+        "rightHolster": "Coldre D.",
+        "leftHolster": "Coldre E."
       },
-      "weaponOf": {
-        "right": "Arma da mão direita",
-        "left": "Arma da mão esquerda"
+      "socketName": {
+        "rightHand": "mão direita",
+        "leftHand": "mão esquerda",
+        "back": "costas",
+        "rightHolster": "coldre direito",
+        "leftHolster": "coldre esquerdo"
       },
+      "weaponOf": "Arma: {{socket}}",
       "none": "Nenhuma",
       "other": "{{name}} — {{owner}}",
       "refreshTitle": "Ler de novo a biblioteca de armas",
-      "noHands": "Este modelo não tem a mão no padrão do Mixamo (osso RightHand/LeftHand), então não segura armas. Uma arma já salva continua guardada no token.",
+      "unavailable": {
+        "noBone": "Este modelo não tem o osso deste encaixe no padrão do Mixamo ({{bone}}). Uma arma já salva continua guardada no token.",
+        "noFingers": "Este modelo não tem os ossos dos dedos: a posição na mão é aproximada. Use o ajuste fino se precisar."
+      },
       "loadFailed": "Não foi possível abrir esta arma.",
-      "grip": "Pegada",
-      "gripHint": "Posição em % da altura do personagem, giro em graus.",
+      "size": "Tamanho",
+      "fine": "Ajuste fino",
+      "fineAdjusted": "ajustado",
+      "fineHint": "A partir do lugar do encaixe: posição em % da altura do personagem (X = gume, Y = cima, Z = face), giro em graus.",
       "gripReset": "Voltar ao padrão",
       "field": {
         "x": "Posição X",
@@ -310,8 +338,7 @@
         "z": "Posição Z",
         "rx": "Giro X",
         "ry": "Giro Y",
-        "rz": "Giro Z",
-        "scale": "Tamanho"
+        "rz": "Giro Z"
       }
     },
     "model": {

@@ -2,7 +2,6 @@ using FluentAssertions;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Models;
-using Roll6.Domain.Weapons;
 
 namespace Roll6.Tests.Domain.Models;
 
@@ -174,77 +173,5 @@ public class TokenTests
         var act = () => new Token().UpdateModel("0123456789abcdef0123456789abcdef.glb", scale: 42);
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelScale");
-    }
-}
-
-public class TokenWeaponsTests
-{
-    private const string MODEL = "0123456789abcdef0123456789abcdef.glb";
-
-    private static Token WithModel()
-    {
-        var token = new Token();
-        token.UpdateModel(MODEL);
-        return token;
-    }
-
-    [Fact]
-    public void UpdateWeapons_SavesBothHandsAndTheirGrips()
-    {
-        var token = WithModel();
-
-        token.UpdateWeapons(new TokenHand(7, new WeaponGrip { Rz = 90, Scale = 120 }), new TokenHand(8, null));
-
-        token.RightWeaponId.Should().Be(7);
-        WeaponGrip.FromJson(token.RightWeaponGrip).Should().Be(new WeaponGrip { Rz = 90, Scale = 120 });
-        token.LeftWeaponId.Should().Be(8);
-        token.LeftWeaponGrip.Should().BeNull();
-    }
-
-    [Fact]
-    public void UpdateWeapons_TheSameWeaponMayBeInBothHands()
-    {
-        var token = WithModel();
-
-        token.UpdateWeapons(new TokenHand(7, null), new TokenHand(7, null));
-
-        token.RightWeaponId.Should().Be(7);
-        token.LeftWeaponId.Should().Be(7);
-    }
-
-    [Fact]
-    public void UpdateWeapons_NullEmptiesTheHand()
-    {
-        var token = WithModel();
-        token.UpdateWeapons(new TokenHand(7, new WeaponGrip { Scale = 50 }), new TokenHand(8, null));
-
-        token.UpdateWeapons(null, new TokenHand(8, null));
-
-        token.RightWeaponId.Should().BeNull();
-        token.RightWeaponGrip.Should().BeNull();
-        token.LeftWeaponId.Should().Be(8);
-    }
-
-    [Fact]
-    public void UpdateWeapons_WithoutAModelEmptiesBothHands()
-    {
-        var token = new Token();
-        token.UpdateModel(null);
-
-        token.UpdateWeapons(new TokenHand(7, new WeaponGrip { Scale = 50 }), new TokenHand(8, null));
-
-        token.RightWeaponId.Should().BeNull();
-        token.LeftWeaponId.Should().BeNull();
-        token.RightWeaponGrip.Should().BeNull();
-    }
-
-    [Fact]
-    public void UpdateWeapons_GripOutOfRange_ThrowsKeyedByHand()
-    {
-        var token = WithModel();
-
-        var act = () => token.UpdateWeapons(null, new TokenHand(8, new WeaponGrip { Scale = 1000 }));
-
-        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("leftWeapon.grip.scale");
     }
 }
