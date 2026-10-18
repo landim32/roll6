@@ -806,6 +806,7 @@
     "turn": "Turno {{no}}"
   },
   "campaign": {
+    "edit": "Editar {{name}}",
     "image": {
       "label": "Imagem da campanha",
       "hint": "Aparece no cartão da campanha na biblioteca. Uma imagem larga (16:9) fica melhor.",
