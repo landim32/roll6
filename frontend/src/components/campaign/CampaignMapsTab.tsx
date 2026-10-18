@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { ArchiveIcon, OpenIcon, PencilIcon, TrashIcon, UnarchiveIcon } from '../ui/icons';
-import { MapEditModal } from '../modals/MapEditModal';
+import { useNavigate } from 'react-router-dom';
+import { mapEditPath } from '../../lib/libraryRoutes';
 import { MakeCurrentMapButton } from './MakeCurrentMapButton';
 import { mapService } from '../../Services/mapService';
 import { useCampaign } from '../../hooks/useCampaign';
@@ -31,7 +32,7 @@ export const CampaignMapsTab = ({ onOpenMap }: CampaignMapsTabProps) => {
   const [data, setData] = useState<PagedList<MapInfo> | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [toDelete, setToDelete] = useState<MapInfo | null>(null);
-  const [editing, setEditing] = useState<MapInfo | null>(null);
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     if (campaignId === null) return;
@@ -108,7 +109,7 @@ export const CampaignMapsTab = ({ onOpenMap }: CampaignMapsTabProps) => {
                   title={t('campaignSettings.openMap')} aria-label={t('campaignSettings.openMap')}>
                   <OpenIcon size={14} />
                 </button>
-                <button type="button" className="btn btn-sm btn-outline-secondary" disabled={busy} onClick={() => setEditing(map)}
+                <button type="button" className="btn btn-sm btn-outline-secondary" disabled={busy} onClick={() => navigate(`${mapEditPath(map.mapModelId)}?map=${map.mapId}`)}
                   title={t('campaignSettings.editMap')} aria-label={t('campaignSettings.editMap')}>
                   <PencilIcon size={14} />
                 </button>
@@ -135,11 +136,6 @@ export const CampaignMapsTab = ({ onOpenMap }: CampaignMapsTabProps) => {
           <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>{t('common.next')}</button>
         </div>
       )}
-      <MapEditModal
-        target={editing ? { mapModelId: editing.mapModelId, map: editing } : null}
-        onClose={() => setEditing(null)}
-        onSaved={() => { void load(); }}
-      />
       <ConfirmModal
         open={toDelete !== null}
         onOpenChange={(o) => { if (!o) setToDelete(null); }}

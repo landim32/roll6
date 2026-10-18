@@ -11,13 +11,12 @@ import type { MapTokenInfo } from '../types/mapToken';
 import { PartyPanel } from '../components/map/PartyPanel';
 import { TopMenu } from '../components/menu/TopMenu';
 import { ActModal } from '../components/modals/ActModal';
-import { CampaignModal } from '../components/modals/CampaignModal';
 import { CampaignCharacterModal } from '../components/modals/CampaignCharacterModal';
 import { GridSizeModal } from '../components/modals/GridSizeModal';
 import { ImageModal } from '../components/modals/ImageModal';
-import { MapModal } from '../components/modals/MapModal';
 import { SaveMapModal } from '../components/modals/SaveMapModal';
-import { NpcFormModal } from '../components/modals/NpcFormModal';
+import { useNavigate } from 'react-router-dom';
+import { campaignEditPath } from '../lib/libraryRoutes';
 import { NpcPickerModal } from '../components/modals/NpcPickerModal';
 import { TokenModal } from '../components/modals/TokenModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -38,7 +37,6 @@ import { useTableRoute } from '../hooks/useTableRoute';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import type { CharacterEditTarget } from '../components/modals/CampaignCharacterModal';
 import type { ActTarget } from '../lib/turnStatus';
-import type { CampaignNpcInfo } from '../types/npc';
 import type { TokenInfo } from '../types/token';
 
 /** 3D view of story maps (033): its own chunk, so three.js is downloaded only when someone opens it. */
@@ -61,8 +59,6 @@ export const MainPage = () => {
   });
   const { guard, requestSave, saveModalProps, unsavedModalProps } = useUnsavedGuard();
   useTableRoute(guard);
-  const [campaignOpen, setCampaignOpen] = useState(false);
-  const [mapOpen, setMapOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
   /** Party card opened in the character form (edit or read-only, per mode). */
@@ -71,7 +67,11 @@ export const MainPage = () => {
   const [tokenPick, setTokenPick] = useState<TokenPickRequest | null>(null);
   /** "Incluir NPC" window and the NPC whose pencil was clicked (014). */
   const [npcPickerOpen, setNpcPickerOpen] = useState(false);
-  const [editingNpc, setEditingNpc] = useState<CampaignNpcInfo | null>(null);
+  const navigate = useNavigate();
+  /** The NPC card's pencil (087): its campaign data and its library page are edited on the campaign page. */
+  const editNpc = () => {
+    if (currentCampaign) navigate(campaignEditPath(currentCampaign.slug, 'npcs'));
+  };
   /** Piece waiting for the delete confirmation; with `mapNpcId` it is an NPC instance leaving the map (051). */
   const [toDelete, setToDelete] = useState<{ mapTokenId: number; name: string; mapNpcId: number | null } | null>(null);
   /** NPC instance open in "Editar NPC" (051). */
@@ -176,8 +176,8 @@ export const MainPage = () => {
             />
           )}
           <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })}
-            onEditNpc={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />
-          <NpcPanel onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />
+            onEditNpc={editNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />
+          <NpcPanel onAdd={() => setNpcPickerOpen(true)} onEdit={editNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />
           <MapControls onOpenImage={openImage} />
           <GridSizeFooter onEditGrid={() => setGridOpen(true)} />
         </div>
@@ -187,9 +187,9 @@ export const MainPage = () => {
           {/* Chat only: the cards come along — fixed columns on the desktop, the map's collapsible panels on phones. */}
           <div className="stm-chat-body">
             {!showMap && <PartyPanel docked={desktop} onOpen={(participation, mode) => setEditing({ participation, mode })}
-              onEditNpc={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />}
+              onEditNpc={editNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />}
             <ChatPanel />
-            {!showMap && <NpcPanel docked={desktop} onAdd={() => setNpcPickerOpen(true)} onEdit={setEditingNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />}
+            {!showMap && <NpcPanel docked={desktop} onAdd={() => setNpcPickerOpen(true)} onEdit={editNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />}
           </div>
         </div>
       )}
@@ -198,14 +198,10 @@ export const MainPage = () => {
       <InstallHint />
       <IosInstallGuide />
       <TopMenu
-        onOpenCampaign={() => setCampaignOpen(true)}
-        onOpenMap={() => setMapOpen(true)}
         onSave={() => { void requestSave(); }}
         guard={guard}
       />
 
-      <CampaignModal open={campaignOpen} onOpenChange={setCampaignOpen} />
-      <MapModal open={mapOpen} onOpenChange={setMapOpen} guard={guard} />
       <ImageModal open={imageOpen} onOpenChange={setImageOpen} />
       <GridSizeModal open={gridOpen} onOpenChange={setGridOpen} />
       <SaveMapModal {...saveModalProps} />
@@ -217,7 +213,6 @@ export const MainPage = () => {
         onSelect={onTokenChosen}
       />
       <NpcPickerModal open={npcPickerOpen} onOpenChange={setNpcPickerOpen} />
-      <NpcFormModal npc={editingNpc} onClose={() => setEditingNpc(null)} />
       <MapNpcFormModal piece={editingInstance} onClose={() => setEditingInstance(null)} />
       <ConfirmModal
         open={toDelete !== null}

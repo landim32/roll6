@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTokenList } from '../../hooks/useTokenList';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -7,8 +8,6 @@ import { Tabs } from '../ui/Tabs';
 import type { ImageCrop } from '../ui/ImageCropper';
 import { TokenFormFields } from '../tokens/TokenFormFields';
 import { TokenGrid } from '../tokens/TokenGrid';
-import { TokenEditModal } from './TokenEditModal';
-import { useMapToken } from '../../hooks/useMapToken';
 import { useModelFile } from '../../hooks/useModelFile';
 import { useSpriteImages } from '../../hooks/useSpriteImages';
 import { useToken } from '../../hooks/useToken';
@@ -16,7 +15,6 @@ import { imageService } from '../../Services/imageService';
 import { cropToFile, tokenImageSize } from '../../lib/cropImage';
 import { downImageSpace, emptyTokenForm, toTokenInsert, validateTokenForm } from '../../lib/tokenForm';
 import type { TokenForm } from '../../lib/tokenForm';
-import type { PagedList } from '../../types/common';
 import type { TokenInfo } from '../../types/token';
 
 interface TokenModalProps {
@@ -28,62 +26,17 @@ interface TokenModalProps {
   onSelect: (token: TokenInfo) => Promise<void> | void;
 }
 
-const PAGE_SIZE = 12;
-const SEARCH_DELAY_MS = 300;
-
 /** Uploads a token image at the pixel size of its footprint (upscaled or downscaled). */
 const uploadTokenImage = async (crop: ImageCrop, space: number): Promise<string> =>
   (await imageService.upload(await cropToFile(crop.src, crop.area, { exactSize: tokenImageSize(space), rotation: crop.rotation, name: 'token' }))).fileName;
 
 /**
- * One list tab ("Meus Tokens" or "Buscar tokens"): its own search (debounced), page and result, loaded
- * only while the tab is visible. `reloadKey` forces a reload (after an edit).
- */
-const useTokenList = (active: boolean, mine: boolean, reloadKey: number) => {
-  const { t } = useTranslation();
-  const { search } = useToken();
-  const [query, setQuery] = useState('');
-  const [debounced, setDebounced] = useState('');
-  const [page, setPage] = useState(1);
-  const [result, setResult] = useState<PagedList<TokenInfo> | null>(null);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebounced(query);
-      setPage(1);
-    }, SEARCH_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    if (!active) return;
-    let cancelled = false;
-    search({ search: debounced, page, pageSize: PAGE_SIZE, mine })
-      .then((list) => { if (!cancelled) setResult(list); })
-      .catch((err) => { if (!cancelled) toast.error(err instanceof Error ? err.message : t('common.unknownError')); });
-    return () => { cancelled = true; };
-  }, [active, mine, debounced, page, reloadKey, search, t]);
-
-  const reset = () => {
-    setQuery('');
-    setDebounced('');
-    setPage(1);
-    setResult(null);
-  };
-
-  const totalPages = result ? Math.max(1, Math.ceil(result.totalCount / result.pageSize)) : 1;
-  return { query, setQuery, page, setPage, result, totalPages, reset };
-};
-
-/**
- * Tokens modal: "Meus Tokens" (the user's own, with a floating pencil to edit), "Buscar tokens" (the whole
- * library) — both in 4-column grids — and "Incluir token". Editing swaps this modal for "Editar token" and
- * comes back to "Meus Tokens" keeping the pending action (`onSelect`).
+ * The token picker of the table (087: editing moved to the library): "Meus Tokens", "Buscar tokens" (the whole
+ * library) — both in 4-column grids — and "Incluir token".
  */
 export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalProps) => {
   const { t } = useTranslation();
   const { create } = useToken();
-  const { refresh: refreshMapTokens } = useMapToken();
   const [tab, setTab] = useState('mine');
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<TokenForm>(emptyTokenForm);
@@ -93,18 +46,13 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
   const sprites = useSpriteImages(null, open);
   /** The 3D model of the new token (055). */
   const model = useModelFile(null, open);
-  /** Own token being edited: this modal hides while "Editar token" is open. */
-  const [editing, setEditing] = useState<TokenInfo | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  const visible = open && editing === null;
-  const mine = useTokenList(visible && tab === 'mine', true, reloadKey);
-  const library = useTokenList(visible && tab === 'search', false, reloadKey);
+  const visible = open;
+  const mine = useTokenList(visible && tab === 'mine', true, 0);
+  const library = useTokenList(visible && tab === 'search', false, 0);
 
   useEffect(() => {
     if (!open) return;
     setTab('mine');
-    setEditing(null);
     setForm(emptyTokenForm());
     setUpCrop(null);
     setDownCrop(null);
@@ -145,17 +93,7 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
     await choose(token);
   };
 
-  const onEditClosed = (saved: boolean) => {
-    setEditing(null);
-    setTab('mine');
-    if (saved) {
-      setReloadKey((k) => k + 1);
-      // Pieces on the open map may use this token: show its new image.
-      void refreshMapTokens();
-    }
-  };
-
-  const listTab = (list: ReturnType<typeof useTokenList>, emptyText: string, editable: boolean) => (
+  const listTab = (list: ReturnType<typeof useTokenList>, emptyText: string) => (
     <>
       <input type="search" className="form-control mb-3" placeholder={t('tokens.search')} aria-label={t('tokens.search')}
         value={list.query} onChange={(e) => list.setQuery(e.target.value)} />
@@ -165,7 +103,6 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
         busy={busy}
         emptyText={emptyText}
         onPick={(token) => { void choose(token); }}
-        onEdit={editable ? setEditing : undefined}
         page={list.page}
         totalPages={list.totalPages}
         onPage={list.setPage}
@@ -198,8 +135,8 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
           active={tab}
           onChange={setTab}
         />
-        <div hidden={tab !== 'mine'}>{listTab(mine, t('tokens.mineEmpty'), true)}</div>
-        <div hidden={tab !== 'search'}>{listTab(library, t('tokens.empty'), false)}</div>
+        <div hidden={tab !== 'mine'}>{listTab(mine, t('tokens.mineEmpty'))}</div>
+        <div hidden={tab !== 'search'}>{listTab(library, t('tokens.empty'))}</div>
         <form id="token-form" hidden={tab !== 'create'} onSubmit={onCreate} noValidate>
           <TokenFormFields
             idPrefix="token"
@@ -213,7 +150,6 @@ export const TokenModal = ({ open, onOpenChange, title, onSelect }: TokenModalPr
           />
         </form>
       </Modal>
-      {editing && <TokenEditModal open token={editing} onClose={onEditClosed} />}
     </>
   );
 };

@@ -8,6 +8,7 @@ import { ApiError } from '../Services/apiHelpers';
 import { parseTablePath, tablePathFor } from '../lib/tableRoute';
 import { useChat } from './useChat';
 import { LAYOUT_MODE } from '../lib/layoutMode';
+import { rememberTableReturn } from '../lib/libraryReturn';
 
 /**
  * Keeps the address and the open table in step.
@@ -40,6 +41,11 @@ export const useTableRoute = (guard: () => Promise<boolean>) => {
   editorRef.current = editor;
   const pathnameRef = useRef(location.pathname);
   pathnameRef.current = location.pathname;
+
+  // "← Voltar para campanha" (087) comes back to the last table address of this tab.
+  useEffect(() => {
+    rememberTableReturn(location.pathname);
+  }, [location.pathname]);
 
   const parsed = parseTablePath(location.pathname);
   const routeKey = `${parsed.kind}:${parsed.slug ?? ''}`;
