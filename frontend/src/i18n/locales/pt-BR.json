@@ -156,7 +156,101 @@
     "confirmDelete": "Apagar a animação \"{{name}}\"?",
     "delete": "Apagar",
     "empty": "Nenhuma animação.",
-    "chooseFile": "Escolha um arquivo de animação."
+    "chooseFile": "Escolha um arquivo de animação.",
+    "openEditor": "Editar no editor"
+  },
+  "editor": {
+    "title": "Editor de animações",
+    "back": "Voltar ao Roll6",
+    "offline": "sem conexão",
+    "offlineLong": "Não foi possível conectar ao Roll6. Verifique a conexão e recarregue a página.",
+    "forbidden": "Só o dono edita esta animação.",
+    "notFound": "Animação não encontrada.",
+    "agent": {
+      "connected": "agente conectado ({{machine}})",
+      "busy": "agente ocupado ({{machine}})",
+      "disconnected": "agente desconectado",
+      "hint": "Rode o Roll6.Console na sua máquina com a sua chave de API (ROLL6_API_KEY) para conversar com o Claude Code local."
+    },
+    "model": {
+      "label": "Modelo",
+      "choose": "Escolha um token…",
+      "chooseHint": "Escolha acima um token com modelo 3D para ver a animação.",
+      "none": "Nenhum token com modelo 3D",
+      "noneHint": "Envie um modelo .glb em um token seu (aba 3D do token) para ver a animação aqui."
+    },
+    "stage": {
+      "loading": "Carregando a vista 3D…",
+      "modelError": "Não foi possível abrir o modelo deste token."
+    },
+    "timeline": {
+      "of": "de",
+      "play": "Tocar",
+      "pause": "Pausar",
+      "progress": "Andamento da animação"
+    },
+    "skeleton": {
+      "label": "Esqueleto",
+      "show": "Mostrar o esqueleto",
+      "hide": "Esconder o esqueleto"
+    },
+    "edit": {
+      "drag": "arraste um anel para girar",
+      "saving": "gravando",
+      "saved": "Versão gravada.",
+      "notSaved": "Não gravado: {{message}}",
+      "notMixamo": "Este esqueleto não usa os nomes do Mixamo: as animações não se aplicam a ele.",
+      "notEditable": "não pode ser animado (fora dos ossos do formato).",
+      "blocked": "Edição bloqueada.",
+      "blockedRunning": "Aguarde o pedido ao Claude terminar para editar a pose.",
+      "noAnimation": "Abra uma animação para editar.",
+      "undo": "Desfazer (Ctrl+Z)",
+      "redo": "Refazer (Ctrl+Y)"
+    },
+    "conversation": {
+      "title": "Conversa com o Claude",
+      "empty": "Peça algo ao Claude: \"levante o braço direito no fim\", \"deixe o aceno mais lento\"…",
+      "placeholder": "Escreva o pedido e tecle Enter (Shift+Enter quebra a linha)",
+      "waitRunning": "Aguarde o pedido terminar…",
+      "queued": "Aguardando o agente (posição {{position}})…",
+      "sending": "Enviando…",
+      "running": "Rodando na máquina {{machine}}…",
+      "thinking": "Pensando…",
+      "newConversation": "Nova conversa",
+      "confirmNew": "Começar uma conversa nova? O Claude esquece o que foi dito nesta.",
+      "stop": "Parar",
+      "stopped": "Pedido parado.",
+      "failed": "O pedido falhou.",
+      "send": "Enviar",
+      "tooLong": "O pedido passa de {{max}} caracteres."
+    },
+    "prints": {
+      "attach": "Anexar print",
+      "edit": "Marcar este print",
+      "remove": "Remover o print",
+      "print": "Print {{index}}",
+      "count": "{{count}} print(s)",
+      "max": "No máximo {{count}} prints por pedido.",
+      "noModel": "Escolha um modelo para tirar um print.",
+      "markupTitle": "Marcar print",
+      "markupHint": "Desenhe em vermelho o que quer mostrar ao Claude; Concluir anexa o print (com ou sem marcas), Cancelar descarta.",
+      "tools": "Ferramentas de marcação",
+      "tool": {
+        "pencil": "Lápis",
+        "rectangle": "Retângulo",
+        "ellipse": "Círculo",
+        "arrow": "Seta"
+      },
+      "undo": "Desfazer",
+      "clear": "Limpar",
+      "done": "Concluir",
+      "cancel": "Cancelar"
+    },
+    "error": {
+      "busy": "Já há um pedido em andamento para esta animação.",
+      "noAgent": "Nenhum agente conectado: rode o Roll6.Console na sua máquina.",
+      "invalid": "Pedido inválido: escreva algo (até 4000 caracteres) ou anexe até 5 prints."
+    }
   },
   "character": {
     "current": "Personagem atual",

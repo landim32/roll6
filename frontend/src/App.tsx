@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
+import { AnimationEditorPage } from './pages/AnimationEditorPage';
 
 /** Routes (/login public, / protected) and the dark toaster. */
 export const App = () => {
@@ -25,6 +26,7 @@ export const App = () => {
         <Route path="/" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
         <Route path="/campaign/:slug" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
         <Route path="/map/:slug" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
+        <Route path="/animation/:id" element={<ProtectedRoute><AnimationEditorPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster theme="dark" position="bottom-left" richColors closeButton />

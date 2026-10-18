@@ -26,6 +26,8 @@ public class Roll6Context : DbContext
     public DbSet<Animation> Animations { get; set; }
     public DbSet<Weapon> Weapons { get; set; }
     public DbSet<TokenWeapon> TokenWeapons { get; set; }
+    public DbSet<AnimationConversation> AnimationConversations { get; set; }
+    public DbSet<AnimationMessage> AnimationMessages { get; set; }
     public DbSet<MapToken> MapTokens { get; set; }
     public DbSet<Character> Characters { get; set; }
     public DbSet<CampaignCharacter> CampaignCharacters { get; set; }
@@ -180,6 +182,40 @@ public class Roll6Context : DbContext
             entity.HasIndex(e => e.UserId).HasDatabaseName("ix_animations_user");
             entity.HasIndex(e => e.AnimationType).HasDatabaseName("ix_animations_type");
             HasOwner(entity, "fk_animation_user");
+        });
+
+        modelBuilder.Entity<AnimationConversation>(entity =>
+        {
+            // The conversations of the animation editor with the local Claude (086): one open per animation.
+            entity.ToTable("animation_conversations");
+            entity.HasKey(e => e.AnimationConversationId).HasName("animation_conversations_pkey");
+            entity.Property(e => e.AnimationConversationId).HasColumnName("animation_conversation_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.AnimationId).HasColumnName("animation_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.ClaudeSessionId).HasColumnName("claude_session_id");
+            entity.Property(e => e.Started).HasColumnName("started").HasDefaultValue(false).HasSentinel(false);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.Property(e => e.ClosedAt).HasColumnName("closed_at").HasColumnType(TIMESTAMP);
+            entity.HasOne<Animation>().WithMany().HasForeignKey(e => e.AnimationId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_animation_animation_conversation");
+            entity.HasIndex(e => e.AnimationId).IsUnique().HasFilter("closed_at IS NULL").HasDatabaseName("ix_animation_conversations_open");
+            entity.HasIndex(e => e.UserId).HasDatabaseName("ix_animation_conversations_user");
+            HasOwner(entity, "fk_user_animation_conversation");
+        });
+
+        modelBuilder.Entity<AnimationMessage>(entity =>
+        {
+            entity.ToTable("animation_messages");
+            entity.HasKey(e => e.AnimationMessageId).HasName("animation_messages_pkey");
+            entity.Property(e => e.AnimationMessageId).HasColumnName("animation_message_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.AnimationConversationId).HasColumnName("animation_conversation_id");
+            entity.Property(e => e.Role).HasColumnName("role").HasConversion<int>();
+            entity.Property(e => e.Text).HasColumnName("text").HasMaxLength(AnimationMessage.MAX_TEXT).IsRequired();
+            entity.Property(e => e.ImageCount).HasColumnName("image_count").HasDefaultValue(0);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.HasOne<AnimationConversation>().WithMany().HasForeignKey(e => e.AnimationConversationId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_animation_conversation_message");
+            entity.HasIndex(e => e.AnimationConversationId).HasDatabaseName("ix_animation_messages_conversation");
         });
 
         modelBuilder.Entity<Weapon>(entity =>

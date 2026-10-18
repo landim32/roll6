@@ -20,6 +20,8 @@ public class AnimationServiceTests
     private readonly Mock<ITokenRepository<Token>> _tokenRepository = new();
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IImageService> _imageService = new();
+    private readonly Mock<IAnimationConversationRepository<AnimationConversation>> _conversations = new();
+    private readonly Mock<IAnimationNotifier> _notifier = new();
     private readonly AnimationService _service;
 
     private static readonly JsonElement VALID = JsonDocument.Parse("""
@@ -38,7 +40,7 @@ public class AnimationServiceTests
         _userRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
             .ReturnsAsync(new List<User> { new() { UserId = 1, Name = "Rodrigo" } });
         _imageService.Setup(s => s.StoreAnimationAsync(It.IsAny<byte[]>())).ReturnsAsync(FILE);
-        _service = new AnimationService(_repository.Object, _tokenRepository.Object, _userRepository.Object, _imageService.Object);
+        _service = new AnimationService(_repository.Object, _tokenRepository.Object, _userRepository.Object, _imageService.Object, _conversations.Object, _notifier.Object);
     }
 
     [Fact]

@@ -64,7 +64,7 @@ const armCorrection = (bone: Bone, name: string): Quaternion => {
 /**
  * What a turn of an animation file needs to know about one bone of a skeleton at rest (055/059): the orientation of its
  * parent relative to the model (P), its own rest rotation in the parent (L) and the upper arms' correction to the relaxed
- * direction (C, identity for any other bone). A file's turn D becomes the local rotation `P⁻¹·(D·C)·P·L`; the roll6anime's
+ * direction (C, identity for any other bone). A file's turn D becomes the local rotation `P⁻¹·(D·C)·P·L`; the editor's
  * pose editor (066) inverts it with the same frame, so the two directions never drift apart. `root` must be at rest.
  */
 export interface RestFrame {

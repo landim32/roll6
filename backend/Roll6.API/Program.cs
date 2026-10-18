@@ -81,5 +81,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<TableHub>("/hubs/table");
+app.MapHub<AnimationHub>("/hubs/animation");
 
 app.Run();

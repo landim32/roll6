@@ -6,6 +6,7 @@ using Roll6.Domain.Models;
 using Roll6.DTO.Animation;
 using Roll6.DTO.Common;
 using Roll6.DTO.Image;
+using Roll6.DTO.Realtime.Animation;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Domain.Services;
@@ -25,17 +26,23 @@ public class AnimationService : IAnimationService
     private readonly ITokenRepository<Token> _tokenRepository;
     private readonly IUserRepository<User> _userRepository;
     private readonly IImageService _imageService;
+    private readonly IAnimationConversationRepository<AnimationConversation> _conversationRepository;
+    private readonly IAnimationNotifier _notifier;
 
     public AnimationService(
         IAnimationRepository<Animation> repository,
         ITokenRepository<Token> tokenRepository,
         IUserRepository<User> userRepository,
-        IImageService imageService)
+        IImageService imageService,
+        IAnimationConversationRepository<AnimationConversation> conversationRepository,
+        IAnimationNotifier notifier)
     {
         _repository = repository;
         _tokenRepository = tokenRepository;
         _userRepository = userRepository;
         _imageService = imageService;
+        _conversationRepository = conversationRepository;
+        _notifier = notifier;
     }
 
     public async Task<PagedList<AnimationInfo>> ListAsync(long viewerUserId, PageQuery query, bool mine, int? type)
@@ -63,6 +70,14 @@ public class AnimationService : IAnimationService
         var animation = await GetAnimationAsync(animationId);
         return await _imageService.OpenAnimationAsync(animation.FileName)
             ?? throw new KeyNotFoundException("Arquivo da animação não encontrado.");
+    }
+
+    public async Task<JsonElement> ReadContentAsync(long animationId)
+    {
+        var file = await OpenFileAsync(animationId);
+        await using var stream = file.Content;
+        using var document = await JsonDocument.ParseAsync(stream);
+        return document.RootElement.Clone();
     }
 
     public async Task<AnimationInfo> CreateAsync(long userId, AnimationInsertInfo info)
@@ -107,10 +122,20 @@ public class AnimationService : IAnimationService
         return await SaveWithNewFileAsync(animation, content!.Value, file);
     }
 
-    public async Task<AnimationInfo> ReplaceContentAsync(long userId, long animationId, AnimationContentInfo info)
+    public async Task<AnimationInfo> ReplaceContentAsync(long userId, long animationId, AnimationContentInfo info, string origin = AnimationVersionInfo.ORIGIN_USER)
     {
         var animation = await GetOwnedAsync(userId, animationId);
-        return await SaveWithNewFileAsync(animation, info.Content, AnimationFormat.Parse(info.Content));
+        var saved = await SaveWithNewFileAsync(animation, info.Content, AnimationFormat.Parse(info.Content));
+        // The editors (and the working file of the console, when the change did not come from it) follow the new version (086).
+        await _notifier.VersionAsync(new AnimationVersionInfo
+        {
+            AnimationId = animationId,
+            Name = saved.Name,
+            Content = info.Content,
+            Origin = origin,
+            UserId = userId
+        });
+        return saved;
     }
 
     /// <summary>Stores the new file, points the row to it and only then removes the old one (a failed update removes the new file).</summary>
@@ -138,6 +163,8 @@ public class AnimationService : IAnimationService
         var animation = await GetOwnedAsync(userId, animationId);
         if (await _tokenRepository.AnyUsesClipAsync(AnimationStates.Choice(animationId), idle: true, walk: true, down: true))
             throw new ConflictException(IN_USE);
+        // The editor conversations point to the animation (086) and the FKs never cascade.
+        await _conversationRepository.DeleteByAnimationAsync(animationId);
         await _repository.DeleteAsync(animationId);
         await _imageService.DeleteAnimationAsync(animation.FileName);
     }

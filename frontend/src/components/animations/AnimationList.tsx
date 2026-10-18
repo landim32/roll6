@@ -6,7 +6,7 @@ import { copyToClipboard } from '../../lib/clipboard';
 import { animationService } from '../../Services/animationService';
 import { ANIMATION_TYPES } from '../../types/animation';
 import type { AnimationInfo, AnimationType } from '../../types/animation';
-import { CopyIcon, PencilIcon, TrashIcon } from '../ui/icons';
+import { BoxArrowUpRightIcon, CopyIcon, PencilIcon, TrashIcon } from '../ui/icons';
 
 const PAGE_SIZE = 12;
 
@@ -24,7 +24,7 @@ const seconds = (value: number, locale: string) => value.toLocaleString(locale, 
 
 /**
  * One tab of "Animações" (059): name, type, duration and whether it repeats; a type filter and a name search, 12 per
- * page. Every row copies its JSON; the user's own rows also edit and delete.
+ * page. Every row copies its JSON; the user's own rows also open the editor in a new tab (086), edit and delete.
  */
 export const AnimationList = ({ mine, version, onEdit, onDelete }: AnimationListProps) => {
   const { t, i18n } = useTranslation();
@@ -96,6 +96,12 @@ export const AnimationList = ({ mine, version, onEdit, onDelete }: AnimationList
                 title={t('animations.copy')} aria-label={t('animations.copy')}>
                 <CopyIcon size={14} />
               </button>
+              {mine && (
+                <a className="btn btn-sm btn-outline-primary" href={`/animation/${animation.animationId}`} target="_blank" rel="noopener"
+                  title={t('animations.openEditor')} aria-label={t('animations.openEditor')}>
+                  <BoxArrowUpRightIcon size={14} />
+                </a>
+              )}
               {onEdit && (
                 <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(animation)}
                   title={t('animations.editLabel', { name: animation.name })} aria-label={t('animations.editLabel', { name: animation.name })}>

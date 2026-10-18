@@ -83,6 +83,101 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("animations", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.AnimationConversation", b =>
+                {
+                    b.Property<long>("AnimationConversationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("animation_conversation_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("AnimationConversationId"));
+
+                    b.Property<long>("AnimationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("animation_id");
+
+                    b.Property<Guid>("ClaudeSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claude_session_id");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("Started")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("started");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("AnimationConversationId")
+                        .HasName("animation_conversations_pkey");
+
+                    b.HasIndex("AnimationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_animation_conversations_open")
+                        .HasFilter("closed_at IS NULL");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_animation_conversations_user");
+
+                    b.ToTable("animation_conversations", (string)null);
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.AnimationMessage", b =>
+                {
+                    b.Property<long>("AnimationMessageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("animation_message_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("AnimationMessageId"));
+
+                    b.Property<long>("AnimationConversationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("animation_conversation_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("ImageCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("image_count");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("text");
+
+                    b.HasKey("AnimationMessageId")
+                        .HasName("animation_messages_pkey");
+
+                    b.HasIndex("AnimationConversationId")
+                        .HasDatabaseName("ix_animation_messages_conversation");
+
+                    b.ToTable("animation_messages", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.ApiKey", b =>
                 {
                     b.Property<long>("ApiKeyId")
@@ -1754,6 +1849,30 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("fk_animation_user");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.AnimationConversation", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Animation", null)
+                        .WithMany()
+                        .HasForeignKey("AnimationId")
+                        .IsRequired()
+                        .HasConstraintName("fk_animation_animation_conversation");
+
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_animation_conversation");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.AnimationMessage", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.AnimationConversation", null)
+                        .WithMany()
+                        .HasForeignKey("AnimationConversationId")
+                        .IsRequired()
+                        .HasConstraintName("fk_animation_conversation_message");
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.ApiKey", b =>

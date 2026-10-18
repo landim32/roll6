@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Roll6.Tests", "Roll6.Tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Roll6.Mcp", "Roll6.Mcp\Roll6.Mcp.csproj", "{F9812A9C-FFA0-40E0-BB96-CE661E6A06B5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Roll6.Console", "Roll6.Console\Roll6.Console.csproj", "{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +127,18 @@ Global
 		{F9812A9C-FFA0-40E0-BB96-CE661E6A06B5}.Release|x64.Build.0 = Release|Any CPU
 		{F9812A9C-FFA0-40E0-BB96-CE661E6A06B5}.Release|x86.ActiveCfg = Release|Any CPU
 		{F9812A9C-FFA0-40E0-BB96-CE661E6A06B5}.Release|x86.Build.0 = Release|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Debug|x64.Build.0 = Debug|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Debug|x86.Build.0 = Debug|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Release|x64.ActiveCfg = Release|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Release|x64.Build.0 = Release|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Release|x86.ActiveCfg = Release|Any CPU
+		{3C0C64E2-D19B-48DB-B5A2-6F3167EA778A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

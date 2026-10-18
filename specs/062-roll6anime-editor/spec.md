@@ -1,3 +1,5 @@
+> **Superseded by 086-web-animation-editor** (2026-10-18): the Windows tool `roll6anime/` was removed; its capabilities live in the web editor (`/animation/:id`) and the generic console `backend/Roll6.Console`. Kept as history.
+
 # Feature Specification: roll6anime — editor de animações com o Claude local
 
 **Feature Branch**: `062-roll6anime-editor`

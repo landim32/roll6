@@ -48,6 +48,8 @@ public static class Startup
         services.AddScoped<IMapRepository<Map>, MapRepository>();
         services.AddScoped<ITokenRepository<Token>, TokenRepository>();
         services.AddScoped<IAnimationRepository<Animation>, AnimationRepository>();
+        services.AddScoped<IAnimationConversationRepository<AnimationConversation>, AnimationConversationRepository>();
+        services.AddScoped<IAnimationMessageRepository<AnimationMessage>, AnimationMessageRepository>();
         services.AddScoped<IWeaponRepository<Weapon>, WeaponRepository>();
         services.AddScoped<ITokenWeaponRepository<TokenWeapon>, TokenWeaponRepository>();
         services.AddScoped<IMapTokenRepository<MapToken>, MapTokenRepository>();
@@ -85,6 +87,7 @@ public static class Startup
         services.AddScoped<IPageMetaService, PageMetaService>();
         services.AddScoped<ITokenLibraryService, TokenLibraryService>();
         services.AddScoped<IAnimationService, AnimationService>();
+        services.AddScoped<IAnimationConversationService, AnimationConversationService>();
         services.AddScoped<IWeaponService, WeaponService>();
         services.AddScoped<IMapTokenService, MapTokenService>();
         services.AddScoped<ICharacterService, CharacterService>();
@@ -103,8 +106,12 @@ public static class Startup
         services.AddSingleton(TimeProvider.System);
 
         // Real-time table events (017): the hub only pushes; changes keep going through the REST API.
-        services.AddSignalR();
+        services.AddSignalR()
+            // The animation editor hub (086) carries prints (base64 PNG) and animation files: 8 MB per message.
+            .AddHubOptions<AnimationHub>(options => options.MaximumReceiveMessageSize = 8 * 1024 * 1024);
         services.AddSingleton<TableConnections>();
+        services.AddSingleton<AnimationConnections>();
+        services.AddSingleton<IAnimationNotifier, AnimationNotifier>();
         services.AddSingleton<SignalRRealtimeNotifier>();
         services.AddSingleton<IRealtimeNotifier>(sp => sp.GetRequiredService<SignalRRealtimeNotifier>());
         services.AddSingleton<INoticeChannel>(sp => sp.GetRequiredService<SignalRRealtimeNotifier>());
