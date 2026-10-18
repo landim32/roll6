@@ -43,3 +43,17 @@ export const tablePathFor = ({ campaignSlug, mapSlug, mapCampaignId, campaignId 
   if (campaignSlug) return `/campaign/${encodeURIComponent(campaignSlug)}`;
   return '/';
 };
+
+/**
+ * What a `/map/:slug` address asks of the table (088), given what is open: `open` the map (another one is loaded),
+ * `skip` (that map is open with its own campaign, or it has no campaign), or `selectCampaign` — that map is already
+ * loaded but another campaign is open (the campaign switched while the master kept the map), so only its campaign is
+ * selected again and the map is not reloaded (no unsaved change is lost).
+ */
+export type MapRouteAction = 'open' | 'skip' | 'selectCampaign';
+
+export const mapRouteAction = (slug: string, open: Pick<TableLocation, 'mapSlug' | 'mapCampaignId' | 'campaignId'>): MapRouteAction => {
+  if (open.mapSlug !== slug) return 'open';
+  if (open.mapCampaignId === null || open.mapCampaignId === open.campaignId) return 'skip';
+  return 'selectCampaign';
+};
