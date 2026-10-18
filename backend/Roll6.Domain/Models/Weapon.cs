@@ -23,7 +23,7 @@ public class Weapon
     public double GripX { get; set; } = WeaponGripPoint.CENTER;
     public double GripY { get; set; } = WeaponGripPoint.CENTER;
     public double GripZ { get; set; } = WeaponGripPoint.CENTER;
-    /// <summary>The standard pose (083): Euler XYZ in degrees, multiples of 90, 0…270.</summary>
+    /// <summary>The standard pose (083): Euler XYZ in whole degrees, 0…359.</summary>
     public int PoseRx { get; set; }
     public int PoseRy { get; set; }
     public int PoseRz { get; set; }

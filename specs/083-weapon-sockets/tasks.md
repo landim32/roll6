@@ -394,6 +394,11 @@ T049).
 
 ## Implementation notes
 
+- **Fine turn (084, after the first build)**: the user found the 90° steps too coarse. The pose now accepts whole degrees
+  (`WeaponPose` −360…360 → 0…359; `lib/weaponPose.normalizePose` rounds to 1°), the editor keeps the six 90° buttons —
+  `turnPose` composes the turn and reads the Euler XYZ back with `eulerOfMatrix`, so they work on any pose — and adds
+  three 1° sliders (`WeaponPoseFields`, −180…180 as shown by `signedDegrees`).
+
 - **Face axis and mirroring** (not in the plan): with `up` (the fist's tunnel) and `attack` (the knuckles) both physical,
   the third axis of a right-handed basis is the back of the hand on one hand and the palm on the other, so a shield held
   by the left hand faced the body. `lib/socketFrame` now declares the wanted `face` per socket (the back of the hand —

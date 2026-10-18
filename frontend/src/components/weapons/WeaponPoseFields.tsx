@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { DEFAULT_GRIP_POINT, isDefaultGripPoint, turnPose } from '../../lib/weaponPose';
+import { DEFAULT_GRIP_POINT, isDefaultGripPoint, normalizePose, signedDegrees, turnPose } from '../../lib/weaponPose';
 import type { PoseAxis, PoseDirection } from '../../lib/weaponPose';
 import type { GripPoint, WeaponPose } from '../../types/weapon';
 import {
@@ -31,10 +31,13 @@ const TURNS: Turn[] = [
   { key: 'rollRight', axis: 'z', direction: -1, Icon: ArrowRightIcon },
 ];
 
+const AXES: (keyof WeaponPose)[] = ['rx', 'ry', 'rz'];
+
 /**
  * The standard pose and the grip point of a library weapon (083, US1), under the editable stage: six buttons that turn the
- * weapon by exactly 90° about the stage's axes until its tip points along the green arrow ("cima") and its edge along the
- * red one ("direita"), the current angles, and "Pega no meio" for the grip point, which is picked by clicking the model.
+ * weapon by exactly 90° about the stage's axes (the coarse part), three 1° sliders — one per Euler axis — for the fine
+ * turn, the current angles, and "Pega no meio" for the grip point, which is picked by clicking the model. The aim is the
+ * tip along the green arrow ("cima"), the edge along the red one ("direita") and the outer face along the blue one.
  */
 export const WeaponPoseFields = ({ pose, gripPoint, onPose, onGripPoint, disabled = false }: WeaponPoseFieldsProps) => {
   const { t } = useTranslation();
@@ -52,6 +55,31 @@ export const WeaponPoseFields = ({ pose, gripPoint, onPose, onGripPoint, disable
           ))}
         </div>
         <span className="small text-secondary">{t('weapons.pose.angles', { rx: pose.rx, ry: pose.ry, rz: pose.rz })}</span>
+      </div>
+      <div className="stm-weapon-pose-fine mb-1">
+        {AXES.map((axis) => {
+          const id = `weapon-pose-${axis}`;
+          const value = signedDegrees(pose[axis]);
+          return (
+            <div key={axis} className="mb-1">
+              <label htmlFor={id} className="form-label small mb-0 d-flex justify-content-between">
+                <span>{t(`weapons.pose.axis.${axis}`)}</span>
+                <output htmlFor={id} className="fw-semibold">{`${value}°`}</output>
+              </label>
+              <input
+                id={id}
+                type="range"
+                className="form-range"
+                min={-180}
+                max={180}
+                step={1}
+                value={value}
+                aria-valuetext={`${value}°`}
+                onChange={(event) => onPose(normalizePose({ ...pose, [axis]: Number(event.target.value) }))}
+              />
+            </div>
+          );
+        })}
       </div>
       <div className="d-flex justify-content-between align-items-center gap-2">
         <div className="form-text mt-0">{t('weapons.pose.hint')}</div>

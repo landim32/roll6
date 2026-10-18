@@ -89,7 +89,7 @@
     "loadFailed": "Não foi possível abrir esta arma.",
     "pose": {
       "title": "Pose padrão e pega",
-      "hint": "Gire até a ponta ficar para cima (seta verde) e o gume para a direita (seta vermelha); num escudo, a face externa para a frente (seta azul). Clique no modelo para marcar onde a mão segura.",
+      "hint": "Gire até a ponta ficar para cima (seta verde) e o gume para a direita (seta vermelha); num escudo, a face externa para a frente (seta azul). Os botões giram 90°; os controles afinam de 1 em 1°. Clique no modelo para marcar onde a mão segura.",
       "angles": "X {{rx}}° · Y {{ry}}° · Z {{rz}}°",
       "tiltUp": "Inclinar para cima (90°)",
       "tiltDown": "Inclinar para baixo (90°)",
@@ -97,6 +97,11 @@
       "turnRight": "Girar para a direita (90°)",
       "rollLeft": "Rolar para a esquerda (90°)",
       "rollRight": "Rolar para a direita (90°)",
+      "axis": {
+        "rx": "Giro fino X (inclinar)",
+        "ry": "Giro fino Y (girar)",
+        "rz": "Giro fino Z (rolar)"
+      },
       "gripCenter": "Pega no meio",
       "legendUp": "cima",
       "legendRight": "direita",

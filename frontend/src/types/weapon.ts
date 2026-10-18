@@ -27,8 +27,8 @@ export const SOCKET_KEY: Record<Socket, SocketKey> = {
 };
 
 /**
- * The standard pose of a weapon (083; `lib/weaponPose`): Euler XYZ in degrees, multiples of 90 (0…270), after which the
- * file's model stands with its tip along +Y and its edge along +X.
+ * The standard pose of a weapon (083; `lib/weaponPose`): Euler XYZ in whole degrees (0…359; 90° buttons and 1° sliders in
+ * the editor), after which the file's model stands with its tip along +Y, its edge along +X and its outer face along +Z.
  */
 export interface WeaponPose {
   rx: number;

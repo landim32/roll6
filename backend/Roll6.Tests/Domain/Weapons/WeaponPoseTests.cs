@@ -18,17 +18,17 @@ public class WeaponPoseTests
     [InlineData(-90, 0, 0, 270, 0, 0)]
     [InlineData(360, -360, -180, 0, 0, 180)]
     [InlineData(0, -270, 0, 0, 90, 0)]
-    public void Normalized_PutsEveryAngleIn0To270(int rx, int ry, int rz, int nx, int ny, int nz)
+    [InlineData(45, -7, 359, 45, 353, 359)]
+    public void Normalized_PutsEveryAngleIn0To359(int rx, int ry, int rz, int nx, int ny, int nz)
     {
         new WeaponPose(rx, ry, rz).Validate("pose").Normalized().Should().Be(new WeaponPose(nx, ny, nz));
     }
 
     [Theory]
-    [InlineData(45, 0, 0, "rx")]
-    [InlineData(0, 91, 0, "ry")]
+    [InlineData(361, 0, 0, "rx")]
+    [InlineData(0, -361, 0, "ry")]
     [InlineData(0, 0, 450, "rz")]
-    [InlineData(0, 0, -450, "rz")]
-    public void Validate_NotAStep_ThrowsKeyedByField(int rx, int ry, int rz, string field)
+    public void Validate_OutOfRange_ThrowsKeyedByField(int rx, int ry, int rz, string field)
     {
         var act = () => new WeaponPose(rx, ry, rz).Validate("pose");
 

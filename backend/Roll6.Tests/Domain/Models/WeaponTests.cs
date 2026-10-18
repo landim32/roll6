@@ -35,11 +35,11 @@ public class WeaponTests
     }
 
     [Fact]
-    public void SetPose_NotAStep_ThrowsKeyedByField()
+    public void SetPose_OutOfRange_ThrowsKeyedByField()
     {
         var weapon = Weapon.Create(3, "Espada", FILE);
 
-        var act = () => weapon.SetPose(new WeaponPose(0, 45, 0));
+        var act = () => weapon.SetPose(new WeaponPose(0, 450, 0));
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("pose.ry");
     }

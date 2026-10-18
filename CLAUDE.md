@@ -224,8 +224,8 @@ Solution lives in `backend/` (`Roll6.sln`): `DTO` → `Infra.Interfaces` → `Do
     take `ITokenWeaponRepository` right before `IWeaponRepository`.
   - **Grip point and standard pose (083)** live on the weapon: `weapons.grip_x/y/z` (`WeaponGripPoint`, fractions of the
     file's bounding box, 0…1, default 0.5 = the middle; 400 `gripPoint.{x|y|z}`) and `weapons.pose_rx/ry/rz` (`WeaponPose`,
-    Euler XYZ in degrees, multiples of 90 — input −360…360 normalised to 0…270; 400 `pose.{rx|ry|rz}` "O giro da arma é em
-    passos de 90°."): after the pose the model stands with its tip along +Y ("cima"), its edge along +X ("direita") and
+    Euler XYZ in whole degrees — input −360…360 normalised to 0…359; 400 `pose.{rx|ry|rz}` "O giro da arma é em graus
+    inteiros, de -360 a 360."): after the pose the model stands with its tip along +Y ("cima"), its edge along +X ("direita") and
     its outer face along +Z ("frente", a shield's face).
     `WeaponInsertInfo`/`WeaponUpdateInfo` take `gripPoint`/`pose` (null = keep); owner only; a change publishes
     `mapTokens.changed` like a file replacement (`WeaponService.UpdateAsync`). Mirrored by the frontend's
@@ -370,7 +370,9 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
     `editable`: no auto-turn, the drag orbits the camera, the pose drawn applied, two `ArrowHelper`s — green +Y "cima", red
     +X "direita" — and a golden marker at the grip point; a click (< 4 px, < 300 ms) raycasts the weapon's meshes and
     reports the hit as a normalised grip point) plus `WeaponPoseFields` (six ±90° buttons about the stage axes composed on
-    the left by `lib/weaponPose.turnPose`, the angles, "Pega no meio"). `WeaponContext.upload(name, file, gripPoint, pose)`
+    the left by `lib/weaponPose.turnPose`, which extracts the Euler XYZ of the product — `eulerOfMatrix` — so they also work
+    on a pose that is not a multiple of 90; three 1° sliders per axis — the fine turn the user asked for after the first
+    build —, the angles, "Pega no meio"). `WeaponContext.upload(name, file, gripPoint, pose)`
     / `update(weapon, { name?, file?, gripPoint?, pose? })` send only what changed.
   - **Token form**: the fifth tab "Armas" after "Animação" renders the same `ModelField` (`section: 'weapons'`, the 060
     pattern — one preview for the three model tabs), with the state select and the timeline, a `btn-group` of the five
@@ -607,7 +609,7 @@ cd .. && dotnet build Roll6Anime.sln && dotnet test Roll6Anime.Tests && dotnet r
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
-- 083-weapon-sockets: weapons snap onto five fixed **sockets** of a token's 3D model — right/left hand, back, right/left holster — each found on the Mixamo skeleton with a standardised frame (hand: grip in the palm, tip toward the thumb, edge toward the knuckles; back: diagonal behind the torso, handle above the right shoulder; holsters: beside the hips, tip down), and every library weapon carries its **grip point** (normalised in its bounding box, picked by clicking the preview) and **standard pose** (90° steps, tip +Y / edge +X), so the token form only adjusts the size, with the 082 position/rotation kept as an optional "Ajuste fino". `token_weapons` replaces the four `tokens` columns (migration `AddWeaponSockets` copied the hands into sockets 1/2), `weapons` gains `grip_x/y/z` + `pose_rx/ry/rz`; `weapons[]` on the token DTOs, `gripPoint`/`pose` on the weapon ones; MCP texts and parameters only (120 operations / 121 tools)
+- 083-weapon-sockets: weapons snap onto five fixed **sockets** of a token's 3D model — right/left hand, back, right/left holster — each found on the Mixamo skeleton with a standardised frame (hand: grip in the palm, tip toward the thumb, edge toward the knuckles; back: diagonal behind the torso, handle above the right shoulder; holsters: beside the hips, tip down), and every library weapon carries its **grip point** (normalised in its bounding box, picked by clicking the preview) and **standard pose** (90° buttons + 1° sliders, tip +Y / edge +X / face +Z), so the token form only adjusts the size, with the 082 position/rotation kept as an optional "Ajuste fino". `token_weapons` replaces the four `tokens` columns (migration `AddWeaponSockets` copied the hands into sockets 1/2), `weapons` gains `grip_x/y/z` + `pose_rx/ry/rz`; `weapons[]` on the token DTOs, `gripPoint`/`pose` on the weapon ones; MCP texts and parameters only (120 operations / 121 tools)
 - 082-token-weapon-library: weapon library in the user menu ("Armas", shared like tokens, owner edits/deletes, delete refused while in use) and one weapon per hand on 3D-model tokens, with a per-token grip (position, rotation, size) adjusted in the token form's "Armas" tab and drawn on the Mixamo hand bones in the preview and the 3D view. `weapons` table + four `tokens` columns (migration `AddWeapons`), `WeaponController`, `rightWeapon`/`leftWeapon` on the token DTOs; MCP `WeaponTools` (120 operations / 121 tools)
 - 081-mask-3d-scene: the 3D view is a real three.js scene built from the 3D mask — blocks as tall as its tones with the map image on top and the wall texture on the sides, the camera looks up and down, the walking character climbs blocks up to a step (36 units, about the waist) and is stopped by taller ones (no jump; a staircase of tones reaches high places), pieces/models/balloons stand on the terrain and hide behind blocks, quality levels redefined (resolution, smoothing, shadows on Ultra). Frontend only (no API, schema or MCP change besides the guide text); the raycaster and its helpers were removed
 - 080-offmap-chat-actions: characters of the campaign act from the chat without a piece on the map — the ⚡ switch is always enabled for an approved character, `POST /api/turn/action` takes `campaignId` + `characterId` as the alternative to `mapTokenId`, and converting a message into an action no longer needs a piece; every action rule is unchanged. No schema change; MCP `act_in_turn` gains `campaignId`/`characterId`
