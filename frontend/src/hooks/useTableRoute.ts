@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import { useCampaign } from './useCampaign';
 import { useMapEditor } from './useMapEditor';
 import { ApiError } from '../Services/apiHelpers';
-import { parseTablePath, tablePathFor } from '../lib/tableRoute';
+import { campaignService } from '../Services/campaignService';
+import { mapRouteAction, parseTablePath, tablePathFor } from '../lib/tableRoute';
 import { useChat } from './useChat';
 import { LAYOUT_MODE } from '../lib/layoutMode';
 import { rememberTableReturn } from '../lib/libraryReturn';
@@ -57,7 +58,10 @@ export const useTableRoute = (guard: () => Promise<boolean>) => {
     const openCampaign = campaignRef.current.currentCampaign;
     const draft = editorRef.current.draft;
     if (path.kind === 'campaign' && openCampaign?.slug === path.slug) return;
-    if (path.kind === 'map' && draft.mapSlug === path.slug) return;
+    const mapAction = path.kind === 'map'
+      ? mapRouteAction(path.slug, { mapSlug: draft.mapSlug, mapCampaignId: draft.campaignId, campaignId: openCampaign?.campaignId ?? null })
+      : null;
+    if (mapAction === 'skip') return;
 
     let cancelled = false;
     pendingRef.current = true;
@@ -71,6 +75,13 @@ export const useTableRoute = (guard: () => Promise<boolean>) => {
 
     (async () => {
       try {
+        // The map asked is already loaded under another campaign (088): select its campaign again, keep the map.
+        if (mapAction === 'selectCampaign') {
+          const owner = await campaignService.getById(draft.campaignId!);
+          if (!cancelled) campaignRef.current.selectCampaign(owner);
+          return;
+        }
+
         const allowed = await guardRef.current();
         if (cancelled) return;
         if (!allowed) {

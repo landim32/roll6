@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isTablePath, parseTablePath, tablePathFor } from './tableRoute';
+import { isTablePath, mapRouteAction, parseTablePath, tablePathFor } from './tableRoute';
 
 describe('parseTablePath', () => {
   it('reads campaign and map slugs, with or without a trailing slash', () => {
@@ -52,5 +52,25 @@ describe('tablePathFor', () => {
     expect(tablePathFor({
       campaignSlug: null, mapSlug: 'estrada-1', mapCampaignId: 3, campaignId: null,
     })).toBe('/');
+  });
+});
+
+describe('mapRouteAction', () => {
+  it('opens a map that is not the one loaded', () => {
+    expect(mapRouteAction('estrada-1', { mapSlug: null, mapCampaignId: null, campaignId: null })).toBe('open');
+    expect(mapRouteAction('estrada-1', { mapSlug: 'caverna', mapCampaignId: 1, campaignId: 1 })).toBe('open');
+  });
+
+  it('skips the map already loaded with its own campaign open', () => {
+    expect(mapRouteAction('estrada-1', { mapSlug: 'estrada-1', mapCampaignId: 1, campaignId: 1 })).toBe('skip');
+  });
+
+  it('skips a loaded map with no campaign', () => {
+    expect(mapRouteAction('estrada-1', { mapSlug: 'estrada-1', mapCampaignId: null, campaignId: 2 })).toBe('skip');
+  });
+
+  it("selects the map's campaign again when the loaded map belongs to another campaign (088)", () => {
+    expect(mapRouteAction('estrada-1', { mapSlug: 'estrada-1', mapCampaignId: 1, campaignId: 2 })).toBe('selectCampaign');
+    expect(mapRouteAction('estrada-1', { mapSlug: 'estrada-1', mapCampaignId: 1, campaignId: null })).toBe('selectCampaign');
   });
 });

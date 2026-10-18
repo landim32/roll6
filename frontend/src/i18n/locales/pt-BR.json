@@ -423,7 +423,7 @@
     "modalTitle": "Tokens",
     "cropHint": "Arraste a imagem para enquadrar, use o zoom (ou a roda do mouse) e gire se precisar. O recorte segue o espaço e é salvo em {{width}} × {{height}} px.",
     "mineTab": "Meus Tokens",
-    "mineEmpty": "Você ainda não cadastrou tokens. Use a aba Incluir token ou procure na biblioteca.",
+    "mineEmpty": "Você ainda não cadastrou tokens. Use o botão Incluir token ou procure na biblioteca.",
     "edit": "Editar {{name}}",
     "badge": {
       "sprites": "2.5D",
@@ -437,7 +437,7 @@
     "searchTab": "Buscar tokens",
     "createTab": "Incluir token",
     "search": "Buscar por nome",
-    "empty": "Nenhum token encontrado. Cadastre um na aba Incluir token.",
+    "empty": "Nenhum token encontrado. Cadastre um com o botão Incluir token.",
     "name": "Nome",
     "description": "Descrição (opcional)",
     "upImage": "Imagem em pé",
