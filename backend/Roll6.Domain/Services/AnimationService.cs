@@ -7,6 +7,7 @@ using Roll6.DTO.Animation;
 using Roll6.DTO.Common;
 using Roll6.DTO.Image;
 using Roll6.DTO.Realtime.Animation;
+using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Domain.Services;
@@ -28,6 +29,7 @@ public class AnimationService : IAnimationService
     private readonly IImageService _imageService;
     private readonly IAnimationConversationRepository<AnimationConversation> _conversationRepository;
     private readonly IAnimationNotifier _notifier;
+    private readonly IImageStorageAppService _imageStorage;
 
     public AnimationService(
         IAnimationRepository<Animation> repository,
@@ -35,7 +37,8 @@ public class AnimationService : IAnimationService
         IUserRepository<User> userRepository,
         IImageService imageService,
         IAnimationConversationRepository<AnimationConversation> conversationRepository,
-        IAnimationNotifier notifier)
+        IAnimationNotifier notifier,
+        IImageStorageAppService imageStorage)
     {
         _repository = repository;
         _tokenRepository = tokenRepository;
@@ -43,6 +46,7 @@ public class AnimationService : IAnimationService
         _imageService = imageService;
         _conversationRepository = conversationRepository;
         _notifier = notifier;
+        _imageStorage = imageStorage;
     }
 
     public async Task<PagedList<AnimationInfo>> ListAsync(long viewerUserId, PageQuery query, bool mine, int? type)
@@ -85,6 +89,8 @@ public class AnimationService : IAnimationService
         var file = AnimationFormat.Parse(info.Content);
         // Name and type are validated before anything is stored, so a bad request leaves no file behind.
         var animation = Animation.Create(userId, info.Name, info.Type, file.Duration, file.Loop);
+        if (info.ThumbnailImage is not null)
+            animation.ChangeThumbnail(info.ThumbnailImage);
         var fileName = await _imageService.StoreAnimationAsync(AnimationFormat.Serialize(info.Content));
         Animation saved;
         try
@@ -116,16 +122,18 @@ public class AnimationService : IAnimationService
             throw new ConflictException(IN_USE);
         if (file is null)
         {
+            if (info.ThumbnailImage is not null)
+                animation.ChangeThumbnail(info.ThumbnailImage);
             var updated = await _repository.UpdateAsync(animation);
             return MapToDto(updated, await OwnerNamesAsync(new[] { updated.UserId }));
         }
-        return await SaveWithNewFileAsync(animation, content!.Value, file);
+        return await SaveWithNewFileAsync(animation, content!.Value, file, info.ThumbnailImage);
     }
 
     public async Task<AnimationInfo> ReplaceContentAsync(long userId, long animationId, AnimationContentInfo info, string origin = AnimationVersionInfo.ORIGIN_USER)
     {
         var animation = await GetOwnedAsync(userId, animationId);
-        var saved = await SaveWithNewFileAsync(animation, info.Content, AnimationFormat.Parse(info.Content));
+        var saved = await SaveWithNewFileAsync(animation, info.Content, AnimationFormat.Parse(info.Content), info.ThumbnailImage);
         // The editors (and the working file of the console, when the change did not come from it) follow the new version (086).
         await _notifier.VersionAsync(new AnimationVersionInfo
         {
@@ -138,8 +146,12 @@ public class AnimationService : IAnimationService
         return saved;
     }
 
-    /// <summary>Stores the new file, points the row to it and only then removes the old one (a failed update removes the new file).</summary>
-    private async Task<AnimationInfo> SaveWithNewFileAsync(Animation animation, JsonElement content, AnimationFile file)
+    /// <summary>
+    /// Stores the new file, points the row to it and only then removes the old one (a failed update removes the new file).
+    /// The new content clears the card's picture (090) unless <paramref name="thumbnailImage"/> brings a new one — the
+    /// editor and the console send none, so the library draws it again.
+    /// </summary>
+    private async Task<AnimationInfo> SaveWithNewFileAsync(Animation animation, JsonElement content, AnimationFile file, string? thumbnailImage = null)
     {
         var oldFileName = animation.FileName;
         var fileName = await _imageService.StoreAnimationAsync(AnimationFormat.Serialize(content));
@@ -147,6 +159,8 @@ public class AnimationService : IAnimationService
         try
         {
             animation.ReplaceFile(fileName, file.Duration, file.Loop);
+            if (thumbnailImage is not null)
+                animation.ChangeThumbnail(thumbnailImage);
             saved = await _repository.UpdateAsync(animation);
         }
         catch
@@ -192,7 +206,7 @@ public class AnimationService : IAnimationService
         return users.ToDictionary(user => user.UserId, user => user.Name);
     }
 
-    private static AnimationInfo MapToDto(Animation animation, IReadOnlyDictionary<long, string> owners) => new()
+    private AnimationInfo MapToDto(Animation animation, IReadOnlyDictionary<long, string> owners) => new()
     {
         AnimationId = animation.AnimationId,
         UserId = animation.UserId,
@@ -202,6 +216,8 @@ public class AnimationService : IAnimationService
         Duration = animation.Duration,
         Loop = animation.Loop,
         FileUrl = $"/api/animation/{animation.AnimationId}/file",
+        ThumbnailImage = animation.ThumbnailImage,
+        ThumbnailImageUrl = _imageStorage.GetUrl(animation.ThumbnailImage),
         CreatedAt = animation.CreatedAt,
         UpdatedAt = animation.UpdatedAt
     };

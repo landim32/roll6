@@ -96,4 +96,58 @@ public class WeaponTests
         weapon.ModelFile.Should().Be(OTHER_FILE);
         weapon.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
+
+    // 090: the library card's picture.
+    private const string THUMB = "aaaabbbbccccddddeeeeffff00001111.png";
+
+    private static Weapon WithThumbnail()
+    {
+        var weapon = Weapon.Create(1, "Espada", "0123456789abcdef0123456789abcdef.glb");
+        weapon.ChangeThumbnail(THUMB);
+        return weapon;
+    }
+
+    [Fact]
+    public void ReplaceFile_WithAnotherFile_ClearsTheThumbnail()
+    {
+        var weapon = WithThumbnail();
+        weapon.ReplaceFile("fedcba9876543210fedcba9876543210.glb");
+        weapon.ThumbnailImage.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReplaceFile_WithTheSameFile_KeepsTheThumbnail()
+    {
+        var weapon = WithThumbnail();
+        weapon.ReplaceFile("0123456789abcdef0123456789abcdef.glb");
+        weapon.ThumbnailImage.Should().Be(THUMB);
+    }
+
+    [Fact]
+    public void SetPose_Different_ClearsTheThumbnail_SameKeepsIt()
+    {
+        var weapon = WithThumbnail();
+        weapon.SetPose(new WeaponPose(0, 0, 0));
+        weapon.ThumbnailImage.Should().Be(THUMB);
+        weapon.SetPose(new WeaponPose(0, 90, 0));
+        weapon.ThumbnailImage.Should().BeNull();
+    }
+
+    [Fact]
+    public void SetGripPoint_KeepsTheThumbnail()
+    {
+        var weapon = WithThumbnail();
+        weapon.SetGripPoint(new WeaponGripPoint(0.5, 0.1, 0.5));
+        weapon.ThumbnailImage.Should().Be(THUMB);
+    }
+
+    [Fact]
+    public void ChangeThumbnail_EmptyRemoves_InvalidIsRefused()
+    {
+        var weapon = WithThumbnail();
+        weapon.ChangeThumbnail("");
+        weapon.ThumbnailImage.Should().BeNull();
+        var act = () => weapon.ChangeThumbnail("../x.png");
+        act.Should().Throw<DomainValidationException>().Where(e => e.Errors.ContainsKey("thumbnailImage"));
+    }
 }

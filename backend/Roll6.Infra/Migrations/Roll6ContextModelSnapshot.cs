@@ -61,6 +61,11 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
+                    b.Property<string>("ThumbnailImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("thumbnail_image");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -270,6 +275,11 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("free_mode");
+
+                    b.Property<string>("Image")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("image");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1822,6 +1832,11 @@ namespace Roll6.Infra.Migrations
                     b.Property<int>("PoseRz")
                         .HasColumnType("integer")
                         .HasColumnName("pose_rz");
+
+                    b.Property<string>("ThumbnailImage")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("thumbnail_image");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()

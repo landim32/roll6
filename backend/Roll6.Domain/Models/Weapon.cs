@@ -27,6 +27,11 @@ public class Weapon
     public int PoseRx { get; set; }
     public int PoseRy { get; set; }
     public int PoseRz { get; set; }
+    /// <summary>
+    /// The library card's picture (090): a stored PNG rendered by the site. Null = the site draws it live. Cleared
+    /// whenever the picture would change (a new file or a different pose); a thumbnail sent in the same request is applied afterwards.
+    /// </summary>
+    public string? ThumbnailImage { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -52,8 +57,10 @@ public class Weapon
 
     public void ReplaceFile(string? modelFile)
     {
-        ModelFile = Guard.ModelFileName(modelFile, "modelFile")
+        var file = Guard.ModelFileName(modelFile, "modelFile")
             ?? throw new DomainValidationException("modelFile", "Envie o modelo 3D da arma.");
+        if (file != ModelFile) ThumbnailImage = null;
+        ModelFile = file;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -71,9 +78,17 @@ public class Weapon
     public void SetPose(WeaponPose pose)
     {
         var normalized = pose.Validate("pose").Normalized();
+        if (normalized != Pose) ThumbnailImage = null;
         PoseRx = normalized.Rx;
         PoseRy = normalized.Ry;
         PoseRz = normalized.Rz;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>The library card's picture (090): <c>""</c> removes it, a stored image name replaces it.</summary>
+    public void ChangeThumbnail(string image)
+    {
+        ThumbnailImage = string.IsNullOrWhiteSpace(image) ? null : Guard.ImageFileName(image, "thumbnailImage");
         UpdatedAt = DateTime.UtcNow;
     }
 

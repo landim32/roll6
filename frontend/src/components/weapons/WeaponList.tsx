@@ -2,8 +2,19 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useWeapon } from '../../hooks/useWeapon';
+import { useAuth } from '../../hooks/useAuth';
 import type { WeaponInfo } from '../../types/weapon';
-import { EyeIcon, PencilIcon, TrashIcon } from '../ui/icons';
+import { EyeIcon, PencilIcon, SwapIcon, TrashIcon } from '../ui/icons';
+import { CardGrid } from '../library/CardGrid';
+import { LibraryCard } from '../library/LibraryCard';
+import { Thumbnail } from '../library/Thumbnail';
+
+/** Draws a weapon's card picture (090): its model in its standard pose (three.js, loaded only here). */
+const renderWeapon = async (weapon: WeaponInfo, signal: AbortSignal): Promise<Blob> => {
+  if (!weapon.modelFileUrl) throw new Error('no model');
+  const { renderWeaponThumbnail } = await import('../library/weaponThumbnail');
+  return renderWeaponThumbnail({ url: weapon.modelFileUrl }, weapon.pose, signal);
+};
 
 const PAGE_SIZE = 12;
 
@@ -17,10 +28,16 @@ interface WeaponListProps {
   onDelete?: (weapon: WeaponInfo) => void;
 }
 
-/** One tab of "Armas" (082): name (and owner), a name search, 12 per page; preview, and edit/delete for the own. */
+/**
+ * One submenu of "Armas" (082; a tab until 090): name (and owner), a name search, 12 per page; preview, and edit/delete
+ * for the own — since 090 as cards in 4 columns (3 on phones) with the weapon's picture (stored, else drawn here and,
+ * for the user's own, stored).
+ */
 export const WeaponList = ({ mine, version, onPreview, onEdit, onDelete }: WeaponListProps) => {
   const { t } = useTranslation();
-  const { search } = useWeapon();
+  const { search, storeThumbnail } = useWeapon();
+  const { session } = useAuth();
+  const userId = session?.user.userId ?? null;
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -52,45 +69,54 @@ export const WeaponList = ({ mine, version, onPreview, onEdit, onDelete }: Weapo
         <button type="submit" className="btn btn-sm btn-outline-secondary">{t('common.search')}</button>
       </form>
 
-      {items === null && <p className="text-body-secondary">{t('common.loading')}</p>}
-      {items !== null && items.length === 0 && <p className="text-body-secondary">{t('weapons.empty')}</p>}
-      {items !== null && items.length > 0 && (
-        <ul className="list-group">
-          {items.map((weapon) => (
-            <li key={weapon.weaponId} className="list-group-item d-flex align-items-center gap-2">
-              <div className="flex-grow-1 min-w-0">
-                <div className="text-truncate fw-semibold" title={weapon.name}>{weapon.name}</div>
-                {!mine && weapon.ownerName && (
-                  <small className="text-body-secondary">{t('weapons.owner', { name: weapon.ownerName })}</small>
+      <CardGrid
+        items={items}
+        cols={4}
+        getKey={(weapon) => weapon.weaponId}
+        emptyText={t('weapons.empty')}
+        page={page}
+        totalPages={totalPages}
+        onPage={setPage}
+        renderCard={(weapon) => (
+          <LibraryCard
+            ratio="square"
+            title={weapon.name}
+            figure={(
+              <Thumbnail
+                storedUrl={weapon.thumbnailImageUrl}
+                render={(signal) => renderWeapon(weapon, signal)}
+                alt={t('library.thumbnail.alt', { name: weapon.name })}
+                fallback={<SwapIcon />}
+                onRendered={weapon.userId === userId && !weapon.thumbnailImage
+                  ? (blob) => { void storeThumbnail(weapon, blob); } : undefined}
+              />
+            )}
+            fallback={<SwapIcon />}
+            onOpen={() => onPreview(weapon)}
+            meta={!mine && weapon.ownerName ? t('weapons.owner', { name: weapon.ownerName }) : undefined}
+            actions={(
+              <>
+                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onPreview(weapon)}
+                  title={t('weapons.previewLabel', { name: weapon.name })} aria-label={t('weapons.previewLabel', { name: weapon.name })}>
+                  <EyeIcon size={14} />
+                </button>
+                {onEdit && (
+                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(weapon)}
+                    title={t('weapons.editLabel', { name: weapon.name })} aria-label={t('weapons.editLabel', { name: weapon.name })}>
+                    <PencilIcon size={14} />
+                  </button>
                 )}
-              </div>
-              <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onPreview(weapon)}
-                title={t('weapons.previewLabel', { name: weapon.name })} aria-label={t('weapons.previewLabel', { name: weapon.name })}>
-                <EyeIcon size={14} />
-              </button>
-              {onEdit && (
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(weapon)}
-                  title={t('weapons.editLabel', { name: weapon.name })} aria-label={t('weapons.editLabel', { name: weapon.name })}>
-                  <PencilIcon size={14} />
-                </button>
-              )}
-              {onDelete && (
-                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onDelete(weapon)}
-                  title={t('weapons.deleteLabel', { name: weapon.name })} aria-label={t('weapons.deleteLabel', { name: weapon.name })}>
-                  <TrashIcon size={14} />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      {totalPages > 1 && (
-        <div className="d-flex justify-content-between align-items-center mt-3">
-          <button type="button" className="btn btn-outline-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t('common.previous')}</button>
-          <small className="text-body-secondary">{t('common.page', { page, total: totalPages })}</small>
-          <button type="button" className="btn btn-outline-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>{t('common.next')}</button>
-        </div>
-      )}
+                {onDelete && (
+                  <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onDelete(weapon)}
+                    title={t('weapons.deleteLabel', { name: weapon.name })} aria-label={t('weapons.deleteLabel', { name: weapon.name })}>
+                    <TrashIcon size={14} />
+                  </button>
+                )}
+              </>
+            )}
+          />
+        )}
+      />
     </>
   );
 };

@@ -69,6 +69,9 @@ export interface WeaponInfo {
   modelFileUrl: string | null;
   gripPoint: GripPoint;
   pose: WeaponPose;
+  /** The library card's picture (090): the stored PNG and its presigned URL; null = drawn live by the site. */
+  thumbnailImage?: string | null;
+  thumbnailImageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +82,8 @@ export interface WeaponInsertInfo {
   modelFile: string;
   gripPoint?: GripPoint;
   pose?: WeaponPose;
+  /** The library card's picture (090): a name from `POST /api/image`; on updates `''` removes it, left out keeps it. */
+  thumbnailImage?: string;
 }
 
 /** Changes a weapon (owner only): a field left out keeps its value. */
@@ -87,6 +92,8 @@ export interface WeaponUpdateInfo {
   modelFile?: string;
   gripPoint?: GripPoint;
   pose?: WeaponPose;
+  /** The library card's picture (090): a name from `POST /api/image`; on updates `''` removes it, left out keeps it. */
+  thumbnailImage?: string;
 }
 
 /** The weapon in one socket of a token, as read: the weapon's name, file, grip point and pose, and the socket's grip. */

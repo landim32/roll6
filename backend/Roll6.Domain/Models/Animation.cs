@@ -21,6 +21,11 @@ public class Animation
     public string FileName { get; set; } = string.Empty;
     public double Duration { get; set; }
     public bool Loop { get; set; }
+    /// <summary>
+    /// The library card's picture (090): a stored PNG rendered by the site. Null = the site draws it live. Cleared
+    /// whenever the picture would change (a new content); a thumbnail sent in the same request is applied afterwards.
+    /// </summary>
+    public string? ThumbnailImage { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -46,6 +51,7 @@ public class Animation
         FileName = Guard.AnimationFileName(fileName, "fileName");
         Duration = duration;
         Loop = loop;
+        ThumbnailImage = null;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -61,6 +67,13 @@ public class Animation
         if (!Enum.IsDefined(typeof(AnimationType), type))
             throw new DomainValidationException("type", "Tipo de animação inválido. Use de 1 a 7.");
         AnimationType = (AnimationType)type;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>The library card's picture (090): <c>""</c> removes it, a stored image name replaces it.</summary>
+    public void ChangeThumbnail(string image)
+    {
+        ThumbnailImage = string.IsNullOrWhiteSpace(image) ? null : Guard.ImageFileName(image, "thumbnailImage");
         UpdatedAt = DateTime.UtcNow;
     }
 

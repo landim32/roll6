@@ -12,7 +12,8 @@ public static class CampaignTools
 {
     private const string CAMPAIGN_FIELDS = """
         Campaign fields: campaignId, userId (the master), ownerName, name, slug (immutable URL slug), open (open campaigns
-        approve access requests at once), currentTurn, currentMapId (the map players follow), createdAt, updatedAt.
+        approve access requests at once), currentTurn, currentMapId (the map players follow), image/imageUrl (the
+        campaign's picture on the library cards, null without one), createdAt, updatedAt.
         """;
 
     [McpServerTool(Name = "list_campaigns", Title = "List campaigns", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -89,8 +90,9 @@ public static class CampaignTools
     public static Task<CallToolResult> CreateCampaign(
         Roll6ApiClient api,
         [Description("Campaign name (required, up to 260 characters). Example: \"The Lost Mine\".")] string name,
-        [Description("true = access requests are approved immediately; false (default) = the master approves each one.")] bool? open = null) =>
-        api.SendAsync(HttpMethod.Post, "/api/campaign", new CampaignInsertInfo { Name = name, Open = open });
+        [Description("true = access requests are approved immediately; false (default) = the master approves each one.")] bool? open = null,
+        [Description("The campaign's picture on the library cards (optional). " + McpDocs.IMAGE_FILE)] string? image = null) =>
+        api.SendAsync(HttpMethod.Post, "/api/campaign", new CampaignInsertInfo { Name = name, Open = open, Image = image });
 
     [McpServerTool(Name = "rename_campaign", Title = "Rename campaign", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/name")]
@@ -186,6 +188,23 @@ public static class CampaignTools
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("true = show the pending pictures over the chat; false = hide them for everyone.")] bool pendingNotice) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/pending-notice", new CampaignPendingNoticeInfo { PendingNotice = pendingNotice });
+
+    [McpServerTool(Name = "set_campaign_image", Title = "Set campaign image", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/campaign/{id}/image")]
+    [Description("""
+        What it does: sets or removes the campaign's picture, shown on the campaign cards of the app's library (a wide
+        16:9 picture reads best). Upload the file first with upload_image and pass the returned fileName; null or an
+        empty string removes it (the cards then show a default figure). Changes no rule; everyone sees it at once.
+        Who can use it: only the master, in any campaign status.
+        Returns: the updated campaign (image, imageUrl).
+        Common errors: 400 image not a stored file name, 403 not the master, 404 not found.
+        Related tools: upload_image, create_campaign, get_campaign.
+        """)]
+    public static Task<CallToolResult> SetCampaignImage(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description(McpDocs.IMAGE_FILE)] string? image = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/image", new CampaignImageInfo { Image = image });
 
     [McpServerTool(Name = "delete_campaign", Title = "Delete campaign", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/campaign/{id}")]

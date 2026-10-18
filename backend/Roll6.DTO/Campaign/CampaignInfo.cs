@@ -35,6 +35,14 @@ public class CampaignInfo
     [JsonPropertyName("currentMapId")]
     public long? CurrentMapId { get; set; }
 
+    /// <summary>The campaign's picture (090): the stored image name, null without one.</summary>
+    [JsonPropertyName("image")]
+    public string? Image { get; set; }
+
+    /// <summary>Presigned URL of <see cref="Image"/>; null without one.</summary>
+    [JsonPropertyName("imageUrl")]
+    public string? ImageUrl { get; set; }
+
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 

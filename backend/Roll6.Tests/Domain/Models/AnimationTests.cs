@@ -58,4 +58,17 @@ public class AnimationTests
         var act = () => animation.AttachFile("x.json");
         act.Should().Throw<DomainValidationException>();
     }
+
+    // 090: the library card's picture.
+    [Fact]
+    public void ReplaceFile_ClearsTheThumbnail_RenameKeepsIt()
+    {
+        var animation = Animation.Create(1, "Aceno", 1, 1, true);
+        animation.ChangeThumbnail("aaaabbbbccccddddeeeeffff00001111.png");
+        animation.Rename("Aceno 2");
+        animation.ChangeType(2);
+        animation.ThumbnailImage.Should().Be("aaaabbbbccccddddeeeeffff00001111.png");
+        animation.ReplaceFile("0123456789abcdef0123456789abcdef.json", 2, false);
+        animation.ThumbnailImage.Should().BeNull();
+    }
 }

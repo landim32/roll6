@@ -27,6 +27,9 @@ export interface AnimationInfo {
   loop: boolean;
   /** `/api/animation/{id}/file`: the file is read through the API, never the bucket. */
   fileUrl: string;
+  /** The library card's picture (090): the stored PNG and its presigned URL; null = drawn live by the site. */
+  thumbnailImage?: string | null;
+  thumbnailImageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,12 +39,16 @@ export interface AnimationInsertInfo {
   name: string;
   type: AnimationType;
   content: AnimationFile;
+  /** The library card's picture (090): a name from `POST /api/image`; on updates `''` removes it, left out keeps it. */
+  thumbnailImage?: string;
 }
 
-/** Renames or retypes an animation (its owner only). */
+/** Renames or retypes an animation, or sets its card's picture (its owner only); a field left out keeps its value. */
 export interface AnimationUpdateInfo {
-  name: string;
-  type: AnimationType;
+  name?: string;
+  type?: AnimationType;
+  /** The library card's picture (090): a name from `POST /api/image`; on updates `''` removes it, left out keeps it. */
+  thumbnailImage?: string;
 }
 
 export interface AnimationQuery extends ListQuery {

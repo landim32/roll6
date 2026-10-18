@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { CharacterAvatar } from '../../components/ui/CharacterAvatar';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { TransferCharacterModal } from '../../components/modals/TransferCharacterModal';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
-import { PencilIcon, TransferIcon } from '../../components/ui/icons';
+import { CardGrid } from '../../components/library/CardGrid';
+import { LibraryCard } from '../../components/library/LibraryCard';
+import { PencilIcon, PersonFillIcon, TransferIcon } from '../../components/ui/icons';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useCharacter } from '../../hooks/useCharacter';
 import { participationAction } from '../../lib/characterSelection';
@@ -20,7 +21,7 @@ const errorMessage = (err: unknown) => (err instanceof Error ? err.message : Str
 /**
  * "Personagens" of the library (087; was "Selecionar personagem"): only the user's own characters, each with its
  * status in the current campaign and the action for it (request access, accept/decline an invite, use it), the pencil
- * to its page and "Transferir".
+ * to its page and "Transferir" — since 090 as cards in 4 columns (3 on phones).
  */
 export const CharactersPage = () => {
   const { t } = useTranslation();
@@ -101,18 +102,21 @@ export const CharactersPage = () => {
       <LibraryPageHeader title={t('library.nav.characters')}
         actions={<button type="button" className="btn btn-primary btn-sm" onClick={() => navigate(characterPath('new'))}>{t('character.include')}</button>} />
       {currentCampaign && <p className="text-body-secondary small">{t('library.characters.statusIn', { campaign: currentCampaign.name })}</p>}
-      {myCharacters.length === 0 ? (
-        <p className="text-body-secondary">{loading ? t('common.loading') : t('selectCharacter.empty')}</p>
-      ) : (
-        <ul className="list-group stm-list">
-          {myCharacters.map((character) => (
-            <li key={character.characterId} className="list-group-item stm-character-row">
-              <CharacterAvatar name={character.name} imageUrl={character.imageUrl} />
-              <div className="stm-character-text">
-                <Link to={characterPath(character.characterId)} className="fw-semibold text-reset text-decoration-none">{character.name}</Link>
-                {currentCampaign && <span><StatusBadge status={participationOf(character.characterId)?.status} /></span>}
-              </div>
-              <div className="stm-character-actions">
+      <CardGrid
+        items={myCharacters.length === 0 && loading ? null : myCharacters}
+        cols={4}
+        getKey={(character) => character.characterId}
+        emptyText={t('selectCharacter.empty')}
+        renderCard={(character) => (
+          <LibraryCard
+            ratio="square"
+            title={character.name}
+            figure={character.imageUrl ? <img src={character.imageUrl} alt={character.name} loading="lazy" /> : undefined}
+            fallback={<PersonFillIcon />}
+            onOpen={() => navigate(characterPath(character.characterId))}
+            badges={currentCampaign ? <StatusBadge status={participationOf(character.characterId)?.status} /> : undefined}
+            actions={(
+              <>
                 {renderActions(character)}
                 <Link to={characterPath(character.characterId)} className="btn btn-sm btn-outline-secondary"
                   title={t('selectCharacter.edit', { name: character.name })} aria-label={t('selectCharacter.edit', { name: character.name })}>
@@ -122,11 +126,11 @@ export const CharactersPage = () => {
                   title={t('transfer.action')} aria-label={t('transfer.action')} onClick={() => setTransferring(character)}>
                   <TransferIcon size={14} />
                 </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+              </>
+            )}
+          />
+        )}
+      />
       <TransferCharacterModal
         open={transferring !== null}
         onOpenChange={(value) => { if (!value) setTransferring(null); }}

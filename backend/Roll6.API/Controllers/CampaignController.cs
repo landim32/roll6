@@ -174,6 +174,21 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Sets or removes the campaign's picture on the library cards (090, master, any status).</summary>
+    [HttpPut("{id:long}/image")]
+    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetImage(long id, [FromBody] CampaignImageInfo info)
+    {
+        try
+        {
+            return Ok(await _campaignService.SetImageAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Changes the campaign status (049, master): 1 Preparando, 2 Ativa, 3 Pausada, 4 Finalizada.</summary>
     [HttpPut("{id:long}/status")]
     [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]

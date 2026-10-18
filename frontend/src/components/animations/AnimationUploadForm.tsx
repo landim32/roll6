@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useAnimation } from '../../hooks/useAnimation';
-import { parseAnimationText, suggestedType } from '../../lib/animationFormat';
+import { parseAnimationText, suggestedType, toRoll6Clip } from '../../lib/animationFormat';
 import type { AnimationFile } from '../../lib/animationFormat';
 import { ANIMATION_TYPE, ANIMATION_TYPES } from '../../types/animation';
 import type { AnimationInfo, AnimationType } from '../../types/animation';
@@ -12,7 +12,19 @@ const MAX_NAME = 100;
 
 interface AnimationUploadFormProps {
   onUploaded: (animation: AnimationInfo) => void;
+  /** Whether a file was picked or a name typed (090: the "Incluir" page asks before leaving). */
+  onDirtyChange?: (dirty: boolean) => void;
 }
+
+/** The library card's picture of the file being added (090): the standard skeleton; null when it cannot be drawn. */
+const drawThumbnail = async (content: AnimationFile): Promise<Blob | null> => {
+  try {
+    const { renderAnimationThumbnail } = await import('../library/animationThumbnail');
+    return await renderAnimationThumbnail(toRoll6Clip(content, 'new'));
+  } catch {
+    return null;
+  }
+};
 
 /** The name a file suggests: its own `name`, else the file name without `.json`. */
 const nameFrom = (file: AnimationFile, fileName: string) =>
@@ -20,9 +32,10 @@ const nameFrom = (file: AnimationFile, fileName: string) =>
 
 /**
  * "Enviar" (059): a `.json` in the `roll6-animation` format, checked here with the server's own rules before sending
- * (`lib/animationFormat`), plus its name and type — both suggested by the file when it carries them.
+ * (`lib/animationFormat`), plus its name and type — both suggested by the file when it carries them. The picture of its
+ * library card (090) is drawn here from the file and sent with it.
  */
-export const AnimationUploadForm = ({ onUploaded }: AnimationUploadFormProps) => {
+export const AnimationUploadForm = ({ onUploaded, onDirtyChange }: AnimationUploadFormProps) => {
   const { t } = useTranslation();
   const { upload } = useAnimation();
   const [content, setContent] = useState<AnimationFile | null>(null);
@@ -32,6 +45,8 @@ export const AnimationUploadForm = ({ onUploaded }: AnimationUploadFormProps) =>
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [inputKey, setInputKey] = useState(0);
+  const dirty = content !== null || name.trim().length > 0;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
   const choose = async (event: ChangeEvent<HTMLInputElement>) => {
     const chosen = event.target.files?.[0];
@@ -59,7 +74,7 @@ export const AnimationUploadForm = ({ onUploaded }: AnimationUploadFormProps) =>
     setSending(true);
     setError(null);
     try {
-      const created = await upload({ name: name.trim(), type, content });
+      const created = await upload({ name: name.trim(), type, content }, await drawThumbnail(content));
       toast.success(t('animations.uploaded'));
       setContent(null);
       setName('');

@@ -68,9 +68,12 @@ public class WeaponService : IWeaponService
 
     public async Task<WeaponInfo> CreateAsync(long userId, WeaponInsertInfo info)
     {
-        var saved = await _repository.InsertAsync(Weapon.Create(userId, info.Name, info.ModelFile,
+        var weapon = Weapon.Create(userId, info.Name, info.ModelFile,
             info.GripPoint == null ? null : TokenWeapons.ToGripPoint(info.GripPoint),
-            info.Pose == null ? null : TokenWeapons.ToPose(info.Pose)));
+            info.Pose == null ? null : TokenWeapons.ToPose(info.Pose));
+        if (info.ThumbnailImage is not null)
+            weapon.ChangeThumbnail(info.ThumbnailImage);
+        var saved = await _repository.InsertAsync(weapon);
         return MapToDto(saved, await OwnerNamesAsync(new[] { userId }));
     }
 
@@ -94,6 +97,10 @@ public class WeaponService : IWeaponService
             weapon.SetPose(TokenWeapons.ToPose(info.Pose));
             placed = true;
         }
+        // 090: applied after the file and the pose, which clear the stored one, so a thumbnail sent along survives.
+        // The card's picture is the library's only: no token shows it, so it publishes nothing.
+        if (info.ThumbnailImage is not null)
+            weapon.ChangeThumbnail(info.ThumbnailImage);
         var saved = await _repository.UpdateAsync(weapon);
         if (newFile || placed)
         {
@@ -138,6 +145,8 @@ public class WeaponService : IWeaponService
         ModelFileUrl = _imageStorage.GetUrl(weapon.ModelFile),
         GripPoint = TokenWeapons.ToInfo(weapon.GripPoint),
         Pose = TokenWeapons.ToInfo(weapon.Pose),
+        ThumbnailImage = weapon.ThumbnailImage,
+        ThumbnailImageUrl = _imageStorage.GetUrl(weapon.ThumbnailImage),
         CreatedAt = weapon.CreatedAt,
         UpdatedAt = weapon.UpdatedAt
     };

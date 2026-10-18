@@ -21,6 +21,9 @@ export interface CampaignInfo {
   pendingNotice?: boolean;
   /** Campaign map the master opened last; players follow it (017). */
   currentMapId: number | null;
+  /** The campaign's picture on the library cards (090): the stored name and its presigned URL; null without one. */
+  image?: string | null;
+  imageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,6 +39,8 @@ export interface CampaignTableInfo {
   freeMode: boolean;
   /** Pending notice over the chat (072). */
   pendingNotice?: boolean;
+  /** Presigned URL of the campaign's picture (090); null without one. */
+  imageUrl?: string | null;
   isMaster: boolean;
   currentMapId: number | null;
   currentMapName: string | null;
@@ -57,4 +62,6 @@ export interface TableMapInfo {
 export interface CampaignInsertInfo {
   name: string;
   open: boolean;
+  /** The campaign's picture (090): a name from `POST /api/image`; optional. */
+  image?: string | null;
 }

@@ -7,16 +7,21 @@ import { useCampaign } from '../../hooks/useCampaign';
 import { useLeaveGuard } from '../../hooks/useLeaveGuard';
 import { campaignEditPath, libraryPath } from '../../lib/libraryRoutes';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
+import { CampaignImageField } from '../../components/campaign/CampaignImageField';
+import { uploadCampaignImage } from '../../lib/campaignImage';
+import type { ImageCrop } from '../../components/ui/ImageCropper';
 
-/** "Nova campanha" (087; was a tab of the campaign window): creates it and goes to its page. */
+/** "Nova campanha" (087; was a tab of the campaign window): creates it — with its picture, 090 — and goes to its page. */
 export const CampaignCreatePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { createCampaign, loading: saving } = useCampaign();
   const [name, setName] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [crop, setCrop] = useState<ImageCrop | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
-  const guard = useLeaveGuard(!done && (name.trim().length > 0 || isOpen));
+  const guard = useLeaveGuard(!done && (name.trim().length > 0 || isOpen || crop !== null));
 
   const onCreate = async (event: FormEvent) => {
     event.preventDefault();
@@ -25,12 +30,16 @@ export const CampaignCreatePage = () => {
       return;
     }
     try {
-      const created = await createCampaign({ name: name.trim(), open: isOpen });
+      setUploading(true);
+      const image = crop ? await uploadCampaignImage(crop) : null;
+      const created = await createCampaign({ name: name.trim(), open: isOpen, image });
       toast.success(t('toast.campaignCreated', { name: created.name }));
       setDone(true);
       navigate(campaignEditPath(created.slug), { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -46,7 +55,8 @@ export const CampaignCreatePage = () => {
           <input id="campaign-open" type="checkbox" className="form-check-input" checked={isOpen} onChange={(e) => setIsOpen(e.target.checked)} />
           <label className="form-check-label" htmlFor="campaign-open">{t('campaign.open')}</label>
         </div>
-        <button type="submit" className="btn btn-primary" disabled={saving}>{t('campaign.create')}</button>
+        <CampaignImageField id="campaign-image" currentUrl={null} onChange={setCrop} disabled={saving || uploading} />
+        <button type="submit" className="btn btn-primary" disabled={saving || uploading}>{t('campaign.create')}</button>
       </form>
       {guard}
     </section>

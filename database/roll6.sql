@@ -2509,5 +2509,34 @@ BEGIN
     VALUES ('20261018181722_AddAnimationConversations', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018225650_AddLibraryImages') THEN
+    ALTER TABLE weapons ADD thumbnail_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018225650_AddLibraryImages') THEN
+    ALTER TABLE campaigns ADD image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018225650_AddLibraryImages') THEN
+    ALTER TABLE animations ADD thumbnail_image character varying(260);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018225650_AddLibraryImages') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261018225650_AddLibraryImages', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

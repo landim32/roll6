@@ -23,8 +23,10 @@ const TokensPage = lazy(() => import('./pages/library/TokensPage'));
 const TokenEditPage = lazy(() => import('./pages/library/TokenEditPage'));
 const WeaponsPage = lazy(() => import('./pages/library/WeaponsPage'));
 const WeaponEditPage = lazy(() => import('./pages/library/WeaponEditPage'));
+const WeaponCreatePage = lazy(() => import('./pages/library/WeaponCreatePage'));
 const AnimationsPage = lazy(() => import('./pages/library/AnimationsPage'));
 const AnimationEditPage = lazy(() => import('./pages/library/AnimationEditPage'));
+const AnimationCreatePage = lazy(() => import('./pages/library/AnimationCreatePage'));
 
 /** Routes (/login public; the table, the animation editor and the library — 087 — protected) and the dark toaster. */
 export const App = () => {
@@ -47,21 +49,31 @@ export const App = () => {
         <Route path="/animation/:id" element={<AnimationEditorRedirect />} />
         <Route path="/library" element={<ProtectedRoute><LibraryLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="campaigns" replace />} />
-          <Route path="campaigns" element={<CampaignsPage />} />
+          {/* 090: each submenu is a route; the key remounts the page so a search never leaks into the next submenu. */}
+          <Route path="campaigns" element={<CampaignsPage key="mine" subsection="mine" />} />
+          <Route path="campaigns/search" element={<CampaignsPage key="search" subsection="search" />} />
+          <Route path="campaigns/playing" element={<CampaignsPage key="playing" subsection="playing" />} />
           <Route path="campaigns/new" element={<CampaignCreatePage />} />
           <Route path="campaigns/:slug" element={<Navigate to="characters" replace />} />
           <Route path="campaigns/:slug/:section" element={<CampaignEditPage />} />
-          <Route path="maps" element={<MapsPage />} />
+          <Route path="maps" element={<MapsPage key="mine" subsection="mine" />} />
+          <Route path="maps/search" element={<MapsPage key="search" subsection="search" />} />
+          <Route path="maps/campaign" element={<MapsPage key="campaign" subsection="campaign" />} />
           <Route path="maps/:id" element={<MapEditPage />} />
           <Route path="characters" element={<CharactersPage />} />
           <Route path="characters/:id" element={<CharacterEditPage />} />
           <Route path="npcs" element={<NpcsPage />} />
           <Route path="npcs/:id" element={<NpcEditPage />} />
-          <Route path="tokens" element={<TokensPage />} />
+          <Route path="tokens" element={<TokensPage key="mine" subsection="mine" />} />
+          <Route path="tokens/search" element={<TokensPage key="search" subsection="search" />} />
           <Route path="tokens/:id" element={<TokenEditPage />} />
-          <Route path="weapons" element={<WeaponsPage />} />
+          <Route path="weapons" element={<WeaponsPage key="mine" subsection="mine" />} />
+          <Route path="weapons/search" element={<WeaponsPage key="search" subsection="search" />} />
+          <Route path="weapons/new" element={<WeaponCreatePage />} />
           <Route path="weapons/:id" element={<WeaponEditPage />} />
-          <Route path="animations" element={<AnimationsPage />} />
+          <Route path="animations" element={<AnimationsPage key="mine" subsection="mine" />} />
+          <Route path="animations/search" element={<AnimationsPage key="search" subsection="search" />} />
+          <Route path="animations/new" element={<AnimationCreatePage />} />
           <Route path="animations/:id" element={<AnimationEditPage />} />
           <Route path="animations/:id/editor" element={<AnimationEditorPage />} />
           <Route path="*" element={<Navigate to="campaigns" replace />} />

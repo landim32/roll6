@@ -480,21 +480,58 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
   - **User menu**: `components/menu/UserMenuHost` = `UserMenu` + the windows it opens (Editar, Trocar senha, Chaves de
     API, Notificações, Qualidade do 3D) + logout; used by `TopMenu`, the library and the animation editor's
     `EditorTopBar` (which also has `BackToTableButton`). "Biblioteca" replaced "Animações" and "Armas".
-  - **Pages**: `CampaignsPage` (Minhas with the gear · Jogando · Buscar, `?tab=`), `CampaignCreatePage`,
+  - **Pages**: `CampaignsPage` (Minhas with the gear · Buscar · Jogando — submenus since 090), `CampaignCreatePage`,
     `CampaignEditPage` (`/library/campaigns/:slug/:section` — `characters`/`npcs`/`maps`/`plan`, master only, status on
-    top; it selects the campaign of the address because the panels read the current one), `MapsPage` (Da campanha ·
-    Meus · Buscar; "Abrir" → table, unsaved map confirmed), `MapEditPage` (`/library/maps/:mapModelId?map={mapId}`),
+    top; it selects the campaign of the address because the panels read the current one), `MapsPage` (Meus · Buscar ·
+    Da campanha; "Abrir" → table, unsaved map confirmed), `MapEditPage` (`/library/maps/:mapModelId?map={mapId}`),
     `CharactersPage` (own only, status in the current campaign + request/accept/use, Transferir) and `CharacterEditPage`
     (`new`/`:id`, tabs `?tab=`), `NpcsPage`/`NpcEditPage` (library data only), `TokensPage`/`TokenEditPage` (others'
     tokens read-only; `hooks/useTokenList` moved out of the picker; `tokenService.get`), `WeaponsPage`/`WeaponEditPage`,
     `AnimationsPage`/`AnimationEditPage`. CSS `.stm-library-*`, texts `library.*`, `menu.library`, `menu.backToTable`.
   - **Table entry points**: the gear and "Gerenciar personagens" → `campaignEditPath(slug)`; "Selecionar personagem" →
     `/library/characters`; "Incluir personagem" → `/library/characters/new`; "Outras campanhas…" →
-    `/library/campaigns?tab=search`; "Mapas…" → `/library/maps`; map pencils → `mapEditPath`; the NPC card pencil →
+    `/library/campaigns/search`; "Mapas…" → `/library/maps`; map pencils → `mapEditPath`; the NPC card pencil →
     the campaign's NPCs section, whose rows now hold the category/master (`CampaignNpcFields`) and "Retirar da campanha".
   - **Still windows at the table** (in-play): `TokenModal` as the piece/character token **picker** (Meus · Buscar ·
     Incluir; no edit pencil), `NpcPickerModal`, `CampaignCharacterModal` (party card), `MapNpcFormModal`, `ImageModal`,
     `SaveMapModal`, `TransferCharacterModal` (from the character page) and the confirmations.
+- Library submenus, cards and pictures (090; spec `specs/090-library-grid-submenus/`, routes in `contracts/routes.md`):
+  - **Submenus**: the list tabs are gone. `lib/libraryRoutes.LIBRARY_SUBSECTIONS` lists them per section — Campanhas:
+    Minhas campanhas · Buscar · Jogando; Mapas: Meus mapas · Buscar · Da campanha; Tokens/Armas/Animações: Minhas (Meus)
+    · Buscar. The first is the section's own address, the others one more segment (`/library/campaigns/search`,
+    `/library/maps/campaign`). `subsectionPath`/`subsectionOf` build and read them. `App.tsx` declares each as a route of
+    the same page with `subsection` + `key`, so a submenu switch remounts the page and the search never leaks. `LibraryNav`
+    opens the current section's submenus under it (desktop `.stm-library-subnav`; the phone dropdown indents them).
+    087 addresses with `?tab=` are replaced through `components/library/useLegacyTab` + `legacyTabPath` (`?tab=upload`
+    of weapons/animations → `/new`). "Outras campanhas…" → `/library/campaigns/search`, "Mapas…" → Meus mapas.
+  - **Cards**: `components/library/CardGrid` (`cols` 3 = campaigns and maps, 1 / 2 md / 3 xl; 4 = characters, NPCs,
+    tokens, weapons, animations, 3 on phones / 4 from lg) + `LibraryCard` (picture at 16:9 or 1:1 with the section's
+    icon as fallback, truncated title, meta, badges, icon actions; `.stm-library-card*`, compact under `md`).
+    `TokenGrid` takes `cols="library"`; the `TokenModal` picker keeps its 4 columns.
+  - **Campaign picture** (Q1 = A): `campaigns.image` (`Campaign.ChangeImage`, `Guard.ImageFileName`), `image` on
+    `CampaignInsertInfo`, `PUT /api/campaign/{id}/image` (`CampaignImageInfo`, master only, any status, same value =
+    no-op, else `campaign.changed`), `image`/`imageUrl` on `CampaignInfo` and `imageUrl` on `CampaignTableInfo` (the
+    "Jogando" cards). Frontend: `components/campaign/CampaignImageField` (16:9 crop) on "Nova campanha" and on the
+    campaign page next to the status (saved at once), `lib/campaignImage.uploadCampaignImage` (≤ 1280 × 720),
+    `CampaignContext.setCampaignImage`.
+  - **Thumbnails** (Q2 = C): `weapons.thumbnail_image` and `animations.thumbnail_image`, `thumbnailImage` on the write
+    DTOs (insert optional; update/content: null keeps, `""` removes) and `thumbnailImage`/`thumbnailImageUrl` on the
+    reads. **The models clear them**: `Weapon.ReplaceFile` with another file and `SetPose` with another pose,
+    `Animation.ReplaceFile` (every content write — REST, the editor, the console's agent); the services apply a thumbnail
+    sent in the same request afterwards. A thumbnail-only weapon update publishes nothing. The site draws them (never the
+    server): `components/library/weaponThumbnail` (lazy three.js: the model in its standard pose, three-quarter
+    orthographic view, 256 px PNG, one renderer per picture) and `animationThumbnail` (2D canvas: the **standard
+    skeleton** of `lib/skeletonFigure` — a T-pose Mixamo figure with identity rest, so a file's turn applies as `D·C`
+    exactly like `threeClips.localRotation` — in the key pose of `lib/keyPose`, the key farthest from rest). The upload
+    forms and the weapon page send one with the save (`lib/thumbnailUpload`, failures skipped). A card without a stored
+    one draws it live (`components/library/Thumbnail`: only near the screen, one at a time through
+    `lib/thumbnailQueue`, cancelled when the card leaves) and, when the viewer owns the item, stores it
+    (`WeaponContext`/`AnimationContext.storeThumbnail`).
+  - **"Incluir"**: `/library/weapons/new` and `/library/animations/new` (`WeaponCreatePage`, `AnimationCreatePage`)
+    replace the "Enviar" tabs: the upload forms with `onDirtyChange` → `useLeaveGuard`, then the new item's page.
+  - Migration `AddLibraryImages` + `database/migrations/090-library-images.sql`. MCP: `set_campaign_image`, `image` on
+    `create_campaign`, `thumbnailImage` on the weapon/animation write tools (`McpDocs.THUMBNAIL_IMAGE`), guide
+    paragraphs (121 operations / 122 tools).
 - `tsconfig` has `erasableSyntaxOnly`: no `enum`s — use constants.
 - Lists "Minhas campanhas" / "Meus mapas" use `mine=true` on `GET /api/campaign` and `GET /api/mapmodel`.
 
@@ -724,6 +761,8 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - PostgreSQL — `animation_conversations`, `animation_messages` (migration `AddAnimationConversations` + `database/migrations/086-animation-conversations.sql`); a console project `backend/Roll6.Console` (a generic bridge to the user's local Claude Code; new NuGet `Microsoft.AspNetCore.SignalR.Client`, `Microsoft.Extensions.Hosting`). (086-web-animation-editor)
 - TypeScript 5 / React 18 (frontend only). + existing — React Router 6.30 (now as a data router: `createBrowserRouter`, `useBlocker`), Bootstrap 5.3, i18next, sonner, Radix; no new dependency. (087-library-fullscreen)
 - browser only — `sessionStorage` `roll6:table-return`; `roll6:settings-tab` dropped (the URL holds the section); no server change. (087-library-fullscreen)
+- C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend). + existing only. (090-library-grid-submenus)
+- PostgreSQL. New columns: (090-library-grid-submenus)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -735,6 +774,7 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 090-library-grid-submenus: the library's list tabs become submenus of the left menu, each with its own address (Campanhas: Minhas campanhas · Buscar · Jogando; Mapas: Meus mapas · Buscar · Da campanha; Tokens, Armas, Animações: Minhas · Buscar; old `?tab=` addresses redirect); every list is a card grid — campaigns and maps in 3 columns with their picture, characters, NPCs, tokens, weapons and animations in 4 (3 on phones); campaigns get a picture sent by the master (`campaigns.image`, `PUT /api/campaign/{id}/image`); weapons and animations get a stored thumbnail drawn by the site (the model in its pose; a standard skeleton in the animation's key pose), cleared by a new file/pose/content and drawn live — and stored by the owner — while missing; "Incluir" pages replace the "Enviar" tabs. Migration `AddLibraryImages`; MCP `set_campaign_image` + `image`/`thumbnailImage` parameters (121 operations / 122 tools)
 - 087-library-fullscreen: a full-screen library at `/library/...` (top bar with "← Voltar para campanha" in yellow and the user menu, left menu Campanhas · Mapas · Personagens · NPCs · Tokens · Armas · Animações, one address per list/new/edit page and per campaign section) replaces the campaign settings, campaigns, maps, map edit, select/include/edit character, NPC edit, token edit, weapons and animations windows; the gear, the character combo, the map pencils, "Outras campanhas…"/"Mapas…" and the NPC card pencil go there; the user menu's "Animações"/"Armas" became "Biblioteca" and the menu is shared with the animation editor; unsaved pages ask before leaving (data router + `useBlocker`). Frontend only
 - 086-web-animation-editor: the roll6anime desktop tool becomes a page of the Roll6 — `/animation/:id` in a new tab (only the logo, the stage with a token's 3D model playing the animation, the time bar with the key pose, the skeleton + bone gizmo saving versions to the library with undo/redo, prints with red marks and captions, and the conversation with the local Claude Code) — plus the generic **`Roll6.Console`** on the user's machine (API key, connects out to `/hubs/animation`, runs `claude -p`, writes/watches files only inside its working directory, knows nothing of animations: the server builds every request and validates every file). `animation_conversations`/`animation_messages` (migration `AddAnimationConversations`); `roll6anime/` removed; no REST endpoint (MCP still 120 operations / 121 tools)
 - 085-weapon-tab-polish: the hand sockets are measured on the idle pose (forward = the character's forward, edge = the fingers, face = the back of the hand away from the body), so a weapon posed in the editor points forward in the hand on every model instead of following a supinated thumb into the belly; the 3D previews zoom (wheel, pinch, "+"/"−"); the "Armas" tab shows the socket controls beside the preview on desktop with "Ajuste fino" open. Frontend only

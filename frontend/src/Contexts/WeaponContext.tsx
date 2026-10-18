@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { modelService } from '../Services/modelService';
 import { weaponService } from '../Services/weaponService';
+import { uploadThumbnail } from '../lib/thumbnailUpload';
 import type { ListQuery, PagedList } from '../types/common';
 import type { GripPoint, WeaponInfo, WeaponPose } from '../types/weapon';
 
@@ -18,11 +19,16 @@ interface WeaponContextType {
   refreshChoices: () => Promise<void>;
   /** Paged library ("Minhas" with `mine`, "Buscar" without), filtered by name. */
   search: (query: ListQuery) => Promise<PagedList<WeaponInfo>>;
-  /** Uploads the `.glb` (`POST /api/model`) and creates the weapon with its grip point and standard pose (083). */
-  upload: (name: string, file: File, gripPoint?: GripPoint, pose?: WeaponPose) => Promise<WeaponInfo>;
+  /**
+   * Uploads the `.glb` (`POST /api/model`) and creates the weapon with its grip point and standard pose (083) and the
+   * picture of its library card (090; a failed picture upload is skipped).
+   */
+  upload: (name: string, file: File, gripPoint?: GripPoint, pose?: WeaponPose, thumbnail?: Blob | null) => Promise<WeaponInfo>;
   /** Renames, replaces the file (uploaded first), and/or sets the grip point and pose of an own weapon (083). */
   update: (weapon: WeaponInfo, change: WeaponChange) => Promise<WeaponInfo>;
   remove: (weapon: WeaponInfo) => Promise<void>;
+  /** Stores the card's picture drawn for an own weapon that had none (090, backfill); failures are ignored. */
+  storeThumbnail: (weapon: WeaponInfo, thumbnail: Blob) => Promise<void>;
 }
 
 /** What "Editar arma" may change; a field left out (or undefined) keeps its value. */
@@ -31,6 +37,8 @@ export interface WeaponChange {
   file?: File | null;
   gripPoint?: GripPoint;
   pose?: WeaponPose;
+  /** A fresh card picture (090), drawn when the file or the pose changes. */
+  thumbnail?: Blob | null;
 }
 
 const WeaponContext = createContext<WeaponContextType | undefined>(undefined);
@@ -69,16 +77,20 @@ export const WeaponProvider = ({ children }: { children: ReactNode }) => {
 
   const search = useCallback((query: ListQuery) => weaponService.list(query), []);
 
-  const upload = useCallback(async (name: string, file: File, gripPoint?: GripPoint, pose?: WeaponPose) => {
+  const upload = useCallback(async (name: string, file: File, gripPoint?: GripPoint, pose?: WeaponPose, thumbnail?: Blob | null) => {
     const stored = await modelService.upload(file);
-    const created = await weaponService.create({ name, modelFile: stored.fileName, gripPoint, pose });
+    const thumbnailImage = await uploadThumbnail(thumbnail, 'weapon');
+    const created = await weaponService.create({ name, modelFile: stored.fileName, gripPoint, pose, thumbnailImage });
     await refreshIfLoaded();
     return created;
   }, [refreshIfLoaded]);
 
   const update = useCallback(async (weapon: WeaponInfo, change: WeaponChange) => {
     const modelFile = change.file ? (await modelService.upload(change.file)).fileName : undefined;
-    const saved = await weaponService.update(weapon.weaponId, { name: change.name, modelFile, gripPoint: change.gripPoint, pose: change.pose });
+    const thumbnailImage = await uploadThumbnail(change.thumbnail, 'weapon');
+    const saved = await weaponService.update(weapon.weaponId, {
+      name: change.name, modelFile, gripPoint: change.gripPoint, pose: change.pose, thumbnailImage,
+    });
     await refreshIfLoaded();
     return saved;
   }, [refreshIfLoaded]);
@@ -88,9 +100,19 @@ export const WeaponProvider = ({ children }: { children: ReactNode }) => {
     await refreshIfLoaded();
   }, [refreshIfLoaded]);
 
+  const storeThumbnail = useCallback(async (weapon: WeaponInfo, thumbnail: Blob) => {
+    const thumbnailImage = await uploadThumbnail(thumbnail, 'weapon');
+    if (!thumbnailImage) return;
+    try {
+      await weaponService.update(weapon.weaponId, { thumbnailImage });
+    } catch {
+      // The card keeps drawing it live.
+    }
+  }, []);
+
   const value = useMemo<WeaponContextType>(
-    () => ({ choices, loadChoices, refreshChoices, search, upload, update, remove }),
-    [choices, loadChoices, refreshChoices, search, upload, update, remove],
+    () => ({ choices, loadChoices, refreshChoices, search, upload, update, remove, storeThumbnail }),
+    [choices, loadChoices, refreshChoices, search, upload, update, remove, storeThumbnail],
   );
   return <WeaponContext.Provider value={value}>{children}</WeaponContext.Provider>;
 };

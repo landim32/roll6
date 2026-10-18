@@ -8,6 +8,7 @@ using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Animation;
 using Roll6.DTO.Common;
+using Roll6.Infra.Interfaces.AppServices;
 using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Tests.Domain.Services;
@@ -22,6 +23,7 @@ public class AnimationServiceTests
     private readonly Mock<IImageService> _imageService = new();
     private readonly Mock<IAnimationConversationRepository<AnimationConversation>> _conversations = new();
     private readonly Mock<IAnimationNotifier> _notifier = new();
+    private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly AnimationService _service;
 
     private static readonly JsonElement VALID = JsonDocument.Parse("""
@@ -40,7 +42,7 @@ public class AnimationServiceTests
         _userRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>()))
             .ReturnsAsync(new List<User> { new() { UserId = 1, Name = "Rodrigo" } });
         _imageService.Setup(s => s.StoreAnimationAsync(It.IsAny<byte[]>())).ReturnsAsync(FILE);
-        _service = new AnimationService(_repository.Object, _tokenRepository.Object, _userRepository.Object, _imageService.Object, _conversations.Object, _notifier.Object);
+        _service = new AnimationService(_repository.Object, _tokenRepository.Object, _userRepository.Object, _imageService.Object, _conversations.Object, _notifier.Object, _imageStorage.Object);
     }
 
     [Fact]
@@ -311,6 +313,77 @@ public class AnimationServiceTests
     public async Task Delete_ByAnotherUser_IsForbidden()
     {
         var act = () => _service.DeleteAsync(2, 10);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    // 090: the library card's picture.
+    private const string THUMB = "fedcba9876543210fedcba9876543210.png";
+    private const string NEW_THUMB = "00112233445566778899aabbccddeeff.png";
+
+    private void WithStoredThumbnail() =>
+        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(() => new Animation
+        {
+            AnimationId = 10, UserId = 1, Name = "Aceno", AnimationType = AnimationType.Idle, FileName = FILE, Duration = 1,
+            Loop = true, ThumbnailImage = THUMB
+        });
+
+    [Fact]
+    public async Task Create_StoresTheThumbnailAndReadsItsUrl()
+    {
+        _imageStorage.Setup(s => s.GetUrl(THUMB)).Returns("https://bucket/thumb.png");
+
+        var result = await _service.CreateAsync(1, new AnimationInsertInfo { Name = "Aceno", Type = 1, Content = VALID, ThumbnailImage = THUMB });
+
+        result.ThumbnailImage.Should().Be(THUMB);
+        result.ThumbnailImageUrl.Should().Be("https://bucket/thumb.png");
+    }
+
+    [Fact]
+    public async Task ReplaceContent_WithoutThumbnail_ClearsTheStoredOne()
+    {
+        WithStoredThumbnail();
+
+        var result = await _service.ReplaceContentAsync(1, 10, new AnimationContentInfo { Content = VALID }, "agent");
+
+        result.ThumbnailImage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ReplaceContent_WithThumbnail_KeepsTheNewOne()
+    {
+        WithStoredThumbnail();
+
+        var result = await _service.ReplaceContentAsync(1, 10, new AnimationContentInfo { Content = VALID, ThumbnailImage = NEW_THUMB });
+
+        result.ThumbnailImage.Should().Be(NEW_THUMB);
+    }
+
+    [Fact]
+    public async Task Update_NameOnly_KeepsTheThumbnail()
+    {
+        WithStoredThumbnail();
+
+        var result = await _service.UpdateAsync(1, 10, new AnimationUpdateInfo { Name = "Aceno 2" });
+
+        result.ThumbnailImage.Should().Be(THUMB);
+    }
+
+    [Fact]
+    public async Task Update_ThumbnailOnly_StoresIt_AndEmptyRemovesIt()
+    {
+        WithStoredThumbnail();
+
+        (await _service.UpdateAsync(1, 10, new AnimationUpdateInfo { ThumbnailImage = NEW_THUMB })).ThumbnailImage.Should().Be(NEW_THUMB);
+        (await _service.UpdateAsync(1, 10, new AnimationUpdateInfo { ThumbnailImage = "" })).ThumbnailImage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_ThumbnailOfSomeoneElse_IsRefused()
+    {
+        WithStoredThumbnail();
+
+        var act = () => _service.UpdateAsync(2, 10, new AnimationUpdateInfo { ThumbnailImage = NEW_THUMB });
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }

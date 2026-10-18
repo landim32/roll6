@@ -16,4 +16,8 @@ public class AnimationInsertInfo
     /// <summary>The animation file (JSON object in the <c>roll6-animation</c> format, version 1).</summary>
     [JsonPropertyName("content")]
     public JsonElement Content { get; set; }
+
+    /// <summary>The library card's picture (090): a PNG name from <c>POST /api/image</c>; optional.</summary>
+    [JsonPropertyName("thumbnailImage")]
+    public string? ThumbnailImage { get; set; }
 }

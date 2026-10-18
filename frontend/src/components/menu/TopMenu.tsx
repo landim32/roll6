@@ -10,7 +10,7 @@ import { TurnControls } from './TurnControls';
 import { TurnSummaryModal } from '../modals/TurnSummaryModal';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
-import { campaignEditPath, characterPath, libraryPath } from '../../lib/libraryRoutes';
+import { campaignEditPath, characterPath, libraryPath, subsectionPath } from '../../lib/libraryRoutes';
 import { GearIcon } from '../ui/icons';
 import { BrandLogo } from '../ui/BrandLogo';
 
@@ -44,7 +44,7 @@ export const TopMenu = ({ onSave, guard }: TopMenuProps) => {
       {/* Phones: the three selects wrap to a second row below this break (CSS order). */}
       <span className="stm-menu-break" aria-hidden="true" />
       <TableSelect
-        onOpenCampaign={() => navigate(libraryPath('campaigns', { tab: 'search' }))}
+        onOpenCampaign={() => navigate(subsectionPath('campaigns', 'search'))}
         onOpenMap={() => navigate(libraryPath('maps'))}
       />
       {isMaster && currentCampaign && (
