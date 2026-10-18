@@ -21,6 +21,7 @@ Esta feature troca esse ajuste por **pontos de encaixe**, o jeito que os jogos u
 
 - Q: O ajuste fino de posição e rotação da 082 continua? → A: Sim, como um ajuste opcional e escondido por padrão, por encaixe de cada token. No caso normal o usuário só mexe no tamanho.
 - Q: A pose padrão da arma gira livremente ou em passos? → A: Só em passos de 90°, em cada um dos três eixos. Não há giro livre na arma.
+  - Revisto depois da primeira entrega (084): os passos de 90° ficaram grossos demais para alguns modelos. Os botões de 90° continuam, e o editor ganhou um giro fino de 1° por eixo; a pose é guardada em graus inteiros.
 
 ## User Scenarios & Testing *(mandatory)*
 

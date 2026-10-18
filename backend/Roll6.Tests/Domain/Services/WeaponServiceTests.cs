@@ -70,9 +70,9 @@ public class WeaponServiceTests
     }
 
     [Fact]
-    public async Task Create_PoseNotAStep_InsertsNothing()
+    public async Task Create_PoseOutOfRange_InsertsNothing()
     {
-        var act = () => _service.CreateAsync(1, new WeaponInsertInfo { Name = "Espada", ModelFile = FILE, Pose = new WeaponPoseInfo { Rx = 45 } });
+        var act = () => _service.CreateAsync(1, new WeaponInsertInfo { Name = "Espada", ModelFile = FILE, Pose = new WeaponPoseInfo { Rx = 450 } });
 
         (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("pose.rx");
         _repository.Verify(r => r.InsertAsync(It.IsAny<Weapon>()), Times.Never);
@@ -170,9 +170,9 @@ public class WeaponServiceTests
     }
 
     [Fact]
-    public async Task Update_PoseNotAStep_IsRefused()
+    public async Task Update_PoseOutOfRange_IsRefused()
     {
-        var act = () => _service.UpdateAsync(1, 7, new WeaponUpdateInfo { Pose = new WeaponPoseInfo { Rx = 45 } });
+        var act = () => _service.UpdateAsync(1, 7, new WeaponUpdateInfo { Pose = new WeaponPoseInfo { Rx = 450 } });
 
         (await act.Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("pose.rx");
         _repository.Verify(r => r.UpdateAsync(It.IsAny<Weapon>()), Times.Never);

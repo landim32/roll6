@@ -21,15 +21,15 @@ public static class WeaponTools
     [ApiOperation("POST", "/api/weapon")]
     [Description($$"""
         What it does: adds a weapon to the shared library — a name, a 3D model uploaded first with upload_token_model and,
-        optionally, its grip point (where the hand holds it) and standard pose (how it stands: tip +Y, edge +X, in 90°
-        steps). Tokens with a 3D model carry it in their sockets (weapons on create_token / update_token: hands, back,
+        optionally, its grip point (where the hand holds it) and standard pose (how it stands: tip +Y, edge +X, face +Z,
+        in whole degrees). Tokens with a 3D model carry it in their sockets (weapons on create_token / update_token: hands, back,
         holsters); the 3D view aligns the grip point and the pose to the socket's frame on the model's Mixamo bones, so
         it follows every animation and normally only the size is adjusted. Full rules: get_roll6_guide, section
         "Weapons".
         Who can use it: any authenticated user (the uploader becomes the owner).
         Returns: the weapon {{ITEM}}.
         Common errors: 400 name (required, ≤ 100 characters), modelFile (not a name returned by upload_token_model),
-        gripPoint.{x|y|z} (outside 0…1) or pose.{rx|ry|rz} (not a multiple of 90).
+        gripPoint.{x|y|z} (outside 0…1) or pose.{rx|ry|rz} (outside −360…360).
         Related tools: upload_token_model, list_weapons, update_token, get_roll6_guide.
         """)]
     public static Task<CallToolResult> CreateWeapon(

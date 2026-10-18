@@ -3,8 +3,8 @@ import type { GripPoint, WeaponPose } from '../types/weapon';
 /**
  * The standard pose and the grip point of a library weapon (083): pure rules shared by the weapon editor, the token form
  * and the 3D view. Mirrors the backend's `Roll6.Domain/Weapons/WeaponPose.cs` and `WeaponGripPoint.cs` — change them
- * together. The pose is an Euler XYZ rotation (three.js order: `R = Rx · Ry · Rz`) whose angles are multiples of 90°, so
- * the 64 combinations cover the 24 rotations of the cube group and every matrix below is exact integers.
+ * together. The pose is an Euler XYZ rotation (three.js order: `R = Rx · Ry · Rz`) in whole degrees, 0…359: the editor
+ * turns it by 90° buttons (composed on the left, in the stage's frame) and by 1° sliders (the Euler angles themselves).
  */
 
 export const POSE_STEP = 90;
@@ -18,12 +18,14 @@ export type PoseDirection = 1 | -1;
 export type Matrix3 = readonly number[];
 export type Vec3 = readonly [number, number, number];
 
+const RAD = Math.PI / 180;
+
 const wrap = (degrees: number): number => {
-  const snapped = Math.round(degrees / POSE_STEP) * POSE_STEP;
-  return ((snapped % 360) + 360) % 360;
+  const whole = Math.round(degrees);
+  return ((whole % 360) + 360) % 360;
 };
 
-/** A pose inside the server's rules: each angle snapped to a step and put in 0…270; missing or invalid = 0. */
+/** A pose inside the server's rules: each angle a whole degree in 0…359; missing or invalid = 0. */
 export const normalizePose = (pose: Partial<WeaponPose> | null | undefined): WeaponPose => {
   const read = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? wrap(value) : 0);
   return { rx: read(pose?.rx), ry: read(pose?.ry), rz: read(pose?.rz) };
@@ -31,9 +33,12 @@ export const normalizePose = (pose: Partial<WeaponPose> | null | undefined): Wea
 
 export const samePose = (a: WeaponPose, b: WeaponPose): boolean => a.rx === b.rx && a.ry === b.ry && a.rz === b.rz;
 
-/** Exact cosine and sine of a multiple of 90°. */
-const cos = (degrees: number): number => [1, 0, -1, 0][wrap(degrees) / 90];
-const sin = (degrees: number): number => [0, 1, 0, -1][wrap(degrees) / 90];
+/** An angle of 0…359 as the sliders show it: −180…180 (180 stays 180). */
+export const signedDegrees = (degrees: number): number => (degrees > 180 ? degrees - 360 : degrees);
+
+/** Exact for multiples of 90, so those matrices stay integers. */
+const cos = (degrees: number): number => (degrees % 90 === 0 ? [1, 0, -1, 0][(wrap(degrees) / 90) % 4] : Math.cos(degrees * RAD));
+const sin = (degrees: number): number => (degrees % 90 === 0 ? [0, 1, 0, -1][(wrap(degrees) / 90) % 4] : Math.sin(degrees * RAD));
 
 const multiply = (a: Matrix3, b: Matrix3): number[] => {
   const out = new Array<number>(9).fill(0);
@@ -69,31 +74,41 @@ export const applyMatrix = (m: Matrix3, v: Vec3): [number, number, number] => [
   m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
 ];
 
-const sameMatrix = (a: Matrix3, b: Matrix3): boolean => a.every((value, index) => Math.abs(value - b[index]) < 1e-6);
+const clampUnit = (value: number): number => Math.min(1, Math.max(-1, value));
 
-const STEPS = [0, 90, 180, 270];
-
-/** The pose whose matrix equals `m`, searching the 64 combinations (every cube rotation has at least one). */
-export const poseOfMatrix = (m: Matrix3): WeaponPose | null => {
-  for (const rx of STEPS) {
-    for (const ry of STEPS) {
-      for (const rz of STEPS) {
-        const pose = { rx, ry, rz };
-        if (sameMatrix(poseMatrix(pose), m)) return pose;
-      }
-    }
+/**
+ * The Euler XYZ angles (whole degrees, 0…359) of a rotation matrix — the decomposition three.js uses for the order
+ * 'XYZ' (`Euler.setFromRotationMatrix`): `m02 = sin(y)`; away from the gimbal lock `x = atan2(−m12, m22)`,
+ * `z = atan2(−m01, m00)`; at the lock `z` is taken as 0 and `x` from the other column.
+ */
+export const eulerOfMatrix = (m: Matrix3): WeaponPose => {
+  const m00 = m[0];
+  const m01 = m[1];
+  const m02 = m[2];
+  const m11 = m[4];
+  const m12 = m[5];
+  const m21 = m[7];
+  const m22 = m[8];
+  const y = Math.asin(clampUnit(m02));
+  let x: number;
+  let z: number;
+  if (Math.abs(m02) < 0.9999999) {
+    x = Math.atan2(-m12, m22);
+    z = Math.atan2(-m01, m00);
+  } else {
+    x = Math.atan2(m21, m11);
+    z = 0;
   }
-  return null;
+  return normalizePose({ rx: x / RAD, ry: y / RAD, rz: z / RAD });
 };
 
 /**
  * The pose after turning the weapon ±90° about one of the stage's axes (the turn buttons of the editor): the turn is
- * composed on the left of the current pose — `R' = T · R` — so it always acts in the stage's frame, whatever the pose.
+ * composed on the left of the current pose — `R' = T · R` — so it always acts in the stage's frame, whatever the pose
+ * (a fine-tuned one included).
  */
-export const turnPose = (pose: WeaponPose, axis: PoseAxis, direction: PoseDirection): WeaponPose => {
-  const turned = multiply(axisMatrix(axis, direction * POSE_STEP), poseMatrix(pose));
-  return poseOfMatrix(turned) ?? normalizePose(pose);
-};
+export const turnPose = (pose: WeaponPose, axis: PoseAxis, direction: PoseDirection): WeaponPose =>
+  eulerOfMatrix(multiply(axisMatrix(axis, direction * POSE_STEP), poseMatrix(pose)));
 
 const clamp01 = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;

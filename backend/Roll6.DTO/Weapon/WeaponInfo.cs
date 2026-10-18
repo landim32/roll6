@@ -28,7 +28,7 @@ public class WeaponInfo
     [JsonPropertyName("gripPoint")]
     public WeaponGripPointInfo GripPoint { get; set; } = new();
 
-    /// <summary>The standard pose (083), multiples of 90°; always filled on reads.</summary>
+    /// <summary>The standard pose (083), whole degrees; always filled on reads.</summary>
     [JsonPropertyName("pose")]
     public WeaponPoseInfo Pose { get; set; } = new();
 

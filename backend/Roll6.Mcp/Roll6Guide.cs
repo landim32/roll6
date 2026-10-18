@@ -247,8 +247,8 @@ public static class Roll6Guide
           update_weapon (name, file, gripPoint and/or pose — same id, so every token carrying it shows the change) or
           delete_weapon (refused with 409 while any token carries it; the stored file is kept).
         - **Grip point and standard pose** live on the weapon (083). gripPoint = where the hand holds it, as fractions of
-          the file's bounding box (0…1 per axis; omit = the middle). pose = the rotation, in **90° steps** (Euler XYZ, each
-          angle a multiple of 90, stored 0…270), after which the model stands with its **tip along +Y** ("cima"), its
+          the file's bounding box (0…1 per axis; omit = the middle). pose = the rotation, in **whole degrees** (Euler XYZ,
+          −360…360, stored 0…359; the site has 90° buttons and 1° sliders), after which the model stands with its **tip along +Y** ("cima"), its
           **edge or attack side along +X** ("direita") and its **outer face along +Z** ("frente": a shield's face, the
           side away from the body). The file's origin and orientation do not matter. Whatever the file's unit, the
           weapon starts with its longest side at half the character's height.
