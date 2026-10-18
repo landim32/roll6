@@ -12,7 +12,7 @@ import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
 import { CardGrid } from '../../components/library/CardGrid';
 import { LibraryCard } from '../../components/library/LibraryCard';
 import { useLegacyTab } from '../../components/library/useLegacyTab';
-import { CampaignIcon, GearIcon, OpenIcon } from '../../components/ui/icons';
+import { CampaignIcon, OpenIcon, PencilIcon } from '../../components/ui/icons';
 
 const PAGE_SIZE = 12;
 
@@ -22,7 +22,7 @@ interface CampaignsPageProps {
 }
 
 /**
- * "Campanhas" of the library (087; was the campaign window): the campaigns the user masters (gear → the campaign's
+ * "Campanhas" of the library (087; was the campaign window): the campaigns the user masters (the pencil → the campaign's
  * page), the search of the others and the ones where one of their characters plays — since 090 as cards in 3 columns
  * with the campaign's picture. Choosing one opens it on the table; "Nova campanha" creates one.
  */
@@ -84,8 +84,8 @@ export const CampaignsPage = ({ subsection }: CampaignsPageProps) => {
         <>
           {playButton(campaign.slug, campaign.name)}
           <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => navigate(campaignEditPath(campaign.slug))}
-            title={t('campaignSettings.open')} aria-label={t('campaignSettings.open')}>
-            <GearIcon size={14} />
+            title={t('campaign.edit', { name: campaign.name })} aria-label={t('campaign.edit', { name: campaign.name })}>
+            <PencilIcon size={14} />
           </button>
         </>
       ) : undefined}

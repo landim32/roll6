@@ -34,6 +34,13 @@ export const AnimationTimeline = ({ onPlay, onPause, onSeek, handle }: Animation
   const dragging = useRef(false);
   const paused = useRef(true);
 
+  // Disabled until the stage reports a playback — set on the DOM, never as a JSX prop: React drops the clicks of a
+  // button whose props say `disabled`, even after `refresh` enables the element (the pause button did nothing).
+  useEffect(() => {
+    if (toggle.current) toggle.current.disabled = true;
+    if (range.current) range.current.disabled = true;
+  }, []);
+
   useEffect(() => {
     handle.current = {
       refresh: (playback, poseInfo) => {
@@ -68,13 +75,13 @@ export const AnimationTimeline = ({ onPlay, onPause, onSeek, handle }: Animation
 
   return (
     <div className="stm-editor-timeline">
-      <button ref={toggle} type="button" className="btn btn-primary btn-sm stm-editor-toggle" disabled
+      <button ref={toggle} type="button" className="btn btn-primary btn-sm stm-editor-toggle"
         title={t('editor.timeline.play')} aria-label={t('editor.timeline.play')}
         onClick={() => (paused.current ? onPlay() : onPause())}>
         <span ref={playIcon}><PlayFillIcon size={14} /></span>
         <span ref={pauseIcon} hidden><PauseFillIcon size={14} /></span>
       </button>
-      <input ref={range} type="range" className="form-range" min={0} max={1} step={0.01} defaultValue={0} disabled
+      <input ref={range} type="range" className="form-range" min={0} max={1} step={0.01} defaultValue={0}
         aria-label={t('editor.timeline.progress')}
         onPointerDown={() => { dragging.current = true; }}
         onPointerUp={() => { dragging.current = false; }}
