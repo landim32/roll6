@@ -2,9 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useAnimationEditor } from '../../../hooks/useAnimationEditor';
 import type { TokenInfo } from '../../../types/token';
-import { BrandLogo } from '../../ui/BrandLogo';
-import { BackToTableButton } from '../../menu/BackToTableButton';
-import { UserMenuHost } from '../../menu/UserMenuHost';
+import { animationPath, libraryPath } from '../../../lib/libraryRoutes';
+import { ArrowLeftIcon } from '../../ui/icons';
 import { ModelTokenSelect } from './ModelTokenSelect';
 
 interface EditorTopBarProps {
@@ -12,13 +11,14 @@ interface EditorTopBarProps {
 }
 
 /**
- * The only thing besides the editor on the page (086): the logo, the animation's name, the agent badge, the model
- * select and, since 087, "← Voltar para campanha" and the user menu (as in the library).
+ * The editor's bar (086), inside the library since 089 (the library's own bar has the logo, "← Voltar para campanha"
+ * and the user menu): back to the animation's page, the animation's name, the agent badge and the model select.
  */
 export const EditorTopBar = ({ onTokens }: EditorTopBarProps) => {
   const { t } = useTranslation();
   const { state, connected, tokenId, setToken } = useAnimationEditor();
   const agent = state.agent;
+  const backTo = state.animation ? animationPath(state.animation.animationId) : libraryPath('animations');
   const badge = !connected
     ? { cls: 'text-bg-secondary', text: t('editor.offline') }
     : !agent.connected
@@ -29,9 +29,8 @@ export const EditorTopBar = ({ onTokens }: EditorTopBarProps) => {
 
   return (
     <header className="stm-editor-bar">
-      <Link to="/" className="stm-editor-brand" title={t('editor.back')} aria-label={t('editor.back')}>
-        <span className="d-none d-md-inline"><BrandLogo variant="horizontal" height={32} /></span>
-        <span className="d-md-none"><BrandLogo variant="symbol" height={28} /></span>
+      <Link to={backTo} className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center" title={t('editor.back')} aria-label={t('editor.back')}>
+        <ArrowLeftIcon size={14} />
       </Link>
       <h1 className="stm-editor-title text-truncate" title={state.animation?.name ?? ''}>{state.animation?.name ?? t('editor.title')}</h1>
       <span className={`badge ${badge.cls} stm-editor-agent`} title={agent.connected ? undefined : t('editor.agent.hint')}>
@@ -39,8 +38,6 @@ export const EditorTopBar = ({ onTokens }: EditorTopBarProps) => {
       </span>
       <span className="flex-grow-1" />
       <ModelTokenSelect tokenId={tokenId} onChange={setToken} onTokens={onTokens} />
-      <BackToTableButton />
-      <UserMenuHost />
     </header>
   );
 };

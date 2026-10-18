@@ -1,10 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AnimationEditorProvider } from '../Contexts/AnimationEditorContext';
 import { useAnimationEditor } from '../hooks/useAnimationEditor';
 import { APP_NAME } from '../lib/documentTitle';
+import { animationEditorPath, idParam, libraryPath } from '../lib/libraryRoutes';
 import { isBusy } from '../lib/editorState';
 import type { PrintAttachment } from '../lib/editorState';
 import { caption } from '../lib/printCaption';
@@ -28,8 +29,9 @@ const AnimationStage = lazy(() => import('../components/animations/editor/Animat
 const PRINT_MAX_SIDE = 1024;
 
 /**
- * `/animation/:id` (086): the animation editor in its own tab — nothing of the table here, only the logo, the stage
- * with the chosen token playing the animation, the time bar, the pose editor and the conversation with the local Claude.
+ * `/library/animations/:id/editor` (089; was `/animation/:id` in its own tab, 086): the animation editor inside the
+ * library — its bar (back to the animation, name, agent, model), the stage with the chosen token playing the
+ * animation, the time bar, the pose editor and the conversation with the local Claude.
  */
 export const AnimationEditorPage = () => {
   const { id } = useParams();
@@ -42,13 +44,20 @@ export const AnimationEditorPage = () => {
   );
 };
 
+/** The old address `/animation/:id` (086) goes to the editor in the library (089). */
+export const AnimationEditorRedirect = () => {
+  const { id } = useParams();
+  const animationId = idParam(id);
+  return <Navigate to={animationId === null ? libraryPath('animations') : animationEditorPath(animationId)} replace />;
+};
+
 const NotAvailable = ({ kind }: { kind: 'forbidden' | 'not-found' | 'offline' }) => {
   const { t } = useTranslation();
   return (
     <div className="stm-editor-page">
       <div className="stm-editor-empty card p-4 m-auto text-center">
         <p className="mb-3">{t(kind === 'forbidden' ? 'editor.forbidden' : kind === 'offline' ? 'editor.offlineLong' : 'editor.notFound')}</p>
-        <Link to="/" className="btn btn-primary">{t('editor.back')}</Link>
+        <Link to={libraryPath('animations')} className="btn btn-primary">{t('editor.backToList')}</Link>
       </div>
     </div>
   );

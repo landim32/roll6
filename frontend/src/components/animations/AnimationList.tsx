@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAnimation } from '../../hooks/useAnimation';
 import { copyToClipboard } from '../../lib/clipboard';
 import { animationService } from '../../Services/animationService';
+import { animationEditorPath } from '../../lib/libraryRoutes';
 import { ANIMATION_TYPES } from '../../types/animation';
 import type { AnimationInfo, AnimationType } from '../../types/animation';
-import { BoxArrowUpRightIcon, CopyIcon, PencilIcon, TrashIcon } from '../ui/icons';
+import { CopyIcon, PencilIcon, PlayFillIcon, TrashIcon } from '../ui/icons';
 
 const PAGE_SIZE = 12;
 
@@ -97,10 +99,10 @@ export const AnimationList = ({ mine, version, onEdit, onDelete }: AnimationList
                 <CopyIcon size={14} />
               </button>
               {mine && (
-                <a className="btn btn-sm btn-outline-primary" href={`/animation/${animation.animationId}`} target="_blank" rel="noopener"
+                <Link className="btn btn-sm btn-outline-primary" to={animationEditorPath(animation.animationId)}
                   title={t('animations.openEditor')} aria-label={t('animations.openEditor')}>
-                  <BoxArrowUpRightIcon size={14} />
-                </a>
+                  <PlayFillIcon size={14} />
+                </Link>
               )}
               {onEdit && (
                 <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(animation)}

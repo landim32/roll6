@@ -1,22 +1,21 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../../hooks/useAuth';
 import { useAnimation } from '../../hooks/useAnimation';
 import { useLeaveGuard } from '../../hooks/useLeaveGuard';
 import { animationService } from '../../Services/animationService';
-import { idParam, libraryPath } from '../../lib/libraryRoutes';
+import { animationEditorPath, idParam, libraryPath } from '../../lib/libraryRoutes';
 import { ANIMATION_TYPES } from '../../types/animation';
 import type { AnimationInfo, AnimationType } from '../../types/animation';
-import { BoxArrowUpRightIcon } from '../../components/ui/icons';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
 import { NotFoundCard } from '../../components/library/NotFoundCard';
 
 /**
  * An animation in full screen (087; was "Editar animação" of 059): name and type of one of the user's animations, and
- * "Editar no editor" (the animation editor in a new tab). A type change is refused while a token uses it in the state of
+ * "Editar no editor" (the animation editor, in the library since 089). A type change is refused while a token uses it in the state of
  * its old type — the server's message comes back as a toast.
  */
 export const AnimationEditPage = () => {
@@ -79,10 +78,9 @@ export const AnimationEditPage = () => {
         back={{ to: libraryPath('animations'), label: t('library.nav.animations') }}
         actions={owner ? (
           <>
-            <a className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1" href={`/animation/${animation.animationId}`}
-              target="_blank" rel="noopener">
-              <BoxArrowUpRightIcon size={14} />{t('animations.openEditor')}
-            </a>
+            <Link className="btn btn-outline-primary btn-sm" to={animationEditorPath(animation.animationId)}>
+              {t('animations.openEditor')}
+            </Link>
             <button type="submit" form="animation-page-form" className="btn btn-primary btn-sm" disabled={saving || !name.trim()}>
               {t('common.save')}
             </button>

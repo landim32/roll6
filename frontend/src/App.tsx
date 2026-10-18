@@ -6,7 +6,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
-import { AnimationEditorPage } from './pages/AnimationEditorPage';
+import { AnimationEditorPage, AnimationEditorRedirect } from './pages/AnimationEditorPage';
 import { LibraryLayout } from './pages/library/LibraryLayout';
 
 // The library pages (087) are lazy: the table's bundle does not grow with them.
@@ -44,7 +44,7 @@ export const App = () => {
         <Route path="/" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
         <Route path="/campaign/:slug" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
         <Route path="/map/:slug" element={<ProtectedRoute><MainPage /></ProtectedRoute>} />
-        <Route path="/animation/:id" element={<ProtectedRoute><AnimationEditorPage /></ProtectedRoute>} />
+        <Route path="/animation/:id" element={<AnimationEditorRedirect />} />
         <Route path="/library" element={<ProtectedRoute><LibraryLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="campaigns" replace />} />
           <Route path="campaigns" element={<CampaignsPage />} />
@@ -63,6 +63,7 @@ export const App = () => {
           <Route path="weapons/:id" element={<WeaponEditPage />} />
           <Route path="animations" element={<AnimationsPage />} />
           <Route path="animations/:id" element={<AnimationEditPage />} />
+          <Route path="animations/:id/editor" element={<AnimationEditorPage />} />
           <Route path="*" element={<Navigate to="campaigns" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
