@@ -32,6 +32,8 @@ export interface WeaponSocketsSync {
    * height in its own units.
    */
   sync: (model: Object3D, characterHeight: number, wanted: SocketWeapons | undefined) => void;
+  /** Hangs the carried weapons again on freshly measured anchors (085: the idle pose changed); nothing when none is held. */
+  refresh: (model: Object3D, characterHeight: number) => void;
   /** Forgets the carried weapons (the model was removed or replaced). */
   reset: () => void;
 }
@@ -94,6 +96,9 @@ export const createWeaponSockets = (onChange: (model: Object3D) => void): Weapon
         });
       }
       if (reattach) attach(model, characterHeight);
+    },
+    refresh: (model, characterHeight) => {
+      if (SOCKETS.some((socket) => held[socket])) attach(model, characterHeight);
     },
     reset: () => {
       generation += 1;

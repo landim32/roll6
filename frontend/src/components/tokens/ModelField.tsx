@@ -23,6 +23,7 @@ import {
 import type { AnimationSource, AnimationState, ClipOption } from '../../lib/modelAnimations';
 import { ModelTimeline } from './ModelTimeline';
 import { ArrowClockwiseIcon, CameraIcon, ChevronDownIcon, ChevronUpIcon } from '../ui/icons';
+import { ZoomButtons } from '../ui/ZoomButtons';
 import type { ModelPreviewHandle, ModelPreviewInfo } from './ModelPreview';
 
 const ModelPreview = lazy(() => import('./ModelPreview'));
@@ -83,8 +84,10 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   /** "Armas" (083): the socket being edited, which sockets the model offers, and the library's weapons. */
   const [socket, setSocket] = useState<Socket>(SOCKET.rightHand);
   const [sockets, setSockets] = useState<SocketAvailabilities | null>(null);
-  /** The "Ajuste fino" block is collapsed by default (083, FR-012). */
-  const [fineOpen, setFineOpen] = useState(false);
+  /** The "Ajuste fino" block starts open beside the preview on desktop (085) and collapsed on phones (083). */
+  const [fineOpen, setFineOpen] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches);
+  /** The preview's zoom (085): kept while the same model is open, in every tab. */
+  const [zoom, setZoom] = useState(1);
   const { choices: weaponChoices, loadChoices, refreshChoices } = useWeapon();
   const [refreshingWeapons, setRefreshingWeapons] = useState(false);
   const { weapons, setWeapon, setGrip } = state;
@@ -97,6 +100,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
     setDeforms(false);
     setShown('idle');
     setSockets(null);
+    setZoom(1);
     setLoading(previewUrl !== null);
   }, [previewUrl]);
 
@@ -320,6 +324,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
           {previewUrl && <div className="form-text mb-2">{t('tokens.model.restPose')}</div>}
         </div>
       )}
+      <div className={`stm-model-layout${arming ? ' is-side' : ''}`}>
       <div className="stm-model-card" hidden={live && !previewUrl}>
         <div className="stm-model-stage">
           {previewUrl ? (
@@ -333,6 +338,8 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 scale={modelScaleFactor(scale)}
                 weapons={heldWeapons}
                 onSockets={setSockets}
+                zoom={zoom}
+                onZoom={setZoom}
                 label={t('tokens.model.previewLabel', { name: name || '—' })}
                 onLoaded={(found) => { setLoading(false); setInfo(found); setInvalid(false); }}
                 onClips={(found, stretched) => { setSources(found); setDeforms(stretched); }}
@@ -343,6 +350,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
             <div className="stm-model-stage-note small text-secondary">{t('tokens.model.none')}</div>
           )}
           {previewUrl && loading && !error && <div className="stm-model-stage-note small text-secondary">{t('tokens.model.loading')}</div>}
+          {previewUrl && !error && <ZoomButtons zoom={zoom} onChange={setZoom} />}
         </div>
         {live && previewUrl && (
           <ModelTimeline
@@ -377,6 +385,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
           </div>
         )}
       </div>
+      <div className="stm-model-controls">
       {section === 'model' && previewUrl && (
         <div className="stm-model-scale mt-3">
           <label htmlFor={`${id}-scale`} className="form-label small mb-1 d-flex justify-content-between">
@@ -525,6 +534,8 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
       )}
       {animating && isStatic && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.static')}</div>}
       {animating && deforms && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.deforms')}</div>}
+      </div>
+      </div>
     </div>
   );
 };

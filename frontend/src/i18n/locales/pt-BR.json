@@ -54,6 +54,11 @@
     "animations": "Animações",
     "weapons": "Armas"
   },
+  "preview": {
+    "zoom": "Aproximação da prévia",
+    "zoomIn": "Aproximar",
+    "zoomOut": "Afastar"
+  },
   "weapons": {
     "title": "Armas",
     "tab": {
@@ -306,7 +311,7 @@
     "tabAnimation": "Animação",
     "tabWeapons": "Armas",
     "weapons": {
-      "help": "A arma é alinhada pela pega e pela pose padrão dela, definidas na biblioteca: normalmente só o tamanho precisa de ajuste. O tamanho e o ajuste fino são deste token: mudar aqui não muda outros tokens que usam a mesma arma.",
+      "help": "A arma é alinhada pela pega e pela pose padrão dela, definidas na biblioteca, na pose \"parado\" do modelo: normalmente só o tamanho precisa de ajuste. O tamanho e o ajuste fino são deste token: mudar aqui não muda outros tokens que usam a mesma arma. Aproxime a prévia com a roda do mouse, a pinça ou os botões para ver a mão de perto.",
       "needsModel": "Escolha um modelo 3D na aba \"3D\" para colocar armas nos encaixes dele.",
       "socketLabel": "Encaixe",
       "socket": {

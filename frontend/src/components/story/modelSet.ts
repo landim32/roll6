@@ -8,7 +8,7 @@ import type { ModelClipChoices } from '../../lib/modelAnimations';
 import type { Roll6Clip } from '../../lib/roll6Clips';
 import { instantiate, loadModel } from './loadModel';
 import type { ModelAsset } from './loadModel';
-import { measureSockets } from './socketAnchors';
+import { forgetSockets, measureSockets } from './socketAnchors';
 import { createWeaponSockets, sameSocketWeapons } from './weaponSockets';
 import type { WeaponSocketsSync } from './weaponSockets';
 import type { SocketWeapons } from '../../types/weapon';
@@ -129,6 +129,19 @@ export const createModelSet = (
       entry.down.setLoop(LoopOnce, 1);
       entry.down.clampWhenFinished = true;
     }
+    // The weapon sockets are measured on the first frame of the idle animation (085), the pose the user sees, and the
+    // carried weapons hung again; a model without an idle is measured on its rest pose (the mixer stopped above).
+    if (entry.object) {
+      if (entry.idle) {
+        entry.idle.reset().play();
+        entry.mixer.update(0);
+        entry.mixer.stopAllAction();
+      }
+      entry.object.updateMatrixWorld(true);
+      forgetSockets(entry.object);
+      measureSockets(entry.object);
+      entry.hands.refresh(entry.object, heightOf(entry.asset));
+    }
     if (entry.spec.lying) {
       if (entry.down) {
         entry.down.reset().play();
@@ -164,8 +177,6 @@ export const createModelSet = (
     loadModel(url).then((asset) => {
       if (disposed || drawn.get(entry.spec.id) !== entry || entry.spec.url !== url) return;
       const object = instantiate(asset);
-      // The sockets are measured on the rest pose, before the mixer moves a bone (083).
-      measureSockets(object);
       entry.asset = asset;
       entry.object = object;
       entry.mixer = new AnimationMixer(object);

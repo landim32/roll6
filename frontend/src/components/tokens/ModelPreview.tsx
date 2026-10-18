@@ -11,9 +11,10 @@ import type { AnimationSource, AnimationState, ModelClipChoices } from '../../li
 import type { Roll6Clip } from '../../lib/roll6Clips';
 import { LYING_TILT } from '../../lib/modelFit';
 import { previewFraming } from '../../lib/modelScale';
+import { pinchZoom, wheelZoom } from '../../lib/previewZoom';
 import { instantiate, loadModel } from '../story/loadModel';
 import type { ModelAsset } from '../story/loadModel';
-import { measureSockets, socketsOf } from '../story/socketAnchors';
+import { forgetSockets, measureSockets, socketsOf } from '../story/socketAnchors';
 import type { SocketAvailabilities } from '../story/socketAnchors';
 import { createWeaponSockets } from '../story/weaponSockets';
 import type { SocketWeapons } from '../../types/weapon';
@@ -70,6 +71,10 @@ interface ModelPreviewProps {
   weapons?: SocketWeapons;
   /** After the model opens: which sockets the model offers (Mixamo bones), and which are approximate. */
   onSockets?: (sockets: SocketAvailabilities) => void;
+  /** The zoom (085, `lib/previewZoom`): divides the camera's distance to the waist, where the hands are. Default 1. */
+  zoom?: number;
+  /** The wheel or a pinch over the canvas asks for another zoom; the owner keeps it. */
+  onZoom?: (zoom: number) => void;
 }
 
 /** Height of the model in the preview's units, and how fast the stage turns by itself (radians per second). */
@@ -87,7 +92,7 @@ const CAMERA_TARGET_Y = 0.95;
  * the form (056), so the user sees each choice at once. Without a death the down state shows the model laid on its back,
  * as the 3D view does. Its own small three.js scene, loaded lazily with the tab, released when it closes.
  */
-export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1, weapons, onSockets }, ref) => {
+export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1, weapons, onSockets, zoom = 1, onZoom }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** The action the preview shows now (057): the timeline's subject; null when that state has no animation. */
   const current = useRef<AnimationAction | null>(null);
@@ -113,6 +118,12 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const sizerRef = useRef<Group | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
   const scaleRef = useRef(scale);
+  const zoomRef = useRef(zoom);
+  const onZoomRef = useRef(onZoom);
+  onZoomRef.current = onZoom;
+  /** The pointers down on the canvas (085): one turns the stage, two pinch the zoom. */
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ zoom: number; distance: number } | null>(null);
   const callbacks = useRef({ onLoaded, onClips, onError, onSockets });
   callbacks.current = { onLoaded, onClips, onError, onSockets };
   /** The weapons in the model's sockets (083) and the model's height in its own units (their grips' unit). */
@@ -138,6 +149,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       walk: built.walk ? mixer.clipAction(built.walk) : null,
       down,
     };
+    measureAtIdle();
     show(animatedRef.current ? actionOf(shownRef.current) : null);
     callbacks.current.onClips(built.sources, built.deforms);
     // A library animation not read yet (059): the state plays its automatic one until the file arrives, then the
@@ -150,6 +162,35 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       });
     }
   };
+
+  /**
+   * Measures the weapon sockets on the first frame of the idle animation (085) — the pose the user sees; the file's idle
+   * clips supinate the wrist, so a frame measured on the T-pose pointed the blade into the belly — and hangs the carried
+   * weapons again. A model whose idle resolves to none is measured on its rest pose. `show` runs right after and puts
+   * the model back where the tab wants it.
+   */
+  function measureAtIdle() {
+    const model = modelRef.current;
+    const mixer = mixerRef.current;
+    if (!model || !mixer) return;
+    const idle = actions.current.idle;
+    mixer.stopAllAction();
+    if (idle) {
+      idle.reset().play();
+      mixer.update(0);
+    } else {
+      for (const rest of restRef.current) {
+        rest.node.position.copy(rest.position);
+        rest.node.quaternion.copy(rest.quaternion);
+        rest.node.scale.copy(rest.scale);
+      }
+    }
+    model.updateMatrixWorld(true);
+    forgetSockets(model);
+    measureSockets(model);
+    callbacks.current.onSockets?.(socketsOf(model));
+    handsRef.current.refresh(model, heightRef.current);
+  }
 
   /** The action of a state: the walk falls back to standing still, the down state has only its death. */
   function actionOf(state: AnimationState): AnimationAction | null {
@@ -196,14 +237,19 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const switchRef = useRef(switchState);
   switchRef.current = switchState;
 
-  /** The model's size (063) on the fixed disc, and the camera pulled back so a bigger one still fits. */
+  /**
+   * The model's size (063) on the fixed disc, and the camera pulled back so a bigger one still fits — then brought
+   * closer to its target (the waist, where the hands are) by the zoom (085).
+   */
   function applySize(factor: number) {
     sizerRef.current?.scale.setScalar(factor);
     const camera = cameraRef.current;
     if (!camera) return;
     const framing = previewFraming(factor);
-    camera.position.set(0, CAMERA_POSITION.y * framing, CAMERA_POSITION.z * framing);
-    camera.lookAt(0, CAMERA_TARGET_Y * framing, 0);
+    const targetY = CAMERA_TARGET_Y * framing;
+    const zoomed = zoomRef.current;
+    camera.position.set(0, targetY + (CAMERA_POSITION.y * framing - targetY) / zoomed, (CAMERA_POSITION.z * framing) / zoomed);
+    camera.lookAt(0, targetY, 0);
   }
 
   /** Starts `action` from the beginning, playing, as the one the timeline follows (FR-008). */
@@ -310,6 +356,12 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
     resize();
+    // The wheel zooms (085); a native listener, because React's onWheel is passive and could not stop the page scroll.
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      onZoomRef.current?.(wheelZoom(zoomRef.current, event.deltaY));
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
 
     let cancelled = false;
     loadModel(url).then((asset) => {
@@ -334,11 +386,10 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       assetRef.current = asset;
       mixerRef.current = new AnimationMixer(model);
       heightRef.current = Math.max(1e-6, maxY - minY);
-      // The sockets are measured on the rest pose, before any action plays (083).
-      measureSockets(model);
+      // The sockets are measured on the idle pose by the first applyClips below (085); the weapons asked for now are
+      // loaded meanwhile and hung when they arrive.
       weaponHands.reset();
       weaponHands.sync(model, heightRef.current, weaponsRef.current);
-      callbacks.current.onSockets?.(socketsOf(model));
       callbacks.current.onLoaded({ clipNames: asset.clipNames, boneNames: asset.boneNames });
       applyRef.current(clipsRef.current);
     }).catch(() => {
@@ -361,6 +412,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       cancelled = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      canvas.removeEventListener('wheel', onWheel);
       weaponHands.reset();
       mixerRef.current?.stopAllAction();
       mixerRef.current = null;
@@ -378,6 +430,13 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       renderer.dispose();
     };
   }, [url]);
+
+  // Another zoom (085): the camera moves at once.
+  useEffect(() => {
+    if (zoomRef.current === zoom) return;
+    zoomRef.current = zoom;
+    applySize(scaleRef.current);
+  }, [zoom]);
 
   // Another size (063): the loaded model grows or shrinks on the disc at once, without loading again.
   useEffect(() => {
@@ -417,18 +476,38 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     switchRef.current(previous, shown);
   }, [shown]);
 
+  /** The distance between the two first pointers down (a pinch). */
+  const pinchDistance = () => {
+    const [a, b] = [...pointers.current.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
   const onPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // A pointer the browser does not know (synthetic events): the drag still works without the capture.
+    }
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    // While a pointer is down the stage stops turning by itself; two pointers pinch the zoom instead of turning.
     drag.current = event.clientX;
+    if (pointers.current.size === 2) pinch.current = { zoom: zoomRef.current, distance: pinchDistance() };
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pinch.current && pointers.current.size >= 2) {
+      onZoomRef.current?.(pinchZoom(pinch.current.zoom, pinch.current.distance, pinchDistance()));
+      drag.current = event.clientX;
+      return;
+    }
     if (drag.current === null || !stage.current) return;
     stage.current.rotation.y += (event.clientX - drag.current) * DRAG_TURN;
     drag.current = event.clientX;
   };
   const onPointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    drag.current = null;
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    drag.current = pointers.current.size > 0 ? event.clientX : null;
   };
 
   return (

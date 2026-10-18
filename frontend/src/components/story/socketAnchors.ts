@@ -7,10 +7,12 @@ import { SOCKET, SOCKETS } from '../../types/weapon';
 import type { Socket } from '../../types/weapon';
 
 /**
- * The weapon sockets of a 3D model (083), measured once per model instance on its rest pose: each one is a point and an
- * orientation in its parent bone's local space (`lib/socketFrame` gives the frame, in world space, from the Mixamo bones
- * — `normalizeBoneName` drops any "mixamorig" prefix), so the animations move it with the bone and attaching works at any
- * instant. Call `measureSockets` right after the model is instantiated, before its mixer runs.
+ * The weapon sockets of a 3D model (083), measured once per model instance: each one is a point and an orientation in
+ * its parent bone's local space (`lib/socketFrame` gives the frame, in world space, from the Mixamo bones —
+ * `normalizeBoneName` drops any "mixamorig" prefix), so the animations move it with the bone and attaching works at any
+ * instant. `measureSockets` reads the pose the bones are in when it is called: since 085 the callers (`ModelPreview`,
+ * `modelSet`) put the model on the first frame of its **idle** animation first — the pose the user sees — and call
+ * `forgetSockets` + `measureSockets` again whenever that animation changes, then hang the weapons again.
  */
 export interface SocketAnchor {
   bone: Bone;
@@ -106,6 +108,7 @@ const measure = (model: Object3D): Measured => {
     }
     const index1 = worldOf(bones.get(`${prefix}HandIndex1`));
     const pinky1 = worldOf(bones.get(`${prefix}HandPinky1`));
+    const hips = worldOf(bones.get('Hips'));
     const frame = handFrame({
       side,
       hand: worldOf(hand)!,
@@ -114,6 +117,7 @@ const measure = (model: Object3D): Measured => {
       pinky1,
       thumb1: worldOf(bones.get(`${prefix}HandThumb1`)),
       foreArm: worldOf(bones.get(`${prefix}ForeArm`)),
+      hips,
     }, axes);
     anchors[socket] = anchorOf(hand, frame);
     availability[socket] = index1 && pinky1 ? { available: true } : { available: true, reason: 'noFingers' };
