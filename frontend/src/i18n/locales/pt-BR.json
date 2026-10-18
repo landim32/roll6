@@ -203,7 +203,8 @@
   },
   "editor": {
     "title": "Editor de animações",
-    "back": "Voltar ao Roll6",
+    "back": "Voltar para a animação",
+    "backToList": "Voltar para animações",
     "offline": "sem conexão",
     "offlineLong": "Não foi possível conectar ao Roll6. Verifique a conexão e recarregue a página.",
     "forbidden": "Só o dono edita esta animação.",

@@ -40,6 +40,12 @@ export const weaponPath = (id: number): string => `${LIBRARY_ROOT}/weapons/${id}
 
 export const animationPath = (id: number): string => `${LIBRARY_ROOT}/animations/${id}`;
 
+/** The animation editor (089; was `/animation/:id` in its own tab) inside the library. */
+export const animationEditorPath = (id: number): string => `${LIBRARY_ROOT}/animations/${id}/editor`;
+
+/** True on the editor's address: the library shows it edge to edge, without the content padding. */
+export const isAnimationEditorPath = (pathname: string): boolean => /^\/library\/animations\/[^/]+\/editor\/?$/.test(pathname);
+
 /** The section an address belongs to (the nav highlights it), or null outside the library. */
 export const sectionOf = (pathname: string): LibrarySection | null => {
   const parts = pathname.split('/').filter(Boolean);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CAMPAIGN_SECTIONS, LIBRARY_SECTIONS, animationPath, campaignEditPath, campaignNewPath, characterPath, idParam,
-  isCampaignSection, isLibrarySection, libraryPath, mapEditPath, npcPath, sectionOf, tokenPath, weaponPath,
+  CAMPAIGN_SECTIONS, LIBRARY_SECTIONS, animationEditorPath, animationPath, campaignEditPath, campaignNewPath, characterPath, idParam,
+  isAnimationEditorPath, isCampaignSection, isLibrarySection, libraryPath, mapEditPath, npcPath, sectionOf, tokenPath, weaponPath,
 } from './libraryRoutes';
 
 describe('library routes (087)', () => {
@@ -42,5 +42,19 @@ describe('library routes (087)', () => {
     expect(idParam('new')).toBeNull();
     expect(idParam('0')).toBeNull();
     expect(idParam(undefined)).toBeNull();
+  });
+});
+
+describe('animation editor route (089)', () => {
+  it('puts the editor under the animation in the library', () => {
+    expect(animationEditorPath(7)).toBe('/library/animations/7/editor');
+  });
+
+  it('recognises only the editor address', () => {
+    expect(isAnimationEditorPath('/library/animations/7/editor')).toBe(true);
+    expect(isAnimationEditorPath('/library/animations/7/editor/')).toBe(true);
+    expect(isAnimationEditorPath('/library/animations/7')).toBe(false);
+    expect(isAnimationEditorPath('/library/animations')).toBe(false);
+    expect(isAnimationEditorPath('/animation/7')).toBe(false);
   });
 });
