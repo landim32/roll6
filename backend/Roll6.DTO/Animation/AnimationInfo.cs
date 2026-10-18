@@ -31,6 +31,14 @@ public class AnimationInfo
     [JsonPropertyName("fileUrl")]
     public string FileUrl { get; set; } = string.Empty;
 
+    /// <summary>The library card's picture (090): the stored PNG name; null = the site draws it live.</summary>
+    [JsonPropertyName("thumbnailImage")]
+    public string? ThumbnailImage { get; set; }
+
+    /// <summary>Presigned URL of <see cref="ThumbnailImage"/>; null without one.</summary>
+    [JsonPropertyName("thumbnailImageUrl")]
+    public string? ThumbnailImageUrl { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

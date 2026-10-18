@@ -16,6 +16,8 @@ interface TokenGridProps {
   page: number;
   totalPages: number;
   onPage: (page: number) => void;
+  /** "picker" (default): always 4 columns, as in the tokens window. "library" (090): 3 on phones, 4 from lg. */
+  cols?: 'picker' | 'library';
 }
 
 /**
@@ -24,7 +26,7 @@ interface TokenGridProps {
  * missing) and "3D" (`lib/tokenBadge`); the optional pencil
  * floats over the top-left corner as a sibling button, so it never picks.
  */
-export const TokenGrid = ({ items, loading, busy, emptyText, onPick, onEdit, page, totalPages, onPage }: TokenGridProps) => {
+export const TokenGrid = ({ items, loading, busy, emptyText, onPick, onEdit, page, totalPages, onPage, cols = 'picker' }: TokenGridProps) => {
   const { t } = useTranslation();
 
   if (loading) return <p className="text-body-secondary">{t('common.loading')}</p>;
@@ -32,7 +34,7 @@ export const TokenGrid = ({ items, loading, busy, emptyText, onPick, onEdit, pag
 
   return (
     <>
-      <div className="row row-cols-4 g-2">
+      <div className={`row g-2 ${cols === 'library' ? 'row-cols-3 row-cols-lg-4 g-md-3' : 'row-cols-4'}`}>
         {items.map((token) => (
           <div className="col" key={token.tokenId}>
             <div className="stm-token-cell">

@@ -105,6 +105,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.FreeMode).HasColumnName("free_mode").HasDefaultValue(false);
             // 072: true is the database default too, so the sentinel is true and an explicit false is written.
             entity.Property(e => e.PendingNotice).HasColumnName("pending_notice").HasDefaultValue(true).HasSentinel(true);
+            entity.Property(e => e.Image).HasColumnName("image").HasMaxLength(260);
             // Map the table follows (017); a map belongs to its campaign, so no navigation both ways.
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.CurrentMapId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_campaign_current");
@@ -177,6 +178,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.FileName).HasColumnName("file_name").HasMaxLength(260).IsRequired();
             entity.Property(e => e.Duration).HasColumnName("duration");
             entity.Property(e => e.Loop).HasColumnName("loop");
+            entity.Property(e => e.ThumbnailImage).HasColumnName("thumbnail_image").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasIndex(e => e.UserId).HasDatabaseName("ix_animations_user");
@@ -234,6 +236,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.PoseRx).HasColumnName("pose_rx");
             entity.Property(e => e.PoseRy).HasColumnName("pose_ry");
             entity.Property(e => e.PoseRz).HasColumnName("pose_rz");
+            entity.Property(e => e.ThumbnailImage).HasColumnName("thumbnail_image").HasMaxLength(260);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasIndex(e => e.UserId).HasDatabaseName("ix_weapons_user");

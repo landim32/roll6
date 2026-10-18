@@ -14,7 +14,7 @@ namespace Roll6.Mcp.Tools;
 public static class WeaponTools
 {
     private const string WEAPON_ID = "Id of the weapon (weaponId from list_weapons or create_weapon).";
-    private const string ITEM = "{ weaponId, userId, ownerName, name, modelFile, modelFileUrl, gripPoint { x, y, z }, pose { rx, ry, rz }, createdAt, updatedAt }";
+    private const string ITEM = "{ weaponId, userId, ownerName, name, modelFile, modelFileUrl, gripPoint { x, y, z }, pose { rx, ry, rz }, thumbnailImage, thumbnailImageUrl, createdAt, updatedAt }";
     private const string MODEL_FILE = "The weapon's 3D model: the fileName returned by upload_token_model (\"{32 hex}.glb\", glTF 2.0 binary, ≤ 20 MB). The file's origin and orientation do not matter: gripPoint and pose say where the hand holds it and how it stands.";
 
     [McpServerTool(Name = "create_weapon", Title = "Create weapon", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -37,8 +37,9 @@ public static class WeaponTools
         [Description("Name shown in the library and in the token form (required, up to 100 characters). Example: \"Espada longa\".")] string name,
         [Description(MODEL_FILE)] string modelFile,
         [Description(McpDocs.WEAPON_GRIP_POINT)] WeaponGripPointInfo? gripPoint = null,
-        [Description(McpDocs.WEAPON_POSE)] WeaponPoseInfo? pose = null) =>
-        api.SendAsync(HttpMethod.Post, "/api/weapon", new WeaponInsertInfo { Name = name, ModelFile = modelFile, GripPoint = gripPoint, Pose = pose });
+        [Description(McpDocs.WEAPON_POSE)] WeaponPoseInfo? pose = null,
+        [Description(McpDocs.THUMBNAIL_IMAGE)] string? thumbnailImage = null) =>
+        api.SendAsync(HttpMethod.Post, "/api/weapon", new WeaponInsertInfo { Name = name, ModelFile = modelFile, GripPoint = gripPoint, Pose = pose, ThumbnailImage = thumbnailImage });
 
     [McpServerTool(Name = "list_weapons", Title = "List weapons", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/weapon")]
@@ -90,8 +91,9 @@ public static class WeaponTools
         [Description("New name (up to 100 characters). Omit to keep the current one.")] string? name = null,
         [Description(MODEL_FILE + " Omit to keep the current file.")] string? modelFile = null,
         [Description(McpDocs.WEAPON_GRIP_POINT + " Omit to keep the current one.")] WeaponGripPointInfo? gripPoint = null,
-        [Description(McpDocs.WEAPON_POSE + " Omit to keep the current one.")] WeaponPoseInfo? pose = null) =>
-        api.SendAsync(HttpMethod.Put, $"/api/weapon/{weaponId}", new WeaponUpdateInfo { Name = name, ModelFile = modelFile, GripPoint = gripPoint, Pose = pose });
+        [Description(McpDocs.WEAPON_POSE + " Omit to keep the current one.")] WeaponPoseInfo? pose = null,
+        [Description(McpDocs.THUMBNAIL_IMAGE)] string? thumbnailImage = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/weapon/{weaponId}", new WeaponUpdateInfo { Name = name, ModelFile = modelFile, GripPoint = gripPoint, Pose = pose, ThumbnailImage = thumbnailImage });
 
     [McpServerTool(Name = "delete_weapon", Title = "Delete weapon", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/weapon/{id}")]

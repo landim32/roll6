@@ -205,4 +205,72 @@ public class WeaponServiceTests
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
+
+    // 090: the library card's picture.
+    private const string THUMB = "aaaabbbbccccddddeeeeffff00001111.png";
+    private const string NEW_THUMB = "00112233445566778899aabbccddeeff.png";
+
+    private void WithStoredThumbnail() =>
+        _repository.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(() => new Weapon
+        {
+            WeaponId = 7, UserId = 1, Name = "Espada", ModelFile = FILE, ThumbnailImage = THUMB
+        });
+
+    [Fact]
+    public async Task Create_StoresTheThumbnail()
+    {
+        var result = await _service.CreateAsync(1, new WeaponInsertInfo { Name = "Espada", ModelFile = FILE, ThumbnailImage = THUMB });
+
+        result.ThumbnailImage.Should().Be(THUMB);
+        result.ThumbnailImageUrl.Should().Be("https://x/" + THUMB);
+    }
+
+    [Fact]
+    public async Task Update_NewFileWithoutThumbnail_ClearsIt()
+    {
+        WithStoredThumbnail();
+
+        var result = await _service.UpdateAsync(1, 7, new WeaponUpdateInfo { ModelFile = OTHER_FILE });
+
+        result.ThumbnailImage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_NewPoseWithThumbnail_KeepsTheNewOne()
+    {
+        WithStoredThumbnail();
+
+        var result = await _service.UpdateAsync(1, 7, new WeaponUpdateInfo { Pose = new WeaponPoseInfo { Ry = 90 }, ThumbnailImage = NEW_THUMB });
+
+        result.ThumbnailImage.Should().Be(NEW_THUMB);
+    }
+
+    [Fact]
+    public async Task Update_GripPointOnly_KeepsTheThumbnail()
+    {
+        WithStoredThumbnail();
+
+        var result = await _service.UpdateAsync(1, 7, new WeaponUpdateInfo { GripPoint = new WeaponGripPointInfo { X = 0.5, Y = 0.2, Z = 0.5 } });
+
+        result.ThumbnailImage.Should().Be(THUMB);
+    }
+
+    [Fact]
+    public async Task Update_ThumbnailOnly_PublishesNothing()
+    {
+        WithStoredThumbnail();
+
+        var result = await _service.UpdateAsync(1, 7, new WeaponUpdateInfo { ThumbnailImage = NEW_THUMB });
+
+        result.ThumbnailImage.Should().Be(NEW_THUMB);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_ThumbnailOfSomeoneElse_IsRefused()
+    {
+        var act = () => _service.UpdateAsync(2, 7, new WeaponUpdateInfo { ThumbnailImage = NEW_THUMB });
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
 }

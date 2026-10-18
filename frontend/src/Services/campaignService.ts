@@ -76,6 +76,14 @@ class CampaignService {
     return this.handleResponse<CampaignInfo>(response);
   }
 
+  /** Sets or removes (null) the campaign's picture on the library cards (090, master). */
+  async setImage(id: number, image: string | null): Promise<CampaignInfo> {
+    const response = await fetch(`${API_BASE}/${id}/image`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ image }),
+    });
+    return this.handleResponse<CampaignInfo>(response);
+  }
+
   /** Creates a campaign owned by the logged user. */
   async create(data: CampaignInsertInfo): Promise<CampaignInfo> {
     const response = await fetch(API_BASE, {

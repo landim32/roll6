@@ -19,4 +19,11 @@ public class WeaponUpdateInfo
     /// <summary>A new standard pose (083); null keeps the current one.</summary>
     [JsonPropertyName("pose")]
     public WeaponPoseInfo? Pose { get; set; }
+
+    /// <summary>
+    /// The library card's picture (090): null keeps it, <c>""</c> removes it, a name from <c>POST /api/image</c> replaces
+    /// it. A new model file or a different pose clears the stored one unless a new one comes in the same request.
+    /// </summary>
+    [JsonPropertyName("thumbnailImage")]
+    public string? ThumbnailImage { get; set; }
 }

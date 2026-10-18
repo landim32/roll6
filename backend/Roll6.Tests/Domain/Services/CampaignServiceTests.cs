@@ -557,4 +557,56 @@ public class CampaignServiceTests
 
         _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
     }
+
+    // ---- 090: the campaign's picture ----
+
+    private const string IMAGE = "aaaabbbbccccddddeeeeffff00001111.webp";
+
+    [Fact]
+    public async Task SetImage_Master_SetsItAndPublishesCampaignChanged()
+    {
+        _imageStorage.Setup(s => s.GetUrl(IMAGE)).Returns("https://bucket/campaign.webp");
+
+        var result = await _service.SetImageAsync(1, 10, new CampaignImageInfo { Image = IMAGE });
+
+        result.Image.Should().Be(IMAGE);
+        result.ImageUrl.Should().Be("https://bucket/campaign.webp");
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CAMPAIGN_CHANGED)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetImage_Null_RemovesIt()
+    {
+        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "Campanha", Image = IMAGE });
+
+        var result = await _service.SetImageAsync(1, 10, new CampaignImageInfo { Image = null });
+
+        result.Image.Should().BeNull();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.Image == null)));
+    }
+
+    [Fact]
+    public async Task SetImage_SameValue_DoesNothing()
+    {
+        await _service.SetImageAsync(1, 10, new CampaignImageInfo { Image = "" });
+
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetImage_NotMaster_IsForbidden()
+    {
+        var act = () => _service.SetImageAsync(2, 10, new CampaignImageInfo { Image = IMAGE });
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    [Fact]
+    public async Task Create_WithImage_StoresIt()
+    {
+        var result = await _service.CreateAsync(1, new CampaignInsertInfo { Name = "Nova", Image = IMAGE });
+
+        result.Image.Should().Be(IMAGE);
+    }
 }

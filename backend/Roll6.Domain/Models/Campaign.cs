@@ -42,12 +42,22 @@ public class Campaign
     /// On by default; the master switches it in any status, and with it on it shows in free mode too.
     /// </summary>
     public bool PendingNotice { get; set; } = true;
+
+    /// <summary>The campaign's picture on the library cards (090), sent by the master. Null = the default figure.</summary>
+    public string? Image { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     public void Rename(string? name)
     {
         Name = Guard.RequiredText(name, "name", 260);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>The campaign's picture (090): null or blank removes it, a stored image name sets it.</summary>
+    public void ChangeImage(string? image)
+    {
+        Image = string.IsNullOrWhiteSpace(image) ? null : Guard.ImageFileName(image, "image");
         UpdatedAt = DateTime.UtcNow;
     }
 

@@ -58,6 +58,8 @@ public static class Roll6Guide
         ## Campaigns and participation
         - Campaigns are listed for everyone (`list_campaigns`, `mine=true` for your own). **Open** campaigns approve
           access requests immediately; closed ones wait for the master.
+        - A campaign may have a **picture** for the app's library cards: `image` on `create_campaign`, or
+          `set_campaign_image` (master only; upload with `upload_image` first; null removes it).
         - Participation status: `1 Invited`, `2 RequestedAccess`, `3 Approved`, `4 Denied`.
           Player: `request_campaign_access`, `accept_invite`, `decline_invite`. Master: `invite_character`,
           `approve_access_request`, `deny_access_request`, `remove_participation`.
@@ -240,6 +242,12 @@ public static class Roll6Guide
           finger tracks the hands stay open as in the rest pose.
         - Errors come back keyed: `content`, `content.format`, `content.version`, `content.duration`, `content.loop`,
           `content.tracks`, `content.tracks[i].bone|times|degrees`, `content.hipsLift.times|values|of`.
+
+        - **Library thumbnails** (090): weapons and animations carry `thumbnailImage`/`thumbnailImageUrl`, the picture of
+          their card in the app's library. The site renders it (the weapon in its standard pose, the animation as a
+          standard skeleton figure in its strongest pose) when the item is saved or first listed by its owner, so an
+          assistant normally leaves it out. A new file, a different pose or a new content clears it; the site draws it
+          again.
 
         ## Weapons
         - The **weapon library** is shared like tokens and animations: create_weapon (a name + a .glb uploaded with

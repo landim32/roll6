@@ -1,36 +1,30 @@
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Tabs } from '../../components/ui/Tabs';
+import { useNavigate } from 'react-router-dom';
 import { TokenGrid } from '../../components/tokens/TokenGrid';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
+import { useLegacyTab } from '../../components/library/useLegacyTab';
 import { useTokenList } from '../../hooks/useTokenList';
 import { tokenPath } from '../../lib/libraryRoutes';
+import type { OwnSubsection } from '../../lib/libraryRoutes';
 
 /**
  * "Tokens" of the library (087; were the list tabs of the tokens window): "Meus tokens" (the pencil edits) and
- * "Buscar tokens" (the whole library, read-only for others' tokens); "Incluir token" creates one in full screen.
+ * "Buscar" (the whole library, read-only for others' tokens) — since 090 two submenus, 4 columns (3 on phones);
+ * "Incluir token" creates one in full screen.
  */
-export const TokensPage = () => {
+export const TokensPage = ({ subsection }: { subsection: OwnSubsection }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') === 'search' ? 'search' : 'mine';
+  useLegacyTab('tokens');
+  const tab = subsection;
   const mine = useTokenList(tab === 'mine', true, 0);
   const library = useTokenList(tab === 'search', false, 0);
   const list = tab === 'mine' ? mine : library;
 
   return (
     <section>
-      <LibraryPageHeader title={t('library.nav.tokens')}
+      <LibraryPageHeader title={t(`library.sub.tokens.${subsection}`)}
         actions={<button type="button" className="btn btn-primary btn-sm" onClick={() => navigate(tokenPath('new'))}>{t('tokens.createTab')}</button>} />
-      <Tabs
-        tabs={[
-          { key: 'mine', label: t('tokens.mineTab') },
-          { key: 'search', label: t('tokens.searchTab') },
-        ]}
-        active={tab}
-        onChange={(key) => setParams(key === 'mine' ? {} : { tab: key }, { replace: true })}
-      />
       <input type="search" className="form-control mb-3" placeholder={t('tokens.search')} aria-label={t('tokens.search')}
         value={list.query} onChange={(e) => list.setQuery(e.target.value)} />
       <TokenGrid
@@ -43,6 +37,7 @@ export const TokensPage = () => {
         page={list.page}
         totalPages={list.totalPages}
         onPage={list.setPage}
+        cols="library"
       />
     </section>
   );

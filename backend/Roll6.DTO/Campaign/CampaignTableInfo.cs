@@ -29,6 +29,10 @@ public class CampaignTableInfo
     [JsonPropertyName("pendingNotice")]
     public bool PendingNotice { get; set; } = true;
 
+    /// <summary>Presigned URL of the campaign's picture (090); null without one.</summary>
+    [JsonPropertyName("imageUrl")]
+    public string? ImageUrl { get; set; }
+
     [JsonPropertyName("isMaster")]
     public bool IsMaster { get; set; }
 

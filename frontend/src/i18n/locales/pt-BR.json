@@ -62,12 +62,8 @@
     "zoomOut": "Afastar"
   },
   "weapons": {
+    "include": "Incluir arma",
     "title": "Armas",
-    "tab": {
-      "mine": "Minhas",
-      "search": "Buscar",
-      "upload": "Enviar"
-    },
     "file": "Arquivo da arma (.glb)",
     "fileHelp": "Um modelo 3D glTF binário de até 20 MB. A origem e a orientação do arquivo não importam: você marca a pega e a pose padrão na prévia.",
     "fileNotGlb": "Escolha um arquivo .glb (glTF binário).",
@@ -117,12 +113,8 @@
     }
   },
   "animations": {
+    "include": "Incluir animação",
     "title": "Animações",
-    "tab": {
-      "mine": "Minhas",
-      "search": "Buscar",
-      "upload": "Enviar"
-    },
     "type": {
       "1": "Parado",
       "2": "Andando",
@@ -162,6 +154,16 @@
     "openEditor": "Editar no editor"
   },
   "library": {
+    "sub": {
+      "campaigns": { "mine": "Minhas campanhas", "search": "Buscar", "playing": "Jogando" },
+      "maps": { "mine": "Meus mapas", "search": "Buscar", "campaign": "Da campanha" },
+      "tokens": { "mine": "Meus tokens", "search": "Buscar" },
+      "weapons": { "mine": "Minhas armas", "search": "Buscar" },
+      "animations": { "mine": "Minhas animações", "search": "Buscar" }
+    },
+    "thumbnail": {
+      "alt": "Miniatura de {{name}}"
+    },
     "title": "Biblioteca",
     "nav": {
       "campaigns": "Campanhas",
@@ -183,7 +185,6 @@
     "readOnly": "Somente leitura",
     "searchPlaceholder": "Buscar pelo nome",
     "campaigns": {
-      "playingTab": "Jogando",
       "playingEmpty": "Nenhum personagem seu está aprovado em uma campanha de outro mestre.",
       "play": "Abrir na mesa",
       "masterOnly": "Só o mestre edita esta campanha."
@@ -805,9 +806,14 @@
     "turn": "Turno {{no}}"
   },
   "campaign": {
+    "image": {
+      "label": "Imagem da campanha",
+      "hint": "Aparece no cartão da campanha na biblioteca. Uma imagem larga (16:9) fica melhor.",
+      "save": "Salvar imagem",
+      "saved": "Imagem da campanha salva.",
+      "removed": "Imagem da campanha removida."
+    },
     "title": "Campanhas",
-    "mineTab": "Minhas campanhas",
-    "searchTab": "Buscar campanhas",
     "newTab": "Nova campanha",
     "name": "Nome da campanha",
     "open": "Campanha aberta (qualquer personagem pode entrar)",
@@ -820,9 +826,6 @@
   },
   "mapModal": {
     "title": "Mapas",
-    "campaignTab": "Mapas da campanha",
-    "mineTab": "Meus mapas",
-    "searchTab": "Buscar mapas",
     "noCampaign": "Escolha uma campanha para ver os mapas dela.",
     "searchPlaceholder": "Nome ou descrição",
     "newMap": "Novo mapa",

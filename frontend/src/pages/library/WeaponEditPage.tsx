@@ -17,6 +17,17 @@ import { WeaponStage } from '../../components/weapons/WeaponStage';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
 import { NotFoundCard } from '../../components/library/NotFoundCard';
 
+/** The library card's picture after a change (090): the new file (or the stored one) in the new pose; null on failure. */
+const drawThumbnail = async (file: File | null, storedUrl: string | null, pose: WeaponPose): Promise<Blob | null> => {
+  try {
+    const { renderWeaponThumbnail } = await import('../../components/library/weaponThumbnail');
+    if (file) return await renderWeaponThumbnail({ bytes: await file.arrayBuffer() }, pose);
+    return storedUrl ? await renderWeaponThumbnail({ url: storedUrl }, pose) : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * A weapon in full screen (087; was "Editar arma" of 082/083): for the owner, the name, optionally a new file, the
  * standard pose and the grip point picked on the stage — only what changed is sent; another user's weapon is shown on
@@ -89,11 +100,14 @@ export const WeaponEditPage = () => {
     if (!owner) return;
     setSaving(true);
     try {
+      const poseChanged = !samePose(pose, normalizePose(weapon.pose));
       const saved = await update(weapon, {
         name: name.trim(),
         file,
         gripPoint: sameGripPoint(gripPoint, clampGripPoint(weapon.gripPoint)) ? undefined : gripPoint,
-        pose: samePose(pose, normalizePose(weapon.pose)) ? undefined : pose,
+        pose: poseChanged ? pose : undefined,
+        // 090: a new file or pose clears the card's picture on the server, so a fresh one goes along.
+        thumbnail: file || poseChanged ? await drawThumbnail(file, weapon.modelFileUrl, pose) : undefined,
       });
       toast.success(t('weapons.updated'));
       seed(saved);

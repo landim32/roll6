@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Tabs } from '../../components/ui/Tabs';
-import { PagedListView } from '../../components/ui/PagedListView';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
-import { PencilIcon } from '../../components/ui/icons';
+import { MapIcon, PencilIcon } from '../../components/ui/icons';
 import { MakeCurrentMapButton } from '../../components/campaign/MakeCurrentMapButton';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
+import { CardGrid } from '../../components/library/CardGrid';
+import { LibraryCard } from '../../components/library/LibraryCard';
+import { useLegacyTab } from '../../components/library/useLegacyTab';
 import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { mapModelService } from '../../Services/mapModelService';
 import { mapService } from '../../Services/mapService';
 import { mapEditPath } from '../../lib/libraryRoutes';
+import type { MapSubsection } from '../../lib/libraryRoutes';
 import { visibleCampaignMaps } from '../../lib/viewerMap';
 import { canMakeCurrent } from '../../lib/currentMap';
 import type { PagedList } from '../../types/common';
@@ -21,20 +23,24 @@ import { MAP_STATUS_DELETED } from '../../types/map';
 import type { MapInfo } from '../../types/map';
 import type { MapModelInfo } from '../../types/mapModel';
 
-const TABS = ['campaign', 'mine', 'search'] as const;
-type MapTab = (typeof TABS)[number];
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 12;
+
+interface MapsPageProps {
+  /** The submenu on screen (090; were the tabs of 087): Meus mapas · Buscar · Da campanha. */
+  subsection: MapSubsection;
+}
 
 /**
- * "Mapas" of the library (087; was the maps window): the current campaign's maps (a player sees only the current one,
- * 039), the user's own library maps and the search. Choosing one opens it on the table; the pencil (own maps) goes to
- * the map's edit page; "Novo mapa" opens an empty map on the table. Replacing an unsaved map asks first.
+ * "Mapas" of the library (087; was the maps window): the user's own library maps, the search and the current
+ * campaign's maps (a player sees only the current one, 039) — since 090 one submenu each, as cards in 3 columns with
+ * the map's picture. Choosing one opens it on the table; the pencil (own maps) goes to the map's edit page; "Novo
+ * mapa" opens an empty map on the table. Replacing an unsaved map asks first.
  */
-export const MapsPage = () => {
+export const MapsPage = ({ subsection }: MapsPageProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [params, setParams] = useSearchParams();
-  const tab: MapTab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? params.get('tab') as MapTab : 'campaign';
+  useLegacyTab('maps');
+  const tab = subsection;
   const { session } = useAuth();
   const userId = session?.user.userId ?? null;
   const { currentCampaign, isMaster } = useCampaign();
@@ -106,34 +112,16 @@ export const MapsPage = () => {
     </button>
   );
 
-  const renderMap = (name: string, imageUrl: string | null, cols: number, rows: number, extra?: string, current = false) => (
-    <div className="d-flex align-items-center gap-3">
-      {imageUrl ? <img className="stm-thumb" src={imageUrl} alt="" /> : <div className="stm-thumb" />}
-      <div>
-        <div className="fw-semibold d-flex align-items-center gap-2">
-          {name}
-          {current && <span className="badge text-bg-info">{t('campaignSettings.currentMap')}</span>}
-        </div>
-        <small className="text-body-secondary">
-          {t('mapModal.grid', { cols, rows })}{extra ? ` · ${extra}` : ''}
-        </small>
-      </div>
-    </div>
-  );
+  const figure = (imageUrl: string | null, name: string) => (imageUrl ? <img src={imageUrl} alt={name} loading="lazy" /> : undefined);
+  const gridText = (cols: number, rows: number) => t('mapModal.grid', { cols, rows });
+
+  const campaignTotal = campaignMaps ? Math.max(1, Math.ceil(campaignMaps.totalCount / campaignMaps.pageSize)) : 1;
+  const modelTotal = models ? Math.max(1, Math.ceil(models.totalCount / models.pageSize)) : 1;
 
   return (
     <section>
-      <LibraryPageHeader title={t('library.nav.maps')}
+      <LibraryPageHeader title={t(`library.sub.maps.${subsection}`)}
         actions={<button type="button" className="btn btn-outline-primary btn-sm" onClick={onNewMap}>{t('mapModal.newMap')}</button>} />
-      <Tabs
-        tabs={[
-          { key: 'campaign', label: t('mapModal.campaignTab') },
-          { key: 'mine', label: t('mapModal.mineTab') },
-          { key: 'search', label: t('mapModal.searchTab') },
-        ]}
-        active={tab}
-        onChange={(key) => { setModels(null); setParams({ tab: key }, { replace: true }); }}
-      />
       {tab === 'search' && (
         <form className="input-group mb-3" onSubmit={(e) => { e.preventDefault(); void load(1); }}>
           <input className="form-control" placeholder={t('mapModal.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -144,37 +132,60 @@ export const MapsPage = () => {
         currentCampaign && !isMaster && campaignMaps && campaignMaps.items.length === 0 ? (
           <p className="text-body-secondary">{t('map.noCurrentMap')}</p>
         ) : currentCampaign ? (
-          <PagedListView
-            data={campaignMaps}
-            loading={loading}
-            renderItem={(m) => renderMap(m.name, m.mapModelImageUrl, m.gridWidth, m.gridHeight, undefined, m.mapId === currentCampaign.currentMapId)}
+          <CardGrid
+            items={loading && !campaignMaps ? null : campaignMaps?.items ?? null}
+            cols={3}
             getKey={(m) => m.mapId}
-            onSelect={openCampaignMap}
-            renderActions={(m) => {
+            emptyText={t('common.empty')}
+            page={campaignMaps?.page ?? 1}
+            totalPages={campaignTotal}
+            onPage={(page) => { void load(page); }}
+            renderCard={(m) => {
               const makeCurrent = canMakeCurrent(m, { isMaster, currentMapId: currentCampaign.currentMapId ?? null });
               const editable = m.userId === userId;
-              if (!makeCurrent && !editable) return null;
               return (
-                <>
-                  {makeCurrent && <MakeCurrentMapButton map={m} />}
-                  {editable && editButton(m.mapModelId, m)}
-                </>
+                <LibraryCard
+                  ratio="wide"
+                  title={m.name}
+                  figure={figure(m.mapModelImageUrl, m.name)}
+                  fallback={<MapIcon />}
+                  onOpen={() => openCampaignMap(m)}
+                  meta={gridText(m.gridWidth, m.gridHeight)}
+                  badges={m.mapId === currentCampaign.currentMapId
+                    ? <span className="badge text-bg-info">{t('campaignSettings.currentMap')}</span> : undefined}
+                  actions={makeCurrent || editable ? (
+                    <>
+                      {makeCurrent && <MakeCurrentMapButton map={m} />}
+                      {editable && editButton(m.mapModelId, m)}
+                    </>
+                  ) : undefined}
+                />
               );
             }}
-            onPageChange={(page) => { void load(page); }}
           />
         ) : (
           <p className="text-body-secondary">{t('mapModal.noCampaign')}</p>
         )
       ) : (
-        <PagedListView
-          data={models}
-          loading={loading}
-          renderItem={(m) => renderMap(m.name, m.imageUrl, m.gridWidth, m.gridHeight, m.description ?? undefined)}
+        <CardGrid
+          items={loading && !models ? null : models?.items ?? null}
+          cols={3}
           getKey={(m) => m.mapModelId}
-          onSelect={(m) => openModel(m.mapModelId)}
-          renderActions={(m) => (m.userId === userId ? editButton(m.mapModelId, null) : null)}
-          onPageChange={(page) => { void load(page); }}
+          emptyText={t('common.empty')}
+          page={models?.page ?? 1}
+          totalPages={modelTotal}
+          onPage={(page) => { void load(page); }}
+          renderCard={(m) => (
+            <LibraryCard
+              ratio="wide"
+              title={m.name}
+              figure={figure(m.imageUrl, m.name)}
+              fallback={<MapIcon />}
+              onOpen={() => openModel(m.mapModelId)}
+              meta={m.description ? `${gridText(m.gridWidth, m.gridHeight)} · ${m.description}` : gridText(m.gridWidth, m.gridHeight)}
+              actions={m.userId === userId ? editButton(m.mapModelId, null) : undefined}
+            />
+          )}
         />
       )}
       <ConfirmModal

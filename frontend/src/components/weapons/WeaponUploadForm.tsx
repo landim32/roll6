@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -12,14 +12,27 @@ import { WeaponStage } from './WeaponStage';
 
 interface WeaponUploadFormProps {
   onUploaded: (weapon: WeaponInfo) => void;
+  /** Whether something was picked or typed (090: the "Incluir" page asks before leaving). */
+  onDirtyChange?: (dirty: boolean) => void;
 }
+
+/** The library card's picture of the file being added (090): drawn from its own bytes; null when it cannot be. */
+const drawThumbnail = async (file: File, pose: WeaponPose): Promise<Blob | null> => {
+  try {
+    const { renderWeaponThumbnail } = await import('../library/weaponThumbnail');
+    return await renderWeaponThumbnail({ bytes: await file.arrayBuffer() }, pose);
+  } catch {
+    return null;
+  }
+};
 
 /**
  * "Enviar" (082): a `.glb` (checked here like the token models before it leaves the device), previewed at once on the
  * editable stage, where the user turns it into its standard pose in 90° steps and clicks where the hand holds it (083),
- * and its name — suggested by the file name. The file goes through `POST /api/model`, then the weapon is created.
+ * and its name — suggested by the file name. The file goes through `POST /api/model`, then the weapon is created with the
+ * picture of its library card (090), drawn here from the file in the chosen pose.
  */
-export const WeaponUploadForm = ({ onUploaded }: WeaponUploadFormProps) => {
+export const WeaponUploadForm = ({ onUploaded, onDirtyChange }: WeaponUploadFormProps) => {
   const { t } = useTranslation();
   const { upload } = useWeapon();
   const [file, setFile] = useState<File | null>(null);
@@ -31,6 +44,8 @@ export const WeaponUploadForm = ({ onUploaded }: WeaponUploadFormProps) => {
   const [sending, setSending] = useState(false);
   const [inputKey, setInputKey] = useState(0);
   const url = usePickedUrl(file);
+  const dirty = file !== null || name.trim().length > 0;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
   const choose = async (event: ChangeEvent<HTMLInputElement>) => {
     const chosen = event.target.files?.[0] ?? null;
@@ -58,7 +73,7 @@ export const WeaponUploadForm = ({ onUploaded }: WeaponUploadFormProps) => {
     setSending(true);
     setError(null);
     try {
-      const created = await upload(name.trim(), file, gripPoint, pose);
+      const created = await upload(name.trim(), file, gripPoint, pose, await drawThumbnail(file, pose));
       toast.success(t('weapons.uploaded'));
       setFile(null);
       setName('');

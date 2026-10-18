@@ -10,6 +10,7 @@ public class CampaignTableRow
     public int Status { get; set; }
     public bool FreeMode { get; set; }
     public bool PendingNotice { get; set; } = true;
+    public string? Image { get; set; }
     public long? CurrentMapId { get; set; }
     public string? CurrentMapName { get; set; }
     public string? CurrentMapSlug { get; set; }

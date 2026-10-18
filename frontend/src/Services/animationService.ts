@@ -53,8 +53,8 @@ class AnimationService {
   }
 
   /** Replaces the content of an animation (owner only; the server validates it and tells the editors, 086). */
-  async replaceContent(id: number, content: AnimationFile): Promise<AnimationInfo> {
-    const response = await fetch(`${API_BASE}/${id}/content`, { method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ content }) });
+  async replaceContent(id: number, content: AnimationFile, thumbnailImage?: string): Promise<AnimationInfo> {
+    const response = await fetch(`${API_BASE}/${id}/content`, { method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ content, thumbnailImage }) });
     return this.handleResponse<AnimationInfo>(response);
   }
 

@@ -2,6 +2,7 @@ import { createContext, useCallback, useEffect, useMemo, useRef, useState } from
 import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { animationService } from '../Services/animationService';
+import { uploadThumbnail } from '../lib/thumbnailUpload';
 import type { PagedList } from '../types/common';
 import type {
   AnimationInfo, AnimationInsertInfo, AnimationQuery, AnimationType, AnimationUpdateInfo,
@@ -19,9 +20,12 @@ interface AnimationContextType {
   refreshType: (type: AnimationType) => Promise<void>;
   /** Paged library ("Minhas" with `mine`, "Buscar" without), filtered by type and name. */
   search: (query: AnimationQuery) => Promise<PagedList<AnimationInfo>>;
-  upload: (data: AnimationInsertInfo) => Promise<AnimationInfo>;
+  /** Uploads an animation with the picture of its library card (090; a failed picture upload is skipped). */
+  upload: (data: AnimationInsertInfo, thumbnail?: Blob | null) => Promise<AnimationInfo>;
   update: (animation: AnimationInfo, data: AnimationUpdateInfo) => Promise<AnimationInfo>;
   remove: (animation: AnimationInfo) => Promise<void>;
+  /** Stores the card's picture drawn for an own animation that had none (090, backfill); failures are ignored. */
+  storeThumbnail: (animation: AnimationInfo, thumbnail: Blob) => Promise<void>;
 }
 
 const AnimationContext = createContext<AnimationContextType | undefined>(undefined);
@@ -56,8 +60,9 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
 
   const search = useCallback((query: AnimationQuery) => animationService.list(query), []);
 
-  const upload = useCallback(async (data: AnimationInsertInfo) => {
-    const created = await animationService.create(data);
+  const upload = useCallback(async (data: AnimationInsertInfo, thumbnail?: Blob | null) => {
+    const thumbnailImage = await uploadThumbnail(thumbnail, 'animation');
+    const created = await animationService.create({ ...data, thumbnailImage });
     if (requested.current.has(created.type)) await refreshType(created.type);
     return created;
   }, [refreshType]);
@@ -73,9 +78,19 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     if (requested.current.has(animation.type)) await refreshType(animation.type);
   }, [refreshType]);
 
+  const storeThumbnail = useCallback(async (animation: AnimationInfo, thumbnail: Blob) => {
+    const thumbnailImage = await uploadThumbnail(thumbnail, 'animation');
+    if (!thumbnailImage) return;
+    try {
+      await animationService.update(animation.animationId, { thumbnailImage });
+    } catch {
+      // The card keeps drawing it live.
+    }
+  }, []);
+
   const value = useMemo<AnimationContextType>(
-    () => ({ byType, listForType, refreshType, search, upload, update, remove }),
-    [byType, listForType, refreshType, search, upload, update, remove],
+    () => ({ byType, listForType, refreshType, search, upload, update, remove, storeThumbnail }),
+    [byType, listForType, refreshType, search, upload, update, remove, storeThumbnail],
   );
   return <AnimationContext.Provider value={value}>{children}</AnimationContext.Provider>;
 };

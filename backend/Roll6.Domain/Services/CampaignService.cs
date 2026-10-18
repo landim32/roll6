@@ -110,6 +110,7 @@ public class CampaignService : ICampaignService
             Status = row.Status,
             FreeMode = row.FreeMode,
             PendingNotice = row.PendingNotice,
+            ImageUrl = _imageStorage.GetUrl(row.Image),
             IsMaster = row.UserId == userId,
             CurrentMapId = row.CurrentMapId,
             CurrentMapName = row.CurrentMapName,
@@ -123,6 +124,7 @@ public class CampaignService : ICampaignService
         var campaign = new Campaign { UserId = userId };
         campaign.Rename(info.Name);
         campaign.SetOpen(info.Open ?? false);
+        campaign.ChangeImage(info.Image);
         // 049: a new campaign is being prepared; the master activates it when the table starts.
         campaign.SetStatus((int)Enums.CampaignStatus.Preparing);
         campaign.CreatedAt = campaign.UpdatedAt;
@@ -191,6 +193,22 @@ public class CampaignService : ICampaignService
         if (campaign.PendingNotice == info.PendingNotice)
             return await MapToDtoAsync(campaign);
         campaign.SetPendingNotice(info.PendingNotice);
+        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
+        return result;
+    }
+
+    /// <summary>
+    /// Sets or removes the campaign's picture (090, master, any status). The same value is a no-op; a change reaches
+    /// every screen through <c>campaign.changed</c>.
+    /// </summary>
+    public async Task<CampaignInfo> SetImageAsync(long userId, long campaignId, CampaignImageInfo info)
+    {
+        var campaign = await GetOwnedAsync(userId, campaignId);
+        var image = string.IsNullOrWhiteSpace(info.Image) ? null : info.Image.Trim();
+        if (campaign.Image == image)
+            return await MapToDtoAsync(campaign);
+        campaign.ChangeImage(image);
         var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
         return result;
@@ -324,7 +342,7 @@ public class CampaignService : ICampaignService
         return MapToDto(campaign, await GetOwnerNamesAsync(new[] { campaign }));
     }
 
-    private static CampaignInfo MapToDto(Campaign campaign, IReadOnlyDictionary<long, string> ownerNames) => new()
+    private CampaignInfo MapToDto(Campaign campaign, IReadOnlyDictionary<long, string> ownerNames) => new()
     {
         CampaignId = campaign.CampaignId,
         UserId = campaign.UserId,
@@ -335,6 +353,8 @@ public class CampaignService : ICampaignService
         Status = (int)campaign.Status,
         FreeMode = campaign.FreeMode,
         PendingNotice = campaign.PendingNotice,
+        Image = campaign.Image,
+        ImageUrl = _imageStorage.GetUrl(campaign.Image),
         CurrentTurn = campaign.CurrentTurn,
         CurrentMapId = campaign.CurrentMapId,
         CreatedAt = campaign.CreatedAt,

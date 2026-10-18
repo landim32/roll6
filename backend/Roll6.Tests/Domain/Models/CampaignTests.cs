@@ -58,4 +58,20 @@ public class CampaignTests
         ((Action)(() => campaign.SetCurrentTurn(turnNo))).Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("turnNo");
         campaign.CurrentTurn.Should().Be(5);
     }
+
+    // 090: the campaign's picture.
+    [Fact]
+    public void ChangeImage_SetsClearsAndValidates()
+    {
+        var campaign = new Campaign();
+        campaign.ChangeImage("aaaabbbbccccddddeeeeffff00001111.webp");
+        campaign.Image.Should().Be("aaaabbbbccccddddeeeeffff00001111.webp");
+        campaign.ChangeImage("  ");
+        campaign.Image.Should().BeNull();
+        campaign.ChangeImage("aaaabbbbccccddddeeeeffff00001111.webp");
+        campaign.ChangeImage(null);
+        campaign.Image.Should().BeNull();
+        var act = () => campaign.ChangeImage("nao-e-uma-imagem");
+        act.Should().Throw<DomainValidationException>().Where(e => e.Errors.ContainsKey("image"));
+    }
 }

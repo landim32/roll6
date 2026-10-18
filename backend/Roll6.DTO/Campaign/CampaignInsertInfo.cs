@@ -9,4 +9,8 @@ public class CampaignInsertInfo
 
     [JsonPropertyName("open")]
     public bool? Open { get; set; }
+
+    /// <summary>The campaign's picture (090): a name returned by <c>POST /api/image</c>; optional.</summary>
+    [JsonPropertyName("image")]
+    public string? Image { get; set; }
 }

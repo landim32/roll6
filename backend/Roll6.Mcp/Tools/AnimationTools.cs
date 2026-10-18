@@ -15,7 +15,7 @@ public static class AnimationTools
 {
     private const string TYPE = "Type of the animation: 1 Parado (idle), 2 Andando (walk), 3 Correndo (run), 4 Agachado (crouch), 5 Derrotado (defeated), 6 Atacando (attack), 7 Defendendo (defend). For now only 1, 2 and 5 can be chosen on tokens (Parado ← 1, Caminhando ← 2, Caído ← 5); the others are stored for states to come.";
     private const string ANIMATION_ID = "Id of the animation (animationId from list_animations or create_animation).";
-    private const string ITEM = "{ animationId, userId, ownerName, name, type, duration, loop, fileUrl, createdAt, updatedAt }";
+    private const string ITEM = "{ animationId, userId, ownerName, name, type, duration, loop, fileUrl, thumbnailImage, thumbnailImageUrl, createdAt, updatedAt }";
     private const string CONTENT = "The animation file: the \"roll6-animation\" JSON object (or its text, which is parsed first).";
 
     [McpServerTool(Name = "create_animation", Title = "Create animation", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -40,11 +40,12 @@ public static class AnimationTools
         Roll6ApiClient api,
         [Description("Name shown in the library and in the token form (required, up to 100 characters). Example: \"Golpe de machado\".")] string name,
         [Description(TYPE)] int type,
-        [Description(CONTENT)] JsonElement content)
+        [Description(CONTENT)] JsonElement content,
+        [Description(McpDocs.THUMBNAIL_IMAGE)] string? thumbnailImage = null)
     {
         if (!TryReadContent(content, out var document, out var failure))
             return failure!;
-        return await api.SendAsync(HttpMethod.Post, "/api/animation", new AnimationInsertInfo { Name = name, Type = type, Content = document });
+        return await api.SendAsync(HttpMethod.Post, "/api/animation", new AnimationInsertInfo { Name = name, Type = type, Content = document, ThumbnailImage = thumbnailImage });
     }
 
     [McpServerTool(Name = "list_animations", Title = "List animations", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -118,7 +119,8 @@ public static class AnimationTools
         [Description(ANIMATION_ID)] long animationId,
         [Description("New name (up to 100 characters). Omit to keep the current one.")] string? name = null,
         [Description(TYPE + " Omit to keep the current one.")] int? type = null,
-        [Description(CONTENT + " Omit to keep the current file.")] JsonElement? content = null)
+        [Description(CONTENT + " Omit to keep the current file.")] JsonElement? content = null,
+        [Description(McpDocs.THUMBNAIL_IMAGE)] string? thumbnailImage = null)
     {
         JsonElement? document = null;
         if (content is { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) } given)
@@ -128,7 +130,7 @@ public static class AnimationTools
             document = parsed;
         }
         return await api.SendAsync(HttpMethod.Put, $"/api/animation/{animationId}",
-            new AnimationUpdateInfo { Name = name, Type = type, Content = document });
+            new AnimationUpdateInfo { Name = name, Type = type, Content = document, ThumbnailImage = thumbnailImage });
     }
 
     [McpServerTool(Name = "update_animation_content", Title = "Update animation content", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
@@ -149,11 +151,12 @@ public static class AnimationTools
     public static async Task<CallToolResult> UpdateAnimationContent(
         Roll6ApiClient api,
         [Description(ANIMATION_ID)] long animationId,
-        [Description(CONTENT)] JsonElement content)
+        [Description(CONTENT)] JsonElement content,
+        [Description(McpDocs.THUMBNAIL_IMAGE)] string? thumbnailImage = null)
     {
         if (!TryReadContent(content, out var document, out var failure))
             return failure!;
-        return await api.SendAsync(HttpMethod.Put, $"/api/animation/{animationId}/content", new AnimationContentInfo { Content = document });
+        return await api.SendAsync(HttpMethod.Put, $"/api/animation/{animationId}/content", new AnimationContentInfo { Content = document, ThumbnailImage = thumbnailImage });
     }
 
     [McpServerTool(Name = "delete_animation", Title = "Delete animation", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
