@@ -1,34 +1,35 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Modal } from '../ui/Modal';
-import { Tabs } from '../ui/Tabs';
-import { CharacterAvatar } from '../ui/CharacterAvatar';
-import { ImageCropper } from '../ui/ImageCropper';
-import { TokenModal } from './TokenModal';
-import { SheetFileField } from '../characters/SheetFileField';
-import type { SheetFileValue } from '../characters/SheetFileField';
-import type { ImageCrop } from '../ui/ImageCropper';
+import { Tabs } from '../../components/ui/Tabs';
+import { CharacterAvatar } from '../../components/ui/CharacterAvatar';
+import { ImageCropper } from '../../components/ui/ImageCropper';
+import type { ImageCrop } from '../../components/ui/ImageCropper';
+import { TokenModal } from '../../components/modals/TokenModal';
+import { TransferCharacterModal } from '../../components/modals/TransferCharacterModal';
+import { SheetFileField } from '../../components/characters/SheetFileField';
+import type { SheetFileValue } from '../../components/characters/SheetFileField';
+import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
+import { NotFoundCard } from '../../components/library/NotFoundCard';
+import { TransferIcon } from '../../components/ui/icons';
 import { useCharacter } from '../../hooks/useCharacter';
+import { useLeaveGuard } from '../../hooks/useLeaveGuard';
 import { imageService } from '../../Services/imageService';
 import { cropToFile } from '../../lib/cropImage';
 import {
   emptyCharacterForm, MAX_CHARACTER_NAME, MAX_CHARACTER_SHEET, toCharacterInsert, validateCharacterForm,
 } from '../../lib/characterForm';
 import type { CharacterForm } from '../../lib/characterForm';
+import { characterPath, idParam, libraryPath } from '../../lib/libraryRoutes';
 import type { CharacterInfo } from '../../types/character';
 import { CAMPAIGN_CHARACTER_STATUS } from '../../types/campaignCharacter';
 
-// The markdown editor is heavy: loaded only when this form is opened.
-const MarkdownEditor = lazy(() => import('../ui/MarkdownEditor'));
+// The markdown editor is heavy: loaded only when this page is opened.
+const MarkdownEditor = lazy(() => import('../../components/ui/MarkdownEditor'));
 
-interface CharacterFormModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  /** Without a character the form creates one ("Incluir Personagem"); with one, its owner edits it. */
-  character?: CharacterInfo | null;
-}
+const TABS = ['data', 'sheet', 'sheetFile'] as const;
 
 const toForm = (c: CharacterInfo): CharacterForm => ({
   name: c.name,
@@ -39,45 +40,53 @@ const toForm = (c: CharacterInfo): CharacterForm => ({
 });
 
 /**
- * The character itself (032), opened from the character combo: tabs "Dados" (name + picture on one line, token and
- * "Ficha permanente" = total life/energy and move), "Ficha" (markdown) and "Ficha em arquivo". Only the owner reaches
- * it, so every field is editable and nothing here belongs to a campaign — what a campaign holds about the character
- * lives in CampaignCharacterModal.
- * Create ("Incluir Personagem"): creates and, with a current campaign, joins it right away — approved for the master
- * (or in open campaigns), otherwise as an access request (008 FR-015/016).
- * Update replaces every field, so the token and the sheet file are seeded from the character and sent back unchanged
- * unless they are changed here.
+ * The character in full screen (087; was the character window of 032): `/library/characters/new` creates it (and,
+ * with a current campaign, joins it as before), `/library/characters/:id` edits one of the user's own characters —
+ * tabs Dados (name, picture, token, "Ficha permanente"), Ficha (markdown) and Ficha em arquivo. Update replaces every
+ * field, so the token and the sheet file are seeded from the character and sent back unchanged unless changed here.
  */
-export const CharacterFormModal = ({ open, onOpenChange, character = null }: CharacterFormModalProps) => {
+export const CharacterEditPage = () => {
   const { t } = useTranslation();
-  const { createCharacter, updateCharacter } = useCharacter();
-  const [tab, setTab] = useState('data');
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const [params, setParams] = useSearchParams();
+  const tab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? params.get('tab')! : 'data';
+  const characterId = idParam(id);
+  const creating = id === 'new';
+  const { myCharacters, loading, refresh, createCharacter, updateCharacter } = useCharacter();
+  const character = characterId === null ? null : myCharacters.find((c) => c.characterId === characterId) ?? null;
+
   const [form, setForm] = useState<CharacterForm>(emptyCharacterForm);
   const [crop, setCrop] = useState<ImageCrop | null>(null);
   const [saving, setSaving] = useState(false);
-  /** Saved picture kept on edit (null once removed). */
+  const [dirty, setDirty] = useState(false);
   const [keptImage, setKeptImage] = useState<{ file: string; url: string | null } | null>(null);
-  /** The character's token (011 US5): chosen in the tokens modal, saved with the character. */
   const [token, setToken] = useState<{ tokenId: number; name: string; imageUrl: string | null } | null>(null);
   const [pickingToken, setPickingToken] = useState(false);
-  /** A new picture is being cropped: the picture area takes the whole line. */
   const [cropping, setCropping] = useState(false);
-  /** The character's sheet file (022): uploaded on choice, saved with the character. */
   const [sheetFile, setSheetFile] = useState<SheetFileValue | null>(null);
   const [uploadingSheet, setUploadingSheet] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [seededFor, setSeededFor] = useState<number | 'new' | null>(null);
+  const guard = useLeaveGuard(dirty && !saving);
 
-  const characterId = character?.characterId ?? null;
+  useEffect(() => { void refresh(); }, [refresh]);
 
+  // Seed once per character (or once for "new").
   useEffect(() => {
-    if (!open) return;
-    setTab('data');
+    const key = creating ? 'new' : character?.characterId ?? null;
+    if (key === null || key === seededFor) return;
+    setSeededFor(key);
     setCrop(null);
     setCropping(false);
-    setForm(emptyCharacterForm());
-    setKeptImage(null);
-    setSheetFile(null);
-    setToken(null);
-    if (!character) return;
+    setDirty(false);
+    if (!character) {
+      setForm(emptyCharacterForm());
+      setKeptImage(null);
+      setSheetFile(null);
+      setToken(null);
+      return;
+    }
     setForm(toForm(character));
     setKeptImage(character.image ? { file: character.image, url: character.imageUrl } : null);
     setSheetFile(character.sheetFile && character.sheetFileType
@@ -86,22 +95,30 @@ export const CharacterFormModal = ({ open, onOpenChange, character = null }: Cha
     setToken(character.tokenId !== null
       ? { tokenId: character.tokenId, name: character.tokenName ?? '', imageUrl: character.tokenImageUrl }
       : null);
-  // Seed once per opening/target.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, characterId]);
+  }, [creating, character, seededFor]);
 
-  const set = (field: keyof CharacterForm) => (value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+  if (!creating && characterId === null) return <NotFoundCard message={t('library.notFound')} backTo={libraryPath('characters')} />;
+  if (!creating && !character) {
+    return loading || seededFor === null && myCharacters.length === 0
+      ? <p className="text-body-secondary">{t('common.loading')}</p>
+      : <NotFoundCard message={t('library.characters.notYours')} backTo={libraryPath('characters')} />;
+  }
+
+  const change = () => setDirty(true);
+  const set = (field: keyof CharacterForm) => (value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    change();
+  };
+  const selectTab = (key: string) => setParams(key === 'data' ? {} : { tab: key }, { replace: true });
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (saving || uploadingSheet) return;
     const error = validateCharacterForm(form);
     if (error) {
-      // Show the tab where the problem is.
-      setTab(error === 'sheetTooLong' ? 'sheet' : 'data');
+      selectTab(error === 'sheetTooLong' ? 'sheet' : 'data');
       return toast.error(t(`characterForm.errors.${error}`));
     }
-
     setSaving(true);
     try {
       const image = crop
@@ -111,6 +128,9 @@ export const CharacterFormModal = ({ open, onOpenChange, character = null }: Cha
       if (character) {
         const updated = await updateCharacter(character.characterId, payload);
         toast.success(t('toast.characterUpdated', { name: updated.name }));
+        setDirty(false);
+        setCrop(null);
+        setSeededFor(null);
       } else {
         const { character: created, participation, requestError } = await createCharacter(payload);
         const name = created.name;
@@ -118,8 +138,9 @@ export const CharacterFormModal = ({ open, onOpenChange, character = null }: Cha
         else if (!participation) toast.success(t('toast.characterCreated', { name }));
         else if (participation.status === CAMPAIGN_CHARACTER_STATUS.approved) toast.success(t('toast.characterCreatedApproved', { name }));
         else toast.success(t('toast.characterCreatedRequested', { name }));
+        setDirty(false);
+        navigate(characterPath(created.characterId), { replace: true });
       }
-      onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
     } finally {
@@ -135,30 +156,34 @@ export const CharacterFormModal = ({ open, onOpenChange, character = null }: Cha
     </div>
   );
 
-  const tabs = [
-    { key: 'data', label: t('characterForm.dataTab') },
-    { key: 'sheet', label: t('characterForm.sheetTab') },
-    { key: 'sheetFile', label: t('sheetFile.tab') },
-  ];
-
   return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t(character === null ? 'characterForm.title' : 'characterForm.editTitle')}
-      large
-      hidden={pickingToken}
-      footer={(
-        <>
-          <button type="button" className="btn btn-secondary" onClick={() => onOpenChange(false)} disabled={saving}>{t('common.cancel')}</button>
-          <button type="submit" form="character-form" className="btn btn-primary" disabled={saving || uploadingSheet}>
-            {saving && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
-            {t('common.save')}
-          </button>
-        </>
-      )}
-    >
-      <Tabs tabs={tabs} active={tab} onChange={setTab} />
+    <section className="stm-library-form">
+      <LibraryPageHeader
+        title={character ? character.name : t('characterForm.title')}
+        back={{ to: libraryPath('characters'), label: t('library.nav.characters') }}
+        actions={(
+          <>
+            {character && (
+              <button type="button" className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1" onClick={() => setTransferring(true)}>
+                <TransferIcon size={14} />{t('transfer.action')}
+              </button>
+            )}
+            <button type="submit" form="character-form" className="btn btn-primary btn-sm" disabled={saving || uploadingSheet}>
+              {saving && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+              {t('common.save')}
+            </button>
+          </>
+        )}
+      />
+      <Tabs
+        tabs={[
+          { key: 'data', label: t('characterForm.dataTab') },
+          { key: 'sheet', label: t('characterForm.sheetTab') },
+          { key: 'sheetFile', label: t('sheetFile.tab') },
+        ]}
+        active={tab}
+        onChange={selectTab}
+      />
       <form id="character-form" onSubmit={onSubmit} noValidate>
         {/* Tabs stay mounted (hidden) so the chosen crop and the sheet survive tab switches. */}
         <div className="row g-3" hidden={tab !== 'data'}>
@@ -166,7 +191,7 @@ export const CharacterFormModal = ({ open, onOpenChange, character = null }: Cha
             <div className="d-flex flex-wrap align-items-end gap-3">
               <div className="flex-grow-1" style={{ minWidth: '12rem' }}>
                 <label className="form-label" htmlFor="character-name">{t('characterForm.name')}</label>
-                <input id="character-name" className="form-control" maxLength={MAX_CHARACTER_NAME} autoFocus
+                <input id="character-name" className="form-control" maxLength={MAX_CHARACTER_NAME} autoFocus={creating}
                   value={form.name} onChange={(e) => set('name')(e.target.value)} />
               </div>
               <div className={cropping ? 'w-100' : undefined}>
@@ -174,12 +199,12 @@ export const CharacterFormModal = ({ open, onOpenChange, character = null }: Cha
                 <ImageCropper
                   id="character-image"
                   compact
-                  onChange={setCrop}
+                  onChange={(value) => { setCrop(value); if (value) change(); }}
                   onCroppingChange={setCropping}
                   hasCurrent={keptImage !== null}
                   currentUrl={keptImage?.url}
                   currentName={form.name}
-                  onRemoveCurrent={() => setKeptImage(null)}
+                  onRemoveCurrent={() => { setKeptImage(null); change(); }}
                 />
               </div>
             </div>
@@ -193,7 +218,7 @@ export const CharacterFormModal = ({ open, onOpenChange, character = null }: Cha
                 {t('characterForm.chooseToken')}
               </button>
               {token && (
-                <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setToken(null)}>
+                <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => { setToken(null); change(); }}>
                   {t('characterForm.removeToken')}
                 </button>
               )}
@@ -220,16 +245,27 @@ export const CharacterFormModal = ({ open, onOpenChange, character = null }: Cha
         </div>
         <div hidden={tab !== 'sheetFile'}>
           <label className="form-label" htmlFor="character-sheet-file">{t('sheetFile.tab')}</label>
-          <SheetFileField id="character-sheet-file" value={sheetFile} onChange={setSheetFile} onUploadingChange={setUploadingSheet} />
+          <SheetFileField id="character-sheet-file" value={sheetFile} onChange={(value) => { setSheetFile(value); change(); }}
+            onUploadingChange={setUploadingSheet} />
         </div>
       </form>
       <TokenModal
         open={pickingToken}
         onOpenChange={setPickingToken}
-        onSelect={(chosen) => setToken({ tokenId: chosen.tokenId, name: chosen.name, imageUrl: chosen.upImageUrl })}
+        onSelect={(chosen) => { setToken({ tokenId: chosen.tokenId, name: chosen.name, imageUrl: chosen.upImageUrl }); change(); }}
       />
-    </Modal>
+      <TransferCharacterModal
+        open={transferring}
+        onOpenChange={(value) => {
+          setTransferring(value);
+          // A finished transfer takes the character out of the user's list: back to it.
+          if (!value && character && !myCharacters.some((c) => c.characterId === character.characterId)) navigate(libraryPath('characters'));
+        }}
+        character={transferring ? character : null}
+      />
+      {guard}
+    </section>
   );
 };
 
-export default CharacterFormModal;
+export default CharacterEditPage;

@@ -1,61 +1,56 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Modal } from '../ui/Modal';
-import { Tabs } from '../ui/Tabs';
-import { PagedListView } from '../ui/PagedListView';
-import { PencilIcon } from '../ui/icons';
-import { MapEditModal } from './MapEditModal';
-import { MakeCurrentMapButton } from '../campaign/MakeCurrentMapButton';
-import type { MapEditTarget } from './MapEditModal';
+import { Tabs } from '../../components/ui/Tabs';
+import { PagedListView } from '../../components/ui/PagedListView';
+import { ConfirmModal } from '../../components/ui/ConfirmModal';
+import { PencilIcon } from '../../components/ui/icons';
+import { MakeCurrentMapButton } from '../../components/campaign/MakeCurrentMapButton';
+import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
 import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { mapModelService } from '../../Services/mapModelService';
 import { mapService } from '../../Services/mapService';
+import { mapEditPath } from '../../lib/libraryRoutes';
+import { visibleCampaignMaps } from '../../lib/viewerMap';
+import { canMakeCurrent } from '../../lib/currentMap';
 import type { PagedList } from '../../types/common';
 import { MAP_STATUS_DELETED } from '../../types/map';
 import type { MapInfo } from '../../types/map';
-import { visibleCampaignMaps } from '../../lib/viewerMap';
-import { canMakeCurrent } from '../../lib/currentMap';
 import type { MapModelInfo } from '../../types/mapModel';
 
-interface MapModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  /** Resolves true when it is fine to replace the current map (unsaved-changes guard). */
-  guard: () => Promise<boolean>;
-}
-
+const TABS = ['campaign', 'mine', 'search'] as const;
+type MapTab = (typeof TABS)[number];
 const PAGE_SIZE = 10;
 
-/** Current map picker: "Mapas da campanha", "Meus mapas" and "Buscar mapas". */
-export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
+/**
+ * "Mapas" of the library (087; was the maps window): the current campaign's maps (a player sees only the current one,
+ * 039), the user's own library maps and the search. Choosing one opens it on the table; the pencil (own maps) goes to
+ * the map's edit page; "Novo mapa" opens an empty map on the table. Replacing an unsaved map asks first.
+ */
+export const MapsPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const tab: MapTab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? params.get('tab') as MapTab : 'campaign';
   const { session } = useAuth();
   const userId = session?.user.userId ?? null;
   const { currentCampaign, isMaster } = useCampaign();
-  const { loadMapModel, newMap } = useMapEditor();
-  const [tab, setTab] = useState('campaign');
+  const { loadMapModel, newMap, isDirty, canEdit } = useMapEditor();
   const [campaignMaps, setCampaignMaps] = useState<PagedList<MapInfo> | null>(null);
   const [models, setModels] = useState<PagedList<MapModelInfo> | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  /** Map whose "Editar" button was clicked (name, grid, image, 3D mask and background). */
-  const [editing, setEditing] = useState<MapEditTarget | null>(null);
+  const [pending, setPending] = useState<(() => Promise<void>) | null>(null);
 
-  /**
-   * The master pages through every campaign map; a player gets only the current one (039 FR-006), read directly
-   * because it may not be on the first page of the full list.
-   */
-  const loadCampaignMaps = async (campaignId: number, currentMapId: number | null, page: number): Promise<PagedList<MapInfo>> => {
+  const loadCampaignMaps = useCallback(async (campaignId: number, currentMapId: number | null, page: number): Promise<PagedList<MapInfo>> => {
     if (isMaster) return mapService.listByCampaign(campaignId, page, PAGE_SIZE);
     const current = currentMapId !== null ? [await mapService.getById(currentMapId)] : [];
     const items = visibleCampaignMaps(current.filter((m) => m.status !== MAP_STATUS_DELETED), { isMaster, currentMapId });
     return { items, page: 1, pageSize: PAGE_SIZE, totalCount: items.length };
-  };
+  }, [isMaster]);
 
   const load = useCallback(async (page: number) => {
     setLoading(true);
@@ -70,41 +65,43 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadCampaignMaps only reads isMaster
-  }, [tab, currentCampaign, isMaster, search, t]);
+  }, [tab, currentCampaign, loadCampaignMaps, search, t]);
 
   useEffect(() => {
-    if (open) load(1);
+    void load(1);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- search reloads only on submit
-  }, [open, tab, currentCampaign]);
+  }, [tab, currentCampaign]);
 
-  const open_ = async (mapModelId: number, map: MapInfo | null) => {
-    if (map) {
-      navigate(`/map/${encodeURIComponent(map.slug)}`);
-      toast.success(t('toast.mapLoaded', { name: map.name }));
-      onOpenChange(false);
-      return;
-    }
-    if (!(await guard())) return;
+  /** Runs an action that replaces the table's map: asks first when its draft has unsaved changes. */
+  const replacing = (action: () => Promise<void>) => {
+    if (isDirty && canEdit) setPending(() => action);
+    else void action();
+  };
+
+  const openCampaignMap = (map: MapInfo) => {
+    navigate(`/map/${encodeURIComponent(map.slug)}`);
+    toast.success(t('toast.mapLoaded', { name: map.name }));
+  };
+
+  const openModel = (mapModelId: number) => replacing(async () => {
     try {
-      const draft = await loadMapModel(mapModelId, map);
+      const draft = await loadMapModel(mapModelId, null);
       toast.success(t('toast.mapLoaded', { name: draft.name }));
-      onOpenChange(false);
+      navigate('/');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
     }
-  };
+  });
 
-  const onNewMap = async () => {
-    if (!(await guard())) return;
+  const onNewMap = () => replacing(async () => {
     newMap();
     toast.info(t('toast.newMap'));
-    onOpenChange(false);
-  };
+    navigate('/');
+  });
 
-  const editButton = (target: MapEditTarget) => (
+  const editButton = (mapModelId: number, map: MapInfo | null) => (
     <button type="button" className="btn btn-sm btn-outline-secondary" title={t('mapModal.edit')} aria-label={t('mapModal.edit')}
-      onClick={() => setEditing(target)}>
+      onClick={() => navigate(map ? `${mapEditPath(mapModelId)}?map=${map.mapId}` : mapEditPath(mapModelId))}>
       <PencilIcon size={14} />
     </button>
   );
@@ -125,13 +122,9 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
   );
 
   return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t('mapModal.title')}
-      large
-      footer={<button type="button" className="btn btn-outline-primary" onClick={onNewMap}>{t('mapModal.newMap')}</button>}
-    >
+    <section>
+      <LibraryPageHeader title={t('library.nav.maps')}
+        actions={<button type="button" className="btn btn-outline-primary btn-sm" onClick={onNewMap}>{t('mapModal.newMap')}</button>} />
       <Tabs
         tabs={[
           { key: 'campaign', label: t('mapModal.campaignTab') },
@@ -139,10 +132,10 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
           { key: 'search', label: t('mapModal.searchTab') },
         ]}
         active={tab}
-        onChange={(key) => { setModels(null); setTab(key); }}
+        onChange={(key) => { setModels(null); setParams({ tab: key }, { replace: true }); }}
       />
       {tab === 'search' && (
-        <form className="input-group mb-3" onSubmit={(e) => { e.preventDefault(); load(1); }}>
+        <form className="input-group mb-3" onSubmit={(e) => { e.preventDefault(); void load(1); }}>
           <input className="form-control" placeholder={t('mapModal.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
           <button type="submit" className="btn btn-outline-primary">{t('common.search')}</button>
         </form>
@@ -154,23 +147,21 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
           <PagedListView
             data={campaignMaps}
             loading={loading}
-            renderItem={(m) => renderMap(m.name, m.mapModelImageUrl, m.gridWidth, m.gridHeight, undefined,
-              m.mapId === currentCampaign.currentMapId)}
+            renderItem={(m) => renderMap(m.name, m.mapModelImageUrl, m.gridWidth, m.gridHeight, undefined, m.mapId === currentCampaign.currentMapId)}
             getKey={(m) => m.mapId}
-            onSelect={(m) => open_(m.mapModelId, m)}
+            onSelect={openCampaignMap}
             renderActions={(m) => {
-              // "Tornar atual" (048) for the master; opening a map from this list never changes the current one.
               const makeCurrent = canMakeCurrent(m, { isMaster, currentMapId: currentCampaign.currentMapId ?? null });
               const editable = m.userId === userId;
               if (!makeCurrent && !editable) return null;
               return (
                 <>
                   {makeCurrent && <MakeCurrentMapButton map={m} />}
-                  {editable && editButton({ mapModelId: m.mapModelId, map: m })}
+                  {editable && editButton(m.mapModelId, m)}
                 </>
               );
             }}
-            onPageChange={load}
+            onPageChange={(page) => { void load(page); }}
           />
         ) : (
           <p className="text-body-secondary">{t('mapModal.noCampaign')}</p>
@@ -181,18 +172,22 @@ export const MapModal = ({ open, onOpenChange, guard }: MapModalProps) => {
           loading={loading}
           renderItem={(m) => renderMap(m.name, m.imageUrl, m.gridWidth, m.gridHeight, m.description ?? undefined)}
           getKey={(m) => m.mapModelId}
-          onSelect={(m) => open_(m.mapModelId, null)}
-          renderActions={(m) => (m.userId === userId ? editButton({ mapModelId: m.mapModelId, map: null }) : null)}
-          onPageChange={load}
+          onSelect={(m) => openModel(m.mapModelId)}
+          renderActions={(m) => (m.userId === userId ? editButton(m.mapModelId, null) : null)}
+          onPageChange={(page) => { void load(page); }}
         />
       )}
-      <MapEditModal
-        target={editing}
-        onClose={() => setEditing(null)}
-        onSaved={() => { void load((tab === 'campaign' ? campaignMaps?.page : models?.page) ?? 1); }}
+      <ConfirmModal
+        open={pending !== null}
+        onOpenChange={(open) => { if (!open) setPending(null); }}
+        title={t('library.maps.discardTitle')}
+        message={t('library.maps.discardMessage')}
+        confirmLabel={t('library.leave.discard')}
+        onConfirm={async () => { const action = pending; setPending(null); await action?.(); }}
+        danger
       />
-    </Modal>
+    </section>
   );
 };
 
-export default MapModal;
+export default MapsPage;

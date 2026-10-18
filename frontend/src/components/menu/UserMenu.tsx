@@ -1,7 +1,7 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
-import { DownloadIcon, PersonFillIcon } from '../ui/icons';
+import { CollectionIcon, DownloadIcon, PersonFillIcon } from '../ui/icons';
 import { useInstall } from '../../hooks/useInstall';
 
 interface UserMenuProps {
@@ -13,20 +13,18 @@ interface UserMenuProps {
   onNotifications: () => void;
   /** "Qualidade do 3D" (053). */
   onViewQuality: () => void;
-  /** "Animações" (059): the animation library. */
-  onAnimations: () => void;
-  /** "Armas" (082): the weapon library. */
-  onWeapons: () => void;
+  /** "Biblioteca" (087): the full-screen library, which replaced "Animações" and "Armas". */
+  onLibrary: () => void;
   onLogout: () => void;
 }
 
 /**
  * User name in the top menu (a person icon on phones, where the name broke the two-row menu) opening
- * "Editar / Trocar senha / Chaves de API / Notificações / Qualidade do 3D / Animações / Armas / Sair".
+ * "Editar / Trocar senha / Chaves de API / Notificações / Qualidade do 3D / Biblioteca / Sair".
  * Radix handles Esc, outside click and keyboard navigation (research R1); `modal={false}` keeps it from competing with
  * the Radix Dialog opened by the items, which run after the menu closes (onSelect).
  */
-export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications, onViewQuality, onAnimations, onWeapons, onLogout }: UserMenuProps) => {
+export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications, onViewQuality, onLibrary, onLogout }: UserMenuProps) => {
   const { t } = useTranslation();
   const { session } = useAuth();
   const { canInstall, install } = useInstall();
@@ -47,8 +45,9 @@ export const UserMenu = ({ onEdit, onChangePassword, onApiKeys, onNotifications,
           <DropdownMenu.Item className="dropdown-item" onSelect={onApiKeys}>{t('userMenu.apiKeys')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onNotifications}>{t('notifications.menu')}</DropdownMenu.Item>
           <DropdownMenu.Item className="dropdown-item" onSelect={onViewQuality}>{t('userMenu.viewQuality')}</DropdownMenu.Item>
-          <DropdownMenu.Item className="dropdown-item" onSelect={onAnimations}>{t('userMenu.animations')}</DropdownMenu.Item>
-          <DropdownMenu.Item className="dropdown-item" onSelect={onWeapons}>{t('userMenu.weapons')}</DropdownMenu.Item>
+          <DropdownMenu.Item className="dropdown-item d-flex align-items-center gap-2" onSelect={onLibrary}>
+            <CollectionIcon size={14} /> {t('menu.library')}
+          </DropdownMenu.Item>
           {canInstall && (
             <DropdownMenu.Item className="dropdown-item d-flex align-items-center gap-2" onSelect={() => { void install(); }}>
               <DownloadIcon size={14} /> {t('install.menu')}

@@ -33,6 +33,11 @@ class TokenService {
     return this.handleResponse<TokenInfo>(response);
   }
 
+  async get(id: number): Promise<TokenInfo> {
+    const response = await fetch(`${API_BASE}/${id}`, { headers: getHeaders(true) });
+    return this.handleResponse<TokenInfo>(response);
+  }
+
   /** Changes a token (its creator only). */
   async update(id: number, data: TokenInsertInfo): Promise<TokenInfo> {
     const response = await fetch(`${API_BASE}/${id}`, {

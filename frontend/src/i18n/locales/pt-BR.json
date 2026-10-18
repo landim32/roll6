@@ -26,6 +26,8 @@
     "shortPassword": "A senha deve ter no mínimo 8 caracteres."
   },
   "menu": {
+    "library": "Biblioteca",
+    "backToTable": "Voltar para campanha",
     "currentCampaign": "Campanha atual",
     "chooseCampaign": "Escolher campanha",
     "currentMap": "Mapa atual",
@@ -158,6 +160,46 @@
     "empty": "Nenhuma animação.",
     "chooseFile": "Escolha um arquivo de animação.",
     "openEditor": "Editar no editor"
+  },
+  "library": {
+    "title": "Biblioteca",
+    "nav": {
+      "campaigns": "Campanhas",
+      "maps": "Mapas",
+      "characters": "Personagens",
+      "npcs": "NPCs",
+      "tokens": "Tokens",
+      "weapons": "Armas",
+      "animations": "Animações"
+    },
+    "leave": {
+      "title": "Descartar as alterações?",
+      "message": "Há alterações não salvas nesta página. Se sair agora, elas serão perdidas.",
+      "discard": "Descartar",
+      "stay": "Continuar editando"
+    },
+    "notFound": "Não encontrado.",
+    "backToList": "Voltar à lista",
+    "readOnly": "Somente leitura",
+    "searchPlaceholder": "Buscar pelo nome",
+    "campaigns": {
+      "playingTab": "Jogando",
+      "playingEmpty": "Nenhum personagem seu está aprovado em uma campanha de outro mestre.",
+      "play": "Abrir na mesa",
+      "masterOnly": "Só o mestre edita esta campanha."
+    },
+    "characters": {
+      "statusIn": "Situação na campanha atual: {{campaign}}",
+      "notYours": "Este personagem não é seu."
+    },
+    "npcs": {
+      "new": "Novo NPC",
+      "notYours": "Este NPC não é seu."
+    },
+    "maps": {
+      "discardTitle": "Descartar o mapa não salvo?",
+      "discardMessage": "O mapa aberto na mesa tem alterações não salvas. Abrir outro mapa descarta essas alterações."
+    }
   },
   "editor": {
     "title": "Editor de animações",
@@ -920,6 +962,7 @@
     "tokenCreated": "Token {{name}} cadastrado.",
     "tokenUpdated": "Token {{name}} atualizado.",
     "npcAddedPlaced": "{{name}} entrou na campanha e no mapa.",
+    "npcCreated": "NPC {{name}} criado.",
     "npcUpdated": "{{name}} atualizado.",
     "npcRemoved": "{{name}} retirado da campanha.",
     "npcPlaced": "{{name}} colocado no mapa.",

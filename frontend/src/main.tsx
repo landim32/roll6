@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles/theme.css';
 import './styles/app.css';
@@ -28,9 +28,12 @@ import { TurnProvider } from './Contexts/TurnContext';
 // the campaign and the characters) →
 // Npc (library and campaign NPCs; places pieces, so it needs MapToken) → Turn (turn of the current campaign;
 // resetting reloads the pieces) → Chat (the campaign's timeline: conversation + turn records, 041) → App.
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
+// A data router (087): `useBlocker` — the guard of the library pages with unsaved changes — needs it. One catch-all
+// route renders the provider chain and `App`, whose `<Routes>` keep working as descendant routes.
+const router = createBrowserRouter([
+  {
+    path: '*',
+    element: (
       <AuthProvider>
         <InstallProvider>
           <PushProvider>
@@ -60,7 +63,13 @@ createRoot(document.getElementById('root')!).render(
           </PushProvider>
         </InstallProvider>
       </AuthProvider>
-    </BrowserRouter>
+    ),
+  },
+]);
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <RouterProvider router={router} />
   </StrictMode>,
 );
 

@@ -3,13 +3,18 @@ import { Link } from 'react-router-dom';
 import { useAnimationEditor } from '../../../hooks/useAnimationEditor';
 import type { TokenInfo } from '../../../types/token';
 import { BrandLogo } from '../../ui/BrandLogo';
+import { BackToTableButton } from '../../menu/BackToTableButton';
+import { UserMenuHost } from '../../menu/UserMenuHost';
 import { ModelTokenSelect } from './ModelTokenSelect';
 
 interface EditorTopBarProps {
   onTokens: (tokens: TokenInfo[]) => void;
 }
 
-/** The only thing besides the editor on the page (086): the logo, the animation's name, the agent badge and the model select. */
+/**
+ * The only thing besides the editor on the page (086): the logo, the animation's name, the agent badge, the model
+ * select and, since 087, "← Voltar para campanha" and the user menu (as in the library).
+ */
 export const EditorTopBar = ({ onTokens }: EditorTopBarProps) => {
   const { t } = useTranslation();
   const { state, connected, tokenId, setToken } = useAnimationEditor();
@@ -34,6 +39,8 @@ export const EditorTopBar = ({ onTokens }: EditorTopBarProps) => {
       </span>
       <span className="flex-grow-1" />
       <ModelTokenSelect tokenId={tokenId} onChange={setToken} onTokens={onTokens} />
+      <BackToTableButton />
+      <UserMenuHost />
     </header>
   );
 };

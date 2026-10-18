@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Modal } from '../ui/Modal';
-import { TrashIcon } from '../ui/icons';
-import { MaskPreview } from './MaskPreview';
+import { TrashIcon } from '../../components/ui/icons';
+import { MaskPreview } from '../../components/modals/MaskPreview';
+import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
+import { NotFoundCard } from '../../components/library/NotFoundCard';
 import { useAuth } from '../../hooks/useAuth';
+import { useLeaveGuard } from '../../hooks/useLeaveGuard';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { MAX_GRID_SIZE, MIN_GRID_SIZE } from '../../lib/draft';
 import { loadImageSize, readFileImageSize } from '../../lib/imageSize';
+import { idParam, libraryPath } from '../../lib/libraryRoutes';
 import { formatRatio, sameRatio } from '../../lib/maskImage';
 import type { ImageSize } from '../../lib/maskImage';
 import { ACCEPTED_IMAGE_TYPES, imageService, MAX_IMAGE_BYTES } from '../../Services/imageService';
@@ -16,19 +20,6 @@ import { mapModelService } from '../../Services/mapModelService';
 import { mapService } from '../../Services/mapService';
 import type { MapInfo } from '../../types/map';
 import type { MapModelInfo } from '../../types/mapModel';
-
-/** The map to edit: a library model, or a campaign map (which also has its own name). */
-export interface MapEditTarget {
-  mapModelId: number;
-  map: MapInfo | null;
-}
-
-interface MapEditModalProps {
-  target: MapEditTarget | null;
-  onClose: () => void;
-  /** Called after the map is saved (the lists reload). */
-  onSaved?: () => void;
-}
 
 /** A stored image of the map: file name + temporary URL. */
 interface StoredImage {
@@ -39,19 +30,26 @@ interface StoredImage {
 type Kind = 'image' | 'mask' | 'background' | 'texture';
 
 /**
- * "Editar mapa": name, description, grid size, scene image, 3D mask, 3D background and wall texture of a map, straight from the
- * lists, without opening it on the table. The model fields are the owner's (PUT replaces the whole model); the name of
- * a campaign map is the master's.
+ * "Editar mapa" in full screen (087; was the map edit window of 034): `/library/maps/:id` (the map model) and, for a
+ * campaign map, `?map={mapId}` (its own name). Name, description, grid size, scene image, 3D mask, 3D background and
+ * wall texture, without opening it on the table. The model fields are the owner's (PUT replaces the whole model); the
+ * name of a campaign map is the master's.
  */
-export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) => {
+export const MapEditPage = () => {
   const { t } = useTranslation();
+  const { id } = useParams();
+  const [params] = useSearchParams();
+  const mapModelId = idParam(id);
+  const mapId = idParam(params.get('map') ?? undefined);
   const { session } = useAuth();
   const { draft, isDirty, loadMapModel } = useMapEditor();
   const userId = session?.user.userId ?? null;
-  const open = target !== null;
 
+  const [target, setTarget] = useState<{ mapModelId: number; map: MapInfo | null } | null>(null);
   const [model, setModel] = useState<MapModelInfo | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState<Kind | null>(null);
   const [name, setName] = useState('');
@@ -65,19 +63,21 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
   /** Natural size of the image picked here; null while the model's own image is kept. */
   const [newImageSize, setNewImageSize] = useState<ImageSize | null>(null);
 
+  const guard = useLeaveGuard(dirty && !saving);
+
   useEffect(() => {
-    if (!target) {
-      setModel(null);
-      return;
-    }
+    if (mapModelId === null) return;
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     setNewImageSize(null);
-    mapModelService.getById(target.mapModelId)
-      .then((loaded) => {
+    setDirty(false);
+    Promise.all([mapModelService.getById(mapModelId), mapId !== null ? mapService.getById(mapId) : Promise.resolve(null)])
+      .then(([loaded, map]) => {
         if (cancelled) return;
+        setTarget({ mapModelId, map });
         setModel(loaded);
-        setName(target.map ? target.map.name : loaded.name);
+        setName(map ? map.name : loaded.name);
         setDescription(loaded.description ?? '');
         setColumns(String(loaded.gridWidth));
         setRows(String(loaded.gridHeight));
@@ -86,15 +86,12 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
         setBackground(loaded.backgroundImage ? { fileName: loaded.backgroundImage, url: loaded.backgroundImageUrl } : null);
         setWallTexture(loaded.wallTextureImage ? { fileName: loaded.wallTextureImage, url: loaded.wallTextureImageUrl } : null);
       })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-        onClose();
+      .catch(() => {
+        if (!cancelled) setFailed(true);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when another map is chosen
-  }, [target?.mapModelId, target?.map?.mapId]);
+  }, [mapModelId, mapId]);
 
   const ownsModel = model !== null && model.userId === userId;
   const canRenameMap = target?.map != null && target.map.userId === userId;
@@ -149,6 +146,7 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
     try {
       const uploaded = await imageService.upload(file);
       const stored = { fileName: uploaded.fileName, url: uploaded.url };
+      setDirty(true);
       if (kind === 'image') {
         setImage(stored);
         setNewImageSize(size);
@@ -211,8 +209,9 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
           await loadMapModel(model.mapModelId, openMap, { keepView: true });
         }
       }
-      onSaved?.();
-      onClose();
+      setDirty(false);
+      setNewImageSize(null);
+      setModel(await mapModelService.getById(model.mapModelId));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'));
     } finally {
@@ -233,7 +232,7 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
             : <img className="stm-mask-preview" src={current.url} alt={label} />}
           {onRemove && ownsModel && (
             <div>
-              <button type="button" className="btn btn-sm btn-outline-danger mt-2" disabled={busy} onClick={onRemove}>
+              <button type="button" className="btn btn-sm btn-outline-danger mt-2" disabled={busy} onClick={() => { onRemove(); setDirty(true); }}>
                 <TrashIcon size={14} /> {t('raycast.remove')}
               </button>
             </div>
@@ -244,22 +243,20 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
     </div>
   );
 
+  if (mapModelId === null || failed) return <NotFoundCard message={t('library.notFound')} backTo={libraryPath('maps')} />;
+
   return (
-    <Modal
-      open={open}
-      onOpenChange={(value) => { if (!value && !saving) onClose(); }}
-      title={t('mapEdit.title')}
-      large
-      footer={(
-        <>
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>{t('common.cancel')}</button>
-          <button type="submit" form="map-edit-form" className="btn btn-primary"
+    <section className="stm-library-form">
+      <LibraryPageHeader
+        title={model ? name || model.name : t('mapEdit.title')}
+        back={{ to: libraryPath('maps'), label: t('library.nav.maps') }}
+        actions={(
+          <button type="submit" form="map-edit-form" className="btn btn-primary btn-sm"
             disabled={loading || busy || !model || (!ownsModel && !canRenameMap)}>
             {saving ? t('common.loading') : t('common.save')}
           </button>
-        </>
-      )}
-    >
+        )}
+      />
       {loading || !model ? (
         <p className="text-body-secondary">{t('common.loading')}</p>
       ) : (
@@ -268,23 +265,23 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
           <div className="mb-3">
             <label className="form-label fw-semibold" htmlFor="map-edit-name">{t('save.name')}</label>
             <input id="map-edit-name" className="form-control" value={name} maxLength={260} disabled={!canEditName || busy}
-              onChange={(e) => setName(e.target.value)} />
+              onChange={(e) => { setName(e.target.value); setDirty(true); }} />
           </div>
           <div className="mb-3">
             <label className="form-label fw-semibold" htmlFor="map-edit-description">{t('save.description')}</label>
             <textarea id="map-edit-description" className="form-control" rows={2} maxLength={2000} value={description}
-              disabled={!ownsModel || busy} onChange={(e) => setDescription(e.target.value)} />
+              disabled={!ownsModel || busy} onChange={(e) => { setDescription(e.target.value); setDirty(true); }} />
           </div>
           <div className="row g-3 mb-3">
             <div className="col-6">
               <label className="form-label fw-semibold" htmlFor="map-edit-columns">{t('grid.columns')}</label>
               <input id="map-edit-columns" type="number" className="form-control" min={MIN_GRID_SIZE} max={MAX_GRID_SIZE}
-                value={columns} disabled={!ownsModel || busy} onChange={(e) => setColumns(e.target.value)} />
+                value={columns} disabled={!ownsModel || busy} onChange={(e) => { setColumns(e.target.value); setDirty(true); }} />
             </div>
             <div className="col-6">
               <label className="form-label fw-semibold" htmlFor="map-edit-rows">{t('grid.rows')}</label>
               <input id="map-edit-rows" type="number" className="form-control" min={MIN_GRID_SIZE} max={MAX_GRID_SIZE}
-                value={rows} disabled={!ownsModel || busy} onChange={(e) => setRows(e.target.value)} />
+                value={rows} disabled={!ownsModel || busy} onChange={(e) => { setRows(e.target.value); setDirty(true); }} />
             </div>
           </div>
           <div className="row g-4">
@@ -303,8 +300,9 @@ export const MapEditModal = ({ target, onClose, onSaved }: MapEditModalProps) =>
           </div>
         </form>
       )}
-    </Modal>
+      {guard}
+    </section>
   );
 };
 
-export default MapEditModal;
+export default MapEditPage;
