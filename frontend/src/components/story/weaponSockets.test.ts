@@ -69,6 +69,22 @@ describe('weaponSockets', () => {
     expect(attachWeapons.mock.calls[1][1]).toEqual({});
   });
 
+  it('hangs the held weapons again on refresh, and nothing when none is held', async () => {
+    const sockets = createWeaponSockets(() => undefined);
+    const model = new Group();
+
+    sockets.refresh(model, 1.8);
+    expect(attachWeapons).not.toHaveBeenCalled();
+
+    sockets.sync(model, 1.8, { [SOCKET.rightHand]: want('d.glb') });
+    pending.get('d.glb')!.resolve(asset);
+    await flush();
+    sockets.refresh(model, 1.8);
+
+    expect(attachWeapons).toHaveBeenCalledTimes(2);
+    expect(Object.keys(attachWeapons.mock.calls[1][1] as object)).toEqual([String(SOCKET.rightHand)]);
+  });
+
   it('drops a weapon that arrives after a reset', async () => {
     const sockets = createWeaponSockets(() => undefined);
     const model = new Group();

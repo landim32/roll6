@@ -5,6 +5,7 @@ import {
   Raycaster, Scene, SphereGeometry, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import type { Object3D } from 'three';
+import { pinchZoom, wheelZoom } from '../../lib/previewZoom';
 import { DEFAULT_GRIP_POINT, DEFAULT_POSE, gripPointLocal, gripPointOf } from '../../lib/weaponPose';
 import type { GripPoint, WeaponPose } from '../../types/weapon';
 import { cloneWeapon, loadWeapon } from '../story/loadWeapon';
@@ -24,6 +25,10 @@ interface WeaponPreviewProps {
   pose?: WeaponPose;
   gripPoint?: GripPoint;
   onPickGrip?: (point: GripPoint) => void;
+  /** The zoom (085, `lib/previewZoom`): divides the camera's distance to the weapon. Default 1. */
+  zoom?: number;
+  /** The wheel or a pinch over the canvas asks for another zoom; the owner keeps it. */
+  onZoom?: (zoom: number) => void;
 }
 
 const PREVIEW_SIZE = 1.6;
@@ -43,7 +48,7 @@ const RAD = Math.PI / 180;
  * (a drag turns it by hand). Lazy, like the token's model preview — its own small three.js scene. In edit mode (083) it
  * is the weapon editor's stage: see `editable`.
  */
-export const WeaponPreview = ({ url, label, onError, editable = false, pose = DEFAULT_POSE, gripPoint = DEFAULT_GRIP_POINT, onPickGrip }: WeaponPreviewProps) => {
+export const WeaponPreview = ({ url, label, onError, editable = false, pose = DEFAULT_POSE, gripPoint = DEFAULT_GRIP_POINT, onPickGrip, zoom = 1, onZoom }: WeaponPreviewProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stage = useRef<Group | null>(null);
   /** Between the turntable and the weapon (083): the standard pose, turning the weapon about its grip point. */
@@ -65,6 +70,13 @@ export const WeaponPreview = ({ url, label, onError, editable = false, pose = DE
   poseProp.current = pose;
   const gripProp = useRef(gripPoint);
   gripProp.current = gripPoint;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const onZoomRef = useRef(onZoom);
+  onZoomRef.current = onZoom;
+  /** The pointers down on the canvas (085): one drags, two pinch the zoom (and never pick). */
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ zoom: number; distance: number } | null>(null);
 
   /** Where the weapon turns about: in edit mode its grip point sits on the pose group's origin; otherwise it rests on the disc. */
   const placeWeapon = () => {
@@ -98,17 +110,19 @@ export const WeaponPreview = ({ url, label, onError, editable = false, pose = DE
   const placeCamera = () => {
     const camera = cameraRef.current;
     if (!camera) return;
+    const radius = ORBIT_RADIUS / zoomRef.current;
     if (editableRef.current) {
       const { yaw, pitch } = orbit.current;
       const target = new Vector3(0, PREVIEW_SIZE * 0.55, 0);
       camera.position.set(
-        target.x + ORBIT_RADIUS * Math.cos(pitch) * Math.sin(yaw),
-        target.y + ORBIT_RADIUS * Math.sin(pitch),
-        target.z + ORBIT_RADIUS * Math.cos(pitch) * Math.cos(yaw),
+        target.x + radius * Math.cos(pitch) * Math.sin(yaw),
+        target.y + radius * Math.sin(pitch),
+        target.z + radius * Math.cos(pitch) * Math.cos(yaw),
       );
       camera.lookAt(target);
     } else {
-      camera.position.set(0, 1.4, 4.2);
+      // The view camera, brought closer to its target by the zoom.
+      camera.position.set(0, 0.8 + 0.6 / zoomRef.current, 4.2 / zoomRef.current);
       camera.lookAt(0, 0.8, 0);
     }
   };
@@ -167,6 +181,12 @@ export const WeaponPreview = ({ url, label, onError, editable = false, pose = DE
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
     resize();
+    // The wheel zooms (085); a native listener, because React's onWheel is passive and could not stop the page scroll.
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      onZoomRef.current?.(wheelZoom(zoomRef.current, event.deltaY));
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
 
     let cancelled = false;
     void loadWeapon(url).then((asset) => {
@@ -197,6 +217,7 @@ export const WeaponPreview = ({ url, label, onError, editable = false, pose = DE
       cancelled = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      canvas.removeEventListener('wheel', onWheel);
       stage.current = null;
       poseRef.current = null;
       weaponRef.current = null;
@@ -218,6 +239,11 @@ export const WeaponPreview = ({ url, label, onError, editable = false, pose = DE
     placeCamera();
   }, [editable, pose, gripPoint]);
 
+  // Another zoom (085): the camera moves at once.
+  useEffect(() => {
+    placeCamera();
+  }, [zoom]);
+
   /** The grip point under a click (083): the first mesh of the weapon hit by the ray, in the file's own units. */
   const pick = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const weapon = weaponRef.current;
@@ -235,15 +261,27 @@ export const WeaponPreview = ({ url, label, onError, editable = false, pose = DE
     pickRef.current(gripPointOf([local.x, local.y, local.z], { min: asset.min, size: [asset.size.x, asset.size.y, asset.size.z] }));
   };
 
+  /** The distance between the two first pointers down (a pinch). */
+  const pinchDistance = () => {
+    const [a, b] = [...pointers.current.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
   const onPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
       // A pointer the browser does not know (synthetic events): the drag still works without the capture.
     }
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.current.size === 2) pinch.current = { zoom: zoomRef.current, distance: pinchDistance() };
     drag.current = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, at: performance.now() };
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pinch.current && pointers.current.size >= 2) {
+      onZoomRef.current?.(pinchZoom(pinch.current.zoom, pinch.current.distance, pinchDistance()));
+      return;
+    }
     if (drag.current === null) return;
     const dx = event.clientX - drag.current.x;
     const dy = event.clientY - drag.current.y;
@@ -261,12 +299,17 @@ export const WeaponPreview = ({ url, label, onError, editable = false, pose = DE
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     const press = drag.current;
     drag.current = null;
-    if (!press || !editableRef.current) return;
+    const pinched = pinch.current !== null;
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    if (!press || pinched || !editableRef.current) return;
     const moved = Math.hypot(event.clientX - press.startX, event.clientY - press.startY);
     if (moved < CLICK_PIXELS && performance.now() - press.at < CLICK_MS) pick(event);
   };
   const onPointerCancel = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
     drag.current = null;
   };
 

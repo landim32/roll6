@@ -383,21 +383,35 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
     (`setWeapon(socket, …)` stores the library weapon's `gripPoint`/`pose` too, `setGrip`; kept when the `.glb` is swapped,
     emptied when the model is removed) → `ResolvedModel.weapons: TokenWeaponWrite[]` → `toTokenInsert`. `ModelPreview
     onSockets(availability)` reports each socket (`noBone` disables it with `tokens.weapons.unavailable.noBone`; `noFingers`
-    warns the hand is approximate); the saved binding is kept.
+    warns the hand is approximate); the saved binding is kept. **Zoom and side layout (085)**: the previews zoom
+    (`lib/previewZoom`: factor 1–4, wheel through a native non-passive listener so the page never scrolls, pinch with
+    two pointers, `components/ui/ZoomButtons` over the stage's corner) — `ModelPreview`/`WeaponPreview` take `zoom`/
+    `onZoom`, the state lives in `ModelField` (one for the three tabs, reset with `previewUrl`) and `WeaponStage` (reset
+    with the file); the camera closes on the waist, where the hands are. `ModelField` wraps the card and the section's
+    controls in `.stm-model-layout` (flex-wrap; `.is-side` in the "Armas" tab puts the socket controls beside the
+    352 px card on `md+`, with "Ajuste fino" starting open — `fineOpen` from `matchMedia('(min-width: 768px)')` —
+    and wrapping under it when the width is short), the card at the same tree position in every section.
   - **3D** (lazy `three` only): the pure `lib/socketFrame` builds each socket's **frame** (`{ origin, up, attack, face }`,
     `mirror }`; `attack`, `up`, `attack × up` is the right-handed basis and `face` the side the weapon's +Z must point to —
     `−attack × up` when `mirror`, applied as scale −1 on the holder's Z, so a sword keeps tip and edge and a shield faces
-    outward in either hand) from the Mixamo bones on the rest pose — hand: origin in the middle of the palm
-    (halfway to `…HandMiddle1`), `up` = the fist's tunnel axis `normalize(palmNormal × fingers)` with `palmNormal =
-    (Index1 − Hand) × (Pinky1 − Hand)`, flipped toward `Thumb1` (fallback: the model's forward), `attack` = the fingers
-    (knuckles; fallback `Hand − ForeArm`, then the character's side), `face` = the back of the hand (the palm normal
-    turned along the model's up at rest; Mixamo rests palms down) — both hands the same rule, the left one mirrored;
+    outward in either hand) from the Mixamo bones on the pose the bones are in — **since 085 the hand sockets are
+    measured on the first frame of the idle animation** (the pose the user sees: the sample rigs' idle clips supinate
+    the wrist, so a frame measured on the T-pose followed the thumb and put the blade across the belly) — hand: origin
+    in the middle of the palm (halfway to `…HandMiddle1`), `attack` = the fingers (knuckles; fallback `Hand − ForeArm`,
+    then the character's side), `up` = the model's forward made perpendicular to the fingers (the thumb rule of 083 —
+    `palmNormal × fingers` toward `Thumb1` — only when the fingers point within ~25° of forward), `face` = the back of
+    the hand: the palm normal (`(Index1 − Hand) × (Pinky1 − Hand)`) turned away from the body (the horizontal hips→hand
+    direction; when the palm is nearly perpendicular to it — the T-pose — turned along the model's up; without fingers
+    the outward side) — both hands the same rule, the left one mirrored;
     back: parent `Spine2` (→ `Spine1` → `Spine`), origin at `RightShoulder` moved `BACK_GAP` 0.07·h backward, `up`
     toward `LeftUpLeg`, `face` = −forward (the flat against the back), `attack` = `up × face`; holsters: parent `Hips`,
     origin outside the `…UpLeg` by `SIDE_GAP` 0.06·h at the hips' height, `up` = −model up, `attack` = forward, `face` =
     outward. `components/story/socketAnchors.measureSockets(model)` reads the
-    bones once per instance (WeakMap; call it right after `instantiate`, before the mixer runs — `modelSet.load` and
-    `ModelPreview` do) and stores each anchor in the parent bone's local space (`frameQuaternion`); `socketsOf(model)` gives
+    bones on the pose they are in and remembers the anchors per instance (WeakMap) in the parent bone's local space
+    (`frameQuaternion`); the callers put the model on the idle's first frame first — `ModelPreview.applyClips →
+    measureAtIdle()` and `modelSet.animate()`: play idle, `mixer.update(0)`, `forgetSockets`, `measureSockets`, then
+    `weaponSockets.refresh(model, height)` re-hangs the carried weapons — so a changed idle (library animation arriving,
+    another choice) measures again; a model without an idle is measured on its rest pose. `socketsOf(model)` gives
     the availability. `attachWeapons` hangs, per socket, bone → holder (anchor position/quaternion, scale `h /
     boneRelativeScale` so one unit = one character height) → `fit` (fine adjustment + `weaponBaseScale × scale/100`) →
     `pose` (`R(weapon.pose)`) → `offset` (−`gripPointLocal`) → the weapon clone, so turning and sizing happen about the grip
@@ -598,6 +612,8 @@ cd .. && dotnet build Roll6Anime.sln && dotnet test Roll6Anime.Tests && dotnet r
 - PostgreSQL — new table `weapons` (name, owner, `.glb` via `POST /api/model`) and `tokens.right_weapon_id`/`left_weapon_id` (FK `ClientSetNull`) + `right_weapon_grip`/`left_weapon_grip` (`jsonb`); migration `AddWeapons` + `database/migrations/082-weapons.sql`. (082-token-weapon-library)
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + existing only (ASP.NET Core 8, EF Core 9 + Npgsql, SignalR, `ModelContextProtocol.AspNetCore` 2.x; React 18, Bootstrap 5.3, i18next, `three` 0.186.1 lazy — `Raycaster`, `ArrowHelper`). **No new dependency.** (083-weapon-sockets)
 - PostgreSQL — `weapons` + `grip_x/y/z`, `pose_rx/ry/rz`; new `token_weapons` (token, socket 1–5, weapon, `grip` jsonb) replacing `tokens.right_/left_weapon_id` + `_grip` (copied, then dropped); migration `AddWeaponSockets` + `database/migrations/083-weapon-sockets.sql`. (083-weapon-sockets)
+- TypeScript 5 / React 18 (frontend only). + existing only — React 18, Bootstrap 5.3, i18next, `three` 0.186.1 (lazy). **No new dependency.** (085-weapon-tab-polish)
+- none (no schema, API or MCP change). (085-weapon-tab-polish)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -609,6 +625,7 @@ cd .. && dotnet build Roll6Anime.sln && dotnet test Roll6Anime.Tests && dotnet r
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 085-weapon-tab-polish: the hand sockets are measured on the idle pose (forward = the character's forward, edge = the fingers, face = the back of the hand away from the body), so a weapon posed in the editor points forward in the hand on every model instead of following a supinated thumb into the belly; the 3D previews zoom (wheel, pinch, "+"/"−"); the "Armas" tab shows the socket controls beside the preview on desktop with "Ajuste fino" open. Frontend only
 - 083-weapon-sockets: weapons snap onto five fixed **sockets** of a token's 3D model — right/left hand, back, right/left holster — each found on the Mixamo skeleton with a standardised frame (hand: grip in the palm, tip toward the thumb, edge toward the knuckles; back: diagonal behind the torso, handle above the right shoulder; holsters: beside the hips, tip down), and every library weapon carries its **grip point** (normalised in its bounding box, picked by clicking the preview) and **standard pose** (90° buttons + 1° sliders, tip +Y / edge +X / face +Z), so the token form only adjusts the size, with the 082 position/rotation kept as an optional "Ajuste fino". `token_weapons` replaces the four `tokens` columns (migration `AddWeaponSockets` copied the hands into sockets 1/2), `weapons` gains `grip_x/y/z` + `pose_rx/ry/rz`; `weapons[]` on the token DTOs, `gripPoint`/`pose` on the weapon ones; MCP texts and parameters only (120 operations / 121 tools)
 - 082-token-weapon-library: weapon library in the user menu ("Armas", shared like tokens, owner edits/deletes, delete refused while in use) and one weapon per hand on 3D-model tokens, with a per-token grip (position, rotation, size) adjusted in the token form's "Armas" tab and drawn on the Mixamo hand bones in the preview and the 3D view. `weapons` table + four `tokens` columns (migration `AddWeapons`), `WeaponController`, `rightWeapon`/`leftWeapon` on the token DTOs; MCP `WeaponTools` (120 operations / 121 tools)
 - 081-mask-3d-scene: the 3D view is a real three.js scene built from the 3D mask — blocks as tall as its tones with the map image on top and the wall texture on the sides, the camera looks up and down, the walking character climbs blocks up to a step (36 units, about the waist) and is stopped by taller ones (no jump; a staircase of tones reaches high places), pieces/models/balloons stand on the terrain and hide behind blocks, quality levels redefined (resolution, smoothing, shadows on Ultra). Frontend only (no API, schema or MCP change besides the guide text); the raycaster and its helpers were removed

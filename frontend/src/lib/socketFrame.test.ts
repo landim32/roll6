@@ -5,6 +5,7 @@ import type { Frame, Vec3 } from './socketFrame';
 
 /** glTF axes: forward +Z, up +Y, the character's right −X; a 1.8-unit-tall character. */
 const MODEL = { forward: [0, 0, 1] as Vec3, up: [0, 1, 0] as Vec3, right: [-1, 0, 0] as Vec3, height: 1.8 };
+const HIPS: Vec3 = [0, 1, 0];
 
 const expectVec = (actual: Vec3, expected: Vec3) => {
   for (let i = 0; i < 3; i++) expect(actual[i]).toBeCloseTo(expected[i], 6);
@@ -23,7 +24,7 @@ const expectWellFormed = (frame: Frame) => {
 
 /**
  * A right hand at rest in the T-pose: the arm along the character's right (−X), the palm facing down, the thumb pointing
- * forward. The tunnel of the fist then runs along +Z, where the thumb is, and the knuckles along −X.
+ * forward. The character's forward is +Z, perpendicular to the fingers, and the back of the hand is up.
  */
 const rightHand = {
   side: 'right' as const,
@@ -33,6 +34,7 @@ const rightHand = {
   pinky1: [-0.8, 1.4, -0.03] as Vec3,
   thumb1: [-0.73, 1.4, 0.04] as Vec3,
   foreArm: [-0.45, 1.4, 0] as Vec3,
+  hips: HIPS,
 };
 
 const leftHand = {
@@ -43,10 +45,26 @@ const leftHand = {
   pinky1: [0.8, 1.4, -0.03] as Vec3,
   thumb1: [0.73, 1.4, 0.04] as Vec3,
   foreArm: [0.45, 1.4, 0] as Vec3,
+  hips: HIPS,
+};
+
+/**
+ * A right hand hanging in an idle pose (085): the fingers point down and a little forward, the palm faces the thigh
+ * (its normal along X), the thumb is turned inward and forward — the supinated wrist of the sample rigs' idle clips.
+ */
+const hangingHand = {
+  side: 'right' as const,
+  hand: [-0.25, 0.75, 0.1] as Vec3,
+  middle1: [-0.25, 0.65, 0.14] as Vec3,
+  index1: [-0.25, 0.65, 0.17] as Vec3,
+  pinky1: [-0.25, 0.65, 0.11] as Vec3,
+  thumb1: [-0.2, 0.7, 0.16] as Vec3,
+  foreArm: [-0.27, 0.95, 0.02] as Vec3,
+  hips: HIPS,
 };
 
 describe('socketFrame', () => {
-  it('puts the right hand frame in the palm, up toward the thumb, edge toward the knuckles, face on the back of the hand', () => {
+  it('puts the right hand frame in the palm, up forward, edge toward the knuckles, face on the back of the hand', () => {
     const frame = handFrame(rightHand, MODEL);
 
     expectVec(frame.origin, [-0.75, 1.4, 0]);
@@ -57,7 +75,7 @@ describe('socketFrame', () => {
     expectWellFormed(frame);
   });
 
-  it('builds the left hand with the same rule, mirrored: up toward its thumb, edge toward its knuckles, face on the back', () => {
+  it('builds the left hand with the same rule, mirrored: up forward, edge toward its knuckles, face on the back', () => {
     const frame = handFrame(leftHand, MODEL);
 
     expectVec(frame.origin, [0.75, 1.4, 0]);
@@ -68,29 +86,66 @@ describe('socketFrame', () => {
     expectWellFormed(frame);
   });
 
-  it('flips up toward the thumb whatever side of the palm the finger bones put it', () => {
+  it('points the blade forward on a hanging hand whose thumb turns inward (085)', () => {
+    const frame = handFrame(hangingHand, MODEL);
+
+    expect(frame.up[2]).toBeGreaterThan(0.85);
+    expect(frame.up[1]).toBeGreaterThan(0);
+    expect(frame.attack[1]).toBeLessThan(-0.9);
+    // The back of the hand faces away from the body: the character's right is −X.
+    expect(frame.face[0]).toBeLessThan(-0.8);
+    expectWellFormed(frame);
+  });
+
+  it('falls back to the thumb when the fingers point forward', () => {
+    const forward = {
+      side: 'right' as const,
+      hand: [-0.3, 1.2, 0.3] as Vec3,
+      middle1: [-0.3, 1.2, 0.4] as Vec3,
+      index1: [-0.27, 1.2, 0.4] as Vec3,
+      pinky1: [-0.33, 1.2, 0.4] as Vec3,
+      thumb1: [-0.25, 1.25, 0.33] as Vec3,
+      hips: HIPS,
+    };
+    const frame = handFrame(forward, MODEL);
+
+    // The tunnel is perpendicular to the palm and the fingers, toward the thumb (inward here).
+    expect(Math.abs(frame.up[0])).toBeGreaterThan(0.9);
+    expect(frame.up[0]).toBeGreaterThan(0);
+    expectVec(frame.attack, [0, 0, 1]);
+    expectWellFormed(frame);
+  });
+
+  it('flips the face toward the back of the hand whatever side of the palm the finger bones put it', () => {
     const swapped = { ...rightHand, index1: rightHand.pinky1, pinky1: rightHand.index1 };
 
     expectVec(handFrame(swapped, MODEL).up, [0, 0, 1]);
     expectVec(handFrame(swapped, MODEL).face, [0, 1, 0]);
   });
 
-  it('falls back to the forearm and the model forward without finger bones', () => {
-    const frame = handFrame({ side: 'right', hand: rightHand.hand, foreArm: rightHand.foreArm }, MODEL);
+  it('falls back to the forearm, the forward and the outward side without finger bones', () => {
+    const frame = handFrame({ side: 'right', hand: rightHand.hand, foreArm: rightHand.foreArm, hips: HIPS }, MODEL);
 
     expectVec(frame.origin, rightHand.hand);
     expectVec(frame.attack, [-1, 0, 0]);
     expectVec(frame.up, [0, 0, 1]);
-    expectVec(frame.face, [0, 1, 0]);
+    // Outward is along the fingers here, so the face comes from the right-handed basis.
     expectWellFormed(frame);
+    const hanging = handFrame({ side: 'right', hand: hangingHand.hand, foreArm: hangingHand.foreArm, hips: HIPS }, MODEL);
+    expect(hanging.attack[1]).toBeLessThan(-0.9);
+    expect(hanging.up[2]).toBeGreaterThan(0.85);
+    expect(hanging.face[0]).toBeLessThan(-0.8);
   });
 
-  it('uses the side of the character when there is only the hand bone', () => {
+  it('uses the model up for the face and the side for the fingers with the hand bone alone, without hips', () => {
     const frame = handFrame({ side: 'left', hand: leftHand.hand }, MODEL);
 
     expectVec(frame.attack, [1, 0, 0]);
+    expectVec(frame.up, [0, 0, 1]);
     expect(frame.mirror).toBe(true);
     expectWellFormed(frame);
+    const rest = handFrame({ ...rightHand, hips: undefined }, MODEL);
+    expectVec(rest.face, [0, 1, 0]);
   });
 
   it('puts the back socket behind the right shoulder, running down to the left hip, face away from the body', () => {

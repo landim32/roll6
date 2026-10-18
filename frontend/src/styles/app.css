@@ -342,6 +342,56 @@ body,
   display: none;
 }
 
+/* The preview card and the section's controls (085): a centered column, or side by side in the "Armas" tab on md+. */
+.stm-model-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.stm-model-controls {
+  width: 100%;
+  max-width: 352px;
+}
+
+@media (min-width: 768px) {
+  .stm-model-layout.is-side {
+    justify-content: flex-start;
+  }
+
+  .stm-model-layout.is-side .stm-model-card {
+    margin: 0;
+    flex: 0 0 352px;
+    width: 352px;
+  }
+
+  .stm-model-layout.is-side .stm-model-controls {
+    flex: 1 1 320px;
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+/* The "+" / "−" of a 3D preview (085), over the stage's top-right corner. */
+.stm-stage-zoom {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 2;
+}
+
+.stm-stage-zoom .btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--stm-surface);
+}
+
 /* The "3D" tab of the token form (055): a square stage for the preview, like the 2,5D fields. */
 .stm-model-stage {
   position: relative;

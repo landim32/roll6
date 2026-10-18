@@ -1,5 +1,6 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ZoomButtons } from '../ui/ZoomButtons';
 import type { GripPoint, WeaponPose } from '../../types/weapon';
 
 const WeaponPreview = lazy(() => import('./WeaponPreview'));
@@ -19,6 +20,9 @@ interface WeaponStageProps {
 export const WeaponStage = ({ url, name, editable, pose, gripPoint, onPickGrip }: WeaponStageProps) => {
   const { t } = useTranslation();
   const [failed, setFailed] = useState<string | null>(null);
+  /** The zoom (085): kept while the same file is shown. */
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => { setZoom(1); }, [url]);
   const error = failed !== null && failed === url;
 
   return (
@@ -26,10 +30,11 @@ export const WeaponStage = ({ url, name, editable, pose, gripPoint, onPickGrip }
       {url && !error && (
         <Suspense fallback={<div className="stm-model-stage-note small text-secondary">{t('weapons.loading')}</div>}>
           <WeaponPreview key={url} url={url} label={t('weapons.previewLabel', { name: name ?? '' })}
-            editable={editable} pose={pose} gripPoint={gripPoint} onPickGrip={onPickGrip}
+            editable={editable} pose={pose} gripPoint={gripPoint} onPickGrip={onPickGrip} zoom={zoom} onZoom={setZoom}
             onError={() => setFailed(url)} />
         </Suspense>
       )}
+      {url && !error && <ZoomButtons zoom={zoom} onChange={setZoom} />}
       {!url && <div className="stm-model-stage-note small text-secondary">{t('weapons.noFile')}</div>}
       {error && <div className="stm-model-stage-note small text-danger">{t('weapons.loadFailed')}</div>}
     </div>
