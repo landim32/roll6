@@ -72,9 +72,9 @@ public class MapTokenRepository : IMapTokenRepository<MapToken>
     {
         return await (
                 from piece in _context.MapTokens.AsNoTracking()
-                join token in _context.Tokens.AsNoTracking() on piece.TokenId equals token.TokenId
+                join held in _context.TokenWeapons.AsNoTracking() on piece.TokenId equals held.TokenId
                 join map in _context.Maps.AsNoTracking() on piece.MapId equals map.MapId
-                where (token.RightWeaponId == weaponId || token.LeftWeaponId == weaponId) && map.Status != MapStatus.Deleted
+                where held.WeaponId == weaponId && map.Status != MapStatus.Deleted
                 select map.CampaignId)
             .Distinct()
             .ToListAsync();

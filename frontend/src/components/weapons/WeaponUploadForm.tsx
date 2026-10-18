@@ -5,7 +5,9 @@ import { toast } from 'sonner';
 import { useWeapon } from '../../hooks/useWeapon';
 import { usePickedUrl } from '../../hooks/usePickedUrl';
 import { MAX_WEAPON_NAME, checkWeaponFile, weaponNameFrom } from '../../lib/weaponFile';
-import type { WeaponInfo } from '../../types/weapon';
+import { DEFAULT_GRIP_POINT, DEFAULT_POSE } from '../../lib/weaponPose';
+import type { GripPoint, WeaponInfo, WeaponPose } from '../../types/weapon';
+import { WeaponPoseFields } from './WeaponPoseFields';
 import { WeaponStage } from './WeaponStage';
 
 interface WeaponUploadFormProps {
@@ -13,8 +15,9 @@ interface WeaponUploadFormProps {
 }
 
 /**
- * "Enviar" (082): a `.glb` (checked here like the token models before it leaves the device), previewed at once, and
- * its name — suggested by the file name. The file goes through `POST /api/model`, then the weapon is created.
+ * "Enviar" (082): a `.glb` (checked here like the token models before it leaves the device), previewed at once on the
+ * editable stage, where the user turns it into its standard pose in 90° steps and clicks where the hand holds it (083),
+ * and its name — suggested by the file name. The file goes through `POST /api/model`, then the weapon is created.
  */
 export const WeaponUploadForm = ({ onUploaded }: WeaponUploadFormProps) => {
   const { t } = useTranslation();
@@ -22,6 +25,8 @@ export const WeaponUploadForm = ({ onUploaded }: WeaponUploadFormProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [pose, setPose] = useState<WeaponPose>(DEFAULT_POSE);
+  const [gripPoint, setGripPoint] = useState<GripPoint>(DEFAULT_GRIP_POINT);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [inputKey, setInputKey] = useState(0);
@@ -32,6 +37,8 @@ export const WeaponUploadForm = ({ onUploaded }: WeaponUploadFormProps) => {
     setFile(null);
     setFileError(null);
     setError(null);
+    setPose(DEFAULT_POSE);
+    setGripPoint(DEFAULT_GRIP_POINT);
     if (!chosen) return;
     const problem = await checkWeaponFile(chosen);
     if (problem) {
@@ -51,10 +58,12 @@ export const WeaponUploadForm = ({ onUploaded }: WeaponUploadFormProps) => {
     setSending(true);
     setError(null);
     try {
-      const created = await upload(name.trim(), file);
+      const created = await upload(name.trim(), file, gripPoint, pose);
       toast.success(t('weapons.uploaded'));
       setFile(null);
       setName('');
+      setPose(DEFAULT_POSE);
+      setGripPoint(DEFAULT_GRIP_POINT);
       setInputKey((key) => key + 1);
       onUploaded(created);
     } catch (err) {
@@ -74,7 +83,12 @@ export const WeaponUploadForm = ({ onUploaded }: WeaponUploadFormProps) => {
           ? <div className="invalid-feedback d-block">{fileError}</div>
           : <div className="form-text">{t('weapons.fileHelp')}</div>}
       </div>
-      {url && <div className="mb-3"><WeaponStage url={url} name={name} /></div>}
+      {url && (
+        <div className="mb-3">
+          <WeaponStage url={url} name={name} editable pose={pose} gripPoint={gripPoint} onPickGrip={setGripPoint} />
+          <WeaponPoseFields pose={pose} gripPoint={gripPoint} onPose={setPose} onGripPoint={setGripPoint} />
+        </div>
+      )}
       <div className="mb-3">
         <label className="form-label" htmlFor="weapon-name">{t('weapons.name')}</label>
         <input id="weapon-name" className="form-control" value={name} maxLength={MAX_WEAPON_NAME} required

@@ -5,8 +5,10 @@ import { MODEL_SCALE } from '../lib/modelScale';
 import type { AnimationState, ModelClipChoice, ModelClipChoices } from '../lib/modelAnimations';
 import type { ResolvedModel } from '../lib/tokenForm';
 import { DEFAULT_GRIP, clampGrip } from '../lib/weaponGrip';
+import { clampGripPoint, normalizePose } from '../lib/weaponPose';
 import type { TokenInfo } from '../types/token';
-import type { Hand, TokenWeapon, WeaponGrip } from '../types/weapon';
+import { SOCKET, SOCKETS } from '../types/weapon';
+import type { Socket, TokenWeapon, TokenWeaponWrite, WeaponGrip } from '../types/weapon';
 
 /** The "3D" tab of the token form (055): a newly picked `.glb`, or the saved model kept or removed, and its animations (056, the death since 058). */
 export interface ModelFileState {
@@ -22,7 +24,7 @@ export interface ModelFileState {
   clips: ModelClipChoices;
   /** Size of the model in the 3D view (063), percent: kept when the file is swapped, 100 when it is removed. */
   scale: number;
-  /** The weapon in each hand (082) with its grip: kept when the file is swapped, emptied when the model is removed. */
+  /** The weapon in each socket (083) with its grip: kept when the file is swapped, emptied when the model is removed. */
   weapons: TokenWeapons;
   pick: (file: File) => void;
   /** Removes the model: the picked file and the saved one. */
@@ -30,22 +32,32 @@ export interface ModelFileState {
   setInvalid: (invalid: boolean) => void;
   setClip: (state: AnimationState, choice: ModelClipChoice) => void;
   setScale: (scale: number) => void;
-  /** Puts a library weapon in a hand (default grip when the hand was empty or held another weapon), or empties it. */
-  setWeapon: (hand: Hand, weapon: Pick<TokenWeapon, 'weaponId' | 'name' | 'modelFileUrl'> | null) => void;
-  setGrip: (hand: Hand, grip: WeaponGrip) => void;
+  /** Puts a library weapon in a socket (default grip when the socket was empty or carried another weapon), or empties it. */
+  setWeapon: (socket: Socket, weapon: PickedWeapon | null) => void;
+  setGrip: (socket: Socket, grip: WeaponGrip) => void;
   /** What to send: uploads the picked file, keeps the saved one, or null — with the chosen animations. */
   resolve: () => Promise<ResolvedModel>;
 }
 
-export type TokenWeapons = Record<Hand, TokenWeapon | null>;
+/** What the form needs from a library weapon to put it in a socket. */
+export type PickedWeapon = Pick<TokenWeapon, 'weaponId' | 'name' | 'modelFileUrl' | 'gripPoint' | 'pose'>;
 
-const NO_WEAPONS: TokenWeapons = { right: null, left: null };
+export type TokenWeapons = Record<Socket, TokenWeapon | null>;
+
+const NO_WEAPONS: TokenWeapons = {
+  [SOCKET.rightHand]: null, [SOCKET.leftHand]: null, [SOCKET.back]: null, [SOCKET.rightHolster]: null, [SOCKET.leftHolster]: null,
+};
 
 const savedWeapons = (token: TokenInfo | null): TokenWeapons => {
   if (!token?.modelFile) return NO_WEAPONS;
-  const read = (weapon: TokenWeapon | null | undefined): TokenWeapon | null =>
-    weapon ? { ...weapon, grip: clampGrip(weapon.grip) } : null;
-  return { right: read(token.rightWeapon), left: read(token.leftWeapon) };
+  const weapons: TokenWeapons = { ...NO_WEAPONS };
+  for (const weapon of token.weapons ?? []) {
+    if (!SOCKETS.includes(weapon.socket)) continue;
+    weapons[weapon.socket] = {
+      ...weapon, grip: clampGrip(weapon.grip), gripPoint: clampGripPoint(weapon.gripPoint), pose: normalizePose(weapon.pose),
+    };
+  }
+  return weapons;
 };
 
 /** A saved choice as the form keeps it: one it does not know (e.g. the former "roll6", 061) is automatic. */
@@ -109,19 +121,20 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
     setWeapons(NO_WEAPONS);
   }, []);
 
-  const setWeapon = useCallback((hand: Hand, weapon: Pick<TokenWeapon, 'weaponId' | 'name' | 'modelFileUrl'> | null) => {
+  const setWeapon = useCallback((socket: Socket, weapon: PickedWeapon | null) => {
     setWeapons((prev) => {
-      if (!weapon) return prev[hand] ? { ...prev, [hand]: null } : prev;
-      const current = prev[hand];
-      if (current?.weaponId === weapon.weaponId) return { ...prev, [hand]: { ...current, ...weapon } };
-      return { ...prev, [hand]: { ...weapon, grip: DEFAULT_GRIP } };
+      if (!weapon) return prev[socket] ? { ...prev, [socket]: null } : prev;
+      const current = prev[socket];
+      const picked: PickedWeapon = { ...weapon, gripPoint: clampGripPoint(weapon.gripPoint), pose: normalizePose(weapon.pose) };
+      if (current?.weaponId === weapon.weaponId) return { ...prev, [socket]: { ...current, ...picked } };
+      return { ...prev, [socket]: { ...picked, socket, grip: DEFAULT_GRIP } };
     });
   }, []);
 
-  const setGrip = useCallback((hand: Hand, grip: WeaponGrip) => {
+  const setGrip = useCallback((socket: Socket, grip: WeaponGrip) => {
     setWeapons((prev) => {
-      const current = prev[hand];
-      return current ? { ...prev, [hand]: { ...current, grip: clampGrip(grip) } } : prev;
+      const current = prev[socket];
+      return current ? { ...prev, [socket]: { ...current, grip: clampGrip(grip) } } : prev;
     });
   }, []);
 
@@ -131,10 +144,13 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
 
   const resolve = useCallback(async (): Promise<ResolvedModel> => {
     const modelFile = picked ? (await modelService.upload(picked)).fileName : keepsSaved ? token?.modelFile ?? null : null;
-    const write = (weapon: TokenWeapon | null) => (weapon ? { weaponId: weapon.weaponId, grip: weapon.grip } : null);
+    const written: TokenWeaponWrite[] = [];
+    for (const socket of SOCKETS) {
+      const weapon = weapons[socket];
+      if (weapon) written.push({ socket, weaponId: weapon.weaponId, grip: weapon.grip });
+    }
     return {
-      modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down, modelScale: scale,
-      rightWeapon: write(weapons.right), leftWeapon: write(weapons.left),
+      modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down, modelScale: scale, weapons: written,
     };
   }, [picked, keepsSaved, token, clips, scale, weapons]);
 

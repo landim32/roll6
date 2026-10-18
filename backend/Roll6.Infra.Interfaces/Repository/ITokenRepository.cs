@@ -13,6 +13,4 @@ public interface ITokenRepository<TModel> where TModel : class
     /// Whether any token holds this animation choice (059, "animation:{id}") in one of the selected state columns.
     /// </summary>
     Task<bool> AnyUsesClipAsync(string choice, bool idle, bool walk, bool down);
-    /// <summary>Whether any token holds this library weapon (082) in either hand.</summary>
-    Task<bool> AnyUsesWeaponAsync(long weaponId);
 }

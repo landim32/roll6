@@ -15,9 +15,8 @@ export interface ResolvedModel {
   modelDownClip: string | null;
   /** Size of the model in the 3D view (063), percent; missing = 100. */
   modelScale?: number;
-  /** The weapons in the model's hands (082) with their grips; missing/null = empty hand. */
-  rightWeapon?: TokenWeaponWrite | null;
-  leftWeapon?: TokenWeaponWrite | null;
+  /** The weapons in the model's sockets (083) with their grips; missing = none. */
+  weapons?: TokenWeaponWrite[];
 }
 
 /** Same limits as the backend Token.Update. */
@@ -94,6 +93,5 @@ export const toTokenInsert = (
   modelWalkClip: model?.modelFile ? model.modelWalkClip : null,
   modelDownClip: model?.modelFile ? model.modelDownClip : null,
   modelScale: model?.modelFile ? model.modelScale ?? MODEL_SCALE.standard : MODEL_SCALE.standard,
-  rightWeapon: model?.modelFile ? model.rightWeapon ?? null : null,
-  leftWeapon: model?.modelFile ? model.leftWeapon ?? null : null,
+  weapons: model?.modelFile ? model.weapons ?? [] : [],
 });

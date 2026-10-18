@@ -2298,5 +2298,153 @@ BEGIN
     VALUES ('20261017225940_AddWeapons', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE weapons ADD grip_x double precision NOT NULL DEFAULT 0.5;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE weapons ADD grip_y double precision NOT NULL DEFAULT 0.5;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE weapons ADD grip_z double precision NOT NULL DEFAULT 0.5;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE weapons ADD pose_rx integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE weapons ADD pose_ry integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE weapons ADD pose_rz integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    CREATE TABLE token_weapons (
+        token_weapon_id bigint GENERATED ALWAYS AS IDENTITY,
+        token_id bigint NOT NULL,
+        socket integer NOT NULL,
+        weapon_id bigint NOT NULL,
+        grip jsonb,
+        CONSTRAINT token_weapons_pkey PRIMARY KEY (token_weapon_id),
+        CONSTRAINT fk_token_token_weapon FOREIGN KEY (token_id) REFERENCES tokens (token_id),
+        CONSTRAINT fk_weapon_token_weapon FOREIGN KEY (weapon_id) REFERENCES weapons (weapon_id)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    CREATE UNIQUE INDEX ix_token_weapons_token_socket ON token_weapons (token_id, socket);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    CREATE INDEX ix_token_weapons_weapon ON token_weapons (weapon_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    INSERT INTO token_weapons (token_id, socket, weapon_id, grip)
+    SELECT token_id, 1, right_weapon_id, jsonb_build_object('scale', COALESCE((right_weapon_grip->>'scale')::int, 100))
+      FROM tokens WHERE right_weapon_id IS NOT NULL
+    UNION ALL
+    SELECT token_id, 2, left_weapon_id, jsonb_build_object('scale', COALESCE((left_weapon_grip->>'scale')::int, 100))
+      FROM tokens WHERE left_weapon_id IS NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE tokens DROP CONSTRAINT fk_token_left_weapon;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE tokens DROP CONSTRAINT fk_token_right_weapon;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    DROP INDEX ix_tokens_left_weapon;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    DROP INDEX ix_tokens_right_weapon;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE tokens DROP COLUMN left_weapon_grip;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE tokens DROP COLUMN left_weapon_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE tokens DROP COLUMN right_weapon_grip;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    ALTER TABLE tokens DROP COLUMN right_weapon_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261018134011_AddWeaponSockets') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261018134011_AddWeaponSockets', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

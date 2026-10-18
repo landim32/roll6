@@ -3,17 +3,20 @@ import type { Object3D } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { storedModelName } from '../../lib/modelFile';
 import type { WeaponSize } from '../../lib/weaponFit';
+import type { Vec3 } from '../../lib/weaponPose';
 import { readModelBytes } from './loadModel';
 
 /**
  * Reads a library weapon (082) with three.js — only imported dynamically, like `loadModel`. A weapon is a plain model
- * (no skeleton needed): parsed once per URL, measured at rest, and every hand that holds it draws a clone that shares
+ * (no skeleton needed): parsed once per URL, measured at rest, and every socket that carries it draws a clone that shares
  * its geometries and materials.
  */
 export interface WeaponAsset {
   scene: Object3D;
   /** Size of its bounding box in the file's own units (what `weaponBaseScale` reads). */
   size: WeaponSize;
+  /** Minimum corner of that box (083): with `size`, where the grip point falls in the file's units. */
+  min: Vec3;
 }
 
 const cache = new Map<string, Promise<WeaponAsset | null>>();
@@ -29,14 +32,14 @@ export const parseWeapon = async (bytes: ArrayBuffer): Promise<WeaponAsset> => {
   scene.traverse((node) => {
     if ((node as { isMesh?: boolean }).isMesh) {
       node.castShadow = true;
-      // The weapon moves with an animated hand, far from where the file put it: never cull it.
+      // The weapon moves with an animated bone, far from where the file put it: never cull it.
       node.frustumCulled = false;
     }
   });
-  return { scene, size: { x: size.x, y: size.y, z: size.z } };
+  return { scene, size: { x: size.x, y: size.y, z: size.z }, min: [box.min.x, box.min.y, box.min.z] };
 };
 
-/** The weapon of a URL, read once; a failure resolves null (the hand simply stays empty) until the page reloads. */
+/** The weapon of a URL, read once; a failure resolves null (the socket simply stays empty) until the page reloads. */
 export const loadWeapon = (url: string): Promise<WeaponAsset | null> => {
   const key = storedModelName(url) ?? url;
   let pending = cache.get(key);

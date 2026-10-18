@@ -2,6 +2,7 @@ using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
 using Roll6.Domain.Realtime;
+using Roll6.Domain.Weapons;
 using Roll6.DTO.Common;
 using Roll6.DTO.Realtime;
 using Roll6.DTO.Weapon;
@@ -11,11 +12,11 @@ using Roll6.Infra.Interfaces.Repository;
 namespace Roll6.Domain.Services;
 
 /// <summary>
-/// The weapon library (082). A weapon is a .glb uploaded through <c>POST /api/model</c> plus a name; tokens hold it in a
-/// hand (<c>tokens.right_weapon_id</c>/<c>left_weapon_id</c>). Replacing the file keeps the weapon's id, so every token
-/// holding it shows the new file, and the campaigns with such a piece are told to reload their pieces. A weapon held by
-/// any token cannot be deleted. Stored files are write-once and never deleted (the same name may be referenced elsewhere,
-/// as with token models).
+/// The weapon library (082). A weapon is a .glb uploaded through <c>POST /api/model</c> plus a name, and since 083 its
+/// grip point and standard pose; tokens carry it in their sockets (<c>token_weapons</c>). Replacing the file, the grip
+/// point or the pose keeps the weapon's id, so every token carrying it shows the change, and the campaigns with such a
+/// piece are told to reload their pieces. A weapon carried by any token cannot be deleted. Stored files are write-once
+/// and never deleted (the same name may be referenced elsewhere, as with token models).
 /// </summary>
 public class WeaponService : IWeaponService
 {
@@ -23,7 +24,7 @@ public class WeaponService : IWeaponService
     public const string NOT_FOUND = "Arma não encontrada.";
 
     private readonly IWeaponRepository<Weapon> _repository;
-    private readonly ITokenRepository<Token> _tokenRepository;
+    private readonly ITokenWeaponRepository<TokenWeapon> _tokenWeaponRepository;
     private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
     private readonly IUserRepository<User> _userRepository;
     private readonly IImageStorageAppService _imageStorage;
@@ -31,14 +32,14 @@ public class WeaponService : IWeaponService
 
     public WeaponService(
         IWeaponRepository<Weapon> repository,
-        ITokenRepository<Token> tokenRepository,
+        ITokenWeaponRepository<TokenWeapon> tokenWeaponRepository,
         IMapTokenRepository<MapToken> mapTokenRepository,
         IUserRepository<User> userRepository,
         IImageStorageAppService imageStorage,
         IRealtimeNotifier notifier)
     {
         _repository = repository;
-        _tokenRepository = tokenRepository;
+        _tokenWeaponRepository = tokenWeaponRepository;
         _mapTokenRepository = mapTokenRepository;
         _userRepository = userRepository;
         _imageStorage = imageStorage;
@@ -67,7 +68,9 @@ public class WeaponService : IWeaponService
 
     public async Task<WeaponInfo> CreateAsync(long userId, WeaponInsertInfo info)
     {
-        var saved = await _repository.InsertAsync(Weapon.Create(userId, info.Name, info.ModelFile));
+        var saved = await _repository.InsertAsync(Weapon.Create(userId, info.Name, info.ModelFile,
+            info.GripPoint == null ? null : TokenWeapons.ToGripPoint(info.GripPoint),
+            info.Pose == null ? null : TokenWeapons.ToPose(info.Pose)));
         return MapToDto(saved, await OwnerNamesAsync(new[] { userId }));
     }
 
@@ -79,8 +82,20 @@ public class WeaponService : IWeaponService
         var newFile = info.ModelFile is not null && info.ModelFile != weapon.ModelFile;
         if (newFile)
             weapon.ReplaceFile(info.ModelFile);
+        // 083: the grip point and the pose are drawn by every token carrying the weapon, like the file.
+        var placed = false;
+        if (info.GripPoint is not null && TokenWeapons.ToGripPoint(info.GripPoint) != weapon.GripPoint)
+        {
+            weapon.SetGripPoint(TokenWeapons.ToGripPoint(info.GripPoint));
+            placed = true;
+        }
+        if (info.Pose is not null && TokenWeapons.ToPose(info.Pose).Validate("pose").Normalized() != weapon.Pose)
+        {
+            weapon.SetPose(TokenWeapons.ToPose(info.Pose));
+            placed = true;
+        }
         var saved = await _repository.UpdateAsync(weapon);
-        if (newFile)
+        if (newFile || placed)
         {
             foreach (var campaignId in await _mapTokenRepository.ListCampaignIdsByWeaponAsync(weaponId))
                 await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
@@ -91,7 +106,7 @@ public class WeaponService : IWeaponService
     public async Task DeleteAsync(long userId, long weaponId)
     {
         await GetOwnedAsync(userId, weaponId);
-        if (await _tokenRepository.AnyUsesWeaponAsync(weaponId))
+        if (await _tokenWeaponRepository.AnyByWeaponAsync(weaponId))
             throw new ConflictException(IN_USE);
         await _repository.DeleteAsync(weaponId);
     }
@@ -121,6 +136,8 @@ public class WeaponService : IWeaponService
         Name = weapon.Name,
         ModelFile = weapon.ModelFile,
         ModelFileUrl = _imageStorage.GetUrl(weapon.ModelFile),
+        GripPoint = TokenWeapons.ToInfo(weapon.GripPoint),
+        Pose = TokenWeapons.ToInfo(weapon.Pose),
         CreatedAt = weapon.CreatedAt,
         UpdatedAt = weapon.UpdatedAt
     };

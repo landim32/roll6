@@ -1,123 +1,129 @@
 import { Group, Vector3 } from 'three';
 import type { Bone, Object3D } from 'three';
-import { normalizeBoneName } from '../../lib/modelAnimations';
 import { gripTransform } from '../../lib/weaponGrip';
 import { weaponBaseScale } from '../../lib/weaponFit';
 import type { WeaponSize } from '../../lib/weaponFit';
-import type { Hand, WeaponGrip } from '../../types/weapon';
+import { gripPointLocal } from '../../lib/weaponPose';
+import type { Vec3 } from '../../lib/weaponPose';
+import { SOCKETS } from '../../types/weapon';
+import type { GripPoint, Socket, WeaponGrip, WeaponPose } from '../../types/weapon';
+import { measureSockets } from './socketAnchors';
 
 /**
- * Weapons held in a 3D model's hands (082). Each weapon hangs on a holder that is a child of the hand bone (Mixamo
- * names: `RightHand`/`LeftHand`, any `mixamorig` prefix), placed in the middle of the palm — halfway between the hand
- * bone and the base of its middle finger — so every animation moves it with no work per frame. The holder's scale
- * cancels the bone's own scale relative to the model (Mixamo bones are often 0.01) and makes one holder unit one
- * character height, so a grip (`lib/weaponGrip`) means the same on every model and at every size: the fit of the model,
- * the token's "Tamanho" (063) and the preview's framing all scale the model above the holder.
+ * Weapons in the sockets of a 3D model (082, sockets since 083). Each weapon hangs on a holder that is a child of the
+ * socket's bone, placed and turned like the socket's frame (`socketAnchors`), so every animation moves it with no work
+ * per frame. The holder's scale cancels the bone's own scale relative to the model (Mixamo bones are often 0.01) and makes
+ * one holder unit one character height, so a grip (`lib/weaponGrip`) means the same on every model and at every size: the
+ * fit of the model, the token's "Tamanho" (063) and the preview's framing all scale the model above the holder.
+ *
+ * Inside the holder: `fit` (the token's fine adjustment and size) → `pose` (the weapon's standard pose) → `offset` (the
+ * weapon moved so that its grip point sits on the origin) → the weapon. Turning and scaling therefore happen about the
+ * grip point, which stays on the socket.
  */
 
-/** What a hand holds: the weapon's drawable copy, its size in its own units and the grip. */
+/** What a socket carries: the weapon's drawable copy, its box in its own units, its grip point and pose, and the grip. */
 export interface HeldWeapon {
   object: Object3D;
   size: WeaponSize;
+  min: Vec3;
+  gripPoint: GripPoint;
+  pose: WeaponPose;
   grip: WeaponGrip;
 }
 
-export interface WeaponHands {
-  right: boolean;
-  left: boolean;
-}
+export const HOLDER = 'roll6-weapon-holder';
+const holderName = (socket: Socket) => `${HOLDER}-${socket}`;
 
-const HOLDER = 'roll6-weapon-holder';
-const BONE_OF: Record<Hand, string> = { right: 'RightHand', left: 'LeftHand' };
-const MIDDLE_OF: Record<Hand, string> = { right: 'RightHandMiddle1', left: 'LeftHandMiddle1' };
-
-const isBone = (node: Object3D): node is Bone => (node as { isBone?: boolean }).isBone === true;
-
-/** The bone of a model with that Mixamo name (prefix ignored), or null. */
-const boneNamed = (root: Object3D, name: string): Bone | null => {
-  let found: Bone | null = null;
-  root.traverse((node) => {
-    if (!found && isBone(node) && normalizeBoneName(node.name) === name) found = node;
-  });
-  return found;
-};
-
-export const findHands = (model: Object3D): Record<Hand, Bone | null> => ({
-  right: boneNamed(model, BONE_OF.right),
-  left: boneNamed(model, BONE_OF.left),
-});
-
-/** Which hands can hold a weapon. */
-export const handsOf = (model: Object3D): WeaponHands => {
-  const hands = findHands(model);
-  return { right: hands.right !== null, left: hands.left !== null };
-};
+const RAD = Math.PI / 180;
 
 /** Removes every holder (and the weapons in them) from the model. */
 export const detachWeapons = (model: Object3D): void => {
   const holders: Object3D[] = [];
   model.traverse((node) => {
-    if (node.name === HOLDER) holders.push(node);
+    if (node.name.startsWith(HOLDER)) holders.push(node);
   });
   for (const holder of holders) holder.removeFromParent();
 };
 
-/** The holder's position inside the hand: the middle of the palm, else the hand bone itself. */
-const palmOf = (bone: Bone, hand: Hand): Vector3 => {
-  const middle = boneNamed(bone, MIDDLE_OF[hand]);
-  if (!middle) return new Vector3();
-  const local = bone.worldToLocal(middle.getWorldPosition(new Vector3()));
-  return local.multiplyScalar(0.5);
-};
-
-/** The hand bone's scale relative to the model (uniform enough: the largest axis). */
-const relativeScale = (hand: Bone, model: Object3D): number => {
-  const bone = hand.getWorldScale(new Vector3());
+/** The socket's bone scale relative to the model (uniform enough: the largest axis). */
+const relativeScale = (bone: Bone, model: Object3D): number => {
+  const boneScale = bone.getWorldScale(new Vector3());
   const root = model.getWorldScale(new Vector3());
-  const ratio = Math.max(bone.x / root.x, bone.y / root.y, bone.z / root.z);
+  const ratio = Math.max(boneScale.x / root.x, boneScale.y / root.y, boneScale.z / root.z);
   return Number.isFinite(ratio) && ratio > 1e-9 ? ratio : 1;
 };
 
+/** Applies the grip (fine adjustment + size) to the `fit` group. */
+const placeFit = (fit: Object3D, held: Pick<HeldWeapon, 'size' | 'grip'>): void => {
+  const { position, rotation, factor } = gripTransform(held.grip);
+  fit.position.set(...position);
+  fit.rotation.set(rotation[0], rotation[1], rotation[2], 'XYZ');
+  fit.scale.setScalar(weaponBaseScale(held.size) * factor);
+};
+
+/** Applies the weapon's standard pose and moves it so that its grip point is on the origin. */
+const placePose = (pose: Object3D, offset: Object3D, held: Pick<HeldWeapon, 'size' | 'min' | 'gripPoint' | 'pose'>): void => {
+  pose.rotation.set(held.pose.rx * RAD, held.pose.ry * RAD, held.pose.rz * RAD, 'XYZ');
+  const [x, y, z] = gripPointLocal(held.gripPoint, { min: held.min, size: [held.size.x, held.size.y, held.size.z] });
+  offset.position.set(-x, -y, -z);
+};
+
 /**
- * Removes any previous holders, then hangs each weapon on its hand. `characterHeight` is the model's height in its own
- * units (its bounds at rest). A hand the model does not have holds nothing; nothing throws.
+ * Removes any previous holders, then hangs each weapon on its socket. `characterHeight` is the model's height in its own
+ * units (its bounds at rest). A socket the model does not have carries nothing; nothing throws.
  */
 export const attachWeapons = (
   model: Object3D,
-  weapons: Partial<Record<Hand, HeldWeapon>>,
+  weapons: Partial<Record<Socket, HeldWeapon>>,
   characterHeight: number,
 ): void => {
   detachWeapons(model);
   model.updateMatrixWorld(true);
-  const hands = findHands(model);
-  for (const hand of ['right', 'left'] as const) {
-    const held = weapons[hand];
-    const bone = hands[hand];
-    if (!held || !bone) continue;
+  const anchors = measureSockets(model);
+  for (const socket of SOCKETS) {
+    const held = weapons[socket];
+    const anchor = anchors[socket];
+    if (!held || !anchor) continue;
     const holder = new Group();
-    holder.name = HOLDER;
-    holder.position.copy(palmOf(bone, hand));
-    holder.scale.setScalar(characterHeight / relativeScale(bone, model));
-    const grip = new Group();
-    placeGrip(grip, held);
-    grip.add(held.object);
-    holder.add(grip);
-    bone.add(holder);
+    holder.name = holderName(socket);
+    holder.position.copy(anchor.position);
+    holder.quaternion.copy(anchor.quaternion);
+    const unit = characterHeight / relativeScale(anchor.bone, model);
+    // A mirrored socket (the left hand, one holster) flips the weapon across its flat plane: tip and edge stay, the face
+    // turns outward; three.js draws a negative scale with the winding flipped, so nothing looks inside out.
+    holder.scale.set(unit, unit, anchor.mirror ? -unit : unit);
+    const fit = new Group();
+    const pose = new Group();
+    const offset = new Group();
+    placeFit(fit, held);
+    placePose(pose, offset, held);
+    offset.add(held.object);
+    pose.add(offset);
+    fit.add(pose);
+    holder.add(fit);
+    anchor.bone.add(holder);
   }
   model.updateMatrixWorld(true);
 };
 
-/** Applies a grip to the group between the holder and the weapon (also used to re-place without reloading). */
-export const placeGrip = (group: Object3D, held: Pick<HeldWeapon, 'size' | 'grip'>): void => {
-  const { position, rotation, factor } = gripTransform(held.grip);
-  group.position.set(...position);
-  group.rotation.set(rotation[0], rotation[1], rotation[2], 'XYZ');
-  group.scale.setScalar(weaponBaseScale(held.size) * factor);
+/** The holder of a socket on the model, or null. */
+export const holderOf = (model: Object3D, socket: Socket): Object3D | null => {
+  const anchor = measureSockets(model)[socket];
+  return anchor?.bone.children.find((child) => child.name === holderName(socket)) ?? null;
 };
 
-/** The grip group holding a weapon in a hand, to re-place it when only the grip changed. */
-export const gripGroupOf = (model: Object3D, hand: Hand): Object3D | null => {
-  const bone = findHands(model)[hand];
-  const holder = bone?.children.find((child) => child.name === HOLDER);
-  return holder?.children[0] ?? null;
+/**
+ * Re-applies the pose, the grip point, the fine adjustment and the size to a weapon already attached (no reload). False
+ * when that socket carries nothing.
+ */
+export const placeWeapon = (model: Object3D, socket: Socket, held: Omit<HeldWeapon, 'object'>): boolean => {
+  const holder = holderOf(model, socket);
+  const fit = holder?.children[0];
+  const pose = fit?.children[0];
+  const offset = pose?.children[0];
+  if (!fit || !pose || !offset) return false;
+  placeFit(fit, held);
+  placePose(pose, offset, held);
+  model.updateMatrixWorld(true);
+  return true;
 };

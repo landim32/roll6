@@ -64,11 +64,6 @@ public class TokenRepository : ITokenRepository<Token>
             (idle && e.ModelIdleClip == choice) || (walk && e.ModelWalkClip == choice) || (down && e.ModelDownClip == choice));
     }
 
-    public async Task<bool> AnyUsesWeaponAsync(long weaponId)
-    {
-        return await _context.Tokens.AnyAsync(e => e.RightWeaponId == weaponId || e.LeftWeaponId == weaponId);
-    }
-
     public async Task DeleteAsync(long id)
     {
         var entity = await _context.Tokens.FindAsync(id)

@@ -20,6 +20,8 @@ public class TokenLibraryService : ITokenLibraryService
     private readonly INpcRepository<Npc> _npcRepository;
     private readonly IImageStorageAppService _imageStorage;
     private readonly IAnimationRepository<Animation> _animationRepository;
+    private readonly ITokenWeaponRepository<TokenWeapon> _tokenWeaponRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IWeaponRepository<Weapon> _weaponRepository;
     private readonly IRealtimeNotifier _notifier;
 
@@ -30,9 +32,13 @@ public class TokenLibraryService : ITokenLibraryService
         INpcRepository<Npc> npcRepository,
         IImageStorageAppService imageStorage,
         IAnimationRepository<Animation> animationRepository,
+        ITokenWeaponRepository<TokenWeapon> tokenWeaponRepository,
+        IUnitOfWork unitOfWork,
         IWeaponRepository<Weapon> weaponRepository,
         IRealtimeNotifier notifier)
     {
+        _tokenWeaponRepository = tokenWeaponRepository;
+        _unitOfWork = unitOfWork;
         _weaponRepository = weaponRepository;
         _notifier = notifier;
         _animationRepository = animationRepository;
@@ -66,11 +72,18 @@ public class TokenLibraryService : ITokenLibraryService
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
         token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale);
-        token.UpdateWeapons(TokenWeapons.ToHand(info.RightWeapon), TokenWeapons.ToHand(info.LeftWeapon));
+        var weapons = TokenWeaponSet.Parse(info.Weapons, token.ModelFile != null);
         await CheckLibraryAnimationsAsync(token);
-        await CheckWeaponsAsync(token);
+        await CheckWeaponsAsync(weapons);
         token.CreatedAt = token.UpdatedAt;
-        return await MapToDtoAsync(await _repository.InsertAsync(token));
+        Token saved = token;
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            saved = await _repository.InsertAsync(token);
+            if (weapons.Count > 0)
+                await _tokenWeaponRepository.ReplaceAsync(saved.TokenId, Rows(saved.TokenId, weapons));
+        });
+        return await MapToDtoAsync(saved);
     }
 
     /// <summary>
@@ -83,10 +96,16 @@ public class TokenLibraryService : ITokenLibraryService
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
         token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale);
-        token.UpdateWeapons(TokenWeapons.ToHand(info.RightWeapon), TokenWeapons.ToHand(info.LeftWeapon));
+        var weapons = TokenWeaponSet.Parse(info.Weapons, token.ModelFile != null);
         await CheckLibraryAnimationsAsync(token);
-        await CheckWeaponsAsync(token);
-        var saved = await MapToDtoAsync(await _repository.UpdateAsync(token));
+        await CheckWeaponsAsync(weapons);
+        Token updated = token;
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            updated = await _repository.UpdateAsync(token);
+            await _tokenWeaponRepository.ReplaceAsync(tokenId, Rows(tokenId, weapons));
+        });
+        var saved = await MapToDtoAsync(updated);
         foreach (var campaignId in await _mapTokenRepository.ListCampaignIdsByTokenAsync(tokenId))
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
         return saved;
@@ -101,7 +120,11 @@ public class TokenLibraryService : ITokenLibraryService
             throw new ConflictException("O token está em uso por personagens e não pode ser excluído.");
         if (await _npcRepository.ExistsByTokenAsync(tokenId))
             throw new ConflictException("O token está em uso por NPCs e não pode ser excluído.");
-        await _repository.DeleteAsync(tokenId);
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await _tokenWeaponRepository.DeleteByTokenAsync(tokenId);
+            await _repository.DeleteAsync(tokenId);
+        });
     }
 
     /// <summary>
@@ -135,18 +158,22 @@ public class TokenLibraryService : ITokenLibraryService
         }
     }
 
-    /// <summary>The weapons chosen for the hands (082) must exist; the same weapon may be in both hands.</summary>
-    private async Task CheckWeaponsAsync(Token token)
+    /// <summary>The weapons chosen for the sockets (083) must exist; the same weapon may be in several sockets.</summary>
+    private async Task CheckWeaponsAsync(IReadOnlyList<TokenWeaponEntry> weapons)
     {
-        var ids = TokenWeapons.IdsOf(new[] { token }).ToList();
+        var ids = TokenWeaponSet.WeaponIds(weapons);
         if (ids.Count == 0)
             return;
         var found = (await _weaponRepository.ListByIdsAsync(ids)).Select(weapon => weapon.WeaponId).ToHashSet();
-        if (token.RightWeaponId is { } right && !found.Contains(right))
-            throw new DomainValidationException("rightWeapon.weaponId", WeaponService.NOT_FOUND);
-        if (token.LeftWeaponId is { } left && !found.Contains(left))
-            throw new DomainValidationException("leftWeapon.weaponId", WeaponService.NOT_FOUND);
+        for (var i = 0; i < weapons.Count; i++)
+        {
+            if (!found.Contains(weapons[i].WeaponId))
+                throw new DomainValidationException($"weapons[{i}].weaponId", WeaponService.NOT_FOUND);
+        }
     }
+
+    private static IEnumerable<TokenWeapon> Rows(long tokenId, IEnumerable<TokenWeaponEntry> weapons) =>
+        weapons.Select(entry => TokenWeapon.Create(tokenId, entry.Socket, entry.WeaponId, entry.Grip));
 
     private async Task<Token> GetTokenAsync(long tokenId)
     {
@@ -164,17 +191,21 @@ public class TokenLibraryService : ITokenLibraryService
 
     private async Task<TokenInfo> MapToDtoAsync(Token token) => (await MapToDtoAsync(new List<Token> { token })).Single();
 
-    /// <summary>The tokens with the weapons of their hands (082), loaded in one query.</summary>
+    /// <summary>The tokens with the weapons of their sockets (083), loaded in two queries.</summary>
     private async Task<List<TokenInfo>> MapToDtoAsync(List<Token> tokens)
     {
-        var ids = TokenWeapons.IdsOf(tokens).ToList();
+        var rows = tokens.Count == 0
+            ? new List<TokenWeapon>()
+            : await _tokenWeaponRepository.ListByTokenIdsAsync(tokens.Select(token => token.TokenId));
+        var ids = TokenWeapons.IdsOf(rows).ToList();
         var weapons = ids.Count == 0
             ? new Dictionary<long, Weapon>()
             : (await _weaponRepository.ListByIdsAsync(ids)).ToDictionary(weapon => weapon.WeaponId);
-        return tokens.Select(token => MapToDto(token, weapons)).ToList();
+        var byToken = rows.ToLookup(row => row.TokenId);
+        return tokens.Select(token => MapToDto(token, byToken[token.TokenId], weapons)).ToList();
     }
 
-    private TokenInfo MapToDto(Token token, IReadOnlyDictionary<long, Weapon> weapons) => new()
+    private TokenInfo MapToDto(Token token, IEnumerable<TokenWeapon> rows, IReadOnlyDictionary<long, Weapon> weapons) => new()
     {
         TokenId = token.TokenId,
         UserId = token.UserId,
@@ -200,8 +231,7 @@ public class TokenLibraryService : ITokenLibraryService
         ModelWalkClip = token.ModelWalkClip,
         ModelDownClip = token.ModelDownClip,
         ModelScale = token.ModelScale,
-        RightWeapon = TokenWeapons.Read(token.RightWeaponId, token.RightWeaponGrip, weapons, _imageStorage.GetUrl),
-        LeftWeapon = TokenWeapons.Read(token.LeftWeaponId, token.LeftWeaponGrip, weapons, _imageStorage.GetUrl),
+        Weapons = TokenWeapons.Read(rows, weapons, _imageStorage.GetUrl),
         CreatedAt = token.CreatedAt,
         UpdatedAt = token.UpdatedAt
     };
