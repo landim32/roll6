@@ -1,0 +1,67 @@
+# Roll6.Console
+
+A ponte entre o Roll6 e o **Claude Code da sua máquina** (feature 086). Um programa de console que conecta **de dentro
+para fora** no site, com a sua chave de API, e fica esperando pedidos: o servidor manda as instruções, o texto, as imagens,
+os arquivos a gravar e as pastas a acompanhar; o console roda o `claude` com a sua conta (não com uma chave da Anthropic),
+devolve a resposta aos poucos e avisa cada arquivo que mudou. Ele **não sabe o que é uma animação** — o editor de
+animações é só a primeira tela que o usa; qualquer tela futura do Roll6 pode mandar outro pedido.
+
+## Antes de rodar
+
+- [Claude Code](https://docs.anthropic.com/claude-code) instalado e logado com a sua conta (`claude` em um terminal).
+- Uma chave de API do Roll6: menu do usuário › **Chaves de API** › Nova chave. Ela nunca é gravada pelo console.
+- O projeto da mesa (por padrão `C:\repos\gurps-adventure`, com a skill `criar-animacao`): é a única pasta onde o console
+  grava e acompanha arquivos.
+
+## Configuração
+
+`appsettings.json` ao lado do executável:
+
+```jsonc
+{
+  "Roll6Console": {
+    "Url": "https://roll6.site",
+    "ClaudeWorkingDirectory": "C:\\repos\\gurps-adventure",
+    "ClaudeExecutable": "claude",
+    "ClaudeAllowedTools": "Bash(python:*)"
+  }
+}
+```
+
+Variáveis de ambiente: `ROLL6_API_KEY` (obrigatória), `ROLL6_URL` (sobrepõe `Url`), `Roll6Console__*` (qualquer chave).
+
+## Rodar
+
+```powershell
+$env:ROLL6_API_KEY = "r6_…"
+cd backend
+dotnet run --project Roll6.Console
+```
+
+```text
+Roll6.Console · ponte entre o Roll6 e o Claude Code desta máquina
+12:00:01 Claude Code 2.x
+12:00:02 Conectado ao roll6.site como Rodrigo (máquina DESKTOP-ABC) · pasta C:\repos\gurps-adventure
+12:03:10 Pedido #12: rodando o Claude…
+12:03:14   Editando animacoes/7-aceno.json
+12:03:15 Arquivo alterado: animacoes/7-aceno.json
+12:03:16 Pedido #12 terminado.
+```
+
+Saídas: chave ausente ou recusada → código 2; pasta de trabalho inexistente → 2; sem rede → tenta de novo a cada 15 s;
+Ctrl+C para o pedido em andamento e sai.
+
+Publicar: `dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../dist/roll6-console`.
+
+## O que ele faz com um pedido
+
+1. Grava os `files[]` (arquivo temporário + move; um arquivo igual não é regravado) — só dentro da pasta de trabalho; um
+   caminho fora dela faz o pedido falhar.
+2. Passa a acompanhar os `watch[]` (arquivos, ou pastas terminadas em `/`).
+3. Roda `claude -p --input-format stream-json --output-format stream-json --verbose --include-partial-messages
+   (--session-id | --resume) <sessão> --permission-mode acceptEdits --allowedTools <config> --append-system-prompt <texto>`
+   com o pedido no stdin (imagens primeiro, depois o texto).
+4. Repassa cada evento (`Progress`), cada arquivo acompanhado que mudou (`FileChanged`, também nos 30 s depois do
+   resultado) e o desfecho (`Finished`).
+
+Fora de um pedido, o servidor pode mandar `writeFiles` (por exemplo, uma pose editada na página) e o console só grava.

@@ -1,0 +1,35 @@
+# Specification Quality Checklist: Editor de animações na web com o Claude local
+
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2026-10-18
+**Feature**: [spec.md](../spec.md)
+
+## Content Quality
+
+- [x] No implementation details (languages, frameworks, APIs)
+- [x] Focused on user value and business needs
+- [x] Written for non-technical stakeholders
+- [x] All mandatory sections completed
+
+## Requirement Completeness
+
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous
+- [x] Success criteria are measurable
+- [x] Success criteria are technology-agnostic (no implementation details)
+- [x] All acceptance scenarios are defined
+- [x] Edge cases are identified
+- [x] Scope is clearly bounded
+- [x] Dependencies and assumptions identified
+
+## Feature Readiness
+
+- [x] All functional requirements have clear acceptance criteria
+- [x] User scenarios cover primary flows
+- [x] Feature meets measurable outcomes defined in Success Criteria
+- [x] No implementation details leak into specification
+
+## Notes
+
+- Q1 answered on 2026-10-18: the desktop roll6anime is removed; the console is `Roll6.Console`, a generic bridge to the local Claude with no animation logic (the animation tools stay on the server). ".NET"/"console", "Claude Code", "chave de API"
+  and the project folder appear only because the user asked for them or they name existing parts of the product.

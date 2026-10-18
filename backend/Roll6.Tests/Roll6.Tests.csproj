@@ -25,12 +25,15 @@
   <!-- The animation file cases shared with the frontend and the criar-animacao skill (059). -->
   <ItemGroup>
     <None Include="..\..\specs\059-token-animation-library\fixtures\*.json" LinkBase="Fixtures\Animations" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Real Claude Code stream-json output (062), read by the console's tests (086). -->
+    <None Include="..\..\specs\062-roll6anime-editor\contracts\samples\*.jsonl" LinkBase="Samples" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Roll6.API\Roll6.API.csproj" />
     <ProjectReference Include="..\Roll6.Application\Roll6.Application.csproj" />
     <ProjectReference Include="..\Roll6.Mcp\Roll6.Mcp.csproj" />
+    <ProjectReference Include="..\Roll6.Console\Roll6.Console.csproj" />
     <ProjectReference Include="..\Roll6.Domain\Roll6.Domain.csproj" />
     <ProjectReference Include="..\Roll6.DTO\Roll6.DTO.csproj" />
     <ProjectReference Include="..\Roll6.Infra.Interfaces\Roll6.Infra.Interfaces.csproj" />

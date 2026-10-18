@@ -119,6 +119,15 @@ public static class AnimationFormat
     /// <summary>The document as compact UTF-8: what is stored in the bucket (and measured against the limit).</summary>
     public static byte[] Serialize(JsonElement content) => JsonSerializer.SerializeToUtf8Bytes(content);
 
+    private static readonly JsonSerializerOptions INDENTED = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <summary>The document as a person (or the Claude) edits it: indented with 2 spaces, accents kept (086, the working file).</summary>
+    public static string SerializeIndented(JsonElement content) => JsonSerializer.Serialize(content, INDENTED);
+
     private static DomainValidationException Error(string key, string message) => new(key, message);
 
     private static bool IsNumber(JsonElement element, out double value)

@@ -1,4 +1,5 @@
 import type { PagedList } from '../types/common';
+import type { AnimationFile } from '../lib/animationFormat';
 import type { AnimationInfo, AnimationInsertInfo, AnimationQuery, AnimationUpdateInfo } from '../types/animation';
 import { API_URL, getHeaders, handleApiResponse, toQuery } from './apiHelpers';
 
@@ -48,6 +49,12 @@ class AnimationService {
   /** Renames or retypes (owner only; 409 while a token uses it in the state of its old type). */
   async update(id: number, data: AnimationUpdateInfo): Promise<AnimationInfo> {
     const response = await fetch(`${API_BASE}/${id}`, { method: 'PUT', headers: getHeaders(true), body: JSON.stringify(data) });
+    return this.handleResponse<AnimationInfo>(response);
+  }
+
+  /** Replaces the content of an animation (owner only; the server validates it and tells the editors, 086). */
+  async replaceContent(id: number, content: AnimationFile): Promise<AnimationInfo> {
+    const response = await fetch(`${API_BASE}/${id}/content`, { method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ content }) });
     return this.handleResponse<AnimationInfo>(response);
   }
 
