@@ -1255,6 +1255,12 @@
         "repeated": "As opções não podem se repetir."
       }
     },
+    "imageZoom": {
+      "label": "Zoom da imagem",
+      "in": "Aproximar",
+      "out": "Afastar",
+      "reset": "Ver a imagem inteira"
+    },
     "ask": {
       "label": "Perguntar",
       "hint": "Pergunte ao Claude do mestre sobre as regras ou a campanha",

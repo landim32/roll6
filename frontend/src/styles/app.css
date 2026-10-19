@@ -994,12 +994,38 @@ body,
   border-radius: 0.75rem;
 }
 
-.stm-chat-lightbox {
+/* The chat photo viewer: the largest window, the picture fitted whole, zoom and drag on the stage. */
+.stm-modal-content.stm-modal-image { max-width: 1400px; }
+@media (max-width: 767.98px) {
+  .stm-modal-content.stm-modal-image { width: calc(100% - 1rem); height: calc(100% - 1rem); }
+}
+.stm-lightbox-body { flex: 1 1 auto; min-height: 0; padding: 0; overflow: hidden !important; }
+.stm-lightbox { position: relative; height: 100%; }
+.stm-lightbox-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  cursor: zoom-in;
+  user-select: none;
+  background: #000;
+}
+.stm-lightbox-stage.is-zoomed { cursor: grab; }
+.stm-lightbox-stage.is-zoomed:active { cursor: grabbing; }
+.stm-lightbox-stage img {
   display: block;
   max-width: 100%;
-  max-height: 75vh;
-  margin: 0 auto;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  will-change: transform;
+  pointer-events: none;
 }
+.stm-lightbox-zoom { position: absolute; right: 0.75rem; bottom: 0.75rem; box-shadow: var(--stm-shadow); }
+.stm-lightbox-percent { min-width: 3.75rem; opacity: 1 !important; }
 
 .stm-chat-audio {
   display: flex;

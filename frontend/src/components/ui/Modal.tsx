@@ -16,26 +16,29 @@ interface ModalProps {
    * shown: only one modal is visible at a time.
    */
   hidden?: boolean;
+  /** Extra classes for the dialog and its body (e.g. the photo viewer, which fills them edge to edge). */
+  className?: string;
+  bodyClassName?: string;
 }
 
 /**
  * Base modal: Radix Dialog (focus trap, Esc, a11y) styled with Bootstrap's modal classes in the
  * dark theme. Every window besides the map opens through it.
  */
-export const Modal = ({ open, onOpenChange, title, large = false, wide = false, children, footer, hidden = false }: ModalProps) => (
+export const Modal = ({ open, onOpenChange, title, large = false, wide = false, children, footer, hidden = false, className = '', bodyClassName = '' }: ModalProps) => (
   <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="stm-modal-overlay" hidden={hidden} />
       <DialogPrimitive.Content
         hidden={hidden}
-        className={`modal-content stm-modal-content${wide ? ' stm-modal-wide' : large ? ' stm-modal-lg' : ''}`}
+        className={`modal-content stm-modal-content${wide ? ' stm-modal-wide' : large ? ' stm-modal-lg' : ''}${className ? ` ${className}` : ''}`}
         aria-describedby={undefined}
       >
         <div className="modal-header">
           <DialogPrimitive.Title className="modal-title h5">{title}</DialogPrimitive.Title>
           <DialogPrimitive.Close className="btn-close" aria-label="Fechar" />
         </div>
-        <div className="modal-body">{children}</div>
+        <div className={`modal-body${bodyClassName ? ` ${bodyClassName}` : ''}`}>{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
