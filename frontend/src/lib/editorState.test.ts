@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  INITIAL_STATE, MAX_ATTACHMENTS, agentStatus, animationVersion, attachPrint, base64Of, conversationCleared, isBusy, opened,
-  removePrint, requestFinished, requestProgress, requestQueued, requestStarted, sent,
+  INITIAL_STATE, MAX_ATTACHMENTS, agentStatus, animationVersion, attachPrint, base64Of, conversationCleared, discarded, draftVersion,
+  edited, isBusy, isDirty, opened, ownVersion, removePrint, requestFinished, requestProgress, requestQueued, requestStarted, saved, sent,
 } from './editorState';
 import type { EditorState, PrintAttachment } from './editorState';
 import type { AnimationFile } from './animationFormat';
@@ -132,5 +132,58 @@ describe('editor state (086)', () => {
     expect(agentStatus(INITIAL_STATE, { connected: true, busy: true, machine: 'X' }).agent.busy).toBe(true);
     expect(base64Of('data:image/png;base64,QUJD')).toBe('QUJD');
     expect(base64Of('QUJD')).toBe('QUJD');
+  });
+});
+
+describe('edit version and explicit save (091)', () => {
+  const turned: AnimationFile = { ...FILE, duration: 2 };
+
+  it('opens clean, with the same saved and edit content', () => {
+    const state = opened(INITIAL_STATE, OPEN);
+    expect(state.savedContent).toBe(FILE);
+    expect(isDirty(state)).toBe(false);
+  });
+
+  it('a turned bone changes only the edit version and does not replay the stage; undo/redo replays', () => {
+    const state = opened(INITIAL_STATE, OPEN);
+    const bone = edited(state, turned, false);
+    expect(isDirty(bone)).toBe(true);
+    expect(bone.savedContent).toBe(FILE);
+    expect(bone.contentVersion).toBe(state.contentVersion);
+    expect(edited(bone, FILE, true).contentVersion).toBe(state.contentVersion + 1);
+    expect(isDirty(edited(bone, FILE, true))).toBe(false);
+  });
+
+  it('saving makes it clean; discarding goes back to the saved version', () => {
+    const dirty = edited(opened(INITIAL_STATE, OPEN), turned, false);
+    expect(isDirty(saved(dirty, turned))).toBe(false);
+    const reverted = discarded(dirty);
+    expect(reverted.content).toBe(FILE);
+    expect(isDirty(reverted)).toBe(false);
+    expect(reverted.contentVersion).toBe(dirty.contentVersion + 1);
+    expect(ownVersion(dirty, turned).savedContent).toBe(turned);
+  });
+
+  it("applies the Claude's draft only for the tab's own request", () => {
+    const state = opened(INITIAL_STATE, OPEN);
+    expect(draftVersion(state, { animationId: 7, requestId: 3, content: turned }, false)).toBe(state);
+    expect(draftVersion(state, { animationId: 8, requestId: 3, content: turned }, true)).toBe(state);
+    const drafted = draftVersion(state, { animationId: 7, requestId: 3, content: turned }, true);
+    expect(drafted.content).toBe(turned);
+    expect(isDirty(drafted)).toBe(true);
+    expect(drafted.savedContent).toBe(FILE);
+  });
+
+  it('a version saved elsewhere replaces a clean tab but keeps the changes of a dirty one', () => {
+    const elsewhere: AnimationFile = { ...FILE, duration: 3 };
+    const version = { animationId: 7, name: 'Aceno', content: elsewhere, origin: 'other' as const, userId: 1 };
+    const clean = animationVersion(opened(INITIAL_STATE, OPEN), version);
+    expect(clean.content).toBe(elsewhere);
+    expect(clean.savedChanged).toBe(false);
+    const dirty = animationVersion(edited(opened(INITIAL_STATE, OPEN), turned, false), version);
+    expect(dirty.content).toBe(turned);
+    expect(dirty.savedContent).toBe(elsewhere);
+    expect(dirty.savedChanged).toBe(true);
+    expect(discarded(dirty).content).toBe(elsewhere);
   });
 });

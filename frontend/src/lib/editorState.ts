@@ -1,7 +1,8 @@
 import type { AnimationFile } from './animationFormat';
 import type { AnimationInfo } from '../types/animation';
+import { versionText } from './animationHistory';
 import type {
-  AgentStatus, AnimationVersion, ClaudeEvent, ConversationCleared, ConversationRole, EditorMessageInfo, EditorStateInfo,
+  AgentStatus, AnimationVersion, ClaudeEvent, ConversationCleared, ConversationRole, DraftVersion, EditorMessageInfo, EditorStateInfo,
   RequestFinished, RequestProgress, RequestQueued, RequestStarted, RequestState,
 } from '../types/animationEditor';
 import { CONVERSATION_ROLE, REQUEST_STATE } from '../types/animationEditor';
@@ -9,6 +10,9 @@ import { CONVERSATION_ROLE, REQUEST_STATE } from '../types/animationEditor';
 /**
  * The pure state of the animation editor page (086) and the reducers of every hub event. Everything the page shows
  * about the conversation and the request comes from here; the context only wires the service and the stage.
+ *
+ * Since 091 the editor keeps two contents: `savedContent` is the library's (what tokens play) and `content` is the edit
+ * version the stage shows. Turned bones, undo/redo and the Claude's files change only `content`; "Salvar" writes it.
  */
 
 export const MAX_ATTACHMENTS = 5;
@@ -48,7 +52,12 @@ export interface EditorRequestState {
 
 export interface EditorState {
   animation: AnimationInfo | null;
+  /** The edit version the stage shows (091). */
   content: AnimationFile | null;
+  /** The library's content (091): what tokens play; changes only by saving (here or elsewhere). */
+  savedContent: AnimationFile | null;
+  /** A version was saved elsewhere while this tab had unsaved changes (091). */
+  savedChanged: boolean;
   /** Grows with every new version (also an own save), so the stage knows when to re-read the content. */
   contentVersion: number;
   conversationId: number | null;
@@ -61,6 +70,8 @@ export interface EditorState {
 export const INITIAL_STATE: EditorState = {
   animation: null,
   content: null,
+  savedContent: null,
+  savedChanged: false,
   contentVersion: 0,
   conversationId: null,
   messages: [],
@@ -112,6 +123,8 @@ export const opened = (state: EditorState, info: EditorStateInfo): EditorState =
     ...state,
     animation: info.animation,
     content: info.content,
+    savedContent: info.content,
+    savedChanged: false,
     contentVersion: state.contentVersion + 1,
     conversationId: info.conversation.animationConversationId,
     messages,
@@ -209,18 +222,57 @@ export const requestFinished = (state: EditorState, info: RequestFinished, notic
   return { ...state, messages, request: state.request?.id === info.requestId ? null : state.request };
 };
 
-export const animationVersion = (state: EditorState, version: AnimationVersion): EditorState =>
-  state.animation && version.animationId !== state.animation.animationId
-    ? state
-    : {
-      ...state,
-      content: version.content,
-      contentVersion: state.contentVersion + 1,
-      animation: state.animation ? { ...state.animation, name: version.name || state.animation.name } : state.animation,
-    };
+/** The tab has changes the library does not (091). */
+export const isDirty = (state: Pick<EditorState, 'content' | 'savedContent'>): boolean =>
+  state.content !== null && versionText(state.content) !== versionText(state.savedContent);
 
-/** A version this tab saved itself: the stage already shows it; only the counter moves (no re-read, no jump). */
-export const ownVersion = (state: EditorState, content: AnimationFile): EditorState => ({ ...state, content });
+/**
+ * A version saved in the library by someone else (another tab, the MCP): a clean tab shows it; a tab with unsaved
+ * changes keeps them and only learns the new saved version (091).
+ */
+export const animationVersion = (state: EditorState, version: AnimationVersion): EditorState => {
+  if (state.animation && version.animationId !== state.animation.animationId) return state;
+  const animation = state.animation ? { ...state.animation, name: version.name || state.animation.name } : state.animation;
+  if (isDirty(state)) return { ...state, animation, savedContent: version.content, savedChanged: true };
+  return {
+    ...state,
+    animation,
+    content: version.content,
+    savedContent: version.content,
+    savedChanged: false,
+    contentVersion: state.contentVersion + 1,
+  };
+};
+
+/** The echo of this tab's own save: the library now holds it (091). */
+export const ownVersion = (state: EditorState, content: AnimationFile): EditorState => ({ ...state, savedContent: content });
+
+/**
+ * A change of the edit version (091): a bone turned on the stage (`replay` false — the stage already shows it) or an
+ * undo/redo (`replay` true — the stage reads it again).
+ */
+export const edited = (state: EditorState, content: AnimationFile, replay: boolean): EditorState => ({
+  ...state,
+  content,
+  contentVersion: replay ? state.contentVersion + 1 : state.contentVersion,
+});
+
+/** A valid file the Claude wrote for this tab's request (091): an unsaved edit the stage plays. */
+export const draftVersion = (state: EditorState, info: DraftVersion, own: boolean): EditorState => {
+  if (!own || (state.animation && info.animationId !== state.animation.animationId)) return state;
+  return edited(state, info.content, true);
+};
+
+/** "Salvar" succeeded (091): the library holds the edit version. */
+export const saved = (state: EditorState, content: AnimationFile): EditorState => ({ ...state, savedContent: content, savedChanged: false });
+
+/** "Descartar" (091): back to the library's version. */
+export const discarded = (state: EditorState): EditorState => ({
+  ...state,
+  content: state.savedContent,
+  savedChanged: false,
+  contentVersion: state.contentVersion + 1,
+});
 
 export const conversationCleared = (state: EditorState, info: ConversationCleared): EditorState =>
   state.animation && info.animationId !== state.animation.animationId

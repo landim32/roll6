@@ -130,4 +130,18 @@ public class AnimationConnectionsTests
         request.Text.Should().Be("Olá, mundo");
         request.Started.Should().BeFalse();
     }
+
+    [Fact]
+    public void ARequestKeepsTheEditVersionItWasSentWith()
+    {
+        var connections = new AnimationConnections();
+        var content = System.Text.Json.JsonDocument.Parse("""{"duration":1}""").RootElement;
+
+        var request = connections.Enqueue(1, 7, "Aceno", 100, Guid.NewGuid(), false, "oi", new List<PromptImageInfo>(), null,
+            DateTime.UtcNow, content);
+        var plain = connections.Enqueue(1, 8, "Pulo", 101, Guid.NewGuid(), false, "oi", new List<PromptImageInfo>(), null, DateTime.UtcNow);
+
+        request!.Content!.Value.GetProperty("duration").GetInt32().Should().Be(1);
+        plain!.Content.Should().BeNull();
+    }
 }

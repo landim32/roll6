@@ -24,6 +24,29 @@ public class RequestInfo
     /// <summary>The name of the token shown on the stage, for the context of the Claude only.</summary>
     [JsonPropertyName("modelName")]
     public string? ModelName { get; set; }
+
+    /// <summary>
+    /// The editor's edit version (091): the content the tab shows, unsaved changes included. The run's working file is
+    /// written from it, so the Claude works on what the user sees; without it, the library's content.
+    /// </summary>
+    [JsonPropertyName("content")]
+    public JsonElement? Content { get; set; }
+}
+
+/// <summary>
+/// A valid version of the working file the Claude wrote (091, client method <c>draftVersion</c>): it goes to the editor
+/// that sent the request as an unsaved edit and never reaches the library until the user saves.
+/// </summary>
+public class DraftVersionInfo
+{
+    [JsonPropertyName("animationId")]
+    public long AnimationId { get; set; }
+
+    [JsonPropertyName("requestId")]
+    public long RequestId { get; set; }
+
+    [JsonPropertyName("content")]
+    public JsonElement Content { get; set; }
 }
 
 /// <summary>One line of a stored conversation.</summary>
