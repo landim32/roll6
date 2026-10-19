@@ -1,5 +1,5 @@
 import { AnimationMixer, LoopOnce, LoopRepeat } from 'three';
-import type { AnimationAction, Object3D } from 'three';
+import type { AnimationAction, AnimationClip, Object3D } from 'three';
 import { toRoll6Clip } from '../../../lib/animationFormat';
 import type { AnimationFile } from '../../../lib/animationFormat';
 import { buildRoll6Clip } from '../../story/threeClips';
@@ -85,18 +85,28 @@ export class Player {
     const clip = buildRoll6Clip(toRoll6Clip(file, `animation:${fileName}`), this.source, this.height);
     if (!clip) return 'O modelo não tem nenhum dos ossos desta animação.';
     const next = nextPlayback(this.state, clip.duration, keepTime);
+    this.start(clip, file.loop ? LoopRepeat : LoopOnce, next.time, next.paused);
+    this.state = next;
+    return null;
+  }
+
+  /**
+   * Plays `clip` from a fresh action at `time`. Building the action again is what makes the whole pose reach the
+   * model: the mixer writes a bound property only when the clip's value differs from the previous frame's
+   * (three.js `PropertyMixer.apply`), so an existing action asked to `update(0)` after something else posed the
+   * model leaves every still bone where that something left it. New bindings always write.
+   */
+  private start(clip: AnimationClip, loop: typeof LoopRepeat | typeof LoopOnce, time: number, paused: boolean): void {
     this.mixer.stopAllAction();
     if (this.action) this.mixer.uncacheAction(this.action.getClip());
     const action = this.mixer.clipAction(clip);
-    action.setLoop(file.loop ? LoopRepeat : LoopOnce, file.loop ? Infinity : 1);
-    action.clampWhenFinished = !file.loop;
+    action.setLoop(loop, loop === LoopRepeat ? Infinity : 1);
+    action.clampWhenFinished = loop === LoopOnce;
     action.play();
-    action.time = next.time;
-    action.paused = next.paused;
+    action.time = time;
+    action.paused = paused;
     this.mixer.update(0);
     this.action = action;
-    this.state = next;
-    return null;
   }
 
   /** No animation: the model back in its rest pose, the bar disabled. */
@@ -119,11 +129,16 @@ export class Player {
 
   /**
    * Poses the model again as the player has it (092): after something else posed it (the sockets measured on the
-   * token's idle), the rest pose comes back and the edited clip is applied at its instant.
+   * token's idle), the rest pose comes back and the edited clip is applied at its instant — from a fresh action, or a
+   * still pose would stay unwritten and the model would show the rest pose (the T-pose on load, until the first
+   * bone turn rebuilt the action). A held bone (`frozen`) is left alone.
    */
   refresh(): void {
+    if (this.frozen) return;
     this.restPose();
-    if (this.action && !this.frozen) this.mixer.update(0);
+    const action = this.action;
+    if (!action) return;
+    this.start(action.getClip(), action.loop === LoopOnce ? LoopOnce : LoopRepeat, action.time, action.paused);
   }
 
   play(): void {

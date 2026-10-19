@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cameraAngles, clampTime, formatTime, NO_PLAYBACK, nextPlayback } from './player';
+import { Bone, Group, Vector3 } from 'three';
+import type { AnimationFile } from '../../../lib/animationFormat';
+import { Player, cameraAngles, clampTime, formatTime, NO_PLAYBACK, nextPlayback } from './player';
 
 describe('editor player (086, from 062)', () => {
   it('keeps a time inside the duration', () => {
@@ -47,5 +49,51 @@ describe('cameraAngles', () => {
 
   it('is ±180 behind', () => {
     expect(Math.abs(cameraAngles({ x: 0, y: 1, z: -5 }, target).azimuth)).toBeCloseTo(180);
+  });
+});
+
+describe('Player.refresh', () => {
+  /** A Mixamo-named rig: the upper arm starts in the T-pose and every Roll6 clip relaxes it (`RELAXED_ARMS`). */
+  const rig = () => {
+    const root = new Group();
+    const hips = new Bone(); hips.name = 'mixamorigHips'; hips.position.set(0, 1, 0);
+    const spine = new Bone(); spine.name = 'mixamorigSpine'; spine.position.set(0, 0.2, 0);
+    const arm = new Bone(); arm.name = 'mixamorigLeftArm'; arm.position.set(0.2, 0.3, 0);
+    arm.quaternion.setFromAxisAngle(new Vector3(0, 0, 1), -Math.PI / 2);
+    const fore = new Bone(); fore.name = 'mixamorigLeftForeArm'; fore.position.set(0, 0.3, 0);
+    root.add(hips); hips.add(spine); spine.add(arm); arm.add(fore);
+    root.updateMatrixWorld(true);
+    return { root, spine };
+  };
+  const still: AnimationFile = { format: 'roll6-animation', version: 1, duration: 1, loop: true, tracks: [{ bone: 'Spine', times: [0, 1], degrees: [[20, 0, 0], [20, 0, 0]] }] };
+
+  it('puts a still pose back after something else posed the model (the T-pose on load)', () => {
+    const { root, spine } = rig();
+    const rest = spine.quaternion.clone();
+    const player = new Player(root, root, 1.8);
+    expect(player.setAnimation(still, 'still', false)).toBeNull();
+    const posed = spine.quaternion.clone();
+    expect(posed.angleTo(rest)).toBeGreaterThan(0.1);
+    // What the sockets' measuring does on load (092): every node back to rest, then the player is asked to re-pose.
+    player.restPose();
+    expect(spine.quaternion.angleTo(rest)).toBeLessThan(1e-3);
+    player.refresh();
+    expect(spine.quaternion.angleTo(posed)).toBeLessThan(1e-3);
+    expect(player.playback()).toMatchObject({ paused: false, enabled: true });
+  });
+
+  it('keeps the instant and the pause, and leaves a held bone alone', () => {
+    const { root, spine } = rig();
+    const player = new Player(root, root, 1.8);
+    player.setAnimation(still, 'still', false);
+    player.seek(0.4);
+    player.restPose();
+    player.refresh();
+    expect(player.playback()).toMatchObject({ time: 0.4, paused: true });
+    const posed = spine.quaternion.clone();
+    player.freeze();
+    player.restPose();
+    player.refresh();
+    expect(spine.quaternion.angleTo(posed)).toBeGreaterThan(0.1);
   });
 });

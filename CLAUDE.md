@@ -694,7 +694,9 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
   `AnimationStage` props `weapons`/`showWeapons`/`idleClip`, the shared `createWeaponSockets` (same placement as the 3D
   view and the token preview); the sockets are measured once per model on the first frame of the **token's own idle**
   (a library one loaded through `lib/animationCache`), else the rest pose, then `Player.refresh()` puts the edited pose
-  back, so the weapons follow the edited animation at any instant. The "Esqueleto" see-through skips the weapon holders
+  back **from a fresh action** (three.js writes a bound property only when the clip's value changed since the previous
+  frame, so an `update(0)` after the rest pose left every still bone in the T-pose until the first bone turn rebuilt the
+  action), so the weapons follow the edited animation at any instant. The "Esqueleto" see-through skips the weapon holders
   (`HOLDER`: their materials are shared). "Armas" toggle next to "Esqueleto" (`lib/editorWeapons`, `roll6:editor-weapons`,
   disabled without weapons); the print caption adds "O modelo carrega: …" and each request sends `modelWeapons`
   (`RequestInfo.ModelWeapons`, ≤ 5 × ≤ 120 chars, `invalid` otherwise) → the line "Armas do modelo: …" of
