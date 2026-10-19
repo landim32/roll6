@@ -9,6 +9,14 @@ import type { AnimationFile } from '../../../lib/animationFormat';
 /** How close (seconds) the time must be to a key to count as that pose: about a frame at 60 Hz. */
 export const POSE_TOLERANCE = 0.02;
 
+/**
+ * How close a track's key must be to a pose's instant to be that pose's key: the instants of `poseTimes` are rounded
+ * to four decimals, so only float noise separates them from the raw times. Two poses may lie closer than
+ * `POSE_TOLERANCE` (a bone turned at 0,2668 s next to a key at 0,25 s), and the wide tolerance would then take one
+ * pose's key for the other's.
+ */
+export const KEY_TOLERANCE = 1e-4;
+
 /** Where the time is among the key poses (1-based); `from === to` on a pose. */
 export interface PoseInfo {
   from: number;
@@ -38,6 +46,13 @@ export const poseAt = (times: readonly number[], time: number, tolerance = POSE_
   let before = 0;
   while (before + 1 < count && times[before + 1] < time) before++;
   return { from: before + 1, to: before + 2, count };
+};
+
+/** The key pose nearest to `time` (a bone is always turned on an existing pose, never a new one), or null without keys. */
+export const nearestPose = (times: readonly number[], time: number): number | null => {
+  let nearest: number | null = null;
+  for (const t of times) if (nearest === null || Math.abs(t - time) < Math.abs(nearest - time)) nearest = t;
+  return nearest;
 };
 
 /** "Pose 3 de 5" or "Entre as poses 2 e 3 (de 5)". */
