@@ -19,6 +19,9 @@ public class CampaignRepository : ICampaignRepository<Campaign>
         _context = context;
     }
 
+    public async Task<List<long>> ListIdsByOwnerAsync(long userId) =>
+        await _context.Campaigns.AsNoTracking().Where(e => e.UserId == userId).Select(e => e.CampaignId).ToListAsync();
+
     public async Task<Campaign?> GetByIdAsync(long id)
     {
         return await _context.Campaigns.AsNoTracking().FirstOrDefaultAsync(e => e.CampaignId == id);

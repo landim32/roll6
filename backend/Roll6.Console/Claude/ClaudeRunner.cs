@@ -50,9 +50,31 @@ public sealed class ClaudeRunner : IClaudeProcess
     public const string NOT_FOUND = "O Claude Code não foi encontrado. Instale-o ou ajuste Roll6Console:ClaudeExecutable em appsettings.json.";
     public const string NOT_LOGGED_IN = "O Claude Code não está logado. Abra um terminal, rode `claude` e faça login com a sua conta.";
 
-    /// <summary>The variables that would make the CLI use an API key or another provider instead of the account.</summary>
+    /// <summary>
+    /// Removed from the Claude's environment: the variables that would make the CLI use an API key or another provider
+    /// instead of the account, and (093) the console's own Roll6 credentials — the Claude never needs them.
+    /// </summary>
     public static readonly string[] REMOVED_VARIABLES =
-        { "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX" };
+    {
+        "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX",
+        ConsoleSettings.API_KEY_VARIABLE, ConsoleSettings.URL_VARIABLE,
+    };
+
+    /// <summary>The only tools of a read-only run (093): read, find, search and the skills.</summary>
+    public const string READ_ONLY_TOOLS = "Read,Glob,Grep,Skill";
+
+    /// <summary>
+    /// Pre-approved in a read-only run: only the skills. Reading is NOT pre-approved on purpose — inside the working
+    /// directory Claude Code reads without asking, and anything outside it would need a permission that "dontAsk" denies
+    /// (a blanket "Read" would let a question read any file of the machine; verified with Claude Code 2.1.301).
+    /// </summary>
+    public const string READ_ONLY_ALLOWED = "Skill";
+
+    /// <summary>Refused by name in a read-only run, on top of not being available at all.</summary>
+    public const string READ_ONLY_DENIED = "Bash,Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task,TodoWrite";
+
+    /// <summary>No MCP server at all in a read-only run (not the machine's, not the project's — e.g. the Roll6 one with a key).</summary>
+    public const string NO_MCP = "{\"mcpServers\":{}}";
 
     private static readonly string[] LOGIN_HINTS = { "login", "log in", "auth", "401", "credential" };
 
@@ -66,19 +88,50 @@ public sealed class ClaudeRunner : IClaudeProcess
     /// <summary>
     /// The arguments for <c>ProcessStartInfo.ArgumentList</c>: the first request of a conversation creates the session
     /// with its id, the next ones resume it; the system prompt comes whole from the server.
+    /// <para>
+    /// A read-only run (093, a question of a player) is locked down here, whatever the server sent: only the tools of
+    /// <see cref="READ_ONLY_TOOLS"/> exist, the dangerous ones are also refused by name, nothing prompts (anything not
+    /// allowed is denied), no MCP server is loaded, a fresh session is never resumed nor kept.
+    /// </para>
     /// </summary>
-    public static List<string> Arguments(ConsoleSettings settings, Guid sessionId, bool started, string systemPrompt) => new()
+    public static List<string> Arguments(ConsoleSettings settings, Guid sessionId, bool started, string systemPrompt, bool readOnly = false)
     {
-        "-p",
-        "--input-format", "stream-json",
-        "--output-format", "stream-json",
-        "--verbose",
-        "--include-partial-messages",
-        started ? "--resume" : "--session-id", sessionId.ToString(),
-        "--permission-mode", "acceptEdits",
-        "--allowedTools", settings.ClaudeAllowedTools,
-        "--append-system-prompt", systemPrompt,
-    };
+        var arguments = new List<string>
+        {
+            "-p",
+            "--input-format", "stream-json",
+            "--output-format", "stream-json",
+            "--verbose",
+            "--include-partial-messages",
+        };
+        if (readOnly)
+        {
+            arguments.AddRange(new[]
+            {
+                "--session-id", sessionId.ToString(),
+                "--no-session-persistence",
+                "--tools", READ_ONLY_TOOLS,
+                "--allowedTools", READ_ONLY_ALLOWED,
+                "--disallowedTools", READ_ONLY_DENIED,
+                "--permission-mode", "dontAsk",
+                "--permission-prompts", "none",
+                "--strict-mcp-config",
+                "--mcp-config", NO_MCP,
+            });
+        }
+        else
+        {
+            arguments.AddRange(new[]
+            {
+                started ? "--resume" : "--session-id", sessionId.ToString(),
+                "--permission-mode", "acceptEdits",
+                "--allowedTools", settings.ClaudeAllowedTools,
+            });
+        }
+        arguments.Add("--append-system-prompt");
+        arguments.Add(systemPrompt);
+        return arguments;
+    }
 
     public async Task<ClaudeOutcome> RunAsync(IReadOnlyList<string> arguments, string stdin, IProgress<ClaudeEvent> progress, CancellationToken cancellation)
     {

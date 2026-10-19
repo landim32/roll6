@@ -51,13 +51,16 @@ public class AnimationHub : Hub
     private readonly IAnimationConversationService _conversations;
     private readonly AnimationConnections _connections;
     private readonly TimeProvider _time;
+    private readonly AgentDispatcher _dispatcher;
 
-    public AnimationHub(IAnimationService animations, IAnimationConversationService conversations, AnimationConnections connections, TimeProvider time)
+    public AnimationHub(IAnimationService animations, IAnimationConversationService conversations, AnimationConnections connections,
+        TimeProvider time, AgentDispatcher dispatcher)
     {
         _animations = animations;
         _conversations = conversations;
         _connections = connections;
         _time = time;
+        _dispatcher = dispatcher;
     }
 
     private long UserId
@@ -83,6 +86,7 @@ public class AnimationHub : Hub
             if (dropped != null)
                 await FinishAsync(dropped, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.FAILED, Message = AGENT_DROPPED });
             await SendAgentStatusAsync(agentUser);
+            await _dispatcher.PublishAskChangedAsync(agentUser);
             await DispatchAsync(agentUser);
         }
         _connections.RemoveEditor(connectionId);
@@ -99,6 +103,7 @@ public class AnimationHub : Hub
         var userId = UserId;
         _connections.AddAgent(Context.ConnectionId, userId, info?.Machine ?? string.Empty, info?.Folder ?? string.Empty);
         await SendAgentStatusAsync(userId);
+        await _dispatcher.PublishAskChangedAsync(userId);
         await DispatchAsync(userId);
         return new AgentRegisteredInfo { UserName = Context.User?.FindFirstValue("name") ?? string.Empty };
     }
@@ -115,7 +120,9 @@ public class AnimationHub : Hub
             request.Append(text);
         if (claudeEvent.Kind == ClaudeEventInfo.STARTED)
             request.Started = true;
-        await SendProgressAsync(request, claudeEvent);
+        // 093: a question's answer is only gathered here; the chat shows it once finished.
+        if (!request.IsAsk)
+            await SendProgressAsync(request, claudeEvent);
     }
 
     /// <summary>
@@ -128,7 +135,8 @@ public class AnimationHub : Hub
         if (info == null || !_connections.IsRunBy(requestId, Context.ConnectionId))
             return;
         var request = _connections.Get(requestId);
-        if (request == null)
+        // 093: a question's run is read-only; nothing it reports about files is taken.
+        if (request == null || request.IsAsk)
             return;
         var animation = new Animation { AnimationId = request.AnimationId, Name = request.AnimationName };
         switch (AnimationRequestBuilder.Classify(animation, info.Path))
@@ -340,67 +348,11 @@ public class AnimationHub : Hub
         return animation;
     }
 
-    /// <summary>Hands queued requests of the user to its free agents; returns the ids that started.</summary>
-    private async Task<HashSet<long>> DispatchAsync(long userId)
-    {
-        var started = new HashSet<long>();
-        while (_connections.NextRunnable(userId, Now) is var (request, agentConnectionId))
-        {
-            started.Add(request.RequestId);
-            RunInfo run;
-            try
-            {
-                // 091: the editor's edit version when it sent one, else the library's content.
-                var content = request.Content ?? await _animations.ReadContentAsync(request.AnimationId);
-                var animation = new Animation { AnimationId = request.AnimationId, Name = request.AnimationName };
-                var conversation = new AnimationConversation { ClaudeSessionId = request.SessionId, Started = request.SessionStarted };
-                run = AnimationRequestBuilder.Build(animation, content, conversation, request.RequestId, request.Prompt, request.Images,
-                    request.ModelName, request.ModelWeapons);
-            }
-            catch (Exception ex)
-            {
-                var failed = _connections.Finish(request.RequestId);
-                if (failed != null)
-                    await FinishAsync(failed, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.FAILED, Message = ex.Message });
-                continue;
-            }
-            await Clients.Client(agentConnectionId).SendAsync(RUN_METHOD, run);
-            await Clients.Group(AnimationConnections.GroupName(request.AnimationId)).SendAsync(REQUEST_STARTED_METHOD, new RequestStartedInfo
-            {
-                RequestId = request.RequestId,
-                AnimationId = request.AnimationId,
-                Machine = request.Machine,
-            });
-        }
-        if (started.Count > 0)
-            await SendAgentStatusAsync(userId);
-        return started;
-    }
+    /// <summary>Hands queued requests of the user to its free agents (093: through the shared dispatcher).</summary>
+    private Task<HashSet<long>> DispatchAsync(long userId) => _dispatcher.DispatchAsync(userId);
 
-    /// <summary>Stores what the Claude said (and a notice for a stop or failure), marks the session started, tells the editors.</summary>
-    private async Task FinishAsync(EditorRequest request, RequestOutcomeInfo outcome)
-    {
-        EditorMessageInfo? message = null;
-        var text = request.Text;
-        if (text.Length > 0)
-            message = ToDto(await _conversations.AddMessageAsync(request.ConversationId, ConversationRole.Claude, text));
-        if (outcome.Kind != RequestOutcomeInfo.DONE)
-        {
-            var reason = string.IsNullOrWhiteSpace(outcome.Message)
-                ? (outcome.Kind == RequestOutcomeInfo.STOPPED ? STOPPED : "O pedido falhou.")
-                : outcome.Message;
-            await _conversations.AddMessageAsync(request.ConversationId, ConversationRole.Notice, reason);
-        }
-        if (request.Started)
-            await _conversations.MarkStartedAsync(request.ConversationId);
-        await Clients.Group(AnimationConnections.GroupName(request.AnimationId)).SendAsync(REQUEST_FINISHED_METHOD, new RequestFinishedInfo
-        {
-            RequestId = request.RequestId,
-            AnimationId = request.AnimationId,
-            Outcome = outcome,
-            Message = message,
-        });
-    }
+    /// <summary>Stores what the Claude said (or answers the question, 093), marks the session started, tells the editors.</summary>
+    private Task FinishAsync(EditorRequest request, RequestOutcomeInfo outcome) => _dispatcher.FinishAsync(request, outcome);
 
     private async Task NoticeAsync(EditorRequest request, string text)
     {
@@ -416,14 +368,9 @@ public class AnimationHub : Hub
             Event = claudeEvent,
         });
 
-    private async Task SendAgentStatusAsync(long userId)
-    {
-        var editors = _connections.EditorsOfUser(userId);
-        if (editors.Count > 0)
-            await Clients.Clients(editors).SendAsync(AGENT_STATUS_METHOD, _connections.AgentStatusOf(userId));
-    }
+    private Task SendAgentStatusAsync(long userId) => _dispatcher.SendAgentStatusAsync(userId);
 
-    private static EditorMessageInfo ToDto(AnimationMessage message) => new()
+    internal static EditorMessageInfo ToDto(AnimationMessage message) => new()
     {
         AnimationMessageId = message.AnimationMessageId,
         Role = (int)message.Role,

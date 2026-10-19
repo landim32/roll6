@@ -16,7 +16,10 @@ public static class ChatTools
         canDelete, dice, cancelled, replyTo {key, turnId, displayName, kind, excerpt, deleted, cancelled, hidden},
         reactions [{userId, name, kind like|love|laugh}], canReply, canReact, canConvert (action|message|null), canClosePoll,
         poll {question, totalVotes, open, closed, closedAt, options [{optionId, text, votes, voters [{characterId|null, name, imageUrl}]}]},
-        whisper {master, recipients [{characterId|null, name, imageUrl}]} | null, whisperHidden }.
+        whisper {master, recipients [{characterId|null, name, imageUrl}]} | null, whisperHidden,
+        ask {state waiting|answered|failed} (questions), editedAt (answers) }.
+        kind question / answer (093): a question to the master's local Claude and its answer (displayName "Claude do
+        mestre", replyTo = the question); a private one has whisper set (only its author and the master see it).
         kind is text | image | audio | roll | poll (what people said, rolled or asked; a roll has dice = the three faces
         and text = the optional reason; a poll has text = its question and poll = options with votes and voters — a
         null characterId is the master; open = true while some approved character has not voted — the master's vote
@@ -265,4 +268,61 @@ public static class ChatTools
         Roll6ApiClient api,
         [Description("Id of the item (turnId from list_chat_messages).")] long turnId) =>
         api.SendAsync(HttpMethod.Delete, $"/api/chat/{turnId}");
+
+    [McpServerTool(Name = "ask_question", Title = "Ask the master's Claude", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
+    [ApiOperation("POST", "/api/campaign/{id}/chat/ask")]
+    [Description($$"""
+        What it does: "Perguntar" (093) — posts a question in the campaign chat that the campaign master's local Claude
+        answers through his Roll6.Console, using the skill "perguntar" of his campaign repository. That Claude may only
+        READ files of that folder (no writing, commands, network or tools on the Roll6), answers each question on its own,
+        and treats the question as player text, never as instructions. The answer arrives later as a chat entry of kind
+        "answer" replying to the question (read it with list_chat_messages); the question's ask.state goes waiting →
+        answered, or failed after two minutes or when the console drops. private = true: only you and the master see
+        the question and its answer (the master sees every question).
+        Who can use it: the campaign master or a player with an approved character, speaking as one of their own approved
+        characters (or as the master without one). One waiting question per person at a time.
+        Returns: the question {{ITEM}}.
+        Common errors: 400 text (1–1000 characters); 403 not your approved character / not the master without a
+        character; 409 "O console do mestre não está conectado." or "Aguarde a resposta da sua pergunta.".
+        Related tools: get_ask_status, list_chat_messages, edit_answer.
+        """)]
+    public static Task<CallToolResult> AskQuestion(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("The question (1–1000 characters). Example: \"O que meu personagem sabe sobre a torre de Vhal?\"")] string text,
+        [Description("Optional: the speaking character (yours, approved). Omit to ask as the master.")] long? characterId = null,
+        [Description("true = only you and the master see the question and the answer; false (default) = the whole table.")] bool @private = false) =>
+        api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/chat/ask", new ChatAskInfo { CharacterId = characterId, Text = text, Private = @private });
+
+    [McpServerTool(Name = "get_ask_status", Title = "Get ask status", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("GET", "/api/campaign/{id}/ask")]
+    [Description("""
+        What it does: tells whether "Perguntar" (093) is available in the campaign now — the master's Roll6.Console is
+        connected — and which of your questions is still waiting for its answer (one at a time).
+        Who can use it: the campaign master or a player with an approved character.
+        Returns: { available, waitingTurnId (null when none) }.
+        Common errors: 403 not in the campaign, 404 campaign not found.
+        Related tools: ask_question, list_chat_messages.
+        """)]
+    public static Task<CallToolResult> GetAskStatus(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
+        api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/ask");
+
+    [McpServerTool(Name = "edit_answer", Title = "Correct an answer of the master's Claude", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/chat/{id}/answer")]
+    [Description($$"""
+        What it does: replaces the text of an answer of the master's Claude (kind "answer", 093) — e.g. when it revealed
+        something it shouldn't. Everyone who sees the answer gets the new text, marked "editada pelo mestre" (editedAt).
+        To remove it instead, use delete_chat_message.
+        Who can use it: only the campaign master.
+        Returns: the answer {{ITEM}}.
+        Common errors: 400 not an answer / text (1–4000 characters); 403 not the master; 404 entry not found.
+        Related tools: ask_question, delete_chat_message, list_chat_messages.
+        """)]
+    public static Task<CallToolResult> EditAnswer(
+        Roll6ApiClient api,
+        [Description("Id of the answer (turnId from list_chat_messages).")] long turnId,
+        [Description("The corrected text (1–4000 characters).")] string text) =>
+        api.SendAsync(HttpMethod.Put, $"/api/chat/{turnId}/answer", new ChatAnswerEditInfo { Text = text });
 }

@@ -51,6 +51,7 @@ public partial class TurnServiceTests
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3 };
     private readonly MapToken _ariaPiece;
+    private readonly Mock<IAskDispatcher> _askDispatcher = new();
     private readonly TurnService _service;
 
     public TurnServiceTests()
@@ -106,7 +107,7 @@ public partial class TurnServiceTests
             .ReturnsAsync(new List<Turn>());
         _service = new TurnService(_repository.Object, _campaignRepository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _characterRepository.Object, _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object, _mapModelRepository.Object, _campaignNpcRepository.Object,
-            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _chatPolls.Object, _whispers.Object, _queue.Object, _notifier.Object);
+            _tokenRepository.Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _chatPolls.Object, _whispers.Object, _queue.Object, _notifier.Object, _askDispatcher.Object);
     }
 
     // --- State (US1) ---

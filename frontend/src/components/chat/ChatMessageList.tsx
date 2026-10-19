@@ -2,11 +2,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatItem } from './ChatItem';
 import { ChatItemActions } from './ChatItemActions';
+import { AnswerEditModal } from './AnswerEditModal';
 import { ImageLightbox } from './ImageLightbox';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
-import { compareCursors, continuesPrevious, voiceSwitch } from '../../lib/chatItems';
+import { canEditAnswer, compareCursors, continuesPrevious, voiceSwitch } from '../../lib/chatItems';
 import { useCampaign } from '../../hooks/useCampaign';
 import { filterChatItems } from '../../lib/chatFilters';
 import { copyToClipboard } from '../../lib/clipboard';
@@ -22,7 +23,7 @@ export const ChatMessageList = () => {
   const { session } = useAuth();
   const {
     items: allItems, pinnedPolls, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters, startReply,
-    react, convert, closePoll, setSpeaker, speaker,
+    react, convert, closePoll, setSpeaker, speaker, editAnswer,
   } = useChat();
   const { isMaster } = useCampaign();
   // Moves and character changes show only when the user turned them on in the paperclip.
@@ -39,6 +40,8 @@ export const ChatMessageList = () => {
   const firstKeyRef = useRef<string | null>(null);
   const openedRef = useRef(false);
   const [toDelete, setToDelete] = useState<ChatItemInfo | null>(null);
+  /** 093: the answer the master is correcting. */
+  const [editing, setEditing] = useState<ChatItemInfo | null>(null);
   const [image, setImage] = useState<{ url: string; caption: string | null } | null>(null);
   const userId = session?.user.userId ?? null;
   /** The entry whose action bar is open (044) and the bubble it floats over. */
@@ -188,6 +191,7 @@ export const ChatMessageList = () => {
         danger
       />
       <ImageLightbox image={image} onClose={() => setImage(null)} />
+      <AnswerEditModal item={editing} onClose={() => setEditing(null)} onSave={editAnswer} />
       {actions && (() => {
         const shown = allItems.find((i) => i.key === actions.item.key) ?? pinnedPolls.find((i) => i.key === actions.item.key) ?? actions.item;
         // 079: the master who also plays may switch the voice of his own message — to the character selected now.
@@ -208,6 +212,7 @@ export const ChatMessageList = () => {
             onConvert={(to) => run(() => convert(actions.item, to))}
             onDelete={() => setToDelete(actions.item)}
             onClosePoll={() => run(() => closePoll(actions.item))}
+            onEditAnswer={canEditAnswer(shown, isMaster) ? () => setEditing(shown) : undefined}
             onCopy={(text) => { void copyToClipboard(text).then((ok) => (ok ? toast.success(t('chat.copied')) : toast.error(t('chat.copyFailed')))); }}
           />
         );

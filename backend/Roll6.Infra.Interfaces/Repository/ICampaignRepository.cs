@@ -8,6 +8,8 @@ public interface ICampaignRepository<TModel> where TModel : class
     /// <summary>Slugs equal to <paramref name="baseSlug"/> or starting with <c>baseSlug-</c>, used to pick the next free suffix.</summary>
     Task<List<string>> ListSlugsWithPrefixAsync(string baseSlug);
     Task<List<TModel>> ListByIdsAsync(IEnumerable<long> ids);
+    /// <summary>The ids of the campaigns the user masters (093: where "Perguntar" depends on their console).</summary>
+    Task<List<long>> ListIdsByOwnerAsync(long userId);
     /// <summary>Campaigns of all users (or only of <paramref name="ownerUserId"/>), optionally filtered by name.</summary>
     Task<(List<TModel> Items, int TotalCount)> ListPagedAsync(string? search, int skip, int take, long? ownerUserId);
     /// <summary>

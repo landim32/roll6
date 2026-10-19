@@ -11,10 +11,27 @@ namespace Roll6.API.Controllers;
 public class ChatController : ApiControllerBase
 {
     private readonly IChatService _chatService;
+    private readonly IAskService _askService;
 
-    public ChatController(IChatService chatService)
+    public ChatController(IChatService chatService, IAskService askService)
     {
         _chatService = chatService;
+        _askService = askService;
+    }
+
+    /// <summary>The master corrects an answer of his Claude (093); it shows "editada pelo mestre".</summary>
+    [HttpPut("{id:long}/answer")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> EditAnswer(long id, [FromBody] ChatAnswerEditInfo info)
+    {
+        try
+        {
+            return Ok(await _askService.EditAnswerAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
     }
 
     /// <summary>One chat entry by id (a poll with its votes, a message, an action…), as the caller may see it.</summary>

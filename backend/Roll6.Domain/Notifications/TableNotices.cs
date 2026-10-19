@@ -22,6 +22,8 @@ public static class TableNotices
             "audio" => NoticeTexts.AUDIO,
             "roll" => NoticeTexts.Roll(item.Dice?.Sum() ?? 0),
             "poll" => "Enquete: " + NoticeTexts.Excerpt(item.Text),
+            "question" => "Pergunta: " + NoticeTexts.Excerpt(item.Text),
+            "answer" => "Resposta: " + NoticeTexts.Excerpt(item.Text),
             _ => NoticeTexts.Excerpt(item.Text)
         };
         return new TableNotice

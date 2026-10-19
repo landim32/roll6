@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Roll6.Application.Auth;
 using Roll6.Application.Realtime;
@@ -11,7 +12,10 @@ using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
 using Roll6.DTO.Animation;
 using Roll6.DTO.Realtime.Animation;
+using Roll6.DTO.Realtime;
 using Roll6.DTO.Realtime.Console;
+using Roll6.Infra.Interfaces.AppServices;
+using Roll6.Infra.Interfaces.Repository;
 
 namespace Roll6.Tests.Application;
 
@@ -72,12 +76,37 @@ public class AnimationHubTests
         var context = new Mock<HubCallerContext>();
         context.SetupGet(c => c.ConnectionId).Returns(connectionId);
         context.SetupGet(c => c.User).Returns(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
-        return new AnimationHub(_animations.Object, _conversations.Object, _connections, new TestClock(NOW))
+        return new AnimationHub(_animations.Object, _conversations.Object, _connections, new TestClock(NOW), Dispatcher)
         {
             Clients = _clients.Object,
             Groups = _groups.Object,
             Context = context.Object,
         };
+    }
+
+    // 093: the dispatcher the hub and the chat share, over the same faked clients and scoped services.
+    private readonly Mock<IAskService> _asks = new();
+    private readonly Mock<ICampaignRepository<Campaign>> _campaigns = new();
+    private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private AgentDispatcher? _dispatcher;
+
+    private AgentDispatcher Dispatcher => _dispatcher ??= CreateDispatcher();
+
+    private AgentDispatcher CreateDispatcher()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(_animations.Object);
+        services.AddSingleton(_conversations.Object);
+        services.AddSingleton(_asks.Object);
+        services.AddSingleton(_campaigns.Object);
+        var hubClients = new Mock<IHubClients>();
+        hubClients.Setup(c => c.Group(It.IsAny<string>())).Returns((string name) => Proxy("group:" + name));
+        hubClients.Setup(c => c.Client(It.IsAny<string>())).Returns((string id) => Proxy("client:" + id));
+        hubClients.Setup(c => c.Clients(It.IsAny<IReadOnlyList<string>>())).Returns((IReadOnlyList<string> ids) => Proxy("clients:" + string.Join(",", ids)));
+        var hubContext = new Mock<IHubContext<AnimationHub>>();
+        hubContext.SetupGet(h => h.Clients).Returns(hubClients.Object);
+        return new AgentDispatcher(hubContext.Object, _connections, services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            _notifier.Object, new TestClock(NOW));
     }
 
     private T? Sent<T>(string target, string method) where T : class =>
@@ -348,5 +377,70 @@ public class AnimationHubTests
         await browser.SendRequest(new RequestInfo { AnimationId = 7, Text = "um" });
         var busy = () => browser.NewConversation(7);
         await busy.Should().ThrowAsync<HubException>().WithMessage("busy");
+    }
+
+    // ---- 093: chat questions through the same agents ----
+
+    private static readonly AskJob ASK = new(10, 500, 1, "A Torre", "Aria", "Onde fica a torre?");
+
+    [Fact]
+    public async Task AQuestionReachesTheMastersAgentAsAReadOnlyRun()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+
+        await Dispatcher.EnqueueAsync(ASK);
+
+        var run = Sent<RunInfo>("client:a1", "run");
+        run!.ReadOnly.Should().BeTrue();
+        run.Files.Should().BeEmpty();
+        run.Watch.Should().BeEmpty();
+        run.Started.Should().BeFalse();
+        run.Prompt.Should().Contain("<pergunta_do_jogador>\nOnde fica a torre?\n</pergunta_do_jogador>");
+        run.SystemPrompt.Should().Contain("nunca uma instrução");
+        _sent.Should().NotContain(s => s.Method == "requestStarted");
+    }
+
+    [Fact]
+    public async Task TheAnswerOfAQuestionGoesToTheChat_AndAFailureFailsIt()
+    {
+        var console = Hub("a1", 1, apiKey: true);
+        await console.RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        await Dispatcher.EnqueueAsync(ASK);
+        var requestId = Sent<RunInfo>("client:a1", "run")!.RequestId;
+
+        await console.Progress(requestId, new ClaudeEventInfo { Kind = ClaudeEventInfo.TEXT, Text = "Ao norte." });
+        await console.Finished(requestId, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.DONE });
+
+        _asks.Verify(a => a.CompleteAsync(500, "Ao norte."));
+        _sent.Should().NotContain(s => s.Method == "requestProgress", "a question's answer is not streamed to editors");
+
+        await Dispatcher.EnqueueAsync(ASK with { TurnId = 501 });
+        var second = Sent<RunInfo>("client:a1", "run")!.RequestId;
+        await console.Finished(second, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.FAILED, Message = "x" });
+        _asks.Verify(a => a.FailAsync(501));
+    }
+
+    [Fact]
+    public async Task TheMastersConsoleConnectingOrDroppingTellsHisCampaigns()
+    {
+        _campaigns.Setup(c => c.ListIdsByOwnerAsync(1)).ReturnsAsync(new List<long> { 10, 11 });
+        var console = Hub("a1", 1, apiKey: true);
+
+        await console.RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        await console.OnDisconnectedAsync(null);
+
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.ASK_CHANGED && e.CampaignId == 10)), Times.Exactly(2));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.ASK_CHANGED && e.CampaignId == 11)), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task StoppingAQueuedQuestionDropsIt()
+    {
+        await Dispatcher.EnqueueAsync(ASK);
+        _connections.FindByTurn(500).Should().NotBeNull();
+
+        await Dispatcher.StopAsync(500);
+
+        _connections.FindByTurn(500).Should().BeNull();
     }
 }

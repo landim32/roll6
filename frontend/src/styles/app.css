@@ -2866,6 +2866,26 @@ button.stm-chat-quote { cursor: pointer; }
 .stm-chat-message.is-master .stm-chat-time { color: rgba(26, 19, 0, 0.7); }
 .stm-chat-message.is-master .stm-chat-bubble a { color: #3d2a00; text-decoration: underline; }
 .stm-chat-message.is-master .stm-chat-bubble .text-body-secondary { color: rgba(26, 19, 0, 0.7) !important; }
+/* 093: "Perguntar" — the question mode of the composer and the question/answer bubbles, in blue. */
+.stm-chat-attach-icon.is-ask { background: #3b82f6; }
+.stm-chat-attach-item.is-disabled { opacity: 0.45; cursor: not-allowed; }
+.stm-chat-field.is-asking,
+.stm-chat-field.is-asking:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5); background: rgba(59, 130, 246, 0.07); }
+.stm-ask-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; color: #93c5fd; font-size: 0.875rem; }
+.stm-ask-bar .form-check-label { color: var(--bs-body-color); }
+.stm-chat-message.is-ask .stm-chat-bubble { background: rgba(59, 130, 246, 0.16); border: 1px solid rgba(59, 130, 246, 0.55); }
+.stm-chat-message.is-answer .stm-chat-bubble { background: #1e3a8a; border-color: #3b82f6; color: #e0ecff; }
+.stm-chat-message.is-ask .stm-chat-name { color: #93c5fd; }
+.stm-chat-ask-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; }
+.stm-chat-ask-tag { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.7rem; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.03em; }
+.stm-chat-ask-private { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.7rem; padding: 0 0.35rem; border-radius: 999px; background: rgba(147, 197, 253, 0.2); color: #bfdbfe; }
+.stm-chat-ask-avatar { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; color: #fff; }
+.stm-chat-ask-status { font-size: 0.75rem; color: #93c5fd; font-style: italic; }
+.stm-chat-ask-status.is-waiting { animation: stm-ask-pulse 1.4s ease-in-out infinite; }
+.stm-chat-ask-status.is-failed { color: var(--bs-danger-text-emphasis); }
+@keyframes stm-ask-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .stm-chat-ask-status.is-waiting { animation: none; } }
+
 .stm-chat-message.is-master .stm-chat-roll-total small { color: rgba(26, 19, 0, 0.7); }
 .stm-chat-message.is-master.is-whisper .stm-chat-bubble { border: 2px dashed #7a5a00; }
 .stm-chat-message.is-master .stm-whisper-footer { color: #3d2a00; }

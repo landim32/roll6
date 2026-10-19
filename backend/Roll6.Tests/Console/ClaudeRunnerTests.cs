@@ -35,6 +35,35 @@ public sealed class ClaudeRunnerTests : IDisposable
     }
 
     [Fact]
+    public void AReadOnlyRunCanOnlyReadInsideTheFolder()
+    {
+        var settings = new ConsoleSettings { ClaudeAllowedTools = "Bash(python:*)" };
+        var session = Guid.NewGuid();
+
+        var arguments = ClaudeRunner.Arguments(settings, session, started: true, "regras", readOnly: true);
+
+        arguments.Should().ContainInOrder("--session-id", session.ToString());
+        arguments.Should().Contain("--no-session-persistence");
+        arguments.Should().NotContain("--resume");
+        arguments.Should().ContainInOrder("--tools", "Read,Glob,Grep,Skill");
+        // Reading is not pre-approved: outside the working directory it would need a permission "dontAsk" denies.
+        arguments.Should().ContainInOrder("--allowedTools", "Skill");
+        arguments.Should().NotContain("Bash(python:*)");
+        arguments.Should().ContainInOrder("--disallowedTools", "Bash,Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task,TodoWrite");
+        arguments.Should().ContainInOrder("--permission-mode", "dontAsk");
+        arguments.Should().NotContain("acceptEdits");
+        arguments.Should().ContainInOrder("--permission-prompts", "none");
+        arguments.Should().ContainInOrder("--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}");
+        arguments.Should().ContainInOrder("--append-system-prompt", "regras");
+    }
+
+    [Fact]
+    public void TheConsoleCredentialsNeverReachTheClaude()
+    {
+        ClaudeRunner.REMOVED_VARIABLES.Should().Contain(new[] { "ROLL6_API_KEY", "ROLL6_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN" });
+    }
+
+    [Fact]
     public async Task AMissingCliSaysSo()
     {
         var settings = new ConsoleSettings { ClaudeWorkingDirectory = _folder, ClaudeExecutable = Path.Combine(_folder, "nao-existe.exe") };

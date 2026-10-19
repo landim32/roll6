@@ -24,6 +24,7 @@ public class CampaignController : ApiControllerBase
     private readonly ICampaignPlanService _campaignPlanService;
     private readonly IChatService _chatService;
     private readonly IPushService _pushService;
+    private readonly IAskService _askService;
 
     public CampaignController(
         ICampaignService campaignService,
@@ -33,8 +34,10 @@ public class CampaignController : ApiControllerBase
         ITurnService turnService,
         ICampaignPlanService campaignPlanService,
         IChatService chatService,
-        IPushService pushService)
+        IPushService pushService,
+        IAskService askService)
     {
+        _askService = askService;
         _pushService = pushService;
         _chatService = chatService;
         _campaignPlanService = campaignPlanService;
@@ -293,6 +296,41 @@ public class CampaignController : ApiControllerBase
         {
             var item = await _chatService.CreatePollAsync(CurrentUserId, id, info);
             return StatusCode(StatusCodes.Status201Created, item);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>
+    /// "Perguntar" (093): a question to the master's local Claude, answered through his Roll6.Console with the skill
+    /// "perguntar" (read-only). Private = only the author and the master. 409 when the master's console is not connected
+    /// or the caller already waits for an answer.
+    /// </summary>
+    [HttpPost("{id:long}/chat/ask")]
+    [ProducesResponseType(typeof(ChatItemInfo), StatusCodes.Status201Created)]
+    public async Task<IActionResult> Ask(long id, [FromBody] ChatAskInfo info)
+    {
+        try
+        {
+            var item = await _askService.AskAsync(CurrentUserId, id, info);
+            return StatusCode(StatusCodes.Status201Created, item);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Whether the caller can ask now (093): the master's console connected, and their own waiting question.</summary>
+    [HttpGet("{id:long}/ask")]
+    [ProducesResponseType(typeof(AskStatusInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> AskStatus(long id)
+    {
+        try
+        {
+            return Ok(await _askService.StatusAsync(CurrentUserId, id));
         }
         catch (Exception ex)
         {

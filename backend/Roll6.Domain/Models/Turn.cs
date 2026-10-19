@@ -140,7 +140,8 @@ public class Turn
     public bool IsWhisper { get; set; }
 
     /// <summary>What can be whispered (047): what people say, rolls included, and actions.</summary>
-    public bool CanBeWhispered => TurnType is TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll or TurnType.Action;
+    public bool CanBeWhispered => TurnType is TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll or TurnType.Action
+        or TurnType.Question or TurnType.Answer;
 
     public void MarkWhisper()
     {
@@ -148,6 +149,85 @@ public class Turn
             throw new DomainValidationException("whisper", "Só mensagens, fotos, áudios, rolagens e ações podem ser sussurrados.");
         IsWhisper = true;
     }
+
+    // --- Perguntar (093) ---
+
+    /// <summary>Longest question to the master's Claude.</summary>
+    public const int MAX_QUESTION = 1000;
+
+    /// <summary>Longest answer kept in the chat; longer ones are cut with <see cref="ANSWER_CUT"/>.</summary>
+    public const int MAX_ANSWER = 4000;
+
+    public const string ANSWER_CUT = " … (resposta encurtada)";
+
+    /// <summary>The speaker of every answer.</summary>
+    public const string ANSWER_NAME = "Claude do mestre";
+
+    /// <summary>A question's state (093): waiting, answered or failed; null for every other entry.</summary>
+    public AskState? AskState { get; set; }
+
+    /// <summary>When the master corrected an answer (093); null when it is as the Claude wrote it.</summary>
+    public DateTime? EditedAt { get; set; }
+
+    /// <summary>A question to the master's Claude, waiting for its answer. Control characters are removed.</summary>
+    public static Turn Question(long campaignId, long? mapId, int turnNo, long userId, long? characterId, string displayName,
+        string? displayImage, string? text)
+    {
+        var turn = Speech(campaignId, mapId, turnNo, userId, characterId, displayName, displayImage, TurnType.Question);
+        turn.Description = Guard.RequiredText(StripControl(text), "text", MAX_QUESTION);
+        turn.AskState = Enums.AskState.Waiting;
+        return turn;
+    }
+
+    /// <summary>The answer of the master's Claude to <paramref name="question"/>, replying to it, cut at <see cref="MAX_ANSWER"/>.</summary>
+    public static Turn Answer(Turn question, long masterUserId, string? text)
+    {
+        if (question.TurnType != TurnType.Question)
+            throw new DomainValidationException("turnId", "Esta entrada não é uma pergunta.");
+        var turn = Speech(question.CampaignId, question.MapId, question.TurnNo, masterUserId, null, ANSWER_NAME, null, TurnType.Answer);
+        turn.Description = CutAnswer(text);
+        turn.ReplyToTurnId = question.TurnId;
+        return turn;
+    }
+
+    /// <summary>The question got its answer; false (nothing changes) unless it was waiting.</summary>
+    public bool MarkAnswered()
+    {
+        if (TurnType != TurnType.Question || AskState != Enums.AskState.Waiting)
+            return false;
+        AskState = Enums.AskState.Answered;
+        return true;
+    }
+
+    /// <summary>The question could not be answered (error, dropped console, 2 minutes); false unless it was waiting.</summary>
+    public bool MarkFailed()
+    {
+        if (TurnType != TurnType.Question || AskState != Enums.AskState.Waiting)
+            return false;
+        AskState = Enums.AskState.Failed;
+        return true;
+    }
+
+    /// <summary>The master corrects an answer (093, Q1 = B).</summary>
+    public void EditAnswer(string? text, DateTime now)
+    {
+        if (TurnType != TurnType.Answer || IsDeleted)
+            throw new DomainValidationException("turnId", "Só respostas do Claude do mestre podem ser corrigidas.");
+        Description = Guard.RequiredText(StripControl(text), "text", MAX_ANSWER);
+        EditedAt = now;
+    }
+
+    private static string CutAnswer(string? text)
+    {
+        var clean = StripControl(text)?.Trim() ?? string.Empty;
+        if (clean.Length == 0)
+            throw new DomainValidationException("text", "A resposta veio vazia.");
+        return clean.Length <= MAX_ANSWER ? clean : clean[..(MAX_ANSWER - ANSWER_CUT.Length)].TrimEnd() + ANSWER_CUT;
+    }
+
+    /// <summary>Removes control characters but keeps line breaks and tabs.</summary>
+    private static string? StripControl(string? text) =>
+        text == null ? null : new string(text.Where(c => !char.IsControl(c) || c is '\n' or '\r' or '\t').ToArray());
 
     /// <summary>Chat: the faces of a <see cref="TurnType.Roll"/>, in order, comma separated ("5,3,6").</summary>
     public string? Dice { get; set; }

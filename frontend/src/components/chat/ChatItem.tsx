@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { PollCard } from './PollCard';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import {
-  Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, MoveIcon, PencilIcon,
+  Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, LockFillIcon, MoveIcon, PencilIcon,
+  QuestionCircleIcon,
 } from '../ui/icons';
 import { ChatBubbleGestures } from './ChatBubbleGestures';
 import { ReactionsBadge } from './ReactionsBadge';
 import { ReplyQuote } from './ReplyQuote';
-import { CHAT_KIND } from '../../types/chat';
+import { ASK_STATE, CHAT_KIND } from '../../types/chat';
 import type { ChatItemInfo } from '../../types/chat';
 import { authorLabel, chatLabel, formatChanges, formatMovement, isMasterVoice, nameColor, rollTotal, shortName } from '../../lib/chatItems';
 import { formatSeconds } from '../../lib/audioFormat';
@@ -39,9 +40,9 @@ const timeOf = (iso: string) => {
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 };
 
-const Text = ({ value }: { value: string }) => (
+const Text = ({ value, strict }: { value: string; strict?: boolean }) => (
   <Suspense fallback={<div className="stm-chat-text">{value}</div>}>
-    <div className="stm-chat-text"><MarkdownView value={value} emptyText="" /></div>
+    <div className="stm-chat-text"><MarkdownView value={value} emptyText="" strict={strict} /></div>
   </Suspense>
 );
 
@@ -210,6 +211,50 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
           {reactions}
         </>,
       );
+
+    case CHAT_KIND.question:
+    case CHAT_KIND.answer: {
+      // 093: a question to the master's Claude and its answer — blue bubbles; "Privado" instead of the whisper footer.
+      const isAnswer = item.kind === CHAT_KIND.answer;
+      const state = item.ask?.state;
+      return row(
+        `stm-chat-message is-ask ${isAnswer ? 'is-answer' : 'is-question'}${own ? ' is-own' : ''}`,
+        <>
+          {!own && (
+            <div className="stm-chat-avatar">
+              {isAnswer
+                ? <span className="stm-chat-ask-avatar" aria-hidden="true"><QuestionCircleIcon size={20} /></span>
+                : <CharacterAvatar name={chatLabel(item.displayName)} imageUrl={item.displayImageUrl} size={32} />}
+            </div>
+          )}
+          <div className="stm-chat-bubble">
+            <div className="stm-chat-ask-head">
+              {!own && <span className="stm-chat-name">{isAnswer ? t('chat.ask.answerName') : chatLabel(item.displayName)}</span>}
+              {!isAnswer && <span className="stm-chat-ask-tag"><QuestionCircleIcon size={12} /> {t('chat.ask.questionTag')}</span>}
+              {item.whisper && !item.deleted && (
+                <span className="stm-chat-ask-private" title={t('chat.ask.privateHint')}><LockFillIcon size={10} /> {t('chat.ask.private')}</span>
+              )}
+            </div>
+            {item.deleted ? (
+              <div className="stm-chat-text"><em className="text-body-secondary">{t('chat.deleted')}</em>{meta}</div>
+            ) : (
+              <>
+                {quote}
+                <div className="stm-chat-captioned">
+                  {/* Model output: links, images and raw HTML never render. A question is user text: the usual sanitizer. */}
+                  <Text value={item.text ?? ''} strict={isAnswer} />
+                  {meta}
+                </div>
+                {!isAnswer && state === ASK_STATE.waiting && <div className="stm-chat-ask-status is-waiting">{t('chat.ask.thinking')}</div>}
+                {!isAnswer && state === ASK_STATE.failed && <div className="stm-chat-ask-status is-failed">{t('chat.ask.failed')}</div>}
+                {isAnswer && item.editedAt && <div className="stm-chat-ask-status">{t('chat.ask.edited')}</div>}
+                {reactions}
+              </>
+            )}
+          </div>
+        </>,
+      );
+    }
 
     default: {
       // Conversation: text, photo, recording, roll or poll (the poll's text is its question, shown by the card).
