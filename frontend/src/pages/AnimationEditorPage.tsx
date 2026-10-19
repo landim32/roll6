@@ -4,6 +4,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AnimationEditorProvider } from '../Contexts/AnimationEditorContext';
 import { useAnimationEditor } from '../hooks/useAnimationEditor';
+import { useLeaveGuard } from '../hooks/useLeaveGuard';
 import { APP_NAME } from '../lib/documentTitle';
 import { animationEditorPath, idParam, libraryPath } from '../lib/libraryRoutes';
 import { isBusy } from '../lib/editorState';
@@ -66,7 +67,9 @@ const NotAvailable = ({ kind }: { kind: 'forbidden' | 'not-found' | 'offline' })
 const EditorBody = () => {
   const { t } = useTranslation();
   const editor = useAnimationEditor();
-  const { state, loading, error, tokenId, skeleton, setSkeleton, history, undo, redo, saveContent, attachPrint, replacePrint } = editor;
+  const { state, loading, error, tokenId, skeleton, setSkeleton, history, undo, redo, saveContent, attachPrint, replacePrint, dirty, save } = editor;
+  // 091: unsaved changes live only in this tab — leaving asks first.
+  const guard = useLeaveGuard(dirty);
   const stage = useRef<StageHandle | null>(null);
   const timeline = useRef<TimelineHandle | null>(null);
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
@@ -97,7 +100,7 @@ const EditorBody = () => {
   const onSave = useCallback(async (file: AnimationFile) => {
     try {
       await saveContent(file);
-      setStatus({ text: t('editor.edit.saved'), error: false });
+      setStatus({ text: t('editor.edit.pending'), error: false });
     } catch (err) {
       setStatus({ text: t('editor.edit.notSaved', { message: err instanceof Error ? err.message : t('common.unknownError') }), error: true });
     }
@@ -110,7 +113,11 @@ const EditorBody = () => {
       if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) return;
       if (markup) return;
       const key = event.key.toLowerCase();
-      if (event.ctrlKey && (key === 'y' || (key === 'z' && event.shiftKey))) {
+      if (event.ctrlKey && key === 's') {
+        // 091: Ctrl+S saves the edit version.
+        event.preventDefault();
+        if (dirty) void save();
+      } else if (event.ctrlKey && (key === 'y' || (key === 'z' && event.shiftKey))) {
         event.preventDefault();
         if (editingAllowed) void redo();
       } else if (event.ctrlKey && key === 'z') {
@@ -122,7 +129,7 @@ const EditorBody = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editingAllowed, markup, redo, undo]);
+  }, [dirty, editingAllowed, markup, redo, save, undo]);
 
   const capture = useCallback(() => {
     const print = stage.current?.capture();
@@ -215,6 +222,7 @@ const EditorBody = () => {
       )}
       <PrintMarkupModal original={markup?.original ?? null} initialMarks={(markup?.existing?.marks as Mark[] | undefined) ?? []}
         onDone={(result) => { void markupDone(result); }} onCancel={() => setMarkup(null)} />
+      {guard}
     </div>
   );
 };

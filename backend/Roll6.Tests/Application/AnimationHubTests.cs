@@ -180,15 +180,13 @@ public class AnimationHubTests
     }
 
     [Fact]
-    public async Task TheWorkingFileBecomesAVersionAndABadOneANotice()
+    public async Task TheWorkingFileBecomesADraftAndABadOneANotice()
     {
         await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
         var browser = Hub("b1", 1, apiKey: false);
         await browser.OpenEditor(7);
         var requestId = await browser.SendRequest(new RequestInfo { AnimationId = 7, Text = "oi" });
         var console = Hub("a1", 1, apiKey: true);
-        _animations.Setup(s => s.ReplaceContentAsync(1, 7, It.IsAny<AnimationContentInfo>(), AnimationVersionInfo.ORIGIN_AGENT))
-            .ReturnsAsync(new AnimationInfo { AnimationId = 7, UserId = 1, Name = "Aceno" });
 
         await console.FileChanged(requestId, new FileChangedInfo
         {
@@ -201,13 +199,48 @@ public class AnimationHubTests
         await console.FileChanged(requestId, new FileChangedInfo { Path = "outra/x.json", Content = "{}" });
         await Hub("a2", 1, apiKey: true).FileChanged(requestId, new FileChangedInfo { Path = "animacoes/7-aceno.json", Content = "{}" });
 
-        _animations.Verify(s => s.ReplaceContentAsync(1, 7, It.IsAny<AnimationContentInfo>(), AnimationVersionInfo.ORIGIN_AGENT), Times.Once);
+        // 091: a valid working file is relayed to the editor as an unsaved edit and never stored.
+        _animations.Verify(s => s.ReplaceContentAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<AnimationContentInfo>(), It.IsAny<string>()), Times.Never);
+        var drafts = _sent.Where(s => s.Method == "draftVersion").ToList();
+        drafts.Should().ContainSingle();
+        drafts[0].Target.Should().Be("group:animation:7");
+        var draft = (DraftVersionInfo)drafts[0].Args[0]!;
+        draft.RequestId.Should().Be(requestId);
+        draft.AnimationId.Should().Be(7);
+        draft.Content.GetProperty("tracks")[0].GetProperty("bone").GetString().Should().Be("LeftArm");
         var notices = _sent.Where(s => s.Method == "requestProgress").Select(s => ((RequestProgressInfo)s.Args[0]!).Event).Where(e => e.Kind == "notice").ToList();
         notices.Should().HaveCount(3);
         notices[0].Text.Should().StartWith("Arquivo inválido: JSON malformado");
         notices[1].Text.Should().StartWith("Arquivo inválido: ");
         notices[2].Text.Should().Be("O Claude criou novo.json");
         _stored.Count(m => m.Role == ConversationRole.Notice).Should().Be(3);
+    }
+
+    [Fact]
+    public async Task ARequestCarriesTheEditVersionToTheRun()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        var browser = Hub("b1", 1, apiKey: false);
+        var edit = JsonDocument.Parse("""{"format":"roll6-animation","version":1,"duration":1,"loop":true,"tracks":[{"bone":"LeftArm","times":[0,1],"degrees":[[0,0,-150],[0,0,-120]]}]}""").RootElement;
+
+        await browser.SendRequest(new RequestInfo { AnimationId = 7, Text = "oi", Content = edit });
+
+        var file = Sent<RunInfo>("client:a1", "run")!.Files.Should().ContainSingle().Subject;
+        file.Content.Should().Contain("LeftArm");
+        _animations.Verify(s => s.ReadContentAsync(7), Times.Never);
+    }
+
+    [Fact]
+    public async Task ARequestWithAnInvalidEditVersionIsRefused()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        var browser = Hub("b1", 1, apiKey: false);
+        var broken = JsonDocument.Parse("""{"duration":-1}""").RootElement;
+
+        var act = () => browser.SendRequest(new RequestInfo { AnimationId = 7, Text = "oi", Content = broken });
+
+        await act.Should().ThrowAsync<HubException>().WithMessage("invalid");
+        _sent.Should().NotContain(s => s.Method == "run");
     }
 
     [Fact]

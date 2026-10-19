@@ -480,7 +480,7 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
   - **User menu**: `components/menu/UserMenuHost` = `UserMenu` + the windows it opens (Editar, Trocar senha, Chaves de
     API, Notificações, Qualidade do 3D) + logout; used by `TopMenu`, the library and the animation editor's
     `EditorTopBar` (which also has `BackToTableButton`). "Biblioteca" replaced "Animações" and "Armas".
-  - **Pages**: `CampaignsPage` (Minhas with the gear · Buscar · Jogando — submenus since 090), `CampaignCreatePage`,
+  - **Pages**: `CampaignsPage` (Minhas with a pencil · Buscar · Jogando — submenus since 090), `CampaignCreatePage`,
     `CampaignEditPage` (`/library/campaigns/:slug/:section` — `characters`/`npcs`/`maps`/`plan`, master only, status on
     top; it selects the campaign of the address because the panels read the current one), `MapsPage` (Meus · Buscar ·
     Da campanha; "Abrir" → table, unsaved map confirmed), `MapEditPage` (`/library/maps/:mapModelId?map={mapId}`),
@@ -528,7 +528,10 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
     `lib/thumbnailQueue`, cancelled when the card leaves) and, when the viewer owns the item, stores it
     (`WeaponContext`/`AnimationContext.storeThumbnail`).
   - **"Incluir"**: `/library/weapons/new` and `/library/animations/new` (`WeaponCreatePage`, `AnimationCreatePage`)
-    replace the "Enviar" tabs: the upload forms with `onDirtyChange` → `useLeaveGuard`, then the new item's page.
+    replace the "Enviar" tabs. Weapons: the upload form with `onDirtyChange` → `useLeaveGuard`, then the weapon's page.
+    Animations (091): only name + type → `lib/restAnimation(type)` (1 s still in the rest pose, a Hips track at 0°,
+    `loop` false for Derrotado/Atacando) + the skeleton picture → the new animation's **editor**;
+    `AnimationUploadForm` was removed.
   - Migration `AddLibraryImages` + `database/migrations/090-library-images.sql`. MCP: `set_campaign_image`, `image` on
     `create_campaign`, `thumbnailImage` on the weapon/animation write tools (`McpDocs.THUMBNAIL_IMAGE`), guide
     paragraphs (121 operations / 122 tools).
@@ -583,8 +586,11 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
   builds each `run` (`files = [animacoes/{id}-{slug}.json` with the library's content indented, LF`]`, `watch =
   ["animacoes/"]`, `systemPrompt = AnimationPromptContext.Build(path, modelName)` — the former roll6anime
   `PromptContext`) and `Classify(path)` → `Working` | `OtherAnimation` | `Ignored`; a `FileChanged` of the working file
-  is parsed, validated with `AnimationFormat.Parse` and stored through `IAnimationService.ReplaceContentAsync(…,
-  origin: "agent")` (invalid → notice "Arquivo inválido: …", another `.json` → "O Claude criou {nome}"); the notices
+  is parsed, validated with `AnimationFormat.Parse` and — since 091 — **never stored**: it goes to the editor group as
+  `draftVersion` (`DraftVersionInfo { animationId, requestId, content }`), an unsaved edit of the tab that sent the
+  request (invalid → notice "Arquivo inválido: …", another `.json` → "O Claude criou {nome}"). `RequestInfo.content`
+  (091) carries the tab's edit version, validated (`invalid`) and used for the run's working file instead of the
+  library's content (`EditorRequest.Content`); the notices
   and the Claude's answer are stored as `animation_messages`. `ReplaceContentAsync(userId, id, content, origin =
   "user")` (also `GET`-less `ReadContentAsync`) publishes `IAnimationNotifier.VersionAsync` → `AnimationNotifier` sends
   `animationVersion` to the editors and, when the origin is not `agent`, `writeFiles` to the user's consoles so the
@@ -616,11 +622,15 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
   ("Marcar print": `lib/markup` — pencil, dotted rectangle/ellipse, arrow, `strokeWidth`, `isMeaningful`,
   `arrowHead`, `markupNote` — on a canvas of the print's own pixels; Concluir/Enter attaches, Cancelar drops) and
   `lib/printCaption.caption(...)` (the Portuguese caption: animation, instant, key pose, camera side, skeleton note,
-  marks note). **Versions**: a bone released turned → `setKey` → `animationService.replaceContent` (the server
-  validates; 400 shows "Não gravado: …"); the tab's `lib/animationHistory` (≤ 100 exact texts) feeds ↶/↷ and
-  Ctrl+Z/Ctrl+Y (outside text fields), each undo/redo saving the neighbour version; own saves are recognised by exact
-  text so their `animationVersion` echo neither re-reads the stage nor doubles the history; a version from elsewhere
-  (the console, another tab) replays at the same instant (`nextPlayback`). Editing is blocked while a request runs
+  marks note). **Versions (091: explicit save)**: the editor keeps `savedContent` (the library's) and `content` (the
+  edit version on the stage, only in the tab — Q1 = A); a bone released turned → `setKey` → `edited`, undo/redo
+  (`lib/animationHistory`, ≤ 100 exact texts, Ctrl+Z/Ctrl+Y outside text fields) and the Claude's `draftVersion` change
+  only `content`; **"Salvar"** (top bar, Ctrl+S) validates and writes it with `animationService.replaceContent(id,
+  content, thumbnailImage)` (090 skeleton picture) → `saved`, **"Descartar"** (`ConfirmModal`) → `discarded`; the
+  "Alterações não salvas" badge (`isDirty`) and `useLeaveGuard(dirty)` keep anything from being lost silently. Own saves
+  are recognised by exact text (`ownVersion`); a version saved elsewhere replays a clean tab, while a dirty one keeps its
+  edit and shows "A versão salva mudou" (`savedChanged`). The conversation sticks to the bottom (`lib/stickToBottom`,
+  a `MutationObserver` + image loads, only while the user is at the end; always after an own send). Editing is blocked while a request runs
   (`editor.edit.blockedRunning`) or the skeleton is not Mixamo. On phones the stage stacks over the conversation and
   the skeleton, gizmo, undo/redo and "Anexar print" are hidden. `roll6:editor-skeleton` remembers the toggle.
 
@@ -761,8 +771,10 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - PostgreSQL — `animation_conversations`, `animation_messages` (migration `AddAnimationConversations` + `database/migrations/086-animation-conversations.sql`); a console project `backend/Roll6.Console` (a generic bridge to the user's local Claude Code; new NuGet `Microsoft.AspNetCore.SignalR.Client`, `Microsoft.Extensions.Hosting`). (086-web-animation-editor)
 - TypeScript 5 / React 18 (frontend only). + existing — React Router 6.30 (now as a data router: `createBrowserRouter`, `useBlocker`), Bootstrap 5.3, i18next, sonner, Radix; no new dependency. (087-library-fullscreen)
 - browser only — `sessionStorage` `roll6:table-return`; `roll6:settings-tab` dropped (the URL holds the section); no server change. (087-library-fullscreen)
-- C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend). + existing only. (090-library-grid-submenus)
-- PostgreSQL. New columns: (090-library-grid-submenus)
+- C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + existing only (ASP.NET Core 8, EF Core 9 + Npgsql, AWSSDK.S3, `ModelContextProtocol.AspNetCore` 2.x; React 18, React Router 6.30, Bootstrap 5.3 grid, i18next, `react-easy-crop`, `three` 0.186.1 lazy). **No new dependency.** (090-library-grid-submenus)
+- PostgreSQL — `campaigns.image`, `weapons.thumbnail_image`, `animations.thumbnail_image` (`varchar(260) null`); migration `AddLibraryImages` + `database/migrations/090-library-images.sql`. (090-library-grid-submenus)
+- C# 12 / .NET 8 (animation hub); TypeScript 5 / React 18 (editor) + existing only (SignalR, React Router 6.30 data router, `three` lazy). **No new dependency.** (091-animation-editor-save)
+- No schema change: the edit version lives in the editor tab; the hub relays the Claude's files as `draftVersion` instead of storing them. (091-animation-editor-save)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -774,6 +786,7 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 091-animation-editor-save: the animation editor saves only on "Salvar" — turned bones, undo/redo and the Claude's files (relayed by the hub as `draftVersion`, never stored) change the tab's edit version; "Descartar" reverts, a badge shows unsaved changes and leaving asks; each request sends the edit version (`RequestInfo.content`) so the Claude works on what is on screen; the conversation follows new content while at the bottom; "Incluir animação" asks only name and type, creates a 1 s rest-pose animation and opens its editor. No schema, REST or MCP change
 - 090-library-grid-submenus: the library's list tabs become submenus of the left menu, each with its own address (Campanhas: Minhas campanhas · Buscar · Jogando; Mapas: Meus mapas · Buscar · Da campanha; Tokens, Armas, Animações: Minhas · Buscar; old `?tab=` addresses redirect); every list is a card grid — campaigns and maps in 3 columns with their picture, characters, NPCs, tokens, weapons and animations in 4 (3 on phones); campaigns get a picture sent by the master (`campaigns.image`, `PUT /api/campaign/{id}/image`); weapons and animations get a stored thumbnail drawn by the site (the model in its pose; a standard skeleton in the animation's key pose), cleared by a new file/pose/content and drawn live — and stored by the owner — while missing; "Incluir" pages replace the "Enviar" tabs. Migration `AddLibraryImages`; MCP `set_campaign_image` + `image`/`thumbnailImage` parameters (121 operations / 122 tools)
 - 087-library-fullscreen: a full-screen library at `/library/...` (top bar with "← Voltar para campanha" in yellow and the user menu, left menu Campanhas · Mapas · Personagens · NPCs · Tokens · Armas · Animações, one address per list/new/edit page and per campaign section) replaces the campaign settings, campaigns, maps, map edit, select/include/edit character, NPC edit, token edit, weapons and animations windows; the gear, the character combo, the map pencils, "Outras campanhas…"/"Mapas…" and the NPC card pencil go there; the user menu's "Animações"/"Armas" became "Biblioteca" and the menu is shared with the animation editor; unsaved pages ask before leaving (data router + `useBlocker`). Frontend only
 - 086-web-animation-editor: the roll6anime desktop tool becomes a page of the Roll6 — `/animation/:id` in a new tab (only the logo, the stage with a token's 3D model playing the animation, the time bar with the key pose, the skeleton + bone gizmo saving versions to the library with undo/redo, prints with red marks and captions, and the conversation with the local Claude Code) — plus the generic **`Roll6.Console`** on the user's machine (API key, connects out to `/hubs/animation`, runs `claude -p`, writes/watches files only inside its working directory, knows nothing of animations: the server builds every request and validates every file). `animation_conversations`/`animation_messages` (migration `AddAnimationConversations`); `roll6anime/` removed; no REST endpoint (MCP still 120 operations / 121 tools)

@@ -113,6 +113,9 @@
     }
   },
   "animations": {
+    "created": "Animação criada.",
+    "createHint": "A animação começa parada na pose de repouso por 1 s; monte-a no editor.",
+    "nameRequired": "Informe o nome da animação.",
     "include": "Incluir animação",
     "title": "Animações",
     "type": {
@@ -132,12 +135,8 @@
     "duration": "{{seconds}} s",
     "owner": "de {{name}}",
     "typeNote": "Por enquanto, só animações dos tipos Parado, Andando e Derrotado podem ser escolhidas nos tokens.",
-    "file": "Arquivo de animação (.json)",
-    "fileHelp": "Um arquivo no formato roll6-animation, para modelos com esqueleto Mixamo.",
     "name": "Nome",
     "typeLabel": "Tipo",
-    "send": "Enviar animação",
-    "uploaded": "Animação enviada.",
     "updated": "Animação alterada.",
     "deleted": "Animação apagada.",
     "copy": "Copiar JSON",
@@ -150,7 +149,6 @@
     "confirmDelete": "Apagar a animação \"{{name}}\"?",
     "delete": "Apagar",
     "empty": "Nenhuma animação.",
-    "chooseFile": "Escolha um arquivo de animação.",
     "openEditor": "Editar no editor"
   },
   "library": {
@@ -203,6 +201,17 @@
     }
   },
   "editor": {
+    "save": {
+      "button": "Salvar",
+      "shortcut": "Salvar na biblioteca (Ctrl+S)",
+      "discard": "Descartar",
+      "dirty": "Alterações não salvas",
+      "savedChanged": "A versão salva mudou",
+      "saved": "Animação salva.",
+      "discardTitle": "Descartar as alterações?",
+      "discardMessage": "A animação volta à versão salva na biblioteca. As alterações feitas desde então serão perdidas.",
+      "invalid": "Não foi possível salvar: {{message}}"
+    },
     "title": "Editor de animações",
     "back": "Voltar para a animação",
     "backToList": "Voltar para animações",
@@ -239,9 +248,9 @@
       "hide": "Esconder o esqueleto"
     },
     "edit": {
+      "pending": "Alteração na edição — clique em Salvar para gravar na biblioteca.",
       "drag": "arraste um anel para girar",
       "saving": "gravando",
-      "saved": "Versão gravada.",
       "notSaved": "Não gravado: {{message}}",
       "notMixamo": "Este esqueleto não usa os nomes do Mixamo: as animações não se aplicam a ele.",
       "notEditable": "não pode ser animado (fora dos ossos do formato).",

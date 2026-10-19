@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Roll6.DTO.Realtime.Animation;
 using Roll6.DTO.Realtime.Console;
 
@@ -49,6 +50,8 @@ public sealed class EditorRequest
     public string Prompt { get; }
     public IReadOnlyList<PromptImageInfo> Images { get; }
     public string? ModelName { get; }
+    /// <summary>The editor's edit version sent with the request (091); null = the library's content.</summary>
+    public JsonElement? Content { get; init; }
     public DateTime QueuedAt { get; }
     public DateTime StartedAt { get; internal set; }
     public RequestState State { get; internal set; } = RequestState.Queued;
@@ -167,14 +170,15 @@ public class AnimationConnections
     /// Queues a request; null when the animation already has one queued or running (one at a time per animation).
     /// </summary>
     public EditorRequest? Enqueue(long userId, long animationId, string animationName, long conversationId, Guid sessionId,
-        bool sessionStarted, string prompt, IReadOnlyList<PromptImageInfo> images, string? modelName, DateTime now)
+        bool sessionStarted, string prompt, IReadOnlyList<PromptImageInfo> images, string? modelName, DateTime now,
+        JsonElement? content = null)
     {
         lock (_lock)
         {
             if (_requests.Values.Any(r => r.AnimationId == animationId))
                 return null;
             var request = new EditorRequest(++_nextRequestId, userId, animationId, animationName, conversationId, sessionId,
-                sessionStarted, prompt, images, modelName, now);
+                sessionStarted, prompt, images, modelName, now) { Content = content };
             _requests[request.RequestId] = request;
             if (!_queues.TryGetValue(userId, out var queue))
                 _queues[userId] = queue = new List<long>();

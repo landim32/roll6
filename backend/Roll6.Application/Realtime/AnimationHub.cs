@@ -37,6 +37,8 @@ public class AnimationHub : Hub
     public const string REQUEST_PROGRESS_METHOD = "requestProgress";
     public const string REQUEST_FINISHED_METHOD = "requestFinished";
     public const string ANIMATION_VERSION_METHOD = "animationVersion";
+    /// <summary>A valid working file of the Claude, relayed to the editor as an unsaved edit (091).</summary>
+    public const string DRAFT_VERSION_METHOD = "draftVersion";
     public const string CONVERSATION_CLEARED_METHOD = "conversationCleared";
 
     public const string AGENT_DROPPED = "O agente caiu.";
@@ -117,8 +119,9 @@ public class AnimationHub : Hub
     }
 
     /// <summary>
-    /// A watched file changed on the machine. The working file of the animation becomes a new version when it is a valid
-    /// <c>roll6-animation</c> (else a notice says why); another <c>.json</c> in the folder is announced; the rest is ignored.
+    /// A watched file changed on the machine. The working file of the animation becomes an unsaved edit of the editor (091)
+    /// when it is a valid <c>roll6-animation</c> (else a notice says why); another <c>.json</c> in the folder is announced;
+    /// the rest is ignored.
     /// </summary>
     public async Task FileChanged(long requestId, FileChangedInfo info)
     {
@@ -131,7 +134,7 @@ public class AnimationHub : Hub
         switch (AnimationRequestBuilder.Classify(animation, info.Path))
         {
             case FileChangeKind.Working:
-                await StoreVersionAsync(request, info.Content);
+                await RelayVersionAsync(request, info.Content);
                 break;
             case FileChangeKind.OtherAnimation:
                 await NoticeAsync(request, string.Format(FILE_CREATED, Path.GetFileName(info.Path.Replace('\\', '/'))));
@@ -139,7 +142,27 @@ public class AnimationHub : Hub
         }
     }
 
-    private async Task StoreVersionAsync(EditorRequest request, string content)
+    /// <summary>The edit version sent with a request (091), validated like an upload; an invalid one refuses the request.</summary>
+    private static JsonElement? ValidContent(JsonElement? content)
+    {
+        if (content is not { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) } given)
+            return null;
+        try
+        {
+            AnimationFormat.Parse(given);
+        }
+        catch (DomainValidationException)
+        {
+            throw new HubException("invalid");
+        }
+        return given.Clone();
+    }
+
+    /// <summary>
+    /// A valid working file becomes an unsaved edit of the editor that sent the request (091): relayed as
+    /// <c>draftVersion</c>, never stored — only the user's "Salvar" writes the library. An invalid file is a notice.
+    /// </summary>
+    private async Task RelayVersionAsync(EditorRequest request, string content)
     {
         JsonElement json;
         try
@@ -156,8 +179,12 @@ public class AnimationHub : Hub
         {
             // Validated here with the same rule as the upload, so an invalid file becomes a notice and never a version.
             AnimationFormat.Parse(json);
-            await _animations.ReplaceContentAsync(request.UserId, request.AnimationId, new AnimationContentInfo { Content = json },
-                AnimationVersionInfo.ORIGIN_AGENT);
+            await Clients.Group(AnimationConnections.GroupName(request.AnimationId)).SendAsync(DRAFT_VERSION_METHOD, new DraftVersionInfo
+            {
+                AnimationId = request.AnimationId,
+                RequestId = request.RequestId,
+                Content = json,
+            });
         }
         catch (DomainValidationException ex)
         {
@@ -227,13 +254,14 @@ public class AnimationHub : Hub
     {
         if (!IsValid(info))
             throw new HubException("invalid");
+        var content = ValidContent(info.Content);
         var userId = UserId;
         var animation = await OwnedAsync(userId, info.AnimationId);
         if (!_connections.AgentStatusOf(userId).Connected)
             throw new HubException("no-agent");
         var conversation = await _conversations.GetOrOpenAsync(userId, info.AnimationId);
         var request = _connections.Enqueue(userId, info.AnimationId, animation.Name, conversation.AnimationConversationId,
-            conversation.ClaudeSessionId, conversation.Started, info.Text.Trim(), info.Images, info.ModelName, Now)
+            conversation.ClaudeSessionId, conversation.Started, info.Text.Trim(), info.Images, info.ModelName, Now, content)
             ?? throw new HubException("busy");
         await _conversations.AddMessageAsync(conversation.AnimationConversationId, ConversationRole.User, info.Text.Trim(), info.Images.Count);
         var started = await DispatchAsync(userId);
@@ -317,7 +345,8 @@ public class AnimationHub : Hub
             RunInfo run;
             try
             {
-                var content = await _animations.ReadContentAsync(request.AnimationId);
+                // 091: the editor's edit version when it sent one, else the library's content.
+                var content = request.Content ?? await _animations.ReadContentAsync(request.AnimationId);
                 var animation = new Animation { AnimationId = request.AnimationId, Name = request.AnimationName };
                 var conversation = new AnimationConversation { ClaudeSessionId = request.SessionId, Started = request.SessionStarted };
                 run = AnimationRequestBuilder.Build(animation, content, conversation, request.RequestId, request.Prompt, request.Images, request.ModelName);

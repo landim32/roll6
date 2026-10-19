@@ -7,9 +7,11 @@ import { animationEditorService, EditorHubError } from '../Services/animationEdi
 import { animationService } from '../Services/animationService';
 import { createHistory, versionText } from '../lib/animationHistory';
 import type { AnimationHistory, HistoryCounts } from '../lib/animationHistory';
+import { parseAnimationText, toRoll6Clip } from '../lib/animationFormat';
 import type { AnimationFile } from '../lib/animationFormat';
+import { uploadThumbnail } from '../lib/thumbnailUpload';
 import * as reducers from '../lib/editorState';
-import { INITIAL_STATE, MAX_ATTACHMENTS, base64Of } from '../lib/editorState';
+import { INITIAL_STATE, MAX_ATTACHMENTS, base64Of, isDirty } from '../lib/editorState';
 import type { EditorState, PrintAttachment } from '../lib/editorState';
 import type { TokenInfo } from '../types/token';
 import type { EditorErrorCode, RequestOutcome } from '../types/animationEditor';
@@ -32,12 +34,18 @@ interface AnimationEditorContextType {
   setToken: (token: TokenInfo | null) => void;
   skeleton: boolean;
   setSkeleton: (on: boolean) => void;
-  /** A bone turned on the stage: validated and stored by the server, then pushed to the history. Throws with the server message. */
+  /** A bone turned on the stage: an unsaved edit pushed to the history (091 — nothing reaches the library). */
   saveContent: (file: AnimationFile) => Promise<void>;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
-  /** The content of the own save just made, to ignore its echo. */
-  isOwnEcho: (file: AnimationFile) => boolean;
+  /** The edit version differs from the library's (091). */
+  dirty: boolean;
+  /** "Salvar" is running. */
+  saving: boolean;
+  /** "Salvar" (091): validates the edit version and writes it to the library with a fresh card picture. */
+  save: () => Promise<void>;
+  /** "Descartar" (091): back to the library's version. */
+  discard: () => void;
   sendRequest: (text: string, modelName: string | null) => Promise<void>;
   stopRequest: () => Promise<void>;
   newConversation: () => Promise<void>;
@@ -68,7 +76,8 @@ const readSkeleton = (): boolean => {
 /**
  * The animation editor page (086): one provider per open tab, scoped to one animation. It connects to
  * `/hubs/animation`, opens the editor, applies every hub event through the pure reducers of `lib/editorState`, keeps
- * the version history of this tab and sends requests for the local Claude. Versions are saved through the REST API.
+ * the version history of this tab and sends requests for the local Claude. Since 091 every change (a turned bone,
+ * undo/redo, a file of the Claude) stays in the tab's edit version until "Salvar" writes it through the REST API.
  */
 export const AnimationEditorProvider = ({ animationId, children }: { animationId: number; children: ReactNode }) => {
   const { t } = useTranslation();
@@ -84,6 +93,11 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
   /** The texts of the versions this tab saved and still waits the echo of. */
   const ownSaves = useRef(new Set<string>());
   const nextPrintId = useRef(1);
+  /** The requests this tab sent: only their drafts become edits here (091). */
+  const ownRequests = useRef(new Set<number>());
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const [saving, setSaving] = useState(false);
 
   const refreshHistory = useCallback(() => setHistory(versions.current.counts), []);
 
@@ -140,6 +154,12 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
         refreshHistory();
         setState((s) => reducers.animationVersion(s, version));
       }),
+      animationEditorService.on(hub, 'draftVersion', (info) => {
+        if (!ownRequests.current.has(info.requestId)) return;
+        versions.current.push(versionText(info.content));
+        refreshHistory();
+        setState((s) => reducers.draftVersion(s, info, true));
+      }),
       animationEditorService.on(hub, 'conversationCleared', (info) => setState((s) => reducers.conversationCleared(s, info))),
     ];
     hub.onreconnecting(() => setConnected(false));
@@ -188,51 +208,62 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
     }
   }, []);
 
-  /** Saves a text as the animation's content; the echo of the version is ignored. */
-  const saveText = useCallback(async (text: string) => {
-    const file = JSON.parse(text) as AnimationFile;
+  /** A bone turned on the stage (091): only the edit version and the history change; the stage already shows it. */
+  const saveContent = useCallback(async (file: AnimationFile) => {
+    versions.current.push(versionText(file));
+    refreshHistory();
+    setState((s) => reducers.edited(s, file, false));
+  }, [refreshHistory]);
+
+  /** Undo/redo (091): the neighbour version becomes the edit version, played again by the stage. */
+  const step = useCallback((text: string | null) => {
+    if (text === null) return;
+    setState((s) => reducers.edited(s, JSON.parse(text) as AnimationFile, true));
+    refreshHistory();
+  }, [refreshHistory]);
+
+  const undo = useCallback(async () => step(versions.current.undo()), [step]);
+  const redo = useCallback(async () => step(versions.current.redo()), [step]);
+
+  const dirty = isDirty(state);
+
+  const save = useCallback(async () => {
+    const current = stateRef.current;
+    if (!current.content || !isDirty(current)) return;
+    const text = versionText(current.content);
+    const parsed = parseAnimationText(text);
+    if ('error' in parsed) {
+      toast.error(t('editor.save.invalid', { message: parsed.error.message }));
+      return;
+    }
+    setSaving(true);
     ownSaves.current.add(text);
     try {
-      await animationService.replaceContent(animationId, file);
-      setState((s) => reducers.ownVersion(s, file));
+      // 090: the library card's picture of the new content; a failed one is skipped (the card draws it live).
+      let thumbnail: Blob | null = null;
+      try {
+        const { renderAnimationThumbnail } = await import('../components/library/animationThumbnail');
+        thumbnail = await renderAnimationThumbnail(toRoll6Clip(parsed.file, `animation:${animationId}`));
+      } catch {
+        thumbnail = null;
+      }
+      await animationService.replaceContent(animationId, parsed.file, await uploadThumbnail(thumbnail, 'animation'));
+      setState((s) => reducers.saved(s, current.content!));
+      toast.success(t('editor.save.saved'));
     } catch (err) {
       ownSaves.current.delete(text);
-      throw err;
+      toast.error(t('editor.save.invalid', { message: err instanceof Error ? err.message : t('common.unknownError') }));
+    } finally {
+      setSaving(false);
     }
-  }, [animationId]);
+  }, [animationId, t]);
 
-  const saveContent = useCallback(async (file: AnimationFile) => {
-    const text = versionText(file);
-    await saveText(text);
-    versions.current.push(text);
+  const discard = useCallback(() => {
+    const saved = stateRef.current.savedContent;
+    if (saved) versions.current.push(versionText(saved));
     refreshHistory();
-  }, [refreshHistory, saveText]);
-
-  const undo = useCallback(async () => {
-    const text = versions.current.undo();
-    if (text === null) return;
-    try {
-      await saveText(text);
-    } catch (err) {
-      versions.current.redo();
-      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-    }
-    refreshHistory();
-  }, [refreshHistory, saveText, t]);
-
-  const redo = useCallback(async () => {
-    const text = versions.current.redo();
-    if (text === null) return;
-    try {
-      await saveText(text);
-    } catch (err) {
-      versions.current.undo();
-      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-    }
-    refreshHistory();
-  }, [refreshHistory, saveText, t]);
-
-  const isOwnEcho = useCallback((file: AnimationFile) => ownSaves.current.has(versionText(file)), []);
+    setState((s) => reducers.discarded(s));
+  }, [refreshHistory]);
 
   const errorToast = useCallback((err: unknown) => {
     const code: EditorErrorCode | null = err instanceof EditorHubError ? err.code : null;
@@ -250,12 +281,15 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
         text,
         images: attachments.map((print) => ({ png: base64Of(print.marked), caption: print.caption })),
         modelName,
+        // 091: the Claude works on the edit version, unsaved changes included.
+        content: state.content,
       });
+      ownRequests.current.add(requestId);
       setState((s) => reducers.sent(s, requestId, text, attachments.map((print) => print.marked), new Date().toISOString()));
     } catch (err) {
       errorToast(err);
     }
-  }, [animationId, errorToast, state.animation, state.attachments]);
+  }, [animationId, errorToast, state.animation, state.attachments, state.content]);
 
   const stopRequest = useCallback(async () => {
     const hub = connection.current;
@@ -290,11 +324,11 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
   const removePrint = useCallback((id: number) => setState((s) => reducers.removePrint(s, id)), []);
 
   const value = useMemo<AnimationEditorContextType>(() => ({
-    state, loading, error, connected, history, tokenId, setToken, skeleton, setSkeleton, saveContent, undo, redo, isOwnEcho,
-    sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint,
+    state, loading, error, connected, history, tokenId, setToken, skeleton, setSkeleton, saveContent, undo, redo, dirty, saving,
+    save, discard, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint,
   }), [
-    state, loading, error, connected, history, tokenId, setToken, skeleton, setSkeleton, saveContent, undo, redo, isOwnEcho,
-    sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint,
+    state, loading, error, connected, history, tokenId, setToken, skeleton, setSkeleton, saveContent, undo, redo, dirty, saving,
+    save, discard, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint,
   ]);
 
   return <AnimationEditorContext.Provider value={value}>{children}</AnimationEditorContext.Provider>;

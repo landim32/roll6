@@ -30,6 +30,8 @@ export interface RequestPayload {
   text: string;
   images: PromptImage[];
   modelName: string | null;
+  /** The tab's edit version (091): the Claude works on what the stage shows, unsaved changes included. */
+  content?: AnimationFile | null;
 }
 
 export type ClaudeEventKind = 'started' | 'text' | 'tool' | 'notice';
@@ -118,6 +120,13 @@ export interface ConversationCleared {
   animationId: number;
 }
 
+/** A valid working file of the Claude (091): an unsaved edit of the tab that sent the request, never stored. */
+export interface DraftVersion {
+  animationId: number;
+  requestId: number;
+  content: AnimationFile;
+}
+
 /** The server → browser methods and their payloads. */
 export interface EditorEvents {
   agentStatus: AgentStatus;
@@ -126,6 +135,7 @@ export interface EditorEvents {
   requestProgress: RequestProgress;
   requestFinished: RequestFinished;
   animationVersion: AnimationVersion;
+  draftVersion: DraftVersion;
   conversationCleared: ConversationCleared;
 }
 

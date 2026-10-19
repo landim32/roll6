@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isAtBottom } from '../../../lib/stickToBottom';
 import { useAnimationEditor } from '../../../hooks/useAnimationEditor';
 import { isBusy } from '../../../lib/editorState';
 import type { EditorMessage, PrintAttachment } from '../../../lib/editorState';
@@ -35,18 +36,32 @@ export const EditorConversation = ({ modelName, onAttach, onEditPrint }: EditorC
   const busy = isBusy(state);
   const canSend = connected && state.agent.connected && !busy && (text.trim().length > 0 || state.attachments.length > 0) && text.length <= MAX_TEXT;
 
-  // Follow the newest line.
-  const count = state.messages.length;
-  const lastText = state.messages[state.messages.length - 1]?.text.length ?? 0;
+  // 091: follow the newest content — growing Claude text, tool lines, notices, markdown and thumbnails that render
+  // late — while the user is at the bottom; leave them alone once they scroll up to read.
+  const atBottom = useRef(true);
   useEffect(() => {
     const element = list.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [count, lastText]);
+    if (!element) return undefined;
+    const stick = () => { if (atBottom.current) element.scrollTop = element.scrollHeight; };
+    const onScroll = () => { atBottom.current = isAtBottom(element); };
+    const observer = new MutationObserver(stick);
+    observer.observe(element, { childList: true, subtree: true, characterData: true });
+    element.addEventListener('scroll', onScroll, { passive: true });
+    element.addEventListener('load', stick, true);
+    stick();
+    return () => {
+      observer.disconnect();
+      element.removeEventListener('scroll', onScroll);
+      element.removeEventListener('load', stick, true);
+    };
+  }, []);
 
   const send = async () => {
     if (!canSend) return;
     const value = text.trim();
     setText('');
+    // An own message always goes to the bottom, even when the user was reading above.
+    atBottom.current = true;
     await sendRequest(value, modelName);
   };
 
