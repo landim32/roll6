@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { animationService } from '../Services/animationService';
 import { uploadThumbnail } from '../lib/thumbnailUpload';
+import { parseAnimationText } from '../lib/animationFormat';
+import { copyBase, copyName } from '../lib/copyName';
 import type { PagedList } from '../types/common';
 import type {
   AnimationInfo, AnimationInsertInfo, AnimationQuery, AnimationType, AnimationUpdateInfo,
@@ -24,6 +26,8 @@ interface AnimationContextType {
   upload: (data: AnimationInsertInfo, thumbnail?: Blob | null) => Promise<AnimationInfo>;
   update: (animation: AnimationInfo, data: AnimationUpdateInfo) => Promise<AnimationInfo>;
   remove: (animation: AnimationInfo) => Promise<void>;
+  /** A copy of an animation (anyone's) into the user's own library — same type, content and picture, named "Nome (2)". */
+  duplicate: (animation: AnimationInfo) => Promise<AnimationInfo>;
   /** Stores the card's picture drawn for an own animation that had none (090, backfill); failures are ignored. */
   storeThumbnail: (animation: AnimationInfo, thumbnail: Blob) => Promise<void>;
 }
@@ -78,6 +82,22 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     if (requested.current.has(animation.type)) await refreshType(animation.type);
   }, [refreshType]);
 
+  const duplicate = useCallback(async (animation: AnimationInfo) => {
+    const parsed = parseAnimationText(await animationService.getContent(animation.animationId));
+    if (!('file' in parsed)) throw new Error(parsed.error.message);
+    // The number comes after the user's own names that start like this one (the stored picture is a write-once object,
+    // so the copy may point at the same one).
+    const own = await animationService.list({ mine: true, page: 1, pageSize: 100, search: copyBase(animation.name) });
+    const created = await animationService.create({
+      name: copyName(animation.name, own.items.map((item) => item.name)),
+      type: animation.type,
+      content: parsed.file,
+      thumbnailImage: animation.thumbnailImage ?? undefined,
+    });
+    if (requested.current.has(created.type)) await refreshType(created.type);
+    return created;
+  }, [refreshType]);
+
   const storeThumbnail = useCallback(async (animation: AnimationInfo, thumbnail: Blob) => {
     const thumbnailImage = await uploadThumbnail(thumbnail, 'animation');
     if (!thumbnailImage) return;
@@ -89,8 +109,8 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const value = useMemo<AnimationContextType>(
-    () => ({ byType, listForType, refreshType, search, upload, update, remove, storeThumbnail }),
-    [byType, listForType, refreshType, search, upload, update, remove, storeThumbnail],
+    () => ({ byType, listForType, refreshType, search, upload, update, remove, duplicate, storeThumbnail }),
+    [byType, listForType, refreshType, search, upload, update, remove, duplicate, storeThumbnail],
   );
   return <AnimationContext.Provider value={value}>{children}</AnimationContext.Provider>;
 };

@@ -8,7 +8,7 @@ import { copyToClipboard } from '../../lib/clipboard';
 import { animationService } from '../../Services/animationService';
 import { ANIMATION_TYPES } from '../../types/animation';
 import type { AnimationInfo, AnimationType } from '../../types/animation';
-import { CopyIcon, PencilIcon, PlayFillIcon, TrashIcon } from '../ui/icons';
+import { CopyIcon, FilesIcon, PencilIcon, PlayFillIcon, TrashIcon } from '../ui/icons';
 import { CardGrid } from '../library/CardGrid';
 import { LibraryCard } from '../library/LibraryCard';
 import { Thumbnail } from '../library/Thumbnail';
@@ -30,6 +30,8 @@ interface AnimationListProps {
   version: number;
   onEdit?: (animation: AnimationInfo) => void;
   onDelete?: (animation: AnimationInfo) => void;
+  /** "Copiar": a copy of the animation into the user's own library, named "Nome (2)". */
+  onDuplicate?: (animation: AnimationInfo) => void;
 }
 
 /** Duration in pt-BR ("1,2 s"). */
@@ -38,10 +40,10 @@ const seconds = (value: number, locale: string) => value.toLocaleString(locale, 
 /**
  * One submenu of "Animações" (059; a tab until 090): name, type, duration and whether it repeats; a type filter and a
  * name search, 12 per page — since 090 as cards in 4 columns (3 on phones) with the animation's picture (stored, else
- * drawn here and, for the user's own, stored). Every card copies its JSON; the user's own also open the editor, edit
- * and delete.
+ * drawn here and, for the user's own, stored). Every card copies its JSON and makes a copy of the animation in the
+ * user's library; the user's own also open the editor, edit and delete.
  */
-export const AnimationList = ({ mine, version, onEdit, onDelete }: AnimationListProps) => {
+export const AnimationList = ({ mine, version, onEdit, onDelete, onDuplicate }: AnimationListProps) => {
   const { t, i18n } = useTranslation();
   const { search, storeThumbnail } = useAnimation();
   const { session } = useAuth();
@@ -128,6 +130,12 @@ export const AnimationList = ({ mine, version, onEdit, onDelete }: AnimationList
             badges={<span className="badge text-bg-secondary">{t(`animations.type.${animation.type}`)}</span>}
             actions={(
               <>
+                {onDuplicate && (
+                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onDuplicate(animation)}
+                    title={t('animations.duplicateLabel', { name: animation.name })} aria-label={t('animations.duplicateLabel', { name: animation.name })}>
+                    <FilesIcon size={14} />
+                  </button>
+                )}
                 <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => { void copy(animation); }}
                   title={t('animations.copy')} aria-label={t('animations.copy')}>
                   <CopyIcon size={14} />
