@@ -7,7 +7,8 @@ import { useAnimationEditor } from '../hooks/useAnimationEditor';
 import { useLeaveGuard } from '../hooks/useLeaveGuard';
 import { APP_NAME } from '../lib/documentTitle';
 import { animationEditorPath, idParam, libraryPath } from '../lib/libraryRoutes';
-import { isBusy } from '../lib/editorState';
+import { base64Of, isBusy } from '../lib/editorState';
+import { SHOT_VIEW_LABEL } from '../lib/shotCamera';
 import type { PrintAttachment } from '../lib/editorState';
 import { caption } from '../lib/printCaption';
 import type { Mark } from '../lib/markup';
@@ -69,7 +70,7 @@ const NotAvailable = ({ kind }: { kind: 'forbidden' | 'not-found' | 'offline' })
 const EditorBody = () => {
   const { t } = useTranslation();
   const editor = useAnimationEditor();
-  const { state, loading, error, tokenId, skeleton, setSkeleton, history, undo, redo, saveContent, attachPrint, replacePrint, dirty, save } = editor;
+  const { state, loading, error, tokenId, skeleton, setSkeleton, history, undo, redo, saveContent, attachPrint, replacePrint, dirty, save, registerPrinter } = editor;
   // 091: unsaved changes live only in this tab — leaving asks first.
   const guard = useLeaveGuard(dirty);
   const stage = useRef<StageHandle | null>(null);
@@ -138,6 +139,38 @@ const EditorBody = () => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [dirty, editingAllowed, markup, redo, save, undo]);
+
+  // 094: the stage takes the prints the Claude asks for — the file it wrote, from the sides and instants it chose.
+  const animationName = state.animation?.name ?? null;
+  useEffect(() => {
+    if (!modelUrl) {
+      registerPrinter(null);
+      return undefined;
+    }
+    registerPrinter(async (request) => {
+      if (mixamo === false) return t('editor.print.notMixamo');
+      const shots = stage.current?.captureShots(request.content, request.shots);
+      if (!shots) return t('editor.print.noModel');
+      if (typeof shots === 'string') return shots;
+      return shots.map((shot) => ({
+        png: base64Of(shot.png),
+        caption: caption({
+          animationName,
+          time: shot.time,
+          duration: shot.duration,
+          paused: true,
+          azimuth: shot.azimuth,
+          elevation: shot.elevation,
+          skeleton: shot.skeleton,
+          pose: shot.pose,
+          marks: [],
+          weapons: visibleWeapons,
+          view: SHOT_VIEW_LABEL[shot.view],
+        }),
+      }));
+    });
+    return () => registerPrinter(null);
+  }, [animationName, mixamo, modelUrl, registerPrinter, t, visibleWeapons]);
 
   const capture = useCallback(() => {
     const print = stage.current?.capture();

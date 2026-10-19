@@ -67,6 +67,98 @@ public sealed class EditorRequest
     /// <summary>The console reported the Claude session started (the conversation becomes resumable).</summary>
     public bool Started { get; internal set; }
 
+    // ---------- prints (094) ----------
+
+    private readonly Dictionary<string, TaskCompletionSource<PrintResultInfo>> _pendingPrints = new();
+    private JsonElement? _latestContent;
+    private string? _latestError;
+    private int _printCount;
+
+    /// <summary>The editor tab that sent the request: the only one asked for prints.</summary>
+    public string? EditorConnectionId { get; init; }
+
+    /// <summary>The latest valid working file (the run's content, then each valid file the Claude wrote).</summary>
+    public JsonElement? LatestContent
+    {
+        get { lock (_lock) return _latestContent; }
+    }
+
+    /// <summary>Why the last file the Claude wrote is not a valid animation; null once a valid one arrives.</summary>
+    public string? LatestError
+    {
+        get { lock (_lock) return _latestError; }
+    }
+
+    public int PrintCount
+    {
+        get { lock (_lock) return _printCount; }
+    }
+
+    public void SetLatest(JsonElement content)
+    {
+        lock (_lock)
+        {
+            _latestContent = content.Clone();
+            _latestError = null;
+        }
+    }
+
+    public void SetLatestError(string message)
+    {
+        lock (_lock) _latestError = message;
+    }
+
+    /// <summary>Counts <paramref name="shots"/> more prints; false (nothing counted) when it would pass <paramref name="limit"/>.</summary>
+    public bool TryReservePrints(int shots, int limit)
+    {
+        lock (_lock)
+        {
+            if (_printCount + shots > limit)
+                return false;
+            _printCount += shots;
+            return true;
+        }
+    }
+
+    /// <summary>Waits for the tab's answer to <paramref name="callId"/>.</summary>
+    public Task<PrintResultInfo> AddPendingPrint(string callId)
+    {
+        var pending = new TaskCompletionSource<PrintResultInfo>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_lock) _pendingPrints[callId] = pending;
+        return pending.Task;
+    }
+
+    /// <summary>The tab answered; false when nobody waits for that call (late, or another request's).</summary>
+    public bool CompletePrint(PrintResultInfo result)
+    {
+        TaskCompletionSource<PrintResultInfo>? pending;
+        lock (_lock)
+        {
+            if (!_pendingPrints.Remove(result.CallId, out pending))
+                return false;
+        }
+        return pending.TrySetResult(result);
+    }
+
+    /// <summary>Forgets a call (timed out).</summary>
+    public void DropPrint(string callId)
+    {
+        lock (_lock) _pendingPrints.Remove(callId);
+    }
+
+    /// <summary>Every waiting print ends with <paramref name="message"/> (request ended, editor gone).</summary>
+    public void FailPendingPrints(string message)
+    {
+        List<(string CallId, TaskCompletionSource<PrintResultInfo> Pending)> all;
+        lock (_lock)
+        {
+            all = _pendingPrints.Select(p => (p.Key, p.Value)).ToList();
+            _pendingPrints.Clear();
+        }
+        foreach (var (callId, pending) in all)
+            pending.TrySetResult(new PrintResultInfo { CallId = callId, Error = message });
+    }
+
     public void Append(string text)
     {
         lock (_lock) _text.Append(text);
@@ -177,7 +269,7 @@ public class AnimationConnections
     /// </summary>
     public EditorRequest? Enqueue(long userId, long animationId, string animationName, long conversationId, Guid sessionId,
         bool sessionStarted, string prompt, IReadOnlyList<PromptImageInfo> images, string? modelName, DateTime now,
-        JsonElement? content = null, IReadOnlyList<string>? modelWeapons = null)
+        JsonElement? content = null, IReadOnlyList<string>? modelWeapons = null, string? editorConnectionId = null)
     {
         lock (_lock)
         {
@@ -188,6 +280,7 @@ public class AnimationConnections
             {
                 Content = content,
                 ModelWeapons = modelWeapons ?? Array.Empty<string>(),
+                EditorConnectionId = editorConnectionId,
             };
             _requests[request.RequestId] = request;
             if (!_queues.TryGetValue(userId, out var queue))
@@ -287,6 +380,12 @@ public class AnimationConnections
             var index = queue.IndexOf(requestId);
             return index < 0 ? null : index + 1;
         }
+    }
+
+    /// <summary>The requests that editor tab sent and are still queued or running (094: its prints fail when it leaves).</summary>
+    public List<EditorRequest> RequestsOfEditor(string connectionId)
+    {
+        lock (_lock) return _requests.Values.Where(r => r.EditorConnectionId == connectionId).ToList();
     }
 
     /// <summary>The request belongs to the agent on that connection (its events are accepted).</summary>

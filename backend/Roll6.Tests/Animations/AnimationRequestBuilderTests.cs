@@ -40,6 +40,19 @@ public class AnimationRequestBuilderTests
     }
 
     [Fact]
+    public void TheRunOffersPrintStageAndTheContextSaysToCheckAfterEachChange()
+    {
+        using var content = JsonDocument.Parse("""{"duration":1,"loop":true,"tracks":[]}""");
+        var run = AnimationRequestBuilder.Build(ACENO, content.RootElement, new AnimationConversation(), 12, "oi",
+            Array.Empty<PromptImageInfo>(), null);
+
+        run.Tools.Should().ContainSingle().Which.Name.Should().Be(PrintRequest.TOOL_NAME);
+        run.SystemPrompt.Should().Contain("mcp__roll6-editor__print_stage");
+        run.SystemPrompt.Should().Contain("Depois de CADA alteração do arquivo, chame print_stage");
+        run.SystemPrompt.Should().Contain("Até 6 prints por chamada e 30 por pedido");
+    }
+
+    [Fact]
     public void TheContextIsTheEditorInstructions()
     {
         var text = AnimationPromptContext.Build("animacoes/7-aceno.json", null);

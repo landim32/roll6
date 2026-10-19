@@ -16,6 +16,9 @@ public sealed class FileWatcher : IDisposable
     private readonly List<FileSystemWatcher> _watchers = new();
     private readonly ConcurrentDictionary<string, Timer> _timers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _ignored = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>094: the text each watched file had when last seen (at start, reported, or written by the console).</summary>
+    private readonly ConcurrentDictionary<string, string> _known = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _settleLock = new();
     private bool _disposed;
 
     /// <summary>How long a file must stay unchanged before it is read.</summary>
@@ -59,12 +62,74 @@ public sealed class FileWatcher : IDisposable
     /// <summary>Starts raising events.</summary>
     public void Start()
     {
+        foreach (var file in WatchedFiles())
+        {
+            try
+            {
+                _known[file] = File.ReadAllText(file);
+            }
+            catch (IOException)
+            {
+                // Being written: the watcher will report it when it settles.
+            }
+        }
         foreach (var watcher in _watchers)
             watcher.EnableRaisingEvents = true;
     }
 
     /// <summary>The next settle of this file with exactly this text is the console's own write: not reported.</summary>
-    public void Ignore(string fullPath, string content) => _ignored[fullPath] = content;
+    public void Ignore(string fullPath, string content)
+    {
+        _ignored[fullPath] = content;
+        _known[fullPath] = content;
+    }
+
+    /// <summary>
+    /// Reports now, synchronously, what would otherwise settle later (094): every file still waiting for its settle, and
+    /// every watched file whose text differs from the last one seen — the OS may not even have raised its event yet. Used
+    /// before a tool call, so the server already has the edit the Claude just made.
+    /// </summary>
+    public void Flush()
+    {
+        if (_disposed)
+            return;
+        foreach (var pending in _timers.Keys.ToList())
+            Settle(pending);
+        foreach (var file in WatchedFiles())
+        {
+            string content;
+            try
+            {
+                content = File.ReadAllText(file);
+            }
+            catch (IOException)
+            {
+                continue;
+            }
+            bool changed;
+            lock (_settleLock)
+            {
+                changed = !_known.TryGetValue(file, out var known) || known != content;
+                if (changed)
+                    _known[file] = content;
+            }
+            if (changed)
+                FileSettled?.Invoke(FileWriter.Relative(_root, file), content);
+        }
+    }
+
+    private IEnumerable<string> WatchedFiles()
+    {
+        foreach (var (folder, file) in _targets)
+        {
+            if (!Directory.Exists(folder))
+                continue;
+            var candidates = file == null ? Directory.EnumerateFiles(folder) : new[] { Path.Combine(folder, file) };
+            foreach (var candidate in candidates)
+                if (File.Exists(candidate) && IsWatched(candidate))
+                    yield return candidate;
+        }
+    }
 
     private bool IsWatched(string fullPath)
     {
@@ -100,10 +165,17 @@ public sealed class FileWatcher : IDisposable
             Touch(fullPath);
             return;
         }
-        if (_ignored.TryGetValue(fullPath, out var own) && own == content)
+        lock (_settleLock)
         {
-            _ignored.TryRemove(fullPath, out _);
-            return;
+            if (_ignored.TryGetValue(fullPath, out var own) && own == content)
+            {
+                _ignored.TryRemove(fullPath, out _);
+                return;
+            }
+            // Already reported (e.g. by a Flush before a tool call) or never changed: nothing new.
+            if (_known.TryGetValue(fullPath, out var seen) && seen == content)
+                return;
+            _known[fullPath] = content;
         }
         FileSettled?.Invoke(FileWriter.Relative(_root, fullPath), content);
     }

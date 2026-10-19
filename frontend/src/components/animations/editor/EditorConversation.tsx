@@ -7,6 +7,7 @@ import { isBusy } from '../../../lib/editorState';
 import type { EditorMessage, PrintAttachment } from '../../../lib/editorState';
 import { CONVERSATION_ROLE, REQUEST_STATE } from '../../../types/animationEditor';
 import { ConfirmModal } from '../../ui/ConfirmModal';
+import { ImageLightbox } from '../../chat/ImageLightbox';
 import { CameraIcon, SendIcon, StopIcon, XIcon } from '../../ui/icons';
 
 const MarkdownView = lazy(() => import('../../ui/MarkdownView'));
@@ -184,6 +185,38 @@ const MessageLine = ({ message }: { message: EditorMessage }) => {
           {message.lines.map((line, index) => <li key={index}>{line}</li>)}
         </ul>
       )}
+      {message.prints.length > 0 && <AgentPrints message={message} />}
+    </div>
+  );
+};
+
+/** 094: the prints this tab took for the Claude, under its line; a tap opens one in the photo viewer. */
+const AgentPrints = ({ message }: { message: EditorMessage }) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState<{ url: string; caption: string | null } | null>(null);
+  return (
+    <div className="stm-editor-agent-prints">
+      {message.prints.map((print) => (
+        <div key={print.callId} className="stm-editor-agent-print">
+          <small className="text-body-secondary">
+            {print.error ? t('editor.print.failed', { reason: print.error }) : t('editor.print.label', { count: print.shots.length })}
+          </small>
+          {print.shots.length > 0 && (
+            <div className="stm-editor-msg-thumbs">
+              {print.shots.map((shot, index) => {
+                const url = `data:image/png;base64,${shot.png}`;
+                return (
+                  <button key={index} type="button" className="stm-editor-agent-thumb" onClick={() => setOpen({ url, caption: shot.caption })}
+                    title={shot.caption} aria-label={t('editor.print.open', { index: index + 1 })}>
+                    <img src={url} alt="" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+      <ImageLightbox image={open} onClose={() => setOpen(null)} />
     </div>
   );
 };

@@ -23,6 +23,8 @@ export interface CaptionInput {
   marks: readonly Mark[];
   /** The weapons visible on the model (092), e.g. "Espada longa (mão direita)". */
   weapons?: readonly string[];
+  /** 094: the side the Claude asked for, in Portuguese ("de frente"), for its own prints. */
+  view?: string;
 }
 
 export const SKELETON_NOTE = ' Esqueleto visível: o modelo aparece semitransparente e as linhas são os ossos (âmbar = movimentados pela animação aberta, ciano = os demais).';
@@ -53,7 +55,8 @@ export const caption = (input: CaptionInput): string => {
     ? 'o modelo na pose de descanso, sem animação'
     : `a animação ${input.animationName} no instante ${seconds(input.time)} de ${seconds(input.duration)}${input.paused ? ' (pausada)' : ' (tocando)'}`
       + (input.pose ? `, ${describePose(input.pose)} (as poses são os instantes com chave no arquivo)` : '');
-  return `print da vista 3D do editor de animações do Roll6: ${what}; câmera ${cameraSide(input.azimuth, input.elevation)}.`
+  return `print da vista 3D do editor de animações do Roll6: ${what}; câmera ${cameraSide(input.azimuth, input.elevation)}`
+    + (input.view ? ` (vista ${input.view})` : '') + '.'
     + (input.skeleton ? SKELETON_NOTE : '')
     + (input.weapons && input.weapons.length > 0 ? ` O modelo carrega: ${input.weapons.join(', ')}.` : '')
     + markupNote(input.marks);

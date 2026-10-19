@@ -2,6 +2,7 @@ using FluentAssertions;
 using Roll6.Console.Bridge;
 using Roll6.Console.Claude;
 using Roll6.Console.Settings;
+using Roll6.Console.Tools;
 using Roll6.DTO.Realtime.Console;
 
 namespace Roll6.Tests.Console;
@@ -142,6 +143,60 @@ public sealed class RequestRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task ARunWithToolsGivesTheClaudeTheServerAndReportsTheEditBeforeEachCall()
+    {
+        var hosts = new FakeToolHosts();
+        var request = Request();
+        request.Tools = new List<ToolInfo> { new() { Name = "print_stage", Description = "prints" } };
+        List<FileChangedInfo>? changesAtCall = null;
+        _reporter.ToolResult = call =>
+        {
+            lock (_reporter.Changes) changesAtCall = _reporter.Changes.ToList();
+            return new ToolResultInfo { CallId = call.CallId, Text = "Print 1: frente" };
+        };
+        IReadOnlyList<string>? seen = null;
+        var claude = new FakeClaude(async (arguments, _, _, ct) =>
+        {
+            seen = arguments;
+            // The Claude edits the file and asks for a print right away, before the watcher settles.
+            File.WriteAllText(Path.Combine(_root, "animacoes", "7-aceno.json"), "{\"v\":2}\n");
+            var result = await hosts.Invoke!(new ToolCallInfo { CallId = "c1", Name = "print_stage" }, ct);
+            result.Text.Should().Be("Print 1: frente");
+            return new ClaudeOutcome(ClaudeOutcomeKind.Done);
+        });
+        var runner = new RequestRunner(_settings, claude, _reporter, toolHosts: hosts);
+
+        await runner.RunAsync(request, afterRun: TimeSpan.Zero);
+
+        hosts.Started.Should().Be(1);
+        hosts.Host!.Disposed.Should().BeTrue("the server lives only while the run lasts");
+        seen.Should().Contain("--mcp-config");
+        seen![seen.ToList().IndexOf("--allowedTools") + 1].Should().EndWith("mcp__roll6-editor__print_stage");
+        changesAtCall.Should().ContainSingle(c => c.Path == "animacoes/7-aceno.json" && c.Content == "{\"v\":2}\n");
+        _reporter.ToolCalls.Should().ContainSingle().Which.Name.Should().Be("print_stage");
+    }
+
+    [Fact]
+    public async Task AReadOnlyRunNeverStartsTheToolServer()
+    {
+        var hosts = new FakeToolHosts();
+        var request = Request();
+        request.ReadOnly = true;
+        request.Tools = new List<ToolInfo> { new() { Name = "print_stage" } };
+        IReadOnlyList<string>? seen = null;
+        var runner = new RequestRunner(_settings, new FakeClaude((arguments, _, _) =>
+        {
+            seen = arguments;
+            return new ClaudeOutcome(ClaudeOutcomeKind.Done);
+        }), _reporter, toolHosts: hosts);
+
+        await runner.RunAsync(request, afterRun: TimeSpan.Zero);
+
+        hosts.Started.Should().Be(0);
+        seen.Should().NotContain(a => a.Contains("roll6-editor"));
+    }
+
+    [Fact]
     public void PermissionDenialsBecomeANotice()
     {
         var info = RequestRunner.ToInfo(new ClaudeFinished(false, "ok", new[] { "Bash" }));
@@ -187,6 +242,45 @@ public sealed class RequestRunnerTests : IDisposable
         {
             lock (Outcomes) Outcomes[requestId] = outcome;
             return Task.CompletedTask;
+        }
+
+        public List<ToolCallInfo> ToolCalls { get; } = new();
+        public Func<ToolCallInfo, ToolResultInfo> ToolResult { get; set; } = call => new ToolResultInfo { CallId = call.CallId };
+
+        public Task<ToolResultInfo> CallToolAsync(long requestId, ToolCallInfo call, CancellationToken cancellation)
+        {
+            lock (ToolCalls) ToolCalls.Add(call);
+            return Task.FromResult(ToolResult(call));
+        }
+    }
+
+    private sealed class FakeToolHosts : IToolHostFactory
+    {
+        public int Started { get; private set; }
+        public ToolInvoker? Invoke { get; private set; }
+        public FakeHost? Host { get; private set; }
+
+        public Task<IToolHost> StartAsync(IReadOnlyList<ToolInfo> tools, ToolInvoker invoke, CancellationToken cancellation)
+        {
+            Started++;
+            Invoke = invoke;
+            Host = new FakeHost(tools.Select(t => t.Name).ToList());
+            return Task.FromResult<IToolHost>(Host);
+        }
+    }
+
+    private sealed class FakeHost : IToolHost
+    {
+        public FakeHost(IReadOnlyList<string> names) => ToolNames = names;
+        public string Url => "http://127.0.0.1:5555/mcp";
+        public string Token => "t";
+        public IReadOnlyList<string> ToolNames { get; }
+        public bool Disposed { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
         }
     }
 }

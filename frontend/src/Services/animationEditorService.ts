@@ -1,7 +1,7 @@
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import type { HubConnection } from '@microsoft/signalr';
 import { API_URL, readStoredSession } from './apiHelpers';
-import type { EditorErrorCode, EditorEvents, EditorStateInfo, RequestPayload } from '../types/animationEditor';
+import type { EditorErrorCode, EditorEvents, EditorStateInfo, PrintResult, RequestPayload } from '../types/animationEditor';
 import { EDITOR_ERROR } from '../types/animationEditor';
 
 /** Hub path (same origin through the Vite/nginx proxy, like /api). */
@@ -84,6 +84,11 @@ class AnimationEditorService {
     } catch (error) {
       translate(error);
     }
+  }
+
+  /** The prints this tab took for the Claude (094), or why it could not. */
+  async printResult(connection: HubConnection, result: PrintResult): Promise<void> {
+    await connection.invoke('PrintResult', result);
   }
 
   /** Listens to one server → browser method; returns the function that stops listening. */

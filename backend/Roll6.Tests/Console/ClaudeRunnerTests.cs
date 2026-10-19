@@ -35,6 +35,52 @@ public sealed class ClaudeRunnerTests : IDisposable
     }
 
     [Fact]
+    public void ARunWithToolsGetsTheLocalServerAndPreApprovesEachTool()
+    {
+        var settings = new ConsoleSettings { ClaudeAllowedTools = "Bash(python:*)" };
+        var tools = new FakeHost("http://127.0.0.1:5123/mcp", "segredo", "print_stage");
+
+        var arguments = ClaudeRunner.Arguments(settings, Guid.NewGuid(), started: false, "contexto", tools: tools);
+
+        arguments.Should().ContainInOrder("--allowedTools", "Bash(python:*),mcp__roll6-editor__print_stage");
+        var config = arguments[arguments.IndexOf("--mcp-config") + 1];
+        using var json = System.Text.Json.JsonDocument.Parse(config);
+        var server = json.RootElement.GetProperty("mcpServers").GetProperty("roll6-editor");
+        server.GetProperty("type").GetString().Should().Be("http");
+        server.GetProperty("url").GetString().Should().Be("http://127.0.0.1:5123/mcp");
+        server.GetProperty("headers").GetProperty("Authorization").GetString().Should().Be("Bearer segredo");
+    }
+
+    [Fact]
+    public void ToolsNeverReachAReadOnlyRunNorARunWithoutTools()
+    {
+        var settings = new ConsoleSettings { ClaudeAllowedTools = "Bash(python:*)" };
+        var tools = new FakeHost("http://127.0.0.1:5123/mcp", "segredo", "print_stage");
+
+        var readOnly = ClaudeRunner.Arguments(settings, Guid.NewGuid(), started: false, "contexto", readOnly: true, tools: tools);
+        var plain = ClaudeRunner.Arguments(settings, Guid.NewGuid(), started: false, "contexto");
+
+        readOnly.Should().NotContain(a => a.Contains("roll6-editor") || a.Contains("segredo"));
+        plain.Should().NotContain("--mcp-config");
+        plain.Should().ContainInOrder("--allowedTools", "Bash(python:*)");
+    }
+
+    private sealed class FakeHost : Roll6.Console.Tools.IToolHost
+    {
+        public FakeHost(string url, string token, params string[] names)
+        {
+            Url = url;
+            Token = token;
+            ToolNames = names;
+        }
+
+        public string Url { get; }
+        public string Token { get; }
+        public IReadOnlyList<string> ToolNames { get; }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    [Fact]
     public void AReadOnlyRunCanOnlyReadInsideTheFolder()
     {
         var settings = new ConsoleSettings { ClaudeAllowedTools = "Bash(python:*)" };

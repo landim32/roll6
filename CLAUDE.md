@@ -686,6 +686,36 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
   disabled without weapons); the print caption adds "O modelo carrega: …" and each request sends `modelWeapons`
   (`RequestInfo.ModelWeapons`, ≤ 5 × ≤ 120 chars, `invalid` otherwise) → the line "Armas do modelo: …" of
   `AnimationPromptContext`.
+- **Prints for the Claude (094)**: during an editor request the Claude calls the tool `print_stage` and sees the stage.
+  - **Console (generic tools)**: `RunInfo.tools[]` (`ToolInfo { name, description, inputSchema }`, ignored on read-only
+    runs). With tools, `RequestRunner` starts `Tools/LocalToolServer` for the run only — Kestrel + `ModelContextProtocol.
+    AspNetCore` 2.2.0 (the console now has the ASP.NET Core framework reference), Streamable HTTP stateless on
+    `127.0.0.1:0/mcp`, a random token per run (`Bearer` header or `?token=`, else 401), list/call handlers built from
+    the given tools — and `ClaudeRunner.Arguments(…, tools)` adds `--mcp-config` (`roll6-editor`, `ToolsMcpConfig`) and
+    `mcp__roll6-editor__<name>` to `--allowedTools` (`AllowedWithTools`). Each call: `FileWatcher.Flush()` reports
+    every pending/changed watched file first (the watcher now remembers each file's last text and skips unchanged
+    settles), then `BridgeClient.CallToolAsync` sends hub `ToolCall(requestId, ToolCallInfo)` and waits for the client
+    method `toolResult` (`ToolResultInfo { callId, isError, text, images[] }`, 60 s → error). Verified live with Claude
+    Code 2.1.301: header sent, tool pre-approved under `-p`, image result reaching the model.
+  - **Server**: `AnimationRequestBuilder.Build` adds `PrintRequest.ToolDefinition()` to every editor run (asks get
+    none) and `AnimationPromptContext.PRINT_LINES` ("Depois de CADA alteração do arquivo, chame print_stage…").
+    `EditorRequest` keeps `EditorConnectionId` (the tab that sent it, from `SendRequest`), `LatestContent` (the run's
+    content, then each valid working file in `RelayVersionAsync`) / `LatestError`, `PrintCount` and pending prints.
+    Hub `ToolCall` (running agent only) hands off to `AgentDispatcher.HandleToolCallAsync` (a hub method that waited
+    would hold the console's messages): `PrintRequest.Parse` (pure, `Domain/Animations/PrintRequest`: ≤ 6 shots,
+    `time` seconds or `"key"`, `view` front|back|right|left|top|three-quarter, `skeleton`; defaults key /
+    three-quarter / false), last file valid, editor still open, ≤ 30 per request, then `printRequested`
+    (`PrintRequestInfo { requestId, callId, content, shots }`) to that tab only and a wait of `PrintTimeout` (20 s) for
+    hub `PrintResult` (accepted only from that tab, ≤ 6 PNGs, captions cut); errors are Portuguese tool results.
+    `FinishAsync` and an editor disconnect fail pending prints. No REST, schema or MCP change.
+  - **Tab**: `AnimationEditorContext.registerPrinter` (the page registers its stage while a model is shown) answers
+    `printRequested` through `animationEditorService.printResult` and adds the prints under the running Claude line
+    (`lib/editorState.agentPrint`, `EditorMessage.prints`, kept when the answer is stored; thumbnails open
+    `ImageLightbox`). `AnimationStage.captureShots(file, shots)` poses a temporary mixer on the model at each instant
+    (`lib/keyPose` for "key"), toggles the skeleton, renders 768 × 768 from the pure `lib/shotCamera`
+    (`SHOT_ANGLES`, `shotCameraPosition`, `shotTime`, `SHOT_VIEW_LABEL`), stamps the pose, then restores every node,
+    the skeleton, the size and the user's view in the same task. Captions are `lib/printCaption.caption` with
+    `view`. Texts `editor.print.*`.
 
 ```bash
 cd backend
@@ -832,6 +862,8 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - No schema change: `roll6:editor-weapons` (localStorage) holds the stage's weapons toggle; `RequestInfo.modelWeapons` adds one context line for the Claude. (092-editor-token-weapons)
 - C# 12 / .NET 8 (API, Roll6.Console read-only runs); TypeScript 5 / React 18 (chat) + existing only (SignalR, EF Core 9, Claude Code CLI flags `--tools`/`--allowedTools`/`--disallowedTools`/`--permission-mode dontAsk`/`--strict-mcp-config`). **No new dependency.** (093-chat-ask-gm-console)
 - PostgreSQL — `turns.ask_state`, `turns.edited_at`; turn types 13 Question / 14 Answer; migration `AddChatAsk` + `database/migrations/093-chat-ask.sql`. (093-chat-ask-gm-console)
+- C# 12 / .NET 8 (API, Console); TypeScript 5 / React 18 (editor) + existing in the solution: the console adds the ASP.NET Core shared framework and `ModelContextProtocol.AspNetCore` 2.2.0 (already used by `Roll6.Mcp`) for a per-run loopback MCP server; `three` lazy on the stage. **No new dependency.** (094-editor-agent-prints)
+- No storage: prints travel in memory (editor tab → hub → console → Claude) and the tab keeps only its thumbnails while open. (094-editor-agent-prints)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -843,6 +875,7 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 094-editor-agent-prints: in the animation editor the local Claude looks at what it wrote — editor runs carry the tool `print_stage`, served by a per-run loopback MCP server in `Roll6.Console` (generic `run.tools`, token per run, pending file changes flushed before each call) and answered by the tab that sent the request, which prints its stage with the Claude's latest valid file at the instants, sides and skeleton asked (≤ 6 per call, 30 per request, 20 s); the prompt tells the Claude to check with prints after every change; the prints show as thumbnails under its line. No schema, REST or MCP change
 - 093-chat-ask-gm-console: "Perguntar" in the chat — the paperclip item (or "/perguntar ") turns the field blue with a "Privado" checkbox and sends a question that the master's `Roll6.Console` answers by running the skill `perguntar` of his repository in a read-only Claude (only Read/Glob/Grep/Skill, no MCP, no writes, reads denied outside the working directory, question fenced and escaped against prompt injection); available only while his console is connected, one waiting question per participant, 2-minute timeout; the answer shows at once as a blue bubble (links/images never render), private ones visible only to the author and the master, who sees every question and may delete or correct answers. Turn types 13/14, `turns.ask_state`/`edited_at` (migration `AddChatAsk`); MCP `ask_question`, `get_ask_status`, `edit_answer` (124 operations / 125 tools)
 - 092-editor-token-weapons: the animation editor's stage shows the chosen token with its weapons on their sockets (placed like the table: sockets measured on the token's idle first frame, then riding the bones through the edited animation); an "Armas" toggle hides them; the print caption and the Claude's context (`RequestInfo.modelWeapons` → "Armas do modelo: …") name the weapons and their sockets. No schema, REST or MCP change
 - 091-animation-editor-save: the animation editor saves only on "Salvar" — turned bones, undo/redo and the Claude's files (relayed by the hub as `draftVersion`, never stored) change the tab's edit version; "Descartar" reverts, a badge shows unsaved changes and leaving asks; each request sends the edit version (`RequestInfo.content`) so the Claude works on what is on screen; the conversation follows new content while at the bottom; "Incluir animação" asks only name and type, creates a 1 s rest-pose animation and opens its editor. No schema, REST or MCP change

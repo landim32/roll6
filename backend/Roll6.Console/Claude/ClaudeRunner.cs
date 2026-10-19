@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using Roll6.Console.Settings;
+using Roll6.Console.Tools;
 using Roll6.DTO.Realtime.Console;
 
 namespace Roll6.Console.Claude;
@@ -76,6 +78,29 @@ public sealed class ClaudeRunner : IClaudeProcess
     /// <summary>No MCP server at all in a read-only run (not the machine's, not the project's — e.g. the Roll6 one with a key).</summary>
     public const string NO_MCP = "{\"mcpServers\":{}}";
 
+    /// <summary>The inline <c>--mcp-config</c> of a run's tool server (094): HTTP on loopback, the run's token as a bearer header.</summary>
+    public static string ToolsMcpConfig(IToolHost tools) => JsonSerializer.Serialize(new Dictionary<string, object>
+    {
+        ["mcpServers"] = new Dictionary<string, object>
+        {
+            [LocalToolServer.SERVER_NAME] = new Dictionary<string, object>
+            {
+                ["type"] = "http",
+                ["url"] = tools.Url,
+                ["headers"] = new Dictionary<string, string> { ["Authorization"] = $"Bearer {tools.Token}" },
+            },
+        },
+    });
+
+    /// <summary>The configured allowed tools plus "mcp__roll6-editor__{name}" for each tool of the run.</summary>
+    public static string AllowedWithTools(string allowed, IToolHost? tools)
+    {
+        if (tools is not { ToolNames.Count: > 0 })
+            return allowed;
+        var names = tools.ToolNames.Select(name => $"mcp__{LocalToolServer.SERVER_NAME}__{name}");
+        return string.IsNullOrWhiteSpace(allowed) ? string.Join(",", names) : $"{allowed},{string.Join(",", names)}";
+    }
+
     private static readonly string[] LOGIN_HINTS = { "login", "log in", "auth", "401", "credential" };
 
     private readonly ConsoleSettings _settings;
@@ -94,7 +119,12 @@ public sealed class ClaudeRunner : IClaudeProcess
     /// allowed is denied), no MCP server is loaded, a fresh session is never resumed nor kept.
     /// </para>
     /// </summary>
-    public static List<string> Arguments(ConsoleSettings settings, Guid sessionId, bool started, string systemPrompt, bool readOnly = false)
+    /// <para>
+    /// 094: with <paramref name="tools"/> (a run that offers tools, never a read-only one) the Claude also gets the run's
+    /// local MCP server through <c>--mcp-config</c> (its token in the header) and each tool pre-approved by name.
+    /// </para>
+    public static List<string> Arguments(ConsoleSettings settings, Guid sessionId, bool started, string systemPrompt, bool readOnly = false,
+        IToolHost? tools = null)
     {
         var arguments = new List<string>
         {
@@ -125,8 +155,13 @@ public sealed class ClaudeRunner : IClaudeProcess
             {
                 started ? "--resume" : "--session-id", sessionId.ToString(),
                 "--permission-mode", "acceptEdits",
-                "--allowedTools", settings.ClaudeAllowedTools,
+                "--allowedTools", AllowedWithTools(settings.ClaudeAllowedTools, tools),
             });
+            if (tools is { ToolNames.Count: > 0 })
+            {
+                arguments.Add("--mcp-config");
+                arguments.Add(ToolsMcpConfig(tools));
+            }
         }
         arguments.Add("--append-system-prompt");
         arguments.Add(systemPrompt);

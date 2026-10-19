@@ -14,7 +14,12 @@ import * as reducers from '../lib/editorState';
 import { INITIAL_STATE, MAX_ATTACHMENTS, base64Of, isDirty } from '../lib/editorState';
 import type { EditorState, PrintAttachment } from '../lib/editorState';
 import type { TokenInfo } from '../types/token';
-import type { EditorErrorCode, RequestOutcome } from '../types/animationEditor';
+import type { EditorErrorCode, PrintedShot, PrintRequested, RequestOutcome } from '../types/animationEditor';
+
+/** Takes the prints the Claude asked for (094): the page's stage, or the reason it can't (a Portuguese text). */
+export interface Printer {
+  (request: PrintRequested): Promise<PrintedShot[] | string>;
+}
 
 /** The remembered token (the model shown) and the skeleton toggle, per device. */
 export const EDITOR_TOKEN_KEY = 'roll6:editor-token';
@@ -52,6 +57,8 @@ interface AnimationEditorContextType {
   attachPrint: (print: Omit<PrintAttachment, 'id'>) => boolean;
   replacePrint: (print: PrintAttachment) => void;
   removePrint: (id: number) => void;
+  /** The page hands its stage's printer (094); null while no model is on the stage. */
+  registerPrinter: (printer: Printer | null) => void;
 }
 
 const AnimationEditorContext = createContext<AnimationEditorContextType | undefined>(undefined);
@@ -98,6 +105,9 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
   const stateRef = useRef(state);
   stateRef.current = state;
   const [saving, setSaving] = useState(false);
+  /** 094: who takes the Claude's prints — the stage of the page, when a model is on it. */
+  const printer = useRef<Printer | null>(null);
+  const registerPrinter = useCallback((next: Printer | null) => { printer.current = next; }, []);
 
   const refreshHistory = useCallback(() => setHistory(versions.current.counts), []);
 
@@ -161,6 +171,27 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
         setState((s) => reducers.draftVersion(s, info, true));
       }),
       animationEditorService.on(hub, 'conversationCleared', (info) => setState((s) => reducers.conversationCleared(s, info))),
+      // 094: the Claude wants to see what it wrote — the stage draws it and the prints go back through the server.
+      animationEditorService.on(hub, 'printRequested', (info) => {
+        void (async () => {
+          let shots: PrintedShot[] = [];
+          let failure: string | null = null;
+          try {
+            const take = printer.current;
+            const taken = take ? await take(info) : t('editor.print.noModel');
+            if (typeof taken === 'string') failure = taken;
+            else shots = taken;
+          } catch (err) {
+            failure = err instanceof Error ? err.message : t('common.unknownError');
+          }
+          try {
+            await animationEditorService.printResult(hub, failure ? { callId: info.callId, error: failure } : { callId: info.callId, shots });
+          } catch {
+            // The server answers the Claude with a timeout.
+          }
+          setState((s) => reducers.agentPrint(s, info.requestId, { callId: info.callId, shots, error: failure }));
+        })();
+      }),
     ];
     hub.onreconnecting(() => setConnected(false));
     hub.onreconnected(() => {
@@ -327,10 +358,10 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
 
   const value = useMemo<AnimationEditorContextType>(() => ({
     state, loading, error, connected, history, tokenId, setToken, skeleton, setSkeleton, saveContent, undo, redo, dirty, saving,
-    save, discard, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint,
+    save, discard, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint, registerPrinter,
   }), [
     state, loading, error, connected, history, tokenId, setToken, skeleton, setSkeleton, saveContent, undo, redo, dirty, saving,
-    save, discard, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint,
+    save, discard, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint, registerPrinter,
   ]);
 
   return <AnimationEditorContext.Provider value={value}>{children}</AnimationEditorContext.Provider>;

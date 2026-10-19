@@ -443,4 +443,131 @@ public class AnimationHubTests
 
         _connections.FindByTurn(500).Should().BeNull();
     }
+
+    // ---------- 094: prints asked by the Claude ----------
+
+    private const string VALID_V2 = """{"format":"roll6-animation","version":1,"duration":1,"loop":true,"tracks":[{"bone":"LeftArm","times":[0,1],"degrees":[[0,0,-150],[0,0,-120]]}]}""";
+
+    private static JsonElement Json(string text) => JsonDocument.Parse(text).RootElement.Clone();
+
+    private static ToolCallInfo PrintCall(string callId, string arguments = "{}") =>
+        new() { CallId = callId, Name = "print_stage", Arguments = Json(arguments) };
+
+    /// <summary>A console a1, the editor tab b1 on animation 7 and a running request sent by b1.</summary>
+    private async Task<long> RunningRequestAsync()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        var browser = Hub("b1", 1, apiKey: false);
+        await browser.OpenEditor(7);
+        return await browser.SendRequest(new RequestInfo { AnimationId = 7, Text = "levante o braço" });
+    }
+
+    [Fact]
+    public async Task APrintGoesToTheTabThatSentTheRequestWithTheLatestFileAndComesBackAsImages()
+    {
+        var requestId = await RunningRequestAsync();
+        await Hub("a1", 1, apiKey: true).FileChanged(requestId, new FileChangedInfo { Path = "animacoes/7-aceno.json", Content = VALID_V2 });
+
+        var pending = Dispatcher.ToolResultAsync(requestId, PrintCall("c1", """{"shots":[{"time":0.5,"view":"right","skeleton":true},{}]}"""));
+
+        var asked = Sent<PrintRequestInfo>("client:b1", "printRequested");
+        asked.Should().NotBeNull();
+        asked!.CallId.Should().Be("c1");
+        asked.Content.GetProperty("tracks")[0].GetProperty("bone").GetString().Should().Be("LeftArm", "the latest file the Claude wrote");
+        asked.Shots.Select(s => s.View).Should().Equal("right", "three-quarter");
+        await Hub("b1", 1, apiKey: false).PrintResult(new PrintResultInfo
+        {
+            CallId = "c1",
+            Shots = new List<PrintedShotInfo> { new() { Png = "AAAA", Caption = "de lado" }, new() { Png = "BBBB", Caption = "três quartos" } },
+        });
+        var result = await pending;
+
+        result.IsError.Should().BeFalse();
+        result.Text.Should().Be("Print 1: de lado\nPrint 2: três quartos");
+        result.Images.Select(i => i.Data).Should().Equal("AAAA", "BBBB");
+    }
+
+    [Fact]
+    public async Task PrintsAreRefusedWithAReasonTheClaudeCanRead()
+    {
+        var requestId = await RunningRequestAsync();
+
+        (await Dispatcher.ToolResultAsync(requestId, PrintCall("c1", """{"shots":[{"view":"diagonal"}]}""")))
+            .Text.Should().StartWith("Pedido de print inválido");
+        (await Dispatcher.ToolResultAsync(requestId, new ToolCallInfo { CallId = "c2", Name = "outra" }))
+            .Text.Should().Be("Ferramenta desconhecida: outra.");
+
+        await Hub("a1", 1, apiKey: true).FileChanged(requestId, new FileChangedInfo { Path = "animacoes/7-aceno.json", Content = "{ broken" });
+        var invalid = await Dispatcher.ToolResultAsync(requestId, PrintCall("c3"));
+        invalid.IsError.Should().BeTrue();
+        invalid.Text.Should().StartWith("O arquivo atual não é uma animação válida");
+        _sent.Should().NotContain(s => s.Method == "printRequested");
+    }
+
+    [Fact]
+    public async Task ThirtyPrintsPerRequestAtMost()
+    {
+        var requestId = await RunningRequestAsync();
+        _connections.Get(requestId)!.TryReservePrints(28, 30).Should().BeTrue();
+
+        var over = await Dispatcher.ToolResultAsync(requestId, PrintCall("c1", """{"shots":[{},{},{}]}"""));
+
+        over.Text.Should().Be("Limite de 30 prints por pedido atingido.");
+    }
+
+    [Fact]
+    public async Task AClosedTabOrASilentOneEndsThePrintWithAnError()
+    {
+        var requestId = await RunningRequestAsync();
+        Dispatcher.PrintTimeout = TimeSpan.FromMilliseconds(50);
+
+        var silent = await Dispatcher.ToolResultAsync(requestId, PrintCall("c1"));
+        silent.Text.Should().Be("O editor não respondeu em 20 s; tente de novo.");
+
+        var waiting = Dispatcher.ToolResultAsync(requestId, PrintCall("c2"));
+        Dispatcher.PrintTimeout = TimeSpan.FromSeconds(20);
+        await Hub("b1", 1, apiKey: false).OnDisconnectedAsync(null);
+        (await waiting).Text.Should().Be("O editor não está aberto; não há como tirar o print.", "the tab left while it was printing");
+
+        var gone = await Dispatcher.ToolResultAsync(requestId, PrintCall("c3"));
+        gone.Text.Should().Be("O editor não está aberto; não há como tirar o print.");
+    }
+
+    [Fact]
+    public async Task TheEndOfTheRequestAnswersAPrintStillOnItsWay()
+    {
+        var requestId = await RunningRequestAsync();
+        var waiting = Dispatcher.ToolResultAsync(requestId, PrintCall("c1"));
+
+        await Hub("a1", 1, apiKey: true).Finished(requestId, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.DONE });
+
+        (await waiting).Text.Should().Be("O pedido foi encerrado.");
+    }
+
+    [Fact]
+    public async Task ToolCallsAndPrintResultsFromOtherConnectionsAreIgnored()
+    {
+        var requestId = await RunningRequestAsync();
+        await Hub("a2", 1, apiKey: true).ToolCall(requestId, PrintCall("c1"));
+        await Task.Delay(50);
+        _sent.Should().NotContain(s => s.Method == "toolResult" || s.Method == "printRequested");
+
+        var waiting = Dispatcher.ToolResultAsync(requestId, PrintCall("c2"));
+        await Hub("b9", 1, apiKey: false).PrintResult(new PrintResultInfo { CallId = "c2", Shots = new List<PrintedShotInfo> { new() { Png = "AAAA" } } });
+        waiting.IsCompleted.Should().BeFalse("only the tab that sent the request answers");
+        await Hub("b1", 1, apiKey: false).PrintResult(new PrintResultInfo { CallId = "c2", Error = "Escolha um modelo 3D no editor para tirar prints." });
+        (await waiting).Text.Should().Be("Escolha um modelo 3D no editor para tirar prints.");
+    }
+
+    [Fact]
+    public async Task TheRunOfARequestOffersPrintStageAndAQuestionDoesNot()
+    {
+        await RunningRequestAsync();
+
+        var run = Sent<RunInfo>("client:a1", "run");
+        run!.Tools.Should().ContainSingle().Which.Name.Should().Be("print_stage");
+        run.SystemPrompt.Should().Contain("print_stage");
+        AgentDispatcher.AskRun(_connections.EnqueueAsk(new AskJob(1, 500, 1, "Mesa", "Aria", "oi"), NOW)!, new AskJob(1, 500, 1, "Mesa", "Aria", "oi"))
+            .Tools.Should().BeEmpty();
+    }
 }

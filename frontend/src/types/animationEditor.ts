@@ -129,6 +129,45 @@ export interface DraftVersion {
   content: AnimationFile;
 }
 
+/** The camera sides of a print asked by the Claude (094). */
+export const SHOT_VIEW = {
+  front: 'front',
+  back: 'back',
+  right: 'right',
+  left: 'left',
+  top: 'top',
+  threeQuarter: 'three-quarter',
+} as const;
+export type ShotView = (typeof SHOT_VIEW)[keyof typeof SHOT_VIEW];
+
+/** One print the Claude asked for: an instant ("key" = the key pose), a side and the skeleton. */
+export interface PrintShot {
+  time: number | 'key';
+  view: ShotView;
+  skeleton: boolean;
+}
+
+/** `printRequested` (094): only the tab that sent the request gets it; `content` is the Claude's latest valid file. */
+export interface PrintRequested {
+  requestId: number;
+  callId: string;
+  content: AnimationFile;
+  shots: PrintShot[];
+}
+
+/** One print taken for the Claude: a PNG (base64, no prefix) and its caption. */
+export interface PrintedShot {
+  png: string;
+  caption: string;
+}
+
+/** The tab's answer (hub method `PrintResult`): the prints, or why there are none. */
+export interface PrintResult {
+  callId: string;
+  error?: string | null;
+  shots?: PrintedShot[];
+}
+
 /** The server → browser methods and their payloads. */
 export interface EditorEvents {
   agentStatus: AgentStatus;
@@ -139,6 +178,7 @@ export interface EditorEvents {
   animationVersion: AnimationVersion;
   draftVersion: DraftVersion;
   conversationCleared: ConversationCleared;
+  printRequested: PrintRequested;
 }
 
 /** The `HubException` codes of the hub, mapped to `editor.error.*`. */

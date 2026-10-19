@@ -38,9 +38,18 @@ export interface EditorMessage {
   thumbnails: string[];
   /** Notices of the request running (tools, files), shown under the growing Claude text. */
   lines: string[];
+  /** 094: the prints this tab took for the Claude during the request (never stored). */
+  prints: AgentPrint[];
   createdAt: string | null;
   /** The Claude answer still arriving. */
   running: boolean;
+}
+
+/** A batch of prints taken for the Claude (094): the pictures with their captions, or why there are none. */
+export interface AgentPrint {
+  callId: string;
+  shots: { png: string; caption: string }[];
+  error: string | null;
 }
 
 export interface EditorRequestState {
@@ -90,6 +99,7 @@ const fromInfo = (info: EditorMessageInfo): EditorMessage => ({
   imageCount: info.imageCount,
   thumbnails: [],
   lines: [],
+  prints: [],
   createdAt: info.createdAt,
   running: false,
 });
@@ -102,6 +112,7 @@ const runningMessage = (requestId: number, text: string): EditorMessage => ({
   imageCount: 0,
   thumbnails: [],
   lines: [],
+  prints: [],
   createdAt: null,
   running: true,
 });
@@ -146,6 +157,7 @@ export const sent = (state: EditorState, requestId: number, text: string, thumbn
     imageCount: thumbnails.length,
     thumbnails,
     lines: [],
+    prints: [],
     createdAt: now,
     running: false,
   }],
@@ -202,8 +214,8 @@ export const requestFinished = (state: EditorState, info: RequestFinished, notic
       messages.push(message);
       continue;
     }
-    if (info.message) messages.push({ ...fromInfo(info.message), lines: message.lines });
-    else if (message.lines.length > 0) messages.push({ ...message, running: false, key: `done-${info.requestId}` });
+    if (info.message) messages.push({ ...fromInfo(info.message), lines: message.lines, prints: message.prints });
+    else if (message.lines.length > 0 || message.prints.length > 0) messages.push({ ...message, running: false, key: `done-${info.requestId}` });
   }
   if (!state.messages.some((m) => m.key === key) && info.message) messages.push(fromInfo(info.message));
   if (noticeText) {
@@ -215,6 +227,7 @@ export const requestFinished = (state: EditorState, info: RequestFinished, notic
       imageCount: 0,
       thumbnails: [],
       lines: [],
+      prints: [],
       createdAt: null,
       running: false,
     });
@@ -297,3 +310,19 @@ export const isBusy = (state: EditorState): boolean => state.request !== null;
 
 /** The base64 body of a PNG data URL, as the hub takes it. */
 export const base64Of = (dataUrl: string): string => dataUrl.replace(/^data:[^;]+;base64,/, '');
+
+/**
+ * The tab took prints for the Claude (094): they go under the running Claude line of that request, like its tool lines,
+ * and stay with it when it is stored. Never sent anywhere else.
+ */
+export const agentPrint = (state: EditorState, requestId: number, print: AgentPrint): EditorState => {
+  const key = RUNNING_KEY(requestId);
+  let found = false;
+  const messages = state.messages.map((message) => {
+    if (message.key !== key) return message;
+    found = true;
+    return { ...message, prints: [...message.prints, print] };
+  });
+  if (!found) messages.push({ ...runningMessage(requestId, ''), prints: [print] });
+  return { ...state, messages };
+};
