@@ -59,6 +59,42 @@ public sealed class FileWatcher : IDisposable
         }
     }
 
+    /// <summary>095: a watched image larger than <see cref="FileWriter.MAX_BINARY_BYTES"/>: its relative path and size, never its bytes.</summary>
+    public event Action<string, long>? FileTooLarge;
+
+    /// <summary>
+    /// The content as reported: the text of a text file, or (095) the bytes of an image file in base64; null for an image
+    /// over the size limit.
+    /// </summary>
+    private static string? ReadContent(string path)
+    {
+        if (!FileWriter.IsBinary(path))
+            return File.ReadAllText(path);
+        var length = new FileInfo(path).Length;
+        return length > FileWriter.MAX_BINARY_BYTES ? null : Convert.ToBase64String(File.ReadAllBytes(path));
+    }
+
+    private void ReportTooLarge(string path)
+    {
+        long length;
+        try
+        {
+            length = new FileInfo(path).Length;
+        }
+        catch (IOException)
+        {
+            return;
+        }
+        lock (_settleLock)
+        {
+            var marker = $"too-large:{length}";
+            if (_known.TryGetValue(path, out var seen) && seen == marker)
+                return;
+            _known[path] = marker;
+        }
+        FileTooLarge?.Invoke(FileWriter.Relative(_root, path), length);
+    }
+
     /// <summary>Starts raising events.</summary>
     public void Start()
     {
@@ -66,7 +102,8 @@ public sealed class FileWatcher : IDisposable
         {
             try
             {
-                _known[file] = File.ReadAllText(file);
+                if (ReadContent(file) is { } known)
+                    _known[file] = known;
             }
             catch (IOException)
             {
@@ -97,13 +134,18 @@ public sealed class FileWatcher : IDisposable
             Settle(pending);
         foreach (var file in WatchedFiles())
         {
-            string content;
+            string? content;
             try
             {
-                content = File.ReadAllText(file);
+                content = ReadContent(file);
             }
             catch (IOException)
             {
+                continue;
+            }
+            if (content == null)
+            {
+                ReportTooLarge(file);
                 continue;
             }
             bool changed;
@@ -154,15 +196,20 @@ public sealed class FileWatcher : IDisposable
             timer.Dispose();
         if (_disposed || !File.Exists(fullPath))
             return;
-        string content;
+        string? content;
         try
         {
-            content = File.ReadAllText(fullPath);
+            content = ReadContent(fullPath);
         }
         catch (IOException)
         {
             // Still being written: wait another settle.
             Touch(fullPath);
+            return;
+        }
+        if (content == null)
+        {
+            ReportTooLarge(fullPath);
             return;
         }
         lock (_settleLock)

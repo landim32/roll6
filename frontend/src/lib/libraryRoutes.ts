@@ -30,6 +30,10 @@ export const campaignNewPath = (): string => `${LIBRARY_ROOT}/campaigns/new`;
 
 export const mapEditPath = (mapModelId: number): string => `${LIBRARY_ROOT}/maps/${mapModelId}`;
 
+/** 095: the map generator — a new map, or one of the user's own maps to edit. */
+export const mapGeneratorPath = (mapModelId?: number | null): string =>
+  mapModelId ? `${LIBRARY_ROOT}/maps/generator?model=${mapModelId}` : `${LIBRARY_ROOT}/maps/generator`;
+
 export const characterPath = (id: number | 'new'): string => `${LIBRARY_ROOT}/characters/${id}`;
 
 export const npcPath = (id: number | 'new'): string => `${LIBRARY_ROOT}/npcs/${id}`;
@@ -53,7 +57,7 @@ export const isAnimationEditorPath = (pathname: string): boolean => /^\/library\
  */
 export const LIBRARY_SUBSECTIONS = {
   campaigns: ['mine', 'search', 'playing'],
-  maps: ['mine', 'search', 'campaign'],
+  maps: ['mine', 'search', 'campaign', 'generator'],
   characters: [],
   npcs: [],
   tokens: ['mine', 'search'],

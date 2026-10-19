@@ -109,7 +109,7 @@ public static class Startup
         // Real-time table events (017): the hub only pushes; changes keep going through the REST API.
         services.AddSignalR()
             // The animation editor hub (086) carries prints (base64 PNG) and animation files: 8 MB per message.
-            .AddHubOptions<AnimationHub>(options => options.MaximumReceiveMessageSize = 8 * 1024 * 1024);
+            .AddHubOptions<AnimationHub>(options => options.MaximumReceiveMessageSize = 16 * 1024 * 1024);
         services.AddSingleton<TableConnections>();
         services.AddSingleton<AnimationConnections>();
         // 093: hands work to the consoles from the hub and from REST (chat questions).

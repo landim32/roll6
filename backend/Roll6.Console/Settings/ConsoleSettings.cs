@@ -24,6 +24,9 @@ public class ConsoleSettings
     /// <summary>The Claude Code CLI, by name (resolved through the PATH) or by path.</summary>
     public string ClaudeExecutable { get; set; } = "claude";
 
+    /// <summary>095: the Codex CLI (the map generator's engine), by name (PATH, .exe/.cmd) or by path. Runs in the same folder.</summary>
+    public string CodexExecutable { get; set; } = "codex";
+
     /// <summary>Value of <c>--allowedTools</c>, on top of <c>--permission-mode acceptEdits</c>.</summary>
     public string ClaudeAllowedTools { get; set; } = "Bash(python:*)";
 

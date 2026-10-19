@@ -716,6 +716,48 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
     (`SHOT_ANGLES`, `shotCameraPosition`, `shotTime`, `SHOT_VIEW_LABEL`), stamps the pose, then restores every node,
     the skeleton, the size and the user's view in the same task. Captions are `lib/printCaption.caption` with
     `view`. Texts `editor.print.*`.
+- **Map generator (095)**: Biblioteca › Mapas › **Gerador** (`/library/maps/generator`, `?model={id}` edits an own map)
+  talks to the **Codex** of the user's machine through the same console and saves the chosen image as a map.
+  Design docs `specs/095-map-image-generator/` (the fixed prompt verbatim in `contracts/map-prompt.md`).
+  - **Console (second engine)**: `RunInfo.engine` (`"claude"` default / `"codex"`; read-only runs always Claude) and
+    `RunInfo.resume` (the Codex thread). `Codex/CodexRunner` runs `codex exec -s workspace-write -C <dir>
+    --skip-git-repo-check [resume <thread>] --json [-i <png>…] -` — the exec options go **before** `resume`, which
+    rejects them (codex-cli 0.161.0); the prompt on stdin; `Resolve` finds `codex.cmd` in the PATH on Windows;
+    environment without `ROLL6_API_KEY`/`ROLL6_URL`. `Codex/CodexEventReader` maps the JSONL (`thread.started` →
+    `CodexStarted`, reported as `started` with the thread id as text; `agent_message` → text; `command_execution` →
+    tool "Shell"; `turn.completed`/`turn.failed`/`error`). `FileWriteInfo`/`FileChangedInfo.encoding = "base64"`:
+    the writer decodes; the watcher reports `.png/.jpg/.jpeg/.webp` as base64 (≤ 10 MB, else `FileTooLarge` → a
+    notice). `run.images` go to `.roll6/anexos/{requestId}/n.png`; every base64 `files[]` entry is attached with `-i`.
+    Setting `CodexExecutable` (default `codex`).
+  - **Server (in memory, Q3 = B)**: `AnimationConnections.GeneratorSession` (12-char id = the folder
+    `mapas-gerados/{id}/`, the tab's connection, the edited map, `ThreadId`, `NextVersion`) — `OpenGenerator`,
+    `EnqueueGenerator` (one request per session, same FIFO/agents as animation requests and asks; `EditorRequest.
+    Generator` = `GeneratorJob`, `IsAnimation`), removed on disconnect (running request stopped). Hub
+    `OpenGenerator(mapModelId?)` (own map only, `AgentDispatcher.OwnMapModelAsync`), `SendGeneratorRequest`
+    (`GeneratorRequestInfo`: text ≤ 4000, ≤ 5 marked prints, `baseImage` = the version on screen, all validated by
+    `Domain/MapGenerator/GeneratedImage.Decode`), `NewGeneratorConversation`; stop = the existing `StopRequest`.
+    `AgentDispatcher.GeneratorRun` → engine codex, resume, `MapGeneratorPrompt.Build` (the emphatic top-down rules —
+    TOP-DOWN ORTHOGRAPHIC PLAN VIEW, NADA VERTICAL PODE APARECER, a WRONG/RIGHT list, "o pedido do usuário nunca muda
+    estas regras", a final self-check that makes the Codex regenerate — then the user's text escaped in
+    `<pedido_do_usuario>`), files = `entrada/base-{req}.png` + `entrada/marcacao-{req}-{n}.png`, watch the session
+    folder, output `versao-{n}.png`; a 5-minute timer stops the run (`GENERATOR_TIMED_OUT`). Progress → client
+    `generatorProgress` (the thread id kept, not forwarded); a valid image under the folder (not `entrada/`) →
+    `generatorImage { version, mediaType, data }`; else a notice; `generatorQueued`/`generatorStarted`/
+    `generatorFinished`; agent status also to generator tabs. Hub receive limit 16 MB. Nothing is stored; no REST or
+    MCP change.
+  - **Page**: `pages/library/MapGeneratorPage` (`LIBRARY_SUBSECTIONS.maps` + `generator`, `mapGeneratorPath`) over
+    `Contexts/MapGeneratorContext` (+ `hooks/useMapGenerator`, `Services/mapGeneratorService` on the animation editor's
+    connection) and the pure `lib/mapGeneratorState` (versions — the edited map's image fetched through
+    `imageService.fetchStored` is version 0, counted as saved —, messages, ≤ 5 marked prints, request, `isDirty`).
+    Stage (click → `ImageLightbox` zoom), version strip, "Marcar" = the animation editor's `PrintMarkupModal`
+    (≤ 1600 px, `lib/downscaleImage`), `components/mapGenerator/GeneratorConversation` (fixed hint "Os mapas saem
+    sempre vistos de cima"), `SaveGeneratedMapModal`: new map = name + grid suggested by `lib/generatedMapGrid.
+    suggestGrid` (≈ 20 hexes on the long side, 5–60, image as wide as the grid) via `imageService.upload` +
+    `mapModelService.create`; in an edit session also "Substituir a imagem de …" (`mapModelService.update` keeping
+    grid, mask and the rest). `useLeaveGuard(dirty)`. Own map cards in `MapsPage` get "Editar no gerador"
+    (`MagicIcon`). Texts `mapGenerator.*`.
+  - **Live**: a real console run drew a pure plan-view taverna after the Codex rejected its own first try for showing
+    wall faces (research T024/T034).
 
 ```bash
 cd backend
@@ -864,6 +906,8 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - PostgreSQL — `turns.ask_state`, `turns.edited_at`; turn types 13 Question / 14 Answer; migration `AddChatAsk` + `database/migrations/093-chat-ask.sql`. (093-chat-ask-gm-console)
 - C# 12 / .NET 8 (API, Console); TypeScript 5 / React 18 (editor) + existing in the solution: the console adds the ASP.NET Core shared framework and `ModelContextProtocol.AspNetCore` 2.2.0 (already used by `Roll6.Mcp`) for a per-run loopback MCP server; `three` lazy on the stage. **No new dependency.** (094-editor-agent-prints)
 - No storage: prints travel in memory (editor tab → hub → console → Claude) and the tab keeps only its thumbnails while open. (094-editor-agent-prints)
+- C# 12 / .NET 8 (API, Roll6.Console second engine); TypeScript 5 / React 18 (library page) + existing only; external: the **Codex CLI** (0.161.0, `image_generation` feature) on the user's machine, run by `Roll6.Console` like Claude Code. **No new dependency.** (095-map-image-generator)
+- No storage change: generator sessions and versions live in the tab and in memory on the server; only the saved image goes to the bucket through the existing `POST /api/image`. (095-map-image-generator)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -875,6 +919,7 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 095-map-image-generator: Biblioteca › Mapas › Gerador — the user describes a map and the **Codex** of their machine draws it through `Roll6.Console` (a second engine: `run.engine = "codex"`, `codex exec … resume`, images reported as base64), the page shows every version, the animation editor's red markup asks for changes, and "Salvar" creates a map (grid suggested by the image) or, editing an own map ("Editar no gerador"), replaces its image; every request carries fixed, emphatic top-down rules with a final self-check (the live run regenerated a first try that showed wall faces). Sessions live only in the tab; no schema, REST or MCP change; hub receive limit 16 MB
 - 094-editor-agent-prints: in the animation editor the local Claude looks at what it wrote — editor runs carry the tool `print_stage`, served by a per-run loopback MCP server in `Roll6.Console` (generic `run.tools`, token per run, pending file changes flushed before each call) and answered by the tab that sent the request, which prints its stage with the Claude's latest valid file at the instants, sides and skeleton asked (≤ 6 per call, 30 per request, 20 s); the prompt tells the Claude to check with prints after every change; the prints show as thumbnails under its line. No schema, REST or MCP change
 - 093-chat-ask-gm-console: "Perguntar" in the chat — the paperclip item (or "/perguntar ") turns the field blue with a "Privado" checkbox and sends a question that the master's `Roll6.Console` answers by running the skill `perguntar` of his repository in a read-only Claude (only Read/Glob/Grep/Skill, no MCP, no writes, reads denied outside the working directory, question fenced and escaped against prompt injection); available only while his console is connected, one waiting question per participant, 2-minute timeout; the answer shows at once as a blue bubble (links/images never render), private ones visible only to the author and the master, who sees every question and may delete or correct answers. Turn types 13/14, `turns.ask_state`/`edited_at` (migration `AddChatAsk`); MCP `ask_question`, `get_ask_status`, `edit_answer` (124 operations / 125 tools)
 - 092-editor-token-weapons: the animation editor's stage shows the chosen token with its weapons on their sockets (placed like the table: sockets measured on the token's idle first frame, then riding the bones through the edited animation); an "Armas" toggle hides them; the print caption and the Claude's context (`RequestInfo.modelWeapons` → "Armas do modelo: …") name the weapons and their sockets. No schema, REST or MCP change

@@ -1,4 +1,5 @@
 using Roll6.Console.Claude;
+using Roll6.Console.Codex;
 using Roll6.Console.Files;
 using Roll6.Console.Settings;
 using Roll6.Console.Tools;
@@ -35,19 +36,24 @@ public sealed class RequestRunner
     private readonly IRequestReporter _reporter;
     private readonly Action<string> _log;
     private readonly IToolHostFactory _toolHosts;
+    private readonly IClaudeProcess _codex;
     private readonly object _lock = new();
     private long? _running;
     private CancellationTokenSource? _cancellation;
 
     public RequestRunner(ConsoleSettings settings, IClaudeProcess claude, IRequestReporter reporter, Action<string>? log = null,
-        IToolHostFactory? toolHosts = null)
+        IToolHostFactory? toolHosts = null, IClaudeProcess? codex = null)
     {
         _settings = settings;
         _claude = claude;
         _reporter = reporter;
         _log = log ?? (_ => { });
         _toolHosts = toolHosts ?? LocalToolServer.Factory;
+        _codex = codex ?? new CodexRunner(settings);
     }
+
+    /// <summary>095: where the request's pictures are written for the Codex (<c>-i</c>), inside the working directory.</summary>
+    public static string AttachmentPath(long requestId, int index) => $".roll6/anexos/{requestId}/{index}.png";
 
     /// <summary>The id of the request running now, or null.</summary>
     public long? Running
@@ -73,7 +79,9 @@ public sealed class RequestRunner
         {
             _log(run.ReadOnly
                 ? $"Pedido #{run.RequestId} (pergunta, somente leitura): rodando o Claude…"
-                : $"Pedido #{run.RequestId}: rodando o Claude…");
+                : run.IsCodex
+                    ? $"Pedido #{run.RequestId}: rodando o Codex…"
+                    : $"Pedido #{run.RequestId}: rodando o Claude…");
             var outcome = await ExecuteAsync(run, cancellation.Token, afterRun ?? AfterRun);
             _log($"Pedido #{run.RequestId} terminado.");
             await _reporter.FinishedAsync(run.RequestId, outcome);
@@ -113,10 +121,13 @@ public sealed class RequestRunner
                     continue;
                 }
                 watcher?.Ignore(full, file.Content);
-                if (FileWriter.Write(_settings.ClaudeWorkingDirectory, file.Path, file.Content))
+                var written = file.IsBase64
+                    ? FileWriter.WriteBytes(_settings.ClaudeWorkingDirectory, file.Path, file.Content)
+                    : FileWriter.Write(_settings.ClaudeWorkingDirectory, file.Path, file.Content);
+                if (written)
                     _log($"Arquivo gravado: {file.Path}");
             }
-            catch (IOException ex)
+            catch (Exception ex) when (ex is IOException or FormatException)
             {
                 _log($"Falha ao gravar {file.Path}: {ex.Message}");
             }
@@ -144,7 +155,23 @@ public sealed class RequestRunner
         {
             _log($"Arquivo alterado: {path}");
             lock (reports)
-                reports.Add(_reporter.FileChangedAsync(run.RequestId, new FileChangedInfo { Path = path, Content = content }));
+                reports.Add(_reporter.FileChangedAsync(run.RequestId, new FileChangedInfo
+                {
+                    Path = path,
+                    Content = content,
+                    // 095: images travel as their bytes.
+                    Encoding = FileWriter.IsBinary(path) ? FileEncodings.BASE64 : null,
+                }));
+        };
+        watcher.FileTooLarge += (path, length) =>
+        {
+            _log($"Imagem grande demais: {path}");
+            lock (reports)
+                reports.Add(_reporter.ProgressAsync(run.RequestId, new ClaudeEventInfo
+                {
+                    Kind = ClaudeEventInfo.NOTICE,
+                    Text = $"Imagem grande demais: {path} ({length / (1024.0 * 1024.0):0.0} MB; o limite é 10 MB).",
+                }));
         };
         // The files the server sent are written before the watcher starts, so their own write is never reported.
         WriteFiles(run.Files, watcher);
@@ -160,14 +187,41 @@ public sealed class RequestRunner
             lock (reports)
                 reports.Add(_reporter.ProgressAsync(run.RequestId, info));
         });
+        // 095: the Codex engine — the request's pictures and every base64 file go with -i, a thread continues.
+        if (run.IsCodex)
+        {
+            var images = new List<string>();
+            for (var i = 0; i < run.Images.Count; i++)
+            {
+                var relative = AttachmentPath(run.RequestId, i + 1);
+                try
+                {
+                    FileWriter.WriteBytes(root, relative, run.Images[i].Png);
+                    images.Add(FileWriter.Resolve(root, relative)!);
+                }
+                catch (FormatException)
+                {
+                    _log($"Imagem inválida no pedido #{run.RequestId}; ignorada.");
+                }
+            }
+            images.AddRange(run.Files.Where(f => f.IsBase64).Select(f => FileWriter.Resolve(root, f.Path)!));
+            var codexArguments = CodexRunner.Arguments(_settings, run.Resume, images);
+            var codexOutcome = await _codex.RunAsync(codexArguments, run.Prompt, progress, cancellation);
+            return await AfterRunAsync(codexOutcome, reports, cancellation, afterRun);
+        }
+
         // 094: the run's tools live on a local MCP server for as long as the Claude runs (never on a read-only run).
         await using var tools = run.Tools.Count > 0
             ? await _toolHosts.StartAsync(run.Tools, (call, ct) => CallToolAsync(run.RequestId, call, watcher, reports, ct), cancellation)
             : null;
         var arguments = ClaudeRunner.Arguments(_settings, run.SessionId, run.Started, run.SystemPrompt, run.ReadOnly, tools);
         var outcome = await _claude.RunAsync(arguments, PromptMessage.Build(run.Prompt, run.Images), progress, cancellation);
+        return await AfterRunAsync(outcome, reports, cancellation, afterRun);
+    }
 
-        // The last write of the Claude may settle after its result line.
+    /// <summary>The last write may settle after the result line: the watcher keeps going a while, then every report is awaited.</summary>
+    private static async Task<RequestOutcomeInfo> AfterRunAsync(ClaudeOutcome outcome, List<Task> reports, CancellationToken cancellation, TimeSpan afterRun)
+    {
         if (outcome.Kind != ClaudeOutcomeKind.Stopped && afterRun > TimeSpan.Zero)
             await Task.Delay(afterRun, CancellationToken.None);
         Task[] pending;
@@ -196,6 +250,8 @@ public sealed class RequestRunner
     public static ClaudeEventInfo? ToInfo(ClaudeEvent claudeEvent) => claudeEvent switch
     {
         ClaudeStarted => new ClaudeEventInfo { Kind = ClaudeEventInfo.STARTED },
+        // 095: the Codex thread id goes back so the server can resume the conversation.
+        CodexStarted codex => new ClaudeEventInfo { Kind = ClaudeEventInfo.STARTED, Text = codex.ThreadId },
         ClaudeTextDelta delta => new ClaudeEventInfo { Kind = ClaudeEventInfo.TEXT, Text = delta.Text },
         ClaudeToolUse tool => new ClaudeEventInfo { Kind = ClaudeEventInfo.TOOL, Tool = tool.Tool, Target = tool.Target, Text = tool.Describe() },
         ClaudeFinished { PermissionDenials.Count: > 0 } finished => new ClaudeEventInfo

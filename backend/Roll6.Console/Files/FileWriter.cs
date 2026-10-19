@@ -31,6 +31,29 @@ public static class FileWriter
     public static string Relative(string workingDirectory, string fullPath) =>
         Path.GetRelativePath(Path.GetFullPath(workingDirectory), fullPath).Replace('\\', '/');
 
+    /// <summary>095: the extensions reported (and written) as bytes in base64 instead of text.</summary>
+    public static readonly IReadOnlyList<string> BINARY_EXTENSIONS = new[] { ".png", ".jpg", ".jpeg", ".webp" };
+
+    /// <summary>Largest binary file reported back (10 MB).</summary>
+    public const int MAX_BINARY_BYTES = 10 * 1024 * 1024;
+
+    public static bool IsBinary(string path) =>
+        BINARY_EXTENSIONS.Any(e => path.EndsWith(e, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>095: writes base64 bytes (temp + move); returns whether the file changed.</summary>
+    public static bool WriteBytes(string workingDirectory, string relativePath, string base64)
+    {
+        var path = Resolve(workingDirectory, relativePath) ?? throw new InvalidOperationException(OUTSIDE);
+        var bytes = Convert.FromBase64String(base64);
+        if (File.Exists(path) && File.ReadAllBytes(path).AsSpan().SequenceEqual(bytes))
+            return false;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporary = path + ".tmp";
+        File.WriteAllBytes(temporary, bytes);
+        File.Move(temporary, path, overwrite: true);
+        return true;
+    }
+
     /// <summary>Writes the text; returns whether the file changed. Throws <see cref="InvalidOperationException"/> for a path outside.</summary>
     public static bool Write(string workingDirectory, string relativePath, string content)
     {
