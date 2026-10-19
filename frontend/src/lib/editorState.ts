@@ -258,6 +258,10 @@ export const animationVersion = (state: EditorState, version: AnimationVersion):
 };
 
 /** The echo of this tab's own save: the library now holds it (091). */
+/** Name and type changed in "Alterar" of the editor's bar: the library's answer replaces the shown animation. */
+export const detailsChanged = (state: EditorState, animation: AnimationInfo): EditorState =>
+  state.animation && state.animation.animationId === animation.animationId ? { ...state, animation } : state;
+
 export const ownVersion = (state: EditorState, content: AnimationFile): EditorState => ({ ...state, savedContent: content });
 
 /**

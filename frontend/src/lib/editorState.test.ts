@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  INITIAL_STATE, MAX_ATTACHMENTS, agentPrint, agentStatus, animationVersion, attachPrint, base64Of, conversationCleared, discarded, draftVersion,
+  INITIAL_STATE, MAX_ATTACHMENTS, agentPrint, agentStatus, animationVersion, attachPrint, base64Of, conversationCleared, detailsChanged, discarded, draftVersion,
   edited, isBusy, isDirty, opened, ownVersion, removePrint, requestFinished, requestProgress, requestQueued, requestStarted, saved, sent,
 } from './editorState';
 import type { EditorState, PrintAttachment } from './editorState';
@@ -201,5 +201,16 @@ describe('edit version and explicit save (091)', () => {
     expect(dirty.savedContent).toBe(elsewhere);
     expect(dirty.savedChanged).toBe(true);
     expect(discarded(dirty).content).toBe(elsewhere);
+  });
+});
+
+describe('name and type from the bar', () => {
+  it('takes the saved animation and keeps the edit version', () => {
+    const state = edited(opened(INITIAL_STATE, OPEN), { ...OPEN.content, duration: 2 } as AnimationFile, false);
+    const changed = detailsChanged(state, { ...ANIMATION, name: 'Outro nome', type: 2 });
+    expect(changed.animation).toMatchObject({ name: 'Outro nome', type: 2 });
+    expect(changed.content).toBe(state.content);
+    expect(isDirty(changed)).toBe(true);
+    expect(detailsChanged(state, { ...ANIMATION, animationId: 99 })).toBe(state);
   });
 });

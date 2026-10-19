@@ -531,7 +531,7 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
     `CharactersPage` (own only, status in the current campaign + request/accept/use, Transferir) and `CharacterEditPage`
     (`new`/`:id`, tabs `?tab=`), `NpcsPage`/`NpcEditPage` (library data only), `TokensPage`/`TokenEditPage` (others'
     tokens read-only; `hooks/useTokenList` moved out of the picker; `tokenService.get`), `WeaponsPage`/`WeaponEditPage`,
-    `AnimationsPage`/`AnimationEditPage`. CSS `.stm-library-*`, texts `library.*`, `menu.library`, `menu.backToTable`.
+    `AnimationsPage` (an animation's only page is its editor, see 090 "Incluir"). CSS `.stm-library-*`, texts `library.*`, `menu.library`, `menu.backToTable`.
   - **Table entry points**: the gear and "Gerenciar personagens" → `campaignEditPath(slug)`; "Selecionar personagem" →
     `/library/characters`; "Incluir personagem" → `/library/characters/new`; "Outras campanhas…" →
     `/library/campaigns/search`; "Mapas…" → `/library/maps`; map pencils → `mapEditPath`; the NPC card pencil →
@@ -571,8 +571,12 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
     one draws it live (`components/library/Thumbnail`: only near the screen, one at a time through
     `lib/thumbnailQueue`, cancelled when the card leaves) and, when the viewer owns the item, stores it
     (`WeaponContext`/`AnimationContext.storeThumbnail`).
-  - **"Incluir"**: `/library/weapons/new` and `/library/animations/new` (`WeaponCreatePage`, `AnimationCreatePage`)
-    replace the "Enviar" tabs. Weapons: the upload form with `onDirtyChange` → `useLeaveGuard`, then the weapon's page.
+  - **"Incluir"**: `/library/weapons/new` (`WeaponCreatePage`) and, for animations, the window
+    `components/animations/AnimationDetailsModal` over the list (`/library/animations/new` redirects there with it open)
+    replace the "Enviar" tabs. **The editor is the only page of an animation**: `AnimationEditPage` was removed,
+    `/library/animations/:id` redirects to `…/:id/editor`, the cards open the editor and the pencil next to the name in
+    `EditorTopBar` opens the same window for name and type (`AnimationEditorContext.applyDetails` →
+    `lib/editorState.detailsChanged`). Weapons: the upload form with `onDirtyChange` → `useLeaveGuard`, then the weapon's page.
     Animations (091): only name + type → `lib/restAnimation(type)` (1 s still in the rest pose, a Hips track at 0°,
     `loop` false for Derrotado/Atacando) + the skeleton picture → the new animation's **editor**;
     `AnimationUploadForm` was removed.
