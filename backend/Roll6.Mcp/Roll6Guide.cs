@@ -280,6 +280,16 @@ public static class Roll6Guide
           Errors: `weapons[i].socket` (unknown or repeated), `weapons[i].weaponId`, `weapons[i].grip.scale`…
         - The 082 bindings (rightWeapon / leftWeapon) became sockets 1 and 2 with their size kept.
 
+        ## Asking the master's Claude
+        - "Perguntar" (093): `ask_question` posts a question in the chat that the campaign master's local Claude answers
+          through his Roll6.Console with the skill `perguntar` of his campaign folder. Available only while the master's
+          console is connected (`get_ask_status`); one waiting question per person; two minutes to answer, else the
+          question shows as failed.
+        - That Claude can only READ the master's folder: no writing, no commands, no network, no MCP tools, no secrets;
+          the question is wrapped as untrusted player text. The answer (kind `answer`) replies to the question.
+        - `private = true`: only the author and the master see the question and the answer. The master corrects an answer
+          with `edit_answer` (shown "editada pelo mestre") or deletes it with `delete_chat_message`.
+
         ## Chat
         - Each campaign has one **chat**, and it is the campaign's whole timeline: what the players and the master say
           (text, photo, audio), **every turn record** (moves, actions, action results, character/NPC changes,

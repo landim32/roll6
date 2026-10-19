@@ -208,6 +208,19 @@ public class TurnRepository : ITurnRepository<Turn>
             .ToListAsync();
     }
 
+    public async Task<Turn?> GetWaitingAskAsync(long campaignId, long userId) =>
+        await _context.Turns.AsNoTracking()
+            .Where(e => e.CampaignId == campaignId && e.UserId == userId && e.TurnType == TurnType.Question
+                && e.AskState == AskState.Waiting && e.DeletedAt == null)
+            .OrderBy(e => e.TurnId)
+            .FirstOrDefaultAsync();
+
+    public async Task<List<Turn>> ListWaitingAsksOlderThanAsync(DateTime cutoff) =>
+        await _context.Turns.AsNoTracking()
+            .Where(e => e.TurnType == TurnType.Question && e.AskState == AskState.Waiting && e.CreatedAt < cutoff)
+            .OrderBy(e => e.TurnId)
+            .ToListAsync();
+
     public async Task<bool> TryClosePollAsync(long turnId, DateTime at)
     {
         // The same row the vote's transaction updates (chat_at, only while open): a vote and a close never cross.

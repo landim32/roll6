@@ -149,6 +149,25 @@ public class ChatItemInfo
     /// <summary>A poll (kind "poll", 045): the question, the options with their votes and who voted.</summary>
     [JsonPropertyName("poll")]
     public ChatPollInfo? Poll { get; set; }
+
+    /// <summary>A question to the master's Claude (kind "question", 093): where its answer stands.</summary>
+    [JsonPropertyName("ask")]
+    public ChatAskStateInfo? Ask { get; set; }
+
+    /// <summary>An answer the master corrected (kind "answer", 093); null when it is as the Claude wrote it.</summary>
+    [JsonPropertyName("editedAt")]
+    public DateTime? EditedAt { get; set; }
+}
+
+/// <summary>The state of a question (093): "waiting", "answered" or "failed".</summary>
+public class ChatAskStateInfo
+{
+    public const string WAITING = "waiting";
+    public const string ANSWERED = "answered";
+    public const string FAILED = "failed";
+
+    [JsonPropertyName("state")]
+    public string State { get; set; } = WAITING;
 }
 
 /// <summary>The recipients of a whisper (047): characters and/or the master.</summary>

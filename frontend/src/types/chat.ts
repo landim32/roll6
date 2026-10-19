@@ -19,7 +19,21 @@ export const CHAT_KIND = {
   poke: 'poke',
   /** A poll (045): a question, 2–12 options, one vote per character and one for the master. */
   poll: 'poll',
+  /** "Perguntar" (093): a question to the master's local Claude. */
+  question: 'question',
+  /** The answer of the master's Claude to a question (093), replying to it. */
+  answer: 'answer',
 } as const;
+
+/** Where a question to the master's Claude stands (093). */
+export const ASK_STATE = { waiting: 'waiting', answered: 'answered', failed: 'failed' } as const;
+export type AskState = (typeof ASK_STATE)[keyof typeof ASK_STATE];
+
+/** Whether the caller can ask now (093): the master's console connected, and their own waiting question. */
+export interface AskStatusInfo {
+  available: boolean;
+  waitingTurnId: number | null;
+}
 
 export type ChatKind = (typeof CHAT_KIND)[keyof typeof CHAT_KIND];
 
@@ -89,6 +103,10 @@ export interface ChatItemInfo {
   whisperHidden?: boolean;
   /** The poll of a `poll` entry (045): votes are public. */
   poll?: ChatPollInfo | null;
+  /** A question's state (093). */
+  ask?: { state: AskState } | null;
+  /** When the master corrected an answer (093). */
+  editedAt?: string | null;
   deleted: boolean;
   canDelete: boolean;
 }

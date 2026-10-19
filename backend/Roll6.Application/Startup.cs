@@ -99,6 +99,7 @@ public static class Startup
         services.AddScoped<TurnService>();
         services.AddScoped<ITurnService>(sp => sp.GetRequiredService<TurnService>());
         services.AddScoped<IChatService>(sp => sp.GetRequiredService<TurnService>());
+        services.AddScoped<IAskService>(sp => sp.GetRequiredService<TurnService>());
         services.AddScoped<ICampaignPlanRepository<CampaignPlan>, CampaignPlanRepository>();
         services.AddScoped<ICampaignPlanService, CampaignPlanService>();
         services.AddScoped<IApiKeyRepository<ApiKey>, ApiKeyRepository>();
@@ -111,6 +112,10 @@ public static class Startup
             .AddHubOptions<AnimationHub>(options => options.MaximumReceiveMessageSize = 8 * 1024 * 1024);
         services.AddSingleton<TableConnections>();
         services.AddSingleton<AnimationConnections>();
+        // 093: hands work to the consoles from the hub and from REST (chat questions).
+        services.AddSingleton<AgentDispatcher>();
+        services.AddSingleton<IAskDispatcher>(sp => sp.GetRequiredService<AgentDispatcher>());
+        services.AddHostedService<Roll6.Application.Asks.AskTimeoutWorker>();
         services.AddSingleton<IAnimationNotifier, AnimationNotifier>();
         services.AddSingleton<SignalRRealtimeNotifier>();
         services.AddSingleton<IRealtimeNotifier>(sp => sp.GetRequiredService<SignalRRealtimeNotifier>());

@@ -1255,6 +1255,27 @@
         "repeated": "As opções não podem se repetir."
       }
     },
+    "ask": {
+      "label": "Perguntar",
+      "hint": "Pergunte ao Claude do mestre sobre as regras ou a campanha",
+      "mode": "Pergunta ao Claude do mestre",
+      "placeholder": "Escreva a sua pergunta…",
+      "send": "Enviar pergunta",
+      "cancel": "Voltar à conversa",
+      "private": "Privado",
+      "privateHint": "Só você e o mestre veem a pergunta e a resposta",
+      "offline": "O console do mestre não está conectado",
+      "waiting": "Aguarde a resposta da sua pergunta anterior",
+      "questionTag": "Pergunta",
+      "answerName": "Claude do mestre",
+      "thinking": "Pensando…",
+      "failed": "Não foi possível responder. Tente de novo mais tarde.",
+      "edited": "Corrigida pelo mestre",
+      "edit": "Corrigir resposta",
+      "editTitle": "Corrigir resposta",
+      "editLabel": "Resposta",
+      "editSaved": "Resposta corrigida."
+    },
     "whisper": {
       "to": "Sussurrando para",
       "visibleTo": "Visível apenas para",

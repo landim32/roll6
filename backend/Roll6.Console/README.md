@@ -65,3 +65,25 @@ Publicar: `dotnet publish Roll6.Console -c Release -r win-x64 --self-contained f
    resultado) e o desfecho (`Finished`).
 
 Fora de um pedido, o servidor pode mandar `writeFiles` (por exemplo, uma pose editada na página) e o console só grava.
+
+## Perguntas da mesa (093, "Perguntar")
+
+Com o console conectado, os jogadores das campanhas em que você é mestre podem usar **Perguntar** no chat. Cada pergunta
+chega como um pedido **somente leitura** (`readOnly`), e o console roda o Claude assim (flags verificadas com
+o Claude Code 2.1.301):
+
+- ferramentas existentes só `Read,Glob,Grep,Skill` (`--tools`); só `Skill` pré-aprovada; `Bash`, `Write`, `Edit`,
+  `WebFetch`, `WebSearch`, `Task`… recusadas pelo nome; `--permission-mode dontAsk` (nada pergunta: o que não for
+  permitido é negado — leitura fora da pasta de trabalho inclusive);
+- nenhum servidor MCP (`--strict-mcp-config --mcp-config {"mcpServers":{}}`), sessão nova e não guardada
+  (`--no-session-persistence`);
+- nenhum arquivo gravado nem acompanhado (o console descarta `files[]`/`watch[]` de um pedido somente leitura);
+- `ROLL6_API_KEY`/`ROLL6_URL` e as variáveis de chave da Anthropic saem do ambiente do processo do Claude.
+
+A pergunta vai entre `<pergunta_do_jogador>` e `</pergunta_do_jogador>` (com `<`/`>` do jogador trocados por `‹`/`›`),
+e o prompt do sistema manda usar a skill **`perguntar`** do seu repositório. Sem ela, a resposta diz que a skill não está
+configurada. Um modelo de skill está em `specs/093-chat-ask-gm-console/contracts/skill-perguntar.md` — coloque-o em
+`.claude/skills/perguntar/SKILL.md` na pasta de trabalho e ajuste as pastas que podem (e não podem) ser lidas.
+
+As perguntas entram na mesma fila dos pedidos do editor de animação (um por vez); uma pergunta sem resposta em 2 minutos
+falha. As respostas aparecem no chat na hora; você pode apagá-las ou corrigi-las ("Corrigir resposta").

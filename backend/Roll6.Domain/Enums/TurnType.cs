@@ -28,7 +28,14 @@ public enum TurnType
     /// <summary>"Rodrigo cutucou Ana e Bruno" (043): a chat line, neither a turn record nor conversation.</summary>
     Poke = 11,
     /// <summary>A poll in the chat (045): the question in the description, options and votes in chat_poll_*.</summary>
-    Poll = 12
+    Poll = 12,
+    /// <summary>
+    /// "Perguntar" (093): a question to the master's local Claude, answered through his Roll6.Console; the state of the
+    /// answer in <c>ask_state</c>. Private = a whisper to the master.
+    /// </summary>
+    Question = 13,
+    /// <summary>The answer of the master's Claude to a <see cref="Question"/> (093), replying to it.</summary>
+    Answer = 14
 }
 
 /// <summary>Groups of <see cref="TurnType"/> (041).</summary>
@@ -39,9 +46,11 @@ public static class TurnTypes
         { TurnType.Movement, TurnType.Action, TurnType.ActionResult, TurnType.CharacterUpdate, TurnType.Narration };
 
     /// <summary>What people say in the chat, dice rolls included.</summary>
-    public static readonly TurnType[] CONVERSATION = { TurnType.Text, TurnType.Image, TurnType.Audio, TurnType.Roll, TurnType.Poll };
+    public static readonly TurnType[] CONVERSATION =
+        { TurnType.Text, TurnType.Image, TurnType.Audio, TurnType.Roll, TurnType.Poll, TurnType.Question, TurnType.Answer };
 
     public static bool IsLog(TurnType type) => type is >= TurnType.Movement and <= TurnType.Narration;
 
-    public static bool IsConversation(TurnType type) => type is TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll or TurnType.Poll;
+    public static bool IsConversation(TurnType type) =>
+        type is TurnType.Text or TurnType.Image or TurnType.Audio or TurnType.Roll or TurnType.Poll or TurnType.Question or TurnType.Answer;
 }

@@ -49,6 +49,10 @@ public interface ITurnRepository<TModel> where TModel : class
     /// not voted (the master's vote doesn't count). None while the campaign has no approved character.
     /// </summary>
     Task<List<TModel>> ListOpenPollsAsync(long campaignId);
+    /// <summary>The user's question still waiting for its answer in the campaign (093), if any.</summary>
+    Task<TModel?> GetWaitingAskAsync(long campaignId, long userId);
+    /// <summary>Questions still waiting since before <paramref name="cutoff"/> (093, the 2-minute timeout).</summary>
+    Task<List<TModel>> ListWaitingAsksOlderThanAsync(DateTime cutoff);
 
     /// <summary>Closes the poll if it is still open (077); false when another request closed it first.</summary>
     Task<bool> TryClosePollAsync(long turnId, DateTime at);

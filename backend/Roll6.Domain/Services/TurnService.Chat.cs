@@ -291,6 +291,11 @@ public partial class TurnService : IChatService
                         item.Dice = t.DiceValues().ToList();
                     if (t.TurnType == TurnType.Poll)
                         item.Poll = polls.GetValueOrDefault(t.TurnId);
+                    // 093: where a question stands, and whether the master corrected an answer.
+                    if (t.TurnType == TurnType.Question)
+                        item.Ask = new ChatAskStateInfo { State = AskStateName(t.AskState) };
+                    if (t.TurnType == TurnType.Answer)
+                        item.EditedAt = t.EditedAt;
                 }
             }
             else if (t.TurnType == TurnType.TurnFinished)
@@ -403,6 +408,7 @@ public partial class TurnService : IChatService
             TurnType.Roll => $"Rolou 3d6: total {target.DiceValues().Sum()}",
             TurnType.Action => "Ação: " + NoticeTexts.Excerpt(target.Description),
             TurnType.Poll => "Enquete: " + NoticeTexts.Excerpt(target.Description),
+            TurnType.Question => "Pergunta: " + NoticeTexts.Excerpt(target.Description),
             _ => NoticeTexts.Excerpt(target.Description)
         };
         return new ChatReplyInfo
@@ -416,6 +422,13 @@ public partial class TurnService : IChatService
             Cancelled = target.IsCancelled
         };
     }
+
+    private static string AskStateName(AskState? state) => state switch
+    {
+        AskState.Answered => ChatAskStateInfo.ANSWERED,
+        AskState.Failed => ChatAskStateInfo.FAILED,
+        _ => ChatAskStateInfo.WAITING
+    };
 
     private static string KeyOf(Turn t) => $"t{t.TurnId}";
 
@@ -447,6 +460,8 @@ public partial class TurnService : IChatService
         TurnType.Roll => "roll",
         TurnType.Poke => "poke",
         TurnType.Poll => "poll",
+        TurnType.Question => "question",
+        TurnType.Answer => "answer",
         _ => type.ToString()
     };
 

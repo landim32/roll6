@@ -18,7 +18,7 @@ public class AnimationConnectionsTests
     {
         _connections.AgentStatusOf(1).Should().BeEquivalentTo(new AgentStatusInfo { Connected = false, Busy = false, Machine = null });
 
-        _connections.AddAgent("a1", 1, "PC-A", @"C:\mesa");
+        _connections.AddAgent("a1", 1, "PC-A", @"mesa");
         _connections.AgentStatusOf(1).Should().BeEquivalentTo(new AgentStatusInfo { Connected = true, Busy = false, Machine = "PC-A" });
         _connections.AgentStatusOf(2).Connected.Should().BeFalse("another user");
         _connections.AgentUserOf("a1").Should().Be(1);
@@ -143,5 +143,22 @@ public class AnimationConnectionsTests
 
         request!.Content!.Value.GetProperty("duration").GetInt32().Should().Be(1);
         plain!.Content.Should().BeNull();
+    }
+
+    [Fact]
+    public void AQuestionQueuesBehindTheMastersAnimationRequest_AndOnlyOncePerTurn()
+    {
+        var connections = new AnimationConnections();
+        var job = new Roll6.Domain.Interfaces.AskJob(10, 500, 1, "C", "Aria", "?");
+        connections.AddAgent("a1", 1, "PC", "mesa");
+        var animation = connections.Enqueue(1, 7, "Aceno", 100, Guid.NewGuid(), false, "oi", new List<PromptImageInfo>(), null, DateTime.UtcNow);
+
+        var ask = connections.EnqueueAsk(job, DateTime.UtcNow);
+
+        ask!.IsAsk.Should().BeTrue();
+        connections.EnqueueAsk(job, DateTime.UtcNow).Should().BeNull();
+        connections.NextRunnable(1, DateTime.UtcNow)!.Value.Request.Should().BeSameAs(animation);
+        connections.FindByTurn(500).Should().BeSameAs(ask);
+        connections.Running(0).Should().BeNull("an animation lookup never returns a question");
     }
 }

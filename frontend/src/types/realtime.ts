@@ -21,6 +21,8 @@ export const TABLE_EVENT = {
   chatDeleted: 'chat.deleted',
   /** A chat entry changed in place (044): reactions, converted, cancelled; data = ChatItemInfo. */
   chatUpdated: 'chat.updated',
+  /** The master's Roll6.Console connected or dropped (093); data = { available }. */
+  askChanged: 'ask.changed',
   resync: 'resync',
 } as const;
 

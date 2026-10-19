@@ -14,7 +14,7 @@ import { addRecipient, mentionAt, mentionOptions, removeMention, removeRecipient
 import type { MentionMatch, WhisperRecipient } from '../../lib/whisper';
 import { pickClipboardImage } from '../../lib/clipboardImage';
 import { replyExcerpt } from '../../lib/chatItems';
-import { BarChartLineIcon, Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, SendIcon } from '../ui/icons';
+import { BarChartLineIcon, Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, QuestionCircleIcon, SendIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -23,6 +23,7 @@ import { imageService } from '../../Services/imageService';
 import { audioExtension, canRecord } from '../../lib/audioFormat';
 import { isPlayable } from '../../lib/campaignStatus';
 import { actionTarget } from '../../lib/chatComposer';
+import { MAX_QUESTION, askAvailability, parseAskPrefix } from '../../lib/askComposer';
 
 /** Longest message (backend Turn.MAX_TEXT) and action (Turn.MAX_DESCRIPTION). */
 const MAX_TEXT = 4000;
@@ -31,15 +32,18 @@ const MAX_ACTION = 2000;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const IMAGE_TYPES = 'image/png,image/jpeg,image/webp';
 
-type ComposerMode = 'talk' | 'act';
+type ComposerMode = 'talk' | 'act' | 'ask';
 
 /**
  * Where the user writes (041): as the chosen approved character, or as the master. With a character, "Ação" records
  * the turn's action of its piece on the open map instead of a message; photos and recordings are always conversation.
+ * "Perguntar" (093, the clip or "/perguntar ") turns the field blue and sends a question to the master's Claude, with
+ * "Privado" for only the author and the master.
  */
 export const ChatComposer = () => {
   const { t } = useTranslation();
-  const { speaker, send, roll, poke, filters, setFilters, replyTo, cancelReply } = useChat();
+  const { speaker, send, roll, poke, filters, setFilters, replyTo, cancelReply, askStatus, ask } = useChat();
+  const [isPrivate, setIsPrivate] = useState(false);
   const [pasted, setPasted] = useState<{ file: File; url: string } | null>(null);
   const { mapTokens } = useMapToken();
   const { act } = useTurn();
@@ -68,7 +72,22 @@ export const ChatComposer = () => {
   // 080: a character acts with or without a piece — by the piece on the open map when there is one, else by itself.
   const target = actionTarget(currentCampaign?.campaignId ?? null, participation, piece);
   const acting = playable && mode === 'act' && !!participation;
-  const max = acting ? MAX_ACTION : MAX_TEXT;
+  // 093: the question mode, while the master's console is connected.
+  const availability = askAvailability(askStatus);
+  const asking = mode === 'ask';
+  const max = acting ? MAX_ACTION : asking ? MAX_QUESTION : MAX_TEXT;
+  const askReason = availability === 'offline' ? t('chat.ask.offline') : availability === 'waiting' ? t('chat.ask.waiting') : null;
+  const startAsking = () => {
+    if (availability !== 'ready') {
+      if (askReason) toast.info(askReason);
+      return false;
+    }
+    setMode('ask');
+    setRecipients([]);
+    setIsPrivate(false);
+    requestAnimationFrame(() => fieldRef.current?.focus());
+    return true;
+  };
   const disabled = !speaker;
 
   // A new campaign or another speaker starts public again.
@@ -116,6 +135,20 @@ export const ChatComposer = () => {
   const submit = async () => {
     const value = text.trim();
     if (!value || busy || disabled) return;
+    if (asking) {
+      try {
+        setBusy(true);
+        await ask(value, isPrivate);
+        setText('');
+        setIsPrivate(false);
+        setMode('talk');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (acting) {
       if (!target) return;
       try {
@@ -277,7 +310,21 @@ export const ChatComposer = () => {
     }
   };
   // Like WhatsApp: an empty field offers the microphone, anything typed (or an action) offers "send".
-  const showRecorder = recordable && !acting && (recording || !text.trim());
+  const showRecorder = recordable && !acting && !asking && (recording || !text.trim());
+
+  /** Typing: "/perguntar " at the start switches to the question mode (093). */
+  const onChangeText = (value: string, caret: number | null) => {
+    if (!asking) {
+      const parsed = parseAskPrefix(value);
+      if (parsed.ask && startAsking()) {
+        setText(parsed.text);
+        setMention(null);
+        return;
+      }
+    }
+    setText(value);
+    if (!asking) trackMention(value, caret);
+  };
 
   return (
     <div className="stm-chat-composer">
@@ -303,17 +350,31 @@ export const ChatComposer = () => {
       <input ref={fileRef} type="file" accept={IMAGE_TYPES} className="d-none" onChange={(e) => { void onPickImage(e); }} />
       <PollComposerModal open={pollOpen} onOpenChange={setPollOpen} />
       <WhisperChips recipients={recipients} onRemove={(r) => setRecipients((list) => removeRecipient(list, r))} />
+      {asking && (
+        <div className="stm-ask-bar">
+          <QuestionCircleIcon size={16} />
+          <span className="flex-grow-1">{t('chat.ask.mode')}</span>
+          <div className="form-check form-check-inline m-0">
+            <input id="chat-ask-private" type="checkbox" className="form-check-input" checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)} disabled={busy} />
+            <label className="form-check-label" htmlFor="chat-ask-private" title={t('chat.ask.privateHint')}>{t('chat.ask.private')}</label>
+          </div>
+          <button type="button" className="btn-close btn-close-sm" onClick={() => setMode('talk')}
+            aria-label={t('chat.ask.cancel')} title={t('chat.ask.cancel')} />
+        </div>
+      )}
       <div className="stm-chat-input">
         {!recording && (
-          <div className={`stm-chat-field${acting ? ' is-acting' : ''}${whispering ? ' is-whisper' : ''}`}>
+          <div className={`stm-chat-field${acting ? ' is-acting' : ''}${asking ? ' is-asking' : ''}${whispering ? ' is-whisper' : ''}`}>
             {mention && <MentionList options={options} active={activeOption} onPick={pickRecipient} onHover={setActiveOption} />}
             <textarea ref={fieldRef} rows={1} maxLength={max} value={text}
               placeholder={acting ? t('chat.actPlaceholder')
+                : asking ? t('chat.ask.placeholder')
                 : whispering ? t('chat.whisper.placeholder', { names: recipients.map((r) => r.name).join(', ') })
                   : t('chat.placeholder', { name: participation?.characterName ?? t('chat.master') })}
-              aria-label={acting ? t('chat.actPlaceholder') : t('chat.messageLabel')}
-              onChange={(e) => { setText(e.target.value); trackMention(e.target.value, e.target.selectionStart); }}
-              onSelect={(e) => trackMention(e.currentTarget.value, e.currentTarget.selectionStart)}
+              aria-label={acting ? t('chat.actPlaceholder') : asking ? t('chat.ask.placeholder') : t('chat.messageLabel')}
+              onChange={(e) => onChangeText(e.target.value, e.target.selectionStart)}
+              onSelect={(e) => { if (!asking) trackMention(e.currentTarget.value, e.currentTarget.selectionStart); }}
               onBlur={() => setMention(null)}
               onKeyDown={onKeyDown} onPaste={onPaste} disabled={busy} />
             <DropdownMenu.Root modal={false}>
@@ -323,8 +384,14 @@ export const ChatComposer = () => {
               <DropdownMenu.Portal>
                 {/* WhatsApp-like attach sheet: two columns of big round icons, sized for a finger. */}
                 <DropdownMenu.Content className="stm-chat-attach" side="top" align="end" sideOffset={10}>
-                  {!acting && (
+                  {!acting && !asking && (
                     <>
+                      {/* 093: a question to the master's Claude; inactive while his console is offline or yours waits. */}
+                      <DropdownMenu.Item className={`stm-chat-attach-item${availability !== 'ready' ? ' is-disabled' : ''}`}
+                        disabled={availability !== 'ready'} onSelect={() => { startAsking(); }} title={askReason ?? t('chat.ask.hint')}>
+                        <span className="stm-chat-attach-icon is-ask"><QuestionCircleIcon size={24} /></span>
+                        <span>{t('chat.ask.label')}</span>
+                      </DropdownMenu.Item>
                       <DropdownMenu.Item className="stm-chat-attach-item" onSelect={() => { void onRoll(); }}>
                         <span className="stm-chat-attach-icon is-roll"><Dice5Icon size={24} /></span>
                         <span>{t('chat.rollOption')}</span>
@@ -391,10 +458,11 @@ export const ChatComposer = () => {
         {showRecorder ? (
           <AudioRecorder disabled={busy} onSend={onSendAudio} onActiveChange={onRecordingChange} />
         ) : (
-          <button type="button" className={`btn ${acting ? 'btn-danger' : 'btn-primary'} stm-chat-send`} onClick={() => { void submit(); }}
+          <button type="button" className={`btn ${acting ? 'btn-danger' : asking ? 'btn-info' : 'btn-primary'} stm-chat-send`} onClick={() => { void submit(); }}
             disabled={busy || !text.trim() || (acting && !target)}
-            title={acting ? t('chat.sendAction') : t('chat.send')} aria-label={acting ? t('chat.sendAction') : t('chat.send')}>
-            {acting ? <LightningIcon size={22} /> : <SendIcon size={22} />}
+            title={acting ? t('chat.sendAction') : asking ? t('chat.ask.send') : t('chat.send')}
+            aria-label={acting ? t('chat.sendAction') : asking ? t('chat.ask.send') : t('chat.send')}>
+            {acting ? <LightningIcon size={22} /> : asking ? <QuestionCircleIcon size={22} /> : <SendIcon size={22} />}
           </button>
         )}
       </div>

@@ -12,7 +12,7 @@ import { useCharacter } from '../hooks/useCharacter';
 import { useRealtime, useTableEvents } from '../hooks/useRealtime';
 import { useTurn } from '../hooks/useTurn';
 import { CHAT_KIND } from '../types/chat';
-import type { ChatItemInfo, ChatSendInfo, ReactionKind } from '../types/chat';
+import type { AskStatusInfo, ChatItemInfo, ChatSendInfo, ReactionKind } from '../types/chat';
 import { TABLE_EVENT } from '../types/realtime';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
@@ -91,7 +91,15 @@ interface ChatContextType {
   closePoll: (item: ChatItemInfo) => Promise<void>;
   /** The master switches the voice of his own message: one of his characters, or null for the master (079). */
   setSpeaker: (item: ChatItemInfo, characterId: number | null) => Promise<void>;
+  /** "Perguntar" (093): whether the master's console is connected and the viewer's own waiting question. */
+  askStatus: AskStatusInfo;
+  /** Asks the master's Claude as the speaker (093); `isPrivate` = only the author and the master see it. Throws the API error. */
+  ask: (text: string, isPrivate: boolean) => Promise<void>;
+  /** The master corrects an answer of his Claude (093). */
+  editAnswer: (item: ChatItemInfo, text: string) => Promise<void>;
 }
+
+const NO_ASK: AskStatusInfo = { available: false, waitingTurnId: null };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -157,6 +165,25 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
    * Puts an entry from the server in place (050): inside or after the loaded pages it joins the timeline; an older poll
    * (open, pinned) is kept aside until it is loaded or moves forward with a vote.
    */
+  // 093: "Perguntar" — read with the campaign, pushed by ask.changed, refreshed when the own question moves.
+  const [askStatus, setAskStatus] = useState<AskStatusInfo>(NO_ASK);
+  const askRef = useRef<number | null>(null);
+  askRef.current = askStatus.waitingTurnId;
+  const refreshAsk = useCallback(async () => {
+    const id = campaignRef.current;
+    if (id === null || !canRead) {
+      setAskStatus(NO_ASK);
+      return;
+    }
+    try {
+      const status = await chatService.askStatus(id);
+      if (campaignRef.current === id) setAskStatus(status);
+    } catch {
+      setAskStatus(NO_ASK);
+    }
+  }, [canRead]);
+  useEffect(() => { void refreshAsk(); }, [refreshAsk, campaignId]);
+
   const upsert = useCallback((item: ChatItemInfo) => {
     const current = itemsRef.current;
     const first = current[0];
@@ -272,14 +299,19 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       if (item.kind === CHAT_KIND.poll) upsert(item);
       else setItems((current) => (current.some((i) => i.key === item.key) ? mergeItems(current, [item]) : current));
       setReplyTo((reply) => (reply?.key === item.key ? item : reply));
+      // 093: the viewer's own question answered or failed — they may ask again.
+      if (item.kind === CHAT_KIND.question && item.turnId === askRef.current) void refreshAsk();
     } else if (event.type === TABLE_EVENT.chatDeleted) {
       const { itemKey } = event.data as { itemKey: string };
       setItems((current) => markDeleted(current, itemKey));
       setExtraPolls((current) => current.filter((p) => p.key !== itemKey));
     } else if (event.type === TABLE_EVENT.turnChanged || event.type === TABLE_EVENT.turnFinished) {
       void refreshRecent();
+    } else if (event.type === TABLE_EVENT.askChanged) {
+      if (event.campaignId === campaignRef.current) void refreshAsk();
     } else if (event.type === TABLE_EVENT.resync) {
       void refreshRecent();
+      void refreshAsk();
     }
   });
 
@@ -436,6 +468,22 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     replace(await chatService.setSpeaker(item.turnId, characterId));
   }, [replace]);
 
+  const ask = useCallback(async (text: string, isPrivate: boolean) => {
+    if (!speaker || campaignId === null) return;
+    try {
+      const item = await chatService.ask(campaignId, { characterId: speaker.characterId, text, private: isPrivate });
+      if (campaignRef.current === campaignId) setItems((current) => mergeItems(current, [forViewer(item)]));
+      setAskStatus((current) => ({ ...current, waitingTurnId: item.turnId }));
+      setFirstUnreadCursor(null);
+    } finally {
+      void refreshAsk();
+    }
+  }, [speaker, campaignId, forViewer, refreshAsk]);
+
+  const editAnswer = useCallback(async (item: ChatItemInfo, text: string) => {
+    replace(await chatService.editAnswer(item.turnId, text));
+  }, [replace]);
+
   const createPoll = useCallback(async (question: string, options: string[]) => {
     if (!speaker || campaignId === null) return;
     const item = await chatService.createPoll(campaignId, {
@@ -468,10 +516,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<ChatContextType>(() => ({
     items: flow, pinnedPolls: pinned, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters, loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert,
-    createPoll, vote, closePoll, setSpeaker,
+    createPoll, vote, closePoll, setSpeaker, askStatus, ask, editAnswer,
   }), [flow, pinned, hasMore, unreadCount, firstUnreadCursor, pending, loading, canRead, speaker, layoutMode, setLayoutMode,
     filters, setFilters,
-    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert, createPoll, vote, closePoll, setSpeaker]);
+    loadOlder, send, retry, discard, remove, roll, poke, replyTo, startReply, cancelReply, react, convert, createPoll, vote, closePoll, setSpeaker,
+    askStatus, ask, editAnswer]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };

@@ -23,6 +23,8 @@ export const DISCREET_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([
 export const TURN_BUBBLE_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.movement, CHAT_KIND.action, CHAT_KIND.characterUpdate]);
 
 export const CONVERSATION_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio, CHAT_KIND.roll]);
+/** "Perguntar" (093): a question to the master's Claude and its answer — blue bubbles, never grouped with the others. */
+export const ASK_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.question, CHAT_KIND.answer]);
 
 /** "{ticks}_{id}" → comparable pair (ticks don't fit in a Number). */
 const cursorParts = (cursor: string): [bigint, bigint] => {
@@ -186,6 +188,7 @@ export interface ViewerContext {
 
 const REPLYABLE: ReadonlySet<ChatKind> = new Set<ChatKind>([
   CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio, CHAT_KIND.roll, CHAT_KIND.poll, CHAT_KIND.action, CHAT_KIND.narration,
+  CHAT_KIND.question, CHAT_KIND.answer,
 ]);
 
 /**
@@ -201,7 +204,7 @@ export const permissionsFor = (item: ChatItemInfo, viewer: ViewerContext): ChatI
   if (!item.deleted) {
     if (item.kind === CHAT_KIND.roll) canDelete = viewer.isMaster;
     // 050: a poll too — its author or the master (polls aren't in CONVERSATION_KINDS, which also groups bubbles).
-    else if (CONVERSATION_KINDS.has(item.kind) || item.kind === CHAT_KIND.poll) canDelete = item.userId === viewer.userId || viewer.isMaster;
+    else if (CONVERSATION_KINDS.has(item.kind) || ASK_KINDS.has(item.kind) || item.kind === CHAT_KIND.poll) canDelete = item.userId === viewer.userId || viewer.isMaster;
     else if (item.kind === CHAT_KIND.narration) canDelete = viewer.isMaster;
     else if (item.kind === CHAT_KIND.action) canDelete = validAction && mayChange;
   }
@@ -246,11 +249,16 @@ export const replyExcerpt = (item: ChatItemInfo): string => {
     case CHAT_KIND.audio: return 'Áudio';
     case CHAT_KIND.roll: return `Rolou 3d6: total ${rollTotal(item.dice)}`;
     case CHAT_KIND.poll: return `Enquete: ${cut}`;
+    case CHAT_KIND.question: return `Pergunta: ${cut}`;
     case CHAT_KIND.action: return `Ação: ${(item.description ?? '').slice(0, 120)}`;
     case CHAT_KIND.narration: return cut;
     default: return cut;
   }
 };
+
+/** 093: only the campaign master corrects an answer of his Claude, while it is not deleted. */
+export const canEditAnswer = (item: Pick<ChatItemInfo, 'kind' | 'deleted' | 'whisperHidden'>, isMaster: boolean): boolean =>
+  isMaster && item.kind === CHAT_KIND.answer && !item.deleted && !item.whisperHidden;
 
 /** 079: the kinds of message that speak with a voice (the master's or a character's) and may switch it. */
 export const VOICE_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.text, CHAT_KIND.image, CHAT_KIND.audio, CHAT_KIND.roll]);

@@ -68,6 +68,14 @@ public class RunInfo
     /// <summary>Relative paths (files, or folders ending in "/") whose changes are reported as <c>FileChanged</c>.</summary>
     [JsonPropertyName("watch")]
     public List<string> Watch { get; set; } = new();
+
+    /// <summary>
+    /// A read-only run (093): the console lets the Claude only read files of its working directory (no write, exec,
+    /// network or MCP), never resumes a session, scrubs its secrets from the environment and ignores
+    /// <see cref="Files"/>/<see cref="Watch"/> — whatever the rest of the request says.
+    /// </summary>
+    [JsonPropertyName("readOnly")]
+    public bool ReadOnly { get; set; }
 }
 
 /// <summary>One event of a running request (hub method <c>Progress</c>, client method <c>requestProgress</c>).</summary>

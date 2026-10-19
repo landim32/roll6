@@ -2538,5 +2538,27 @@ BEGIN
     VALUES ('20261018225650_AddLibraryImages', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261019021709_AddChatAsk') THEN
+    ALTER TABLE turns ADD ask_state integer;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261019021709_AddChatAsk') THEN
+    ALTER TABLE turns ADD edited_at timestamp without time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261019021709_AddChatAsk') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261019021709_AddChatAsk', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

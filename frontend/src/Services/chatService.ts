@@ -1,5 +1,5 @@
 import type {
-  ChatAudioUploadInfo, ChatItemInfo, ChatPageInfo, ChatPollCreateInfo, ChatRollInfo, ChatSendInfo, ReactionKind,
+  AskStatusInfo, ChatAudioUploadInfo, ChatItemInfo, ChatPageInfo, ChatPollCreateInfo, ChatRollInfo, ChatSendInfo, ReactionKind,
 } from '../types/chat';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 
@@ -90,6 +90,28 @@ class ChatService {
   /** The master closes a poll (077): no more votes, only the result. */
   async closePoll(turnId: number): Promise<ChatItemInfo> {
     const response = await fetch(`${API_URL}/api/chat/${turnId}/poll/close`, { method: 'POST', headers: getHeaders(true), body: '{}' });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
+  /** "Perguntar" (093): a question to the master's Claude; `private` = only the author and the master. */
+  async ask(campaignId: number, info: { characterId: number | null; text: string; private: boolean }): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/chat/ask`, {
+      method: 'POST', headers: getHeaders(true), body: JSON.stringify(info),
+    });
+    return this.handleResponse<ChatItemInfo>(response);
+  }
+
+  /** Whether "Perguntar" is available now and the caller's waiting question (093). */
+  async askStatus(campaignId: number): Promise<AskStatusInfo> {
+    const response = await fetch(`${API_URL}/api/campaign/${campaignId}/ask`, { headers: getHeaders(true) });
+    return this.handleResponse<AskStatusInfo>(response);
+  }
+
+  /** The master corrects an answer of his Claude (093). */
+  async editAnswer(turnId: number, text: string): Promise<ChatItemInfo> {
+    const response = await fetch(`${API_URL}/api/chat/${turnId}/answer`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ text }),
+    });
     return this.handleResponse<ChatItemInfo>(response);
   }
 

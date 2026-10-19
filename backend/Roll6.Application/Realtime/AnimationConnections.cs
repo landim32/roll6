@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Roll6.Domain.Interfaces;
 using Roll6.DTO.Realtime.Animation;
 using Roll6.DTO.Realtime.Console;
 
@@ -54,6 +55,9 @@ public sealed class EditorRequest
     public JsonElement? Content { get; init; }
     /// <summary>The weapons of the model shown (092), for the Claude's context.</summary>
     public IReadOnlyList<string> ModelWeapons { get; init; } = Array.Empty<string>();
+    /// <summary>A question of the chat (093) instead of an animation request: a read-only run, answered into the chat.</summary>
+    public AskJob? Ask { get; init; }
+    public bool IsAsk => Ask != null;
     public DateTime QueuedAt { get; }
     public DateTime StartedAt { get; internal set; }
     public RequestState State { get; internal set; } = RequestState.Queued;
@@ -177,7 +181,7 @@ public class AnimationConnections
     {
         lock (_lock)
         {
-            if (_requests.Values.Any(r => r.AnimationId == animationId))
+            if (_requests.Values.Any(r => !r.IsAsk && r.AnimationId == animationId))
                 return null;
             var request = new EditorRequest(++_nextRequestId, userId, animationId, animationName, conversationId, sessionId,
                 sessionStarted, prompt, images, modelName, now)
@@ -191,6 +195,33 @@ public class AnimationConnections
             queue.Add(request.RequestId);
             return request;
         }
+    }
+
+    /// <summary>
+    /// Queues a question of the chat (093) for the master's agents, in the same FIFO as his animation requests; null when
+    /// that question is already queued or running.
+    /// </summary>
+    public EditorRequest? EnqueueAsk(AskJob job, DateTime now)
+    {
+        lock (_lock)
+        {
+            if (_requests.Values.Any(r => r.Ask?.TurnId == job.TurnId))
+                return null;
+            var request = new EditorRequest(++_nextRequestId, job.MasterUserId, 0, string.Empty, 0, Guid.NewGuid(), false,
+                job.Text, Array.Empty<PromptImageInfo>(), null, now) { Ask = job };
+            _requests[request.RequestId] = request;
+            if (!_queues.TryGetValue(job.MasterUserId, out var queue))
+                _queues[job.MasterUserId] = queue = new List<long>();
+            queue.Add(request.RequestId);
+            return request;
+        }
+    }
+
+    /// <summary>The queued or running job of a question (093), if any.</summary>
+    public EditorRequest? FindByTurn(long turnId)
+    {
+        lock (_lock)
+            return _requests.Values.FirstOrDefault(r => r.Ask?.TurnId == turnId);
     }
 
     /// <summary>
@@ -243,7 +274,7 @@ public class AnimationConnections
     /// <summary>The request queued or running for the animation, or null.</summary>
     public EditorRequest? Running(long animationId)
     {
-        lock (_lock) return _requests.Values.FirstOrDefault(r => r.AnimationId == animationId);
+        lock (_lock) return _requests.Values.FirstOrDefault(r => !r.IsAsk && r.AnimationId == animationId);
     }
 
     /// <summary>1-based position of a queued request in the queue of its user; null when running or unknown.</summary>

@@ -38,4 +38,7 @@ public static class TableEventType
 
     /// <summary>A chat entry changed in place (044): reactions, converted, cancelled. Data = the ChatItemInfo.</summary>
     public const string CHAT_UPDATED = "chat.updated";
+
+    /// <summary>The master's Roll6.Console connected or dropped (093): "Perguntar" becomes available or not. Data = { available }.</summary>
+    public const string ASK_CHANGED = "ask.changed";
 }

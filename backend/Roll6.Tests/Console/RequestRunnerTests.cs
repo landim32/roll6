@@ -59,6 +59,27 @@ public sealed class RequestRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task AReadOnlyRunWritesAndWatchesNothing()
+    {
+        var claude = new FakeClaude((arguments, stdin, progress) =>
+        {
+            File.Exists(Path.Combine(_root, "animacoes", "7-aceno.json")).Should().BeFalse("a read-only run writes nothing");
+            arguments.Should().ContainInOrder("--permission-mode", "dontAsk");
+            File.WriteAllText(Path.Combine(_root, "animacoes-novo.json"), "{}");
+            progress.Report(new ClaudeTextDelta("Resposta."));
+            return new ClaudeOutcome(ClaudeOutcomeKind.Done);
+        });
+        var runner = new RequestRunner(_settings, claude, _reporter);
+        var run = Request();
+        run.ReadOnly = true;
+
+        await runner.RunAsync(run, afterRun: TimeSpan.FromMilliseconds(300));
+
+        _reporter.Changes.Should().BeEmpty();
+        _reporter.Outcome!.Kind.Should().Be("done");
+    }
+
+    [Fact]
     public async Task APathOutsideTheWorkingDirectoryFailsTheRequest()
     {
         var runner = new RequestRunner(_settings, new FakeClaude((_, _, _) => throw new InvalidOperationException("must not run")), _reporter);

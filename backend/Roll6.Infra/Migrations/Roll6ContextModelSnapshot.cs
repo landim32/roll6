@@ -1478,6 +1478,10 @@ namespace Roll6.Infra.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("TurnId"));
 
+                    b.Property<int?>("AskState")
+                        .HasColumnType("integer")
+                        .HasColumnName("ask_state");
+
                     b.Property<string>("Audio")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
@@ -1550,6 +1554,10 @@ namespace Roll6.Infra.Migrations
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
                         .HasColumnName("display_name");
+
+                    b.Property<DateTime?>("EditedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("edited_at");
 
                     b.Property<string>("Image")
                         .HasMaxLength(260)

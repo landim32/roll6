@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ChatLeftTextIcon, CopyIcon, EmojiLaughingFillIcon, EmojiLaughingIcon, HeartFillIcon, HeartIcon, LightningIcon, PersonBadgeIcon, PersonFillIcon, ReplyIcon, StopCircleIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
+  ChatLeftTextIcon, CopyIcon, EmojiLaughingFillIcon, EmojiLaughingIcon, HeartFillIcon, HeartIcon, LightningIcon, PencilIcon, PersonBadgeIcon, PersonFillIcon, ReplyIcon, StopCircleIcon, ThumbsUpFillIcon, ThumbsUpIcon, TrashIcon,
 } from '../ui/icons';
 import { copyableText, reactionSummary } from '../../lib/chatItems';
 import type { VoiceSwitch } from '../../lib/chatItems';
@@ -25,6 +25,8 @@ export interface ChatItemActionsProps {
   /** 079: the voice the master may switch his own message to ("Falar como …"), or null. */
   voice?: VoiceSwitch | null;
   onVoice?: () => void;
+  /** 093: the master corrects an answer of his Claude ("Corrigir resposta"); offered only when set. */
+  onEditAnswer?: () => void;
   /** Puts the text on the clipboard (only offered when the entry has text). */
   onCopy: (text: string) => void;
   onClose: () => void;
@@ -37,7 +39,7 @@ const BAR_HEIGHT = 56;
  * Ação/Mensagem (077: or, on a poll, Encerrar enquete for the master) and Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
  * closes on a tap outside, a scroll or Esc.
  */
-export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onClosePoll, voice = null, onVoice, onCopy, onClose }: ChatItemActionsProps) => {
+export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onClosePoll, voice = null, onVoice, onEditAnswer, onCopy, onClose }: ChatItemActionsProps) => {
   const { t } = useTranslation();
   // 049: items loaded before the campaign stopped playing still carry their old flag.
   const { currentCampaign } = useCampaign();
@@ -128,6 +130,11 @@ export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConv
           </button>
         );
       })()}
+      {onEditAnswer && (
+        <button type="button" className="stm-chat-action" onClick={act(onEditAnswer)} title={t('chat.ask.edit')} aria-label={t('chat.ask.edit')}>
+          <PencilIcon size={24} />
+        </button>
+      )}
       {item.canClosePoll && (
         <button type="button" className="stm-chat-action" onClick={act(onClosePoll)} title={t('chat.closePoll')} aria-label={t('chat.closePoll')}>
           <StopCircleIcon size={24} />

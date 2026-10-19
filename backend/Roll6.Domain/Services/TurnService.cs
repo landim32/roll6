@@ -37,6 +37,7 @@ public partial class TurnService : ITurnService
     private readonly IChatReadRepository<ChatRead> _chatReadRepository;
     private readonly IImageStorageAppService _imageStorage;
     private readonly IRealtimeNotifier _notifier;
+    private readonly IAskDispatcher _askDispatcher;
     private readonly INotificationQueue _queue;
     private readonly IChatReactionRepository<ChatReaction> _chatReactionRepository;
     private readonly IChatPollRepository<ChatPollOption, ChatPollVote> _chatPollRepository;
@@ -66,7 +67,8 @@ public partial class TurnService : ITurnService
         IChatPollRepository<ChatPollOption, ChatPollVote> chatPollRepository,
         ITurnWhisperRepository<TurnWhisperTarget> whisperRepository,
         INotificationQueue queue,
-        IRealtimeNotifier notifier)
+        IRealtimeNotifier notifier,
+        IAskDispatcher askDispatcher)
     {
         _whisperRepository = whisperRepository;
         _chatPollRepository = chatPollRepository;
@@ -79,6 +81,7 @@ public partial class TurnService : ITurnService
         _campaignNpcRepository = campaignNpcRepository;
         _mapModelRepository = mapModelRepository;
         _notifier = notifier;
+        _askDispatcher = askDispatcher;
         _userRepository = userRepository;
         _repository = repository;
         _campaignRepository = campaignRepository;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isPollOpen } from './chatPoll';
 import {
-  authorLabel, chatLabel, compareCursors, isMasterVoice, voiceSwitch, pinOpenPolls, nextReaction, permissionsFor, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
+  authorLabel, chatLabel, compareCursors, isMasterVoice, voiceSwitch, pinOpenPolls, nextReaction, permissionsFor, canEditAnswer, replyExcerpt, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
 import { CHAT_KIND } from '../types/chat';
@@ -286,5 +286,31 @@ describe("079: the master's voice", () => {
     expect(voiceSwitch(item(3, { kind: 'poll', userId: 1, characterId: null }), master)).toBeNull();
     expect(voiceSwitch(item(4, { kind: 'text', userId: 1, characterId: null, deleted: true }), master)).toBeNull();
     expect(voiceSwitch(item(5, { kind: 'text', userId: 1, characterId: 85, whisperHidden: true }), master)).toBeNull();
+  });
+});
+
+describe('093: questions and answers', () => {
+  const player = { userId: 2, isMaster: false, currentTurn: 1, ownerOf: () => 2 };
+  const master = { userId: 1, isMaster: true, currentTurn: 1, ownerOf: () => 2 };
+  const question = item(1, { kind: 'question', text: 'Posso abrir a porta?' });
+  const answer = item(2, { kind: 'answer', userId: 1, characterId: null, displayName: 'Claude do mestre', text: 'Sim.' });
+
+  it('lets the author or the master delete, everyone reply and react, nobody convert', () => {
+    const own = permissionsFor(question, player);
+    expect([own.canDelete, own.canReply, own.canReact, own.canConvert]).toEqual([true, true, true, null]);
+    expect(permissionsFor(answer, player).canDelete).toBe(false);
+    expect(permissionsFor(answer, master).canDelete).toBe(true);
+  });
+
+  it('only the master corrects an answer, while it is not deleted', () => {
+    expect(canEditAnswer(answer, true)).toBe(true);
+    expect(canEditAnswer(answer, false)).toBe(false);
+    expect(canEditAnswer(question, true)).toBe(false);
+    expect(canEditAnswer({ ...answer, deleted: true }, true)).toBe(false);
+  });
+
+  it('never groups with the conversation and quotes a question as such', () => {
+    expect(continuesPrevious(item(3, { kind: 'text' }), { ...question, turnId: 4 })).toBe(false);
+    expect(replyExcerpt(question)).toBe('Pergunta: Posso abrir a porta?');
   });
 });

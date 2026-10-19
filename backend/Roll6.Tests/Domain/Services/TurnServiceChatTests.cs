@@ -42,6 +42,7 @@ public partial class TurnServiceChatTests
     private readonly Mock<IChatReadRepository<ChatRead>> _chatReadRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3, CurrentMapId = MAP };
+    private readonly Mock<IAskDispatcher> _askDispatcher = new();
     private readonly TurnService _service;
 
     public TurnServiceChatTests()
@@ -84,7 +85,7 @@ public partial class TurnServiceChatTests
             _mapTokenRepository.Object, _campaignCharacterRepository.Object, _characterRepository.Object,
             _mapNpcRepository.Object, _npcRepository.Object, _unitOfWork.Object, _userRepository.Object,
             new Mock<IMapModelRepository<MapModel>>().Object, new Mock<ICampaignNpcRepository<CampaignNpc>>().Object,
-            new Mock<ITokenRepository<Token>>().Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _chatPolls.Object, _whispers.Object, _queue.Object, _notifier.Object);
+            new Mock<ITokenRepository<Token>>().Object, _chatReadRepository.Object, _imageStorage.Object, _chatReactions.Object, _chatPolls.Object, _whispers.Object, _queue.Object, _notifier.Object, _askDispatcher.Object);
     }
 
     private static Turn At(Turn t, long id, int second)

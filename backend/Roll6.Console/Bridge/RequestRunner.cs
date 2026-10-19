@@ -64,7 +64,9 @@ public sealed class RequestRunner
         }
         try
         {
-            _log($"Pedido #{run.RequestId}: rodando o Claude…");
+            _log(run.ReadOnly
+                ? $"Pedido #{run.RequestId} (pergunta, somente leitura): rodando o Claude…"
+                : $"Pedido #{run.RequestId}: rodando o Claude…");
             var outcome = await ExecuteAsync(run, cancellation.Token, afterRun ?? AfterRun);
             _log($"Pedido #{run.RequestId} terminado.");
             await _reporter.FinishedAsync(run.RequestId, outcome);
@@ -119,6 +121,13 @@ public sealed class RequestRunner
         var root = _settings.ClaudeWorkingDirectory;
         if (_settings.CheckClaudeWorkingDirectory() is { } missing)
             return new RequestOutcomeInfo { Kind = RequestOutcomeInfo.FAILED, Message = missing };
+        // 093: a read-only run writes and watches nothing, whatever came with it.
+        if (run.ReadOnly)
+            run = new RunInfo
+            {
+                RequestId = run.RequestId, SessionId = run.SessionId, Started = false, SystemPrompt = run.SystemPrompt,
+                Prompt = run.Prompt, Images = run.Images, ReadOnly = true,
+            };
         if (run.Files.Any(f => FileWriter.Resolve(root, f.Path) == null) || run.Watch.Any(w => FileWriter.Resolve(root, w.TrimEnd('/', '\\')) == null))
             return new RequestOutcomeInfo { Kind = RequestOutcomeInfo.FAILED, Message = FileWriter.OUTSIDE };
 
@@ -144,7 +153,7 @@ public sealed class RequestRunner
             lock (reports)
                 reports.Add(_reporter.ProgressAsync(run.RequestId, info));
         });
-        var arguments = ClaudeRunner.Arguments(_settings, run.SessionId, run.Started, run.SystemPrompt);
+        var arguments = ClaudeRunner.Arguments(_settings, run.SessionId, run.Started, run.SystemPrompt, run.ReadOnly);
         var outcome = await _claude.RunAsync(arguments, PromptMessage.Build(run.Prompt, run.Images), progress, cancellation);
 
         // The last write of the Claude may settle after its result line.
