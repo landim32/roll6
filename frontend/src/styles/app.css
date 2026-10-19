@@ -2961,6 +2961,10 @@ button.stm-chat-quote { cursor: pointer; }
 .stm-editor-msg-lines { margin: 0.4rem 0 0; padding-left: 1rem; font-size: 0.75rem; color: var(--bs-secondary-color); }
 .stm-editor-msg-thumbs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
 .stm-editor-msg-thumbs img { width: 72px; height: 54px; object-fit: cover; border-radius: 4px; border: 1px solid var(--stm-border); }
+/* 094: prints taken for the Claude, under its line. */
+.stm-editor-agent-prints { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.4rem; }
+.stm-editor-agent-thumb { padding: 0; border: 0; background: none; cursor: zoom-in; }
+.stm-editor-agent-thumb img { width: 72px; height: 72px; object-fit: cover; }
 .stm-editor-notice { align-self: center; margin: 0; font-size: 0.75rem; color: var(--bs-secondary-color); text-align: center; }
 .stm-editor-attachments { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.4rem 0.5rem 0; }
 .stm-editor-thumb { position: relative; display: inline-block; }

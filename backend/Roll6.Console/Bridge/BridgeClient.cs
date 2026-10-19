@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR.Client;
 using Roll6.Console.Settings;
 using Roll6.DTO.Realtime.Console;
@@ -14,7 +15,15 @@ public sealed class BridgeClient : IRequestReporter, IAsyncDisposable
     private readonly ConsoleSettings _settings;
     private readonly Action<string> _log;
     private readonly HubConnection _connection;
+    /// <summary>094: tool calls waiting for the server's <c>toolResult</c>, by call id.</summary>
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<ToolResultInfo>> _toolCalls = new();
     private RequestRunner? _runner;
+
+    /// <summary>How long a tool call waits for the server before answering the Claude with an error.</summary>
+    public static readonly TimeSpan TOOL_TIMEOUT = TimeSpan.FromSeconds(60);
+
+    public const string TOOL_TIMED_OUT = "O Roll6 não respondeu a tempo.";
+    public const string TOOL_FAILED = "Não foi possível falar com o Roll6: {0}";
 
     public BridgeClient(ConsoleSettings settings, Action<string> log)
     {
@@ -48,6 +57,11 @@ public sealed class BridgeClient : IRequestReporter, IAsyncDisposable
         _connection.On<RunInfo>("run", run => { _ = RunAsync(run); });
         _connection.On<long>("stop", requestId => runner.Stop(requestId));
         _connection.On<List<FileWriteInfo>>("writeFiles", files => runner.WriteFiles(files));
+        _connection.On<ToolResultInfo>("toolResult", result =>
+        {
+            if (result != null && _toolCalls.TryRemove(result.CallId, out var pending))
+                pending.TrySetResult(result);
+        });
     }
 
     private async Task RunAsync(RunInfo run)
@@ -108,6 +122,33 @@ public sealed class BridgeClient : IRequestReporter, IAsyncDisposable
     public Task FileChangedAsync(long requestId, FileChangedInfo info) => _connection.SendAsync("FileChanged", requestId, info);
 
     public Task FinishedAsync(long requestId, RequestOutcomeInfo outcome) => _connection.SendAsync("Finished", requestId, outcome);
+
+    /// <summary>A call of a run's tool (094): sent as <c>ToolCall</c>, answered by the server's <c>toolResult</c>.</summary>
+    public async Task<ToolResultInfo> CallToolAsync(long requestId, ToolCallInfo call, CancellationToken cancellation)
+    {
+        var key = $"{requestId}:{call.CallId}";
+        call.CallId = key;
+        var pending = new TaskCompletionSource<ToolResultInfo>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _toolCalls[key] = pending;
+        try
+        {
+            await _connection.SendAsync("ToolCall", requestId, call, cancellation);
+            var finished = await Task.WhenAny(pending.Task, Task.Delay(TOOL_TIMEOUT, cancellation));
+            return finished == pending.Task ? await pending.Task : ToolResultInfo.Error(key, TOOL_TIMED_OUT);
+        }
+        catch (OperationCanceledException)
+        {
+            return ToolResultInfo.Error(key, "O pedido foi encerrado.");
+        }
+        catch (Exception ex)
+        {
+            return ToolResultInfo.Error(key, string.Format(TOOL_FAILED, ex.Message));
+        }
+        finally
+        {
+            _toolCalls.TryRemove(key, out _);
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {

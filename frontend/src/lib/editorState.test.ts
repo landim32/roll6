@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  INITIAL_STATE, MAX_ATTACHMENTS, agentStatus, animationVersion, attachPrint, base64Of, conversationCleared, discarded, draftVersion,
+  INITIAL_STATE, MAX_ATTACHMENTS, agentPrint, agentStatus, animationVersion, attachPrint, base64Of, conversationCleared, discarded, draftVersion,
   edited, isBusy, isDirty, opened, ownVersion, removePrint, requestFinished, requestProgress, requestQueued, requestStarted, saved, sent,
 } from './editorState';
 import type { EditorState, PrintAttachment } from './editorState';
@@ -85,6 +85,22 @@ describe('editor state (086)', () => {
     }, null);
     expect(state.request).toBeNull();
     expect(last(state.messages)).toMatchObject({ key: 'm-9', text: 'Pronto.', running: false, lines: ['Editando animacoes/7-aceno.json'] });
+  });
+
+  it('094: prints for the Claude stay under its line and survive the stored answer', () => {
+    let state = requestStarted(sent(opened(INITIAL_STATE, OPEN), 12, 'oi', [], 'now'), { requestId: 12, animationId: 7, machine: null });
+    state = agentPrint(state, 12, { callId: '12:c1', shots: [{ png: 'AAAA', caption: 'de frente' }], error: null });
+    state = agentPrint(state, 12, { callId: '12:c2', shots: [], error: 'O editor não respondeu.' });
+    expect(last(state.messages)).toMatchObject({ running: true });
+    expect(last(state.messages).prints.map((p) => p.callId)).toEqual(['12:c1', '12:c2']);
+
+    state = requestFinished(state, {
+      requestId: 12, animationId: 7, outcome: { kind: 'done', permissionDenials: [] },
+      message: { animationMessageId: 9, role: 2, text: 'Conferi.', imageCount: 0, createdAt: 'later' },
+    }, null);
+
+    expect(last(state.messages)).toMatchObject({ key: 'm-9', text: 'Conferi.' });
+    expect(last(state.messages).prints).toHaveLength(2);
   });
 
   it('a failed request leaves a notice and a silent one leaves only its lines', () => {

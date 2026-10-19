@@ -1,6 +1,7 @@
 using Roll6.Console.Claude;
 using Roll6.Console.Files;
 using Roll6.Console.Settings;
+using Roll6.Console.Tools;
 using Roll6.DTO.Realtime.Console;
 
 namespace Roll6.Console.Bridge;
@@ -11,6 +12,9 @@ public interface IRequestReporter
     Task ProgressAsync(long requestId, ClaudeEventInfo claudeEvent);
     Task FileChangedAsync(long requestId, FileChangedInfo info);
     Task FinishedAsync(long requestId, RequestOutcomeInfo outcome);
+
+    /// <summary>A call of one of the run's tools (094), answered by the server.</summary>
+    Task<ToolResultInfo> CallToolAsync(long requestId, ToolCallInfo call, CancellationToken cancellation);
 }
 
 /// <summary>
@@ -30,16 +34,19 @@ public sealed class RequestRunner
     private readonly IClaudeProcess _claude;
     private readonly IRequestReporter _reporter;
     private readonly Action<string> _log;
+    private readonly IToolHostFactory _toolHosts;
     private readonly object _lock = new();
     private long? _running;
     private CancellationTokenSource? _cancellation;
 
-    public RequestRunner(ConsoleSettings settings, IClaudeProcess claude, IRequestReporter reporter, Action<string>? log = null)
+    public RequestRunner(ConsoleSettings settings, IClaudeProcess claude, IRequestReporter reporter, Action<string>? log = null,
+        IToolHostFactory? toolHosts = null)
     {
         _settings = settings;
         _claude = claude;
         _reporter = reporter;
         _log = log ?? (_ => { });
+        _toolHosts = toolHosts ?? LocalToolServer.Factory;
     }
 
     /// <summary>The id of the request running now, or null.</summary>
@@ -121,7 +128,7 @@ public sealed class RequestRunner
         var root = _settings.ClaudeWorkingDirectory;
         if (_settings.CheckClaudeWorkingDirectory() is { } missing)
             return new RequestOutcomeInfo { Kind = RequestOutcomeInfo.FAILED, Message = missing };
-        // 093: a read-only run writes and watches nothing, whatever came with it.
+        // 093: a read-only run writes and watches nothing, whatever came with it (094: and offers no tools).
         if (run.ReadOnly)
             run = new RunInfo
             {
@@ -153,7 +160,11 @@ public sealed class RequestRunner
             lock (reports)
                 reports.Add(_reporter.ProgressAsync(run.RequestId, info));
         });
-        var arguments = ClaudeRunner.Arguments(_settings, run.SessionId, run.Started, run.SystemPrompt, run.ReadOnly);
+        // 094: the run's tools live on a local MCP server for as long as the Claude runs (never on a read-only run).
+        await using var tools = run.Tools.Count > 0
+            ? await _toolHosts.StartAsync(run.Tools, (call, ct) => CallToolAsync(run.RequestId, call, watcher, reports, ct), cancellation)
+            : null;
+        var arguments = ClaudeRunner.Arguments(_settings, run.SessionId, run.Started, run.SystemPrompt, run.ReadOnly, tools);
         var outcome = await _claude.RunAsync(arguments, PromptMessage.Build(run.Prompt, run.Images), progress, cancellation);
 
         // The last write of the Claude may settle after its result line.
@@ -164,6 +175,21 @@ public sealed class RequestRunner
             pending = reports.ToArray();
         await Task.WhenAll(pending);
         return outcome.ToInfo();
+    }
+
+    /// <summary>
+    /// A tool call of the Claude (094): first every pending file change is reported (and its sending awaited), so the
+    /// server already has the edit the Claude just made; then the call goes to the server and its answer comes back.
+    /// </summary>
+    private async Task<ToolResultInfo> CallToolAsync(long requestId, ToolCallInfo call, FileWatcher watcher, List<Task> reports, CancellationToken cancellation)
+    {
+        _log($"Pedido #{requestId}: ferramenta {call.Name}…");
+        watcher.Flush();
+        Task[] pending;
+        lock (reports)
+            pending = reports.ToArray();
+        await Task.WhenAll(pending);
+        return await _reporter.CallToolAsync(requestId, call, cancellation);
     }
 
     /// <summary>The console's events as the hub takes them; permission denials come as notices at the end.</summary>

@@ -50,6 +50,8 @@ public static class AnimationRequestBuilder
             Images = images.ToList(),
             Files = new List<FileWriteInfo> { new() { Path = path, Content = Serialize(content) } },
             Watch = new List<string> { FOLDER + "/" },
+            // 094: the Claude can look at what it wrote.
+            Tools = new List<ToolInfo> { PrintRequest.ToolDefinition() },
         };
     }
 

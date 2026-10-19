@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import {
   AnimationMixer, CircleGeometry, Clock, Color, DirectionalLight, Group, HemisphereLight, Mesh, MeshBasicMaterial,
-  PerspectiveCamera, Scene, WebGLRenderer,
+  PerspectiveCamera, Scene, Vector3, WebGLRenderer,
 } from 'three';
 import type { Bone, Object3D, Quaternion } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -13,9 +13,13 @@ import { createWeaponSockets } from '../../story/weaponSockets';
 import { loadAnimations } from '../../../lib/animationCache';
 import { AUTO_CLIPS, clipChoiceIds } from '../../../lib/modelAnimations';
 import type { SocketWeapons } from '../../../types/weapon';
-import { restFrame } from '../../story/threeClips';
+import { buildRoll6Clip, restFrame } from '../../story/threeClips';
 import { isMixamoSkeleton, normalizeBoneName } from '../../../lib/modelAnimations';
+import { toRoll6Clip } from '../../../lib/animationFormat';
 import type { AnimationFile } from '../../../lib/animationFormat';
+import { keyPoseTime } from '../../../lib/keyPose';
+import { shotAngles, shotCameraPosition, shotTime } from '../../../lib/shotCamera';
+import type { PrintShot, ShotView } from '../../../types/animationEditor';
 import { Player, cameraAngles, formatTime } from './player';
 import type { Playback } from './player';
 import { poseAt, poseLabel, poseTimes } from './poses';
@@ -41,7 +45,28 @@ export interface CapturedPrint {
   pose: PoseInfo | null;
 }
 
+/** One print taken for the Claude (094): the picture and where the animation and the camera were. */
+export interface CapturedShot {
+  png: string;
+  time: number;
+  duration: number;
+  view: ShotView;
+  azimuth: number;
+  elevation: number;
+  skeleton: boolean;
+  pose: PoseInfo | null;
+}
+
+/** Side of the square prints taken for the Claude, in pixels. */
+export const SHOT_SIZE = 768;
+
 export interface StageHandle {
+  /**
+   * Prints of `file` for the Claude (094): posed, lit and framed like the stage, each from its own side and instant,
+   * taken in one go and then everything put back — the user's view never changes. Null without a model; a text when
+   * the model has none of the animation's bones.
+   */
+  captureShots: (file: AnimationFile, shots: readonly PrintShot[]) => CapturedShot[] | string | null;
   play: () => void;
   pause: () => void;
   seek: (seconds: number) => void;
@@ -471,6 +496,78 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
     playback: () => player.current?.playback() ?? { time: 0, duration: 0, paused: true, enabled: false },
     pose: currentPose,
     deselect,
+    captureShots: (file, shots) => {
+      const r = renderer.current;
+      const s = scene.current;
+      const c = camera.current;
+      const canvas = canvasRef.current;
+      const loaded = modelRef.current;
+      const p = player.current;
+      if (!r || !s || !c || !canvas || !loaded || !p) return null;
+      const roll6 = toRoll6Clip(file, `animation:${latest.current.animationName}`);
+      const clip = buildRoll6Clip(roll6, p.source, loaded.height);
+      if (!clip) return 'O modelo não tem nenhum dos ossos desta animação.';
+      const keyTime = keyPoseTime(roll6);
+      const keys = poseTimes(file);
+      const { model } = loaded;
+      // Everything the shots change, to put back in the same task: the browser paints only the user's view.
+      const transforms: { node: Object3D; position: Vector3; quaternion: Quaternion; scale: Vector3 }[] = [];
+      model.traverse((node) => transforms.push({ node, position: node.position.clone(), quaternion: node.quaternion.clone(), scale: node.scale.clone() }));
+      const view = skeletonView.current;
+      const skeletonWas = view?.enabled ?? false;
+      const ratio = r.getPixelRatio();
+      hideBoneLabel();
+      const mixer = new AnimationMixer(model);
+      const action = mixer.clipAction(clip);
+      action.play();
+      action.paused = true;
+      const shotCamera = new PerspectiveCamera(35, 1, 0.05, 100);
+      const target = new Vector3(0, MODEL_HEIGHT / 2, 0);
+      const result: CapturedShot[] = [];
+      try {
+        r.setPixelRatio(1);
+        r.setSize(SHOT_SIZE, SHOT_SIZE, false);
+        view?.setMoved(movedBones(file));
+        for (const shot of shots) {
+          const time = shotTime(shot.time, clip.duration, keyTime);
+          action.time = time;
+          mixer.update(0);
+          model.updateMatrixWorld(true);
+          view?.setEnabled(shot.skeleton);
+          view?.update();
+          const at = shotCameraPosition(target, MODEL_HEIGHT * 2.6, shot.view);
+          shotCamera.position.set(at.x, at.y, at.z);
+          shotCamera.lookAt(target);
+          r.render(s, shotCamera);
+          const pose = poseAt(keys, time);
+          result.push({
+            png: stampPrint(canvas, pose ? `${poseLabel(pose)} · ${formatTime(time)}` : formatTime(time)),
+            time,
+            duration: clip.duration,
+            view: shot.view,
+            ...shotAngles(shot.view),
+            skeleton: shot.skeleton,
+            pose,
+          });
+        }
+      } finally {
+        mixer.stopAllAction();
+        mixer.uncacheRoot(model);
+        for (const { node, position, quaternion, scale } of transforms) {
+          node.position.copy(position);
+          node.quaternion.copy(quaternion);
+          node.scale.copy(scale);
+        }
+        model.updateMatrixWorld(true);
+        view?.setMoved(movedBones(latest.current.content));
+        view?.setEnabled(skeletonWas);
+        view?.update();
+        r.setPixelRatio(ratio);
+        r.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight), false);
+        r.render(s, c);
+      }
+      return result;
+    },
     capture: () => {
       const r = renderer.current;
       const s = scene.current;

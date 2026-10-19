@@ -66,6 +66,24 @@ Publicar: `dotnet publish Roll6.Console -c Release -r win-x64 --self-contained f
 
 Fora de um pedido, o servidor pode mandar `writeFiles` (por exemplo, uma pose editada na página) e o console só grava.
 
+## Ferramentas de um pedido (094)
+
+Um pedido pode trazer `tools[]` (nome, descrição e esquema dos argumentos, montados pelo servidor — hoje o
+`print_stage` do editor de animação, que tira prints do palco). Quando traz, e o pedido não é somente leitura:
+
+1. o console abre, só enquanto o Claude roda, um **servidor MCP local** em `http://127.0.0.1:<porta escolhida pelo
+   sistema>/mcp` com uma senha aleatória do pedido (qualquer chamada sem `Authorization: Bearer <senha>` recebe 401);
+2. passa ao Claude `--mcp-config` com esse servidor (`roll6-editor`) e acrescenta `mcp__roll6-editor__<nome>` a
+   `--allowedTools`;
+3. a cada chamada, primeiro envia as mudanças de arquivo ainda não relatadas (para o servidor já ter a edição que o
+   Claude acabou de fazer), depois repassa a chamada (`ToolCall`) e devolve ao Claude a resposta do servidor
+   (`toolResult`: texto e imagens) — sem resposta em 60 s, devolve "O Roll6 não respondeu a tempo.";
+4. fecha o servidor quando o pedido termina.
+
+O console não sabe o que as ferramentas fazem. Pedidos somente leitura (as perguntas da mesa) nunca recebem
+ferramentas. Verificado com o Claude Code 2.1.301 (cabeçalho com a senha, ferramenta pré-aprovada sem perguntar,
+imagem chegando ao modelo).
+
 ## Perguntas da mesa (093, "Perguntar")
 
 Com o console conectado, os jogadores das campanhas em que você é mestre podem usar **Perguntar** no chat. Cada pergunta

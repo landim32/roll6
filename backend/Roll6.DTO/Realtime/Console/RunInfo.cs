@@ -76,6 +76,13 @@ public class RunInfo
     /// </summary>
     [JsonPropertyName("readOnly")]
     public bool ReadOnly { get; set; }
+
+    /// <summary>
+    /// Tools offered to the Claude in this run (094): exposed by the console on a local MCP server for the run and
+    /// forwarded as <c>ToolCall</c>. Empty = none; ignored on a read-only run.
+    /// </summary>
+    [JsonPropertyName("tools")]
+    public List<ToolInfo> Tools { get; set; } = new();
 }
 
 /// <summary>One event of a running request (hub method <c>Progress</c>, client method <c>requestProgress</c>).</summary>

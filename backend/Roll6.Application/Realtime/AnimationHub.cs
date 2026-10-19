@@ -40,6 +40,11 @@ public class AnimationHub : Hub
     /// <summary>A valid working file of the Claude, relayed to the editor as an unsaved edit (091).</summary>
     public const string DRAFT_VERSION_METHOD = "draftVersion";
     public const string CONVERSATION_CLEARED_METHOD = "conversationCleared";
+    /// <summary>094: the Claude asked for prints; only the tab that sent the request gets it.</summary>
+    public const string PRINT_REQUESTED_METHOD = "printRequested";
+
+    /// <summary>094: the answer to a console's <c>ToolCall</c>.</summary>
+    public const string TOOL_RESULT_METHOD = "toolResult";
 
     public const string AGENT_DROPPED = "O agente caiu.";
     public const string STOPPED = "Pedido parado.";
@@ -89,6 +94,9 @@ public class AnimationHub : Hub
             await _dispatcher.PublishAskChangedAsync(agentUser);
             await DispatchAsync(agentUser);
         }
+        // 094: prints this tab was taking for the Claude can no longer come.
+        foreach (var request in _connections.RequestsOfEditor(connectionId))
+            request.FailPendingPrints(PrintRequest.NO_EDITOR);
         _connections.RemoveEditor(connectionId);
         await base.OnDisconnectedAsync(exception);
     }
@@ -180,6 +188,7 @@ public class AnimationHub : Hub
         }
         catch (JsonException ex)
         {
+            request.SetLatestError("JSON malformado — " + ex.Message);
             await NoticeAsync(request, string.Format(INVALID_FILE, "JSON malformado — " + ex.Message));
             return;
         }
@@ -187,6 +196,8 @@ public class AnimationHub : Hub
         {
             // Validated here with the same rule as the upload, so an invalid file becomes a notice and never a version.
             AnimationFormat.Parse(json);
+            // 094: what the Claude's prints show from now on.
+            request.SetLatest(json);
             await Clients.Group(AnimationConnections.GroupName(request.AnimationId)).SendAsync(DRAFT_VERSION_METHOD, new DraftVersionInfo
             {
                 AnimationId = request.AnimationId,
@@ -197,9 +208,47 @@ public class AnimationHub : Hub
         catch (DomainValidationException ex)
         {
             var (_, messages) = ex.Errors.First();
+            request.SetLatestError(messages.FirstOrDefault() ?? ex.Message);
             await NoticeAsync(request, string.Format(INVALID_FILE, messages.FirstOrDefault() ?? ex.Message));
         }
     }
+
+    /// <summary>
+    /// A tool of the run called by the Claude (094), from the console running that request only. Answered later with
+    /// <c>toolResult</c> by <see cref="AgentDispatcher.HandleToolCallAsync"/>: a print waits for the editor tab, and a hub
+    /// method that waited would hold the console's other messages behind it.
+    /// </summary>
+    public Task ToolCall(long requestId, ToolCallInfo call)
+    {
+        if (call == null || !_connections.IsRunBy(requestId, Context.ConnectionId))
+            return Task.CompletedTask;
+        var agentConnectionId = Context.ConnectionId;
+        _ = Task.Run(() => _dispatcher.HandleToolCallAsync(requestId, agentConnectionId, call));
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The editor tab's prints for a call of its own request (094); anything else is ignored.</summary>
+    public Task PrintResult(PrintResultInfo result)
+    {
+        if (result == null || string.IsNullOrEmpty(result.CallId))
+            return Task.CompletedTask;
+        var clean = new PrintResultInfo
+        {
+            CallId = result.CallId,
+            Error = string.IsNullOrWhiteSpace(result.Error) ? null : Truncate(result.Error.Trim(), 300),
+            Shots = (result.Shots ?? new List<PrintedShotInfo>())
+                .Where(s => !string.IsNullOrEmpty(s?.Png) && s.Png.Length <= PrintedShotInfo.MAX_PNG_BASE64)
+                .Take(PrintRequest.MAX_SHOTS)
+                .Select(s => new PrintedShotInfo { Png = s.Png, Caption = Truncate(s.Caption ?? string.Empty, 1000) })
+                .ToList(),
+        };
+        foreach (var request in _connections.RequestsOfEditor(Context.ConnectionId))
+            if (request.CompletePrint(clean))
+                break;
+        return Task.CompletedTask;
+    }
+
+    private static string Truncate(string text, int max) => text.Length <= max ? text : text[..max];
 
     /// <summary>The request ended: the Claude line is stored, the agent freed, the editors told, the queue advanced.</summary>
     public async Task Finished(long requestId, RequestOutcomeInfo outcome)
@@ -270,7 +319,7 @@ public class AnimationHub : Hub
         var conversation = await _conversations.GetOrOpenAsync(userId, info.AnimationId);
         var request = _connections.Enqueue(userId, info.AnimationId, animation.Name, conversation.AnimationConversationId,
             conversation.ClaudeSessionId, conversation.Started, info.Text.Trim(), info.Images, info.ModelName, Now, content,
-            info.ModelWeapons?.Select(w => w.Trim()).Where(w => w.Length > 0).ToList())
+            info.ModelWeapons?.Select(w => w.Trim()).Where(w => w.Length > 0).ToList(), Context.ConnectionId)
             ?? throw new HubException("busy");
         await _conversations.AddMessageAsync(conversation.AnimationConversationId, ConversationRole.User, info.Text.Trim(), info.Images.Count);
         var started = await DispatchAsync(userId);

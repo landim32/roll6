@@ -283,6 +283,14 @@
       "send": "Enviar",
       "tooLong": "O pedido passa de {{max}} caracteres."
     },
+    "print": {
+      "label_one": "Print para o Claude",
+      "label_other": "{{count}} prints para o Claude",
+      "failed": "Print para o Claude não tirado: {{reason}}",
+      "open": "Ver o print {{index}}",
+      "noModel": "Escolha um modelo 3D no editor para tirar prints.",
+      "notMixamo": "O esqueleto do modelo não é Mixamo; não dá para posar a animação."
+    },
     "prints": {
       "attach": "Anexar print",
       "edit": "Marcar este print",
