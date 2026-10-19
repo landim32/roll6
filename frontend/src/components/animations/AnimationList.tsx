@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAnimation } from '../../hooks/useAnimation';
 import { useAuth } from '../../hooks/useAuth';
 import { loadAnimation } from '../../lib/animationCache';
 import { copyToClipboard } from '../../lib/clipboard';
 import { animationService } from '../../Services/animationService';
-import { animationEditorPath } from '../../lib/libraryRoutes';
 import { ANIMATION_TYPES } from '../../types/animation';
 import type { AnimationInfo, AnimationType } from '../../types/animation';
 import { CopyIcon, PencilIcon, PlayFillIcon, TrashIcon } from '../ui/icons';
@@ -134,12 +132,6 @@ export const AnimationList = ({ mine, version, onEdit, onDelete }: AnimationList
                   title={t('animations.copy')} aria-label={t('animations.copy')}>
                   <CopyIcon size={14} />
                 </button>
-                {mine && (
-                  <Link className="btn btn-sm btn-outline-primary" to={animationEditorPath(animation.animationId)}
-                    title={t('animations.openEditor')} aria-label={t('animations.openEditor')}>
-                    <PlayFillIcon size={14} />
-                  </Link>
-                )}
                 {onEdit && (
                   <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(animation)}
                     title={t('animations.editLabel', { name: animation.name })} aria-label={t('animations.editLabel', { name: animation.name })}>

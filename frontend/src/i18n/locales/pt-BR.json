@@ -138,6 +138,7 @@
     "name": "Nome",
     "typeLabel": "Tipo",
     "updated": "Animação alterada.",
+    "editTitle": "Alterar animação",
     "deleted": "Animação apagada.",
     "copy": "Copiar JSON",
     "copied": "JSON copiado.",
@@ -270,6 +271,7 @@
     }
   },
   "editor": {
+    "rename": "Alterar nome e tipo",
     "save": {
       "button": "Salvar",
       "shortcut": "Salvar na biblioteca (Ctrl+S)",

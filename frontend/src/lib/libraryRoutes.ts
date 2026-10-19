@@ -42,8 +42,6 @@ export const tokenPath = (id: number | 'new'): string => `${LIBRARY_ROOT}/tokens
 
 export const weaponPath = (id: number | 'new'): string => `${LIBRARY_ROOT}/weapons/${id}`;
 
-export const animationPath = (id: number | 'new'): string => `${LIBRARY_ROOT}/animations/${id}`;
-
 /** The animation editor (089; was `/animation/:id` in its own tab) inside the library. */
 export const animationEditorPath = (id: number): string => `${LIBRARY_ROOT}/animations/${id}/editor`;
 

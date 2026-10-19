@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CAMPAIGN_SECTIONS, LIBRARY_SECTIONS, animationEditorPath, animationPath, campaignEditPath, campaignNewPath, characterPath, idParam,
+  CAMPAIGN_SECTIONS, LIBRARY_SECTIONS, animationEditorPath, campaignEditPath, campaignNewPath, characterPath, idParam,
   isAnimationEditorPath, isCampaignSection, isLibrarySection, libraryPath, mapEditPath, npcPath, sectionOf, tokenPath, weaponPath,
   LIBRARY_SUBSECTIONS, legacyTabPath, mapGeneratorPath, subsectionOf, subsectionPath,
 } from './libraryRoutes';
@@ -23,7 +23,6 @@ describe('library routes (087)', () => {
     expect(npcPath(2)).toBe('/library/npcs/2');
     expect(tokenPath('new')).toBe('/library/tokens/new');
     expect(weaponPath(3)).toBe('/library/weapons/3');
-    expect(animationPath(7)).toBe('/library/animations/7');
   });
 
   it('finds the section of an address', () => {
@@ -112,6 +111,5 @@ describe('library submenus (090)', () => {
 
   it('builds the "new" pages of weapons and animations', () => {
     expect(weaponPath('new')).toBe('/library/weapons/new');
-    expect(animationPath('new')).toBe('/library/animations/new');
   });
 });

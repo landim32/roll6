@@ -26,8 +26,6 @@ const WeaponsPage = lazy(() => import('./pages/library/WeaponsPage'));
 const WeaponEditPage = lazy(() => import('./pages/library/WeaponEditPage'));
 const WeaponCreatePage = lazy(() => import('./pages/library/WeaponCreatePage'));
 const AnimationsPage = lazy(() => import('./pages/library/AnimationsPage'));
-const AnimationEditPage = lazy(() => import('./pages/library/AnimationEditPage'));
-const AnimationCreatePage = lazy(() => import('./pages/library/AnimationCreatePage'));
 
 /** Routes (/login public; the table, the animation editor and the library — 087 — protected) and the dark toaster. */
 export const App = () => {
@@ -75,8 +73,9 @@ export const App = () => {
           <Route path="weapons/:id" element={<WeaponEditPage />} />
           <Route path="animations" element={<AnimationsPage key="mine" subsection="mine" />} />
           <Route path="animations/search" element={<AnimationsPage key="search" subsection="search" />} />
-          <Route path="animations/new" element={<AnimationCreatePage />} />
-          <Route path="animations/:id" element={<AnimationEditPage />} />
+          {/* The editor is the only page of an animation; "Incluir animação" is a window over the list. */}
+          <Route path="animations/new" element={<Navigate to="/library/animations" replace state={{ include: true }} />} />
+          <Route path="animations/:id" element={<AnimationEditorRedirect />} />
           <Route path="animations/:id/editor" element={<AnimationEditorPage />} />
           <Route path="*" element={<Navigate to="campaigns" replace />} />
         </Route>

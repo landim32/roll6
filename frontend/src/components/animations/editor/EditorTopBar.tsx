@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useAnimationEditor } from '../../../hooks/useAnimationEditor';
 import type { TokenInfo } from '../../../types/token';
-import { animationPath, libraryPath } from '../../../lib/libraryRoutes';
-import { ArrowLeftIcon } from '../../ui/icons';
+import { libraryPath } from '../../../lib/libraryRoutes';
+import { ArrowLeftIcon, PencilIcon } from '../../ui/icons';
 import { ConfirmModal } from '../../ui/ConfirmModal';
+import { AnimationDetailsModal } from '../AnimationDetailsModal';
 import { ModelTokenSelect } from './ModelTokenSelect';
 
 interface EditorTopBarProps {
@@ -14,16 +15,18 @@ interface EditorTopBarProps {
 
 /**
  * The editor's bar (086), inside the library since 089 (the library's own bar has the logo, "← Voltar para campanha"
- * and the user menu): back to the animation's page, the animation's name, the agent badge, the model select and,
+ * and the user menu): back to the animation list, the animation's name with "Alterar" (name and type in a window —
+ * the editor is the only page of an animation), the agent badge, the model select and,
  * since 091, "Salvar" / "Descartar" with the "Alterações não salvas" badge — nothing reaches the library before
  * "Salvar".
  */
 export const EditorTopBar = ({ onTokens }: EditorTopBarProps) => {
   const { t } = useTranslation();
-  const { state, connected, tokenId, setToken, dirty, saving, save, discard } = useAnimationEditor();
+  const { state, connected, tokenId, setToken, dirty, saving, save, discard, applyDetails } = useAnimationEditor();
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [editing, setEditing] = useState(false);
   const agent = state.agent;
-  const backTo = state.animation ? animationPath(state.animation.animationId) : libraryPath('animations');
+  const backTo = libraryPath('animations');
   const badge = !connected
     ? { cls: 'text-bg-secondary', text: t('editor.offline') }
     : !agent.connected
@@ -38,6 +41,12 @@ export const EditorTopBar = ({ onTokens }: EditorTopBarProps) => {
         <ArrowLeftIcon size={14} />
       </Link>
       <h1 className="stm-editor-title text-truncate" title={state.animation?.name ?? ''}>{state.animation?.name ?? t('editor.title')}</h1>
+      {state.animation && (
+        <button type="button" className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center"
+          title={t('editor.rename')} aria-label={t('editor.rename')} onClick={() => setEditing(true)}>
+          <PencilIcon size={14} />
+        </button>
+      )}
       <span className={`badge ${badge.cls} stm-editor-agent`} title={agent.connected ? undefined : t('editor.agent.hint')}>
         {badge.text}
       </span>
@@ -67,6 +76,7 @@ export const EditorTopBar = ({ onTokens }: EditorTopBarProps) => {
         onConfirm={() => { discard(); setConfirmDiscard(false); }}
         danger
       />
+      <AnimationDetailsModal open={editing} onOpenChange={setEditing} animation={state.animation} onSaved={applyDetails} />
     </header>
   );
 };

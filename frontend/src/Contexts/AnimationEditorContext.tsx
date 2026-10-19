@@ -13,6 +13,7 @@ import { uploadThumbnail } from '../lib/thumbnailUpload';
 import * as reducers from '../lib/editorState';
 import { INITIAL_STATE, MAX_ATTACHMENTS, base64Of, isDirty } from '../lib/editorState';
 import type { EditorState, PrintAttachment } from '../lib/editorState';
+import type { AnimationInfo } from '../types/animation';
 import type { TokenInfo } from '../types/token';
 import type { EditorErrorCode, PrintedShot, PrintRequested, RequestOutcome } from '../types/animationEditor';
 
@@ -51,6 +52,8 @@ interface AnimationEditorContextType {
   save: () => Promise<void>;
   /** "Descartar" (091): back to the library's version. */
   discard: () => void;
+  /** Name and type saved in "Alterar" of the bar: the shown animation takes them. */
+  applyDetails: (animation: AnimationInfo) => void;
   sendRequest: (text: string, modelName: string | null, modelWeapons?: string[]) => Promise<void>;
   stopRequest: () => Promise<void>;
   newConversation: () => Promise<void>;
@@ -353,15 +356,16 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
     return true;
   }, [state.attachments.length, t]);
 
+  const applyDetails = useCallback((animation: AnimationInfo) => setState((s) => reducers.detailsChanged(s, animation)), []);
   const replacePrint = useCallback((print: PrintAttachment) => setState((s) => reducers.replacePrint(s, print)), []);
   const removePrint = useCallback((id: number) => setState((s) => reducers.removePrint(s, id)), []);
 
   const value = useMemo<AnimationEditorContextType>(() => ({
     state, loading, error, connected, history, tokenId, setToken, skeleton, setSkeleton, saveContent, undo, redo, dirty, saving,
-    save, discard, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint, registerPrinter,
+    save, discard, applyDetails, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint, registerPrinter,
   }), [
     state, loading, error, connected, history, tokenId, setToken, skeleton, setSkeleton, saveContent, undo, redo, dirty, saving,
-    save, discard, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint, registerPrinter,
+    save, discard, applyDetails, sendRequest, stopRequest, newConversation, attachPrint, replacePrint, removePrint, registerPrinter,
   ]);
 
   return <AnimationEditorContext.Provider value={value}>{children}</AnimationEditorContext.Provider>;
