@@ -313,6 +313,19 @@
       "pause": "Pausar",
       "progress": "Andamento da animação"
     },
+    "poses": {
+      "label": "Poses",
+      "none": "Sem poses",
+      "goTo": "Pose {{n}} — {{time}} s. Clique para mostrar esta pose.",
+      "pickOne": "Clique em uma pose para incluir, mover ou excluir.",
+      "add": "Incluir uma pose depois da pose {{n}}, copiando-a",
+      "time": "Instante da pose {{n}}, em segundos (Enter aplica)",
+      "firstFixed": "A primeira pose fica sempre em 0 s.",
+      "remove": "Excluir a pose {{n}}",
+      "removeFirst": "A primeira pose não pode ser excluída.",
+      "noRoom": "Não há espaço para outra pose depois desta.",
+      "badTime": "O instante precisa ficar entre {{min}} s e {{max}} s."
+    },
     "skeleton": {
       "label": "Esqueleto",
       "show": "Mostrar o esqueleto",

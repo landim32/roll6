@@ -22,7 +22,7 @@ import { shotAngles, shotCameraPosition, shotTime } from '../../../lib/shotCamer
 import type { PrintShot, ShotView } from '../../../types/animationEditor';
 import { Player, cameraAngles, formatTime } from './player';
 import type { Playback } from './player';
-import { poseAt, poseLabel, poseTimes } from './poses';
+import { KEY_TOLERANCE, nearestPose, poseAt, poseLabel, poseTimes } from './poses';
 import type { PoseInfo } from './poses';
 import { movedBones } from './skeleton';
 import { createSkeletonView } from './skeletonView';
@@ -175,7 +175,10 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
     const p = player.current;
     const g = gizmo.current;
     if (!p || !g) return;
-    p.pause();
+    // A turn changes an existing key pose, never adds one: the time goes to the nearest pose first.
+    const pose = nearestPose(poses.current, p.playback().time);
+    if (pose === null) return;
+    p.seek(pose);
     p.freeze();
     g.attach(bone);
     g.enabled = true;
@@ -197,7 +200,8 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
     }
     const time = p.playback().time;
     status(`${name}: ${latest.current.labels.saving} [${after.join(', ')}]…`);
-    latest.current.onSave(setKey(file, name, time, after));
+    // The time is a pose's instant (`select` snaps to it), so only float noise may separate it from the track's key.
+    latest.current.onSave(setKey(file, name, time, after, KEY_TOLERANCE));
   };
 
   const frameCamera = () => {
@@ -388,7 +392,8 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
   // The animation: a new version of the same animation keeps the instant and the held bone.
   const shownAnimation = useRef<string | null>(null);
   useEffect(() => {
-    const keep = shownAnimation.current === animationName && contentVersion > 1;
+    // A new version of the animation already on the stage keeps the instant, paused or not, and the held bone.
+    const keep = shownAnimation.current !== null && shownAnimation.current === animationName;
     shownAnimation.current = content ? animationName : null;
     if (!keep) deselect();
     else if (gizmo.current?.bone) status(`${normalizeBoneName(gizmo.current.bone.name)} — ${labels.dragHint}`);

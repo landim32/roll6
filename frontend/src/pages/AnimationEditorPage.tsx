@@ -21,6 +21,9 @@ import { AnimationTimeline } from '../components/animations/editor/AnimationTime
 import type { TimelineHandle } from '../components/animations/editor/AnimationTimeline';
 import { EditorConversation } from '../components/animations/editor/EditorConversation';
 import { EditorTopBar } from '../components/animations/editor/EditorTopBar';
+import { PoseBar } from '../components/animations/editor/PoseBar';
+import type { PoseBarHandle } from '../components/animations/editor/PoseBar';
+import type { PoseChange } from '../components/animations/editor/poseList';
 import { PrintMarkupModal } from '../components/animations/editor/PrintMarkupModal';
 import type { MarkupResult } from '../components/animations/editor/PrintMarkupModal';
 import type { CapturedPrint, StageHandle, StageStatus } from '../components/animations/editor/AnimationStage';
@@ -75,6 +78,9 @@ const EditorBody = () => {
   const guard = useLeaveGuard(dirty);
   const stage = useRef<StageHandle | null>(null);
   const timeline = useRef<TimelineHandle | null>(null);
+  const poseBar = useRef<PoseBarHandle | null>(null);
+  /** The instant the pose bar asked for, shown once the stage plays the changed file. */
+  const pendingSeek = useRef<number | null>(null);
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
   const [mixamo, setMixamo] = useState<boolean | null>(null);
   const [status, setStatus] = useState<StageStatus>({ text: null, error: false });
@@ -114,6 +120,17 @@ const EditorBody = () => {
       setStatus({ text: t('editor.edit.notSaved', { message: err instanceof Error ? err.message : t('common.unknownError') }), error: true });
     }
   }, [saveContent, t]);
+
+  // The pose bar changed the file: the stage takes the new file in its own effect (before this one), then the instant.
+  const applyPoseChange = useCallback((change: PoseChange) => {
+    pendingSeek.current = change.time;
+    void onSave(change.file);
+  }, [onSave]);
+  useEffect(() => {
+    if (pendingSeek.current === null) return;
+    stage.current?.seek(pendingSeek.current);
+    pendingSeek.current = null;
+  }, [state.content]);
 
   // Ctrl+Z / Ctrl+Y on the page (not inside a text field) walk the versions.
   useEffect(() => {
@@ -215,7 +232,7 @@ const EditorBody = () => {
       {!loading && (
         <div className="stm-editor-layout">
           <div className="stm-editor-left">
-            <div className="stm-editor-stage-wrap">
+            <div className={`stm-editor-stage-wrap${modelUrl && desktop ? ' has-poses' : ''}`}>
               {modelUrl ? (
                 <Suspense fallback={<div className="stm-editor-stage text-body-secondary p-3">{t('editor.stage.loading')}</div>}>
                   <AnimationStage ref={stage} modelUrl={modelUrl} content={state.content} contentVersion={state.contentVersion}
@@ -225,7 +242,7 @@ const EditorBody = () => {
                     onModelLoaded={(info) => setMixamo(info.mixamo)}
                     onModelError={() => { setMixamo(null); toast.error(t('editor.stage.modelError')); }}
                     onAnimationError={(message) => toast.error(message)}
-                    onFrame={(playback, pose) => timeline.current?.refresh(playback, pose)}
+                    onFrame={(playback, pose) => { timeline.current?.refresh(playback, pose); poseBar.current?.refresh(playback, pose); }}
                     onSave={(file) => { void onSave(file); }}
                     onStatus={setStatus}
                     labels={{
@@ -239,6 +256,10 @@ const EditorBody = () => {
                 </div>
               )}
               {modelUrl && <ZoomButtons zoom={zoom} onChange={(value) => setZoom(clampZoom(value))} />}
+              {modelUrl && desktop && (
+                <PoseBar content={state.content} disabled={!editingAllowed} handle={poseBar}
+                  onSeek={(seconds) => stage.current?.seek(seconds)} onChange={applyPoseChange} />
+              )}
               {modelUrl && desktop && (
                 <div className="stm-editor-tools btn-group btn-group-sm" role="group">
                   <button type="button" className={`btn ${skeleton ? 'btn-primary' : 'btn-outline-secondary'}`} aria-pressed={skeleton}

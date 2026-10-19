@@ -2933,6 +2933,25 @@ button.stm-chat-quote { cursor: pointer; }
 .stm-editor-canvas:active { cursor: grabbing; }
 .stm-editor-stage-wrap .stm-stage-zoom { top: 0.5rem; right: 0.5rem; }
 .stm-editor-tools { position: absolute; top: 0.5rem; left: 0.5rem; z-index: 2; }
+/* The pose bar (top-right of the stage): a chip per key pose, the actions on the lit one; the zoom moves under it. */
+.stm-editor-poses {
+  position: absolute; top: 0.5rem; right: 0.5rem; z-index: 2; display: flex; align-items: center; gap: 0.5rem;
+  max-width: calc(100% - 300px); padding: 0.3rem 0.5rem; border-radius: var(--stm-radius); border: 1px solid var(--stm-border);
+  background: rgba(11, 18, 32, 0.88);
+}
+.stm-editor-poses-title { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--bs-secondary-color); }
+.stm-editor-poses-list { display: flex; gap: 0.25rem; min-width: 0; padding: 2px; overflow-x: auto; scrollbar-width: thin; }
+.stm-editor-pose-chip {
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; min-width: 44px; padding: 2px 6px; border-radius: 6px;
+  border: 1px solid var(--stm-border-strong); background: var(--stm-surface-2); color: var(--bs-body-color); line-height: 1.15;
+}
+.stm-editor-pose-chip:hover { border-color: #ffb020; }
+.stm-editor-pose-chip.is-current { border-color: #ffb020; background: rgba(255, 176, 32, 0.18); color: #ffb020; }
+.stm-editor-pose-no { font-weight: 700; font-size: 0.85rem; }
+.stm-editor-pose-at { font-size: 0.68rem; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.stm-editor-poses-actions { width: auto; flex: 0 0 auto; }
+.stm-editor-pose-input { width: 5.2rem; max-width: 5.2rem; font-variant-numeric: tabular-nums; }
+.stm-editor-stage-wrap.has-poses .stm-stage-zoom { top: 3.9rem; }
 .stm-editor-bone-label {
   position: absolute; z-index: 3; pointer-events: none; padding: 3px 7px; border-radius: 4px;
   background: rgba(11, 18, 32, 0.9); border: 1px solid #ffb020; color: #fff; font-weight: 600; white-space: nowrap; font-size: 0.8rem;

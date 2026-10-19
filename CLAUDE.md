@@ -679,7 +679,16 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
   are recognised by exact text (`ownVersion`); a version saved elsewhere replays a clean tab, while a dirty one keeps its
   edit and shows "A versão salva mudou" (`savedChanged`). The conversation sticks to the bottom (`lib/stickToBottom`,
   a `MutationObserver` + image loads, only while the user is at the end; always after an own send). Editing is blocked while a request runs
-  (`editor.edit.blockedRunning`) or the skeleton is not Mixamo. On phones the stage stacks over the conversation and
+  (`editor.edit.blockedRunning`) or the skeleton is not Mixamo. **Poses are edited only in the pose bar or by the
+  Claude**: a bone turned on the stage changes the key pose nearest to the instant (`select` snaps the time to it,
+  `nearestPose`; `setKey` with `KEY_TOLERANCE` = 1e-4 so a pose 0,017 s from another keeps its own key) and never adds
+  one; `components/animations/editor/PoseBar` (top-right of the stage, desktop only; the zoom moves under it) lists the
+  key poses as chips (click = show it, the lit one is the pose on screen, fed by the stage's frame loop like the
+  timeline) and acts on the lit one through the pure `poseList.ts`: `insertPoseAfter` (a copy of the pose halfway to the
+  next one or to the end, a step later after the last one — the animation grows up to 30 s), `movePose` (the instant,
+  between its neighbours; a last pose at the end drags the end) and `removePose` (the first pose stays at 0 s). Every
+  change goes through `saveContent` (history, undo/redo, "Alterações não salvas") and the page then seeks to the
+  changed pose (`pendingSeek`, after the stage's own effect). On phones the stage stacks over the conversation and
   the skeleton, gizmo, undo/redo and "Anexar print" are hidden. `roll6:editor-skeleton` remembers the toggle.
   **Weapons on the stage (092)**: the chosen token's weapons ride their sockets — `socketWeaponsOf(token)` →
   `AnimationStage` props `weapons`/`showWeapons`/`idleClip`, the shared `createWeaponSockets` (same placement as the 3D

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { poseAt, poseLabel, poseTimes } from './poses';
+import { nearestPose, poseAt, poseLabel, poseTimes } from './poses';
 
 const track = (bone: string, times: number[]) => ({ bone, times, degrees: times.map(() => [0, 0, 0] as [number, number, number]) });
 
@@ -23,5 +23,14 @@ describe('key poses', () => {
   it('says it in Portuguese', () => {
     expect(poseLabel({ from: 3, to: 3, count: 5 })).toBe('Pose 3 de 5');
     expect(poseLabel({ from: 2, to: 3, count: 5 })).toBe('Entre as poses 2 e 3 (de 5)');
+  });
+});
+
+describe('nearest pose', () => {
+  it('a bone is turned on the key pose nearest to the time, never between two', () => {
+    expect(nearestPose([0, 0.5, 1], 0.27)).toBe(0.5);
+    expect(nearestPose([0, 0.5, 1], 0.2)).toBe(0);
+    expect(nearestPose([0, 0.5, 1], 0.9)).toBe(1);
+    expect(nearestPose([], 0.3)).toBeNull();
   });
 });

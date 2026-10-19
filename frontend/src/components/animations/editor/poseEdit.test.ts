@@ -3,6 +3,7 @@ import { AnimationMixer, Bone, Group, LoopOnce, Quaternion, Vector3 } from 'thre
 import { buildRoll6Clip, localRotation, restFrame } from '../../story/threeClips';
 import type { AnimationFile } from '../../../lib/animationFormat';
 import { degreesFromLocal, isEditableBone, keyAt, sameDegrees, setKey } from './poseEdit';
+import { KEY_TOLERANCE } from './poses';
 
 /** A small Mixamo-like rig whose bones have crooked local axes, with an upper arm (it gets the relaxed-arm correction). */
 const rig = () => {
@@ -104,6 +105,14 @@ describe('setKey (066)', () => {
   it('gives a bone without a track the rest pose at the other key poses (Q1 = A)', () => {
     const after = setKey(file({ loop: false }), 'Neck', 0.3, [0, 25, 0]);
     expect(after.tracks[2]).toEqual({ bone: 'Neck', times: [0, 0.3, 0.6, 1.2], degrees: [[0, 0, 0], [0, 25, 0], [0, 0, 0], [0, 0, 0]] });
+  });
+
+  it('with the key tolerance, a pose next to another one gets its own key', () => {
+    const near = file({ loop: false, tracks: [{ bone: 'LeftArm', times: [0, 0.25, 1.2], degrees: [[0, 0, 0], [1, 0, 0], [0, 0, 0]] }] });
+    const after = setKey(near, 'LeftArm', 0.2668, [2, 0, 0], KEY_TOLERANCE);
+    expect(after.tracks[0].times).toEqual([0, 0.25, 0.2668, 1.2]);
+    expect(after.tracks[0].degrees[1]).toEqual([1, 0, 0]);
+    expect(setKey(near, 'LeftArm', 0.25000000001, [2, 0, 0], KEY_TOLERANCE).tracks[0].times).toEqual([0, 0.25, 1.2]);
   });
 
   it('keeps both ends of a loop equal', () => {
