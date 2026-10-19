@@ -37,7 +37,7 @@ public static class AnimationRequestBuilder
     /// <summary>The <c>run</c> payload of one request.</summary>
     public static RunInfo Build(
         Animation animation, JsonElement content, AnimationConversation conversation, long requestId,
-        string text, IReadOnlyList<PromptImageInfo> images, string? modelName)
+        string text, IReadOnlyList<PromptImageInfo> images, string? modelName, IReadOnlyList<string>? modelWeapons = null)
     {
         var path = WorkingPath(animation);
         return new RunInfo
@@ -45,7 +45,7 @@ public static class AnimationRequestBuilder
             RequestId = requestId,
             SessionId = conversation.ClaudeSessionId,
             Started = conversation.Started,
-            SystemPrompt = AnimationPromptContext.Build(path, modelName),
+            SystemPrompt = AnimationPromptContext.Build(path, modelName, modelWeapons),
             Prompt = text,
             Images = images.ToList(),
             Files = new List<FileWriteInfo> { new() { Path = path, Content = Serialize(content) } },

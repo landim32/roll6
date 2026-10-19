@@ -46,7 +46,7 @@ interface AnimationEditorContextType {
   save: () => Promise<void>;
   /** "Descartar" (091): back to the library's version. */
   discard: () => void;
-  sendRequest: (text: string, modelName: string | null) => Promise<void>;
+  sendRequest: (text: string, modelName: string | null, modelWeapons?: string[]) => Promise<void>;
   stopRequest: () => Promise<void>;
   newConversation: () => Promise<void>;
   attachPrint: (print: Omit<PrintAttachment, 'id'>) => boolean;
@@ -271,7 +271,7 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
     toast.error(key ? t(key) : err instanceof Error ? err.message : t('common.unknownError'));
   }, [t]);
 
-  const sendRequest = useCallback(async (text: string, modelName: string | null) => {
+  const sendRequest = useCallback(async (text: string, modelName: string | null, modelWeapons: string[] = []) => {
     const hub = connection.current;
     if (!hub || !state.animation) return;
     const attachments = state.attachments;
@@ -281,6 +281,8 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
         text,
         images: attachments.map((print) => ({ png: base64Of(print.marked), caption: print.caption })),
         modelName,
+        // 092: the weapons the model on the stage carries, for the Claude's context.
+        modelWeapons: modelWeapons.slice(0, 5),
         // 091: the Claude works on the edit version, unsaved changes included.
         content: state.content,
       });

@@ -261,7 +261,8 @@ public class AnimationHub : Hub
             throw new HubException("no-agent");
         var conversation = await _conversations.GetOrOpenAsync(userId, info.AnimationId);
         var request = _connections.Enqueue(userId, info.AnimationId, animation.Name, conversation.AnimationConversationId,
-            conversation.ClaudeSessionId, conversation.Started, info.Text.Trim(), info.Images, info.ModelName, Now, content)
+            conversation.ClaudeSessionId, conversation.Started, info.Text.Trim(), info.Images, info.ModelName, Now, content,
+            info.ModelWeapons?.Select(w => w.Trim()).Where(w => w.Length > 0).ToList())
             ?? throw new HubException("busy");
         await _conversations.AddMessageAsync(conversation.AnimationConversationId, ConversationRole.User, info.Text.Trim(), info.Images.Count);
         var started = await DispatchAsync(userId);
@@ -285,6 +286,10 @@ public class AnimationHub : Hub
         if (text.Length > RequestInfo.MAX_TEXT || (text.Length == 0 && info.Images.Count == 0))
             return false;
         if (info.Images.Count > RequestInfo.MAX_IMAGES)
+            return false;
+        // 092: the weapons of the model shown, plain text for the context.
+        if (info.ModelWeapons is { } weapons
+            && (weapons.Count > RequestInfo.MAX_WEAPONS || weapons.Any(w => w == null || w.Length > RequestInfo.MAX_WEAPON_TEXT)))
             return false;
         return info.Images.All(image => image != null && !string.IsNullOrEmpty(image.Png) && image.Png.Length <= RequestInfo.MAX_IMAGE_BASE64);
     }
@@ -349,7 +354,8 @@ public class AnimationHub : Hub
                 var content = request.Content ?? await _animations.ReadContentAsync(request.AnimationId);
                 var animation = new Animation { AnimationId = request.AnimationId, Name = request.AnimationName };
                 var conversation = new AnimationConversation { ClaudeSessionId = request.SessionId, Started = request.SessionStarted };
-                run = AnimationRequestBuilder.Build(animation, content, conversation, request.RequestId, request.Prompt, request.Images, request.ModelName);
+                run = AnimationRequestBuilder.Build(animation, content, conversation, request.RequestId, request.Prompt, request.Images,
+                    request.ModelName, request.ModelWeapons);
             }
             catch (Exception ex)
             {

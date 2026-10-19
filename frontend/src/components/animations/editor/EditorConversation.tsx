@@ -16,6 +16,8 @@ const MAX_TEXT = 4000;
 interface EditorConversationProps {
   /** The name of the token on the stage, for the Claude's context. */
   modelName: string | null;
+  /** The weapons it carries on the stage (092), for the Claude's context. */
+  modelWeapons?: string[];
   /** "Anexar print" (null on phones or without a model): captures and opens the markup. */
   onAttach: (() => void) | null;
   /** A thumbnail was tapped: reopen the markup of that print. */
@@ -27,7 +29,7 @@ interface EditorConversationProps {
  * markdown once finished and as live text while it arrives, notices muted), the state of the request, the composer with
  * the attached prints, "Enviar", "Parar" and "Nova conversa".
  */
-export const EditorConversation = ({ modelName, onAttach, onEditPrint }: EditorConversationProps) => {
+export const EditorConversation = ({ modelName, modelWeapons = [], onAttach, onEditPrint }: EditorConversationProps) => {
   const { t } = useTranslation();
   const { state, connected, sendRequest, stopRequest, newConversation, removePrint } = useAnimationEditor();
   const [text, setText] = useState('');
@@ -62,7 +64,7 @@ export const EditorConversation = ({ modelName, onAttach, onEditPrint }: EditorC
     setText('');
     // An own message always goes to the bottom, even when the user was reading above.
     atBottom.current = true;
-    await sendRequest(value, modelName);
+    await sendRequest(value, modelName, modelWeapons);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {

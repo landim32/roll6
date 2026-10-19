@@ -66,4 +66,15 @@ public class AnimationRequestBuilderTests
     {
         AnimationRequestBuilder.Classify(ACENO, path).Should().Be(expected);
     }
+
+    [Fact]
+    public void TheContextNamesTheWeaponsOfTheModel()
+    {
+        var text = AnimationPromptContext.Build("animacoes/7-aceno.json", "Orc", new[] { "Machado (mão direita)", "Escudo (mão esquerda)" });
+        var without = AnimationPromptContext.Build("animacoes/7-aceno.json", "Orc", Array.Empty<string>());
+
+        text.Should().Contain("Armas do modelo: Machado (mão direita), Escudo (mão esquerda)");
+        text.Should().Contain("não fazem parte do arquivo da animação");
+        without.Should().NotContain("Armas do modelo");
+    }
 }

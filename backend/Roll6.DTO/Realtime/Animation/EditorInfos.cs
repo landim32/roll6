@@ -11,6 +11,9 @@ public class RequestInfo
     public const int MAX_IMAGES = 5;
     /// <summary>Each PNG as base64, about 1.5 MB.</summary>
     public const int MAX_IMAGE_BASE64 = 2_100_000;
+    /// <summary>The weapons of the model shown (092): at most five, one per socket.</summary>
+    public const int MAX_WEAPONS = 5;
+    public const int MAX_WEAPON_TEXT = 120;
 
     [JsonPropertyName("animationId")]
     public long AnimationId { get; set; }
@@ -31,6 +34,12 @@ public class RequestInfo
     /// </summary>
     [JsonPropertyName("content")]
     public JsonElement? Content { get; set; }
+
+    /// <summary>
+    /// The weapons the model on the stage carries (092), e.g. "Escudo (mão esquerda)", for the Claude's context only.
+    /// </summary>
+    [JsonPropertyName("modelWeapons")]
+    public List<string>? ModelWeapons { get; set; }
 }
 
 /// <summary>

@@ -2,6 +2,7 @@ import {
   BufferAttribute, BufferGeometry, Color, Group, LineBasicMaterial, LineSegments, Mesh, Points, PointsMaterial, Vector3,
 } from 'three';
 import type { Bone, Camera, Material, Object3D, Scene } from 'three';
+import { HOLDER } from '../../story/attachWeapons';
 import { MODEL_OPACITY, boneSegments, nearestBone, segmentColor } from './skeleton';
 import type { BoneSegment, PickTarget, ScreenPoint } from './skeleton';
 
@@ -99,9 +100,15 @@ export const createSkeletonView = (scene: Scene, model: Object3D): SkeletonView 
   };
 
   const seeThrough = (on: boolean) => {
-    model.traverse((node) => {
-      const mesh = node as Mesh;
-      if (!mesh.isMesh) return;
+    // The carried weapons (092) stay opaque: they share their materials with every copy of the weapon.
+    const meshes: Mesh[] = [];
+    const collect = (node: Object3D) => {
+      if (node.name.startsWith(HOLDER)) return;
+      if ((node as Mesh).isMesh) meshes.push(node as Mesh);
+      node.children.forEach(collect);
+    };
+    collect(model);
+    meshes.forEach((mesh) => {
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const material of materials) {
         if (on && !saved.has(material)) {
