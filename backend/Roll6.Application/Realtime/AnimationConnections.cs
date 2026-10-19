@@ -58,6 +58,12 @@ public sealed class EditorRequest
     /// <summary>A question of the chat (093) instead of an animation request: a read-only run, answered into the chat.</summary>
     public AskJob? Ask { get; init; }
     public bool IsAsk => Ask != null;
+    /// <summary>095: a request of the map generator (a Codex run), instead of an animation request.</summary>
+    public GeneratorJob? Generator { get; init; }
+    /// <summary>An animation editor request (neither a question nor a generator request).</summary>
+    public bool IsAnimation => Ask == null && Generator == null;
+    /// <summary>095: the generator run went past its time and was stopped by the server.</summary>
+    public bool TimedOut { get; set; }
     public DateTime QueuedAt { get; }
     public DateTime StartedAt { get; internal set; }
     public RequestState State { get; internal set; } = RequestState.Queued;
@@ -190,6 +196,7 @@ public class AnimationConnections
     private readonly Dictionary<string, Editor> _editors = new();
     private readonly Dictionary<long, EditorRequest> _requests = new();
     private readonly Dictionary<long, List<long>> _queues = new();
+    private readonly Dictionary<string, GeneratorSession> _generators = new();
     private long _nextRequestId;
 
     public static string GroupName(long animationId) => $"animation:{animationId}";
@@ -262,6 +269,82 @@ public class AnimationConnections
         lock (_lock) return _editors.Where(e => e.Value.UserId == userId).Select(e => e.Key).ToList();
     }
 
+    // ---------- map generator (095) ----------
+
+    /// <summary>A generator session for the tab on that connection (lives until the tab leaves).</summary>
+    public GeneratorSession OpenGenerator(string connectionId, long userId, long? mapModelId)
+    {
+        lock (_lock)
+        {
+            var session = new GeneratorSession(Roll6.Domain.MapGenerator.GeneratedImage.NewSessionId(), userId, connectionId, mapModelId);
+            _generators[session.SessionId] = session;
+            return session;
+        }
+    }
+
+    /// <summary>The tabs of the user with a generator open (they follow the agent's state too).</summary>
+    public List<string> GeneratorConnectionsOfUser(long userId)
+    {
+        lock (_lock) return _generators.Values.Where(g => g.UserId == userId).Select(g => g.ConnectionId).Distinct().ToList();
+    }
+
+    public GeneratorSession? GeneratorOf(string? sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId))
+            return null;
+        lock (_lock) return _generators.GetValueOrDefault(sessionId);
+    }
+
+    /// <summary>The request queued or running for the session, or null.</summary>
+    public EditorRequest? GeneratorRequestOf(string sessionId)
+    {
+        lock (_lock) return _requests.Values.FirstOrDefault(r => r.Generator?.SessionId == sessionId);
+    }
+
+    /// <summary>
+    /// Forgets the generator sessions of a tab that left: queued requests are dropped; the running ones are returned
+    /// (the caller stops them on their consoles).
+    /// </summary>
+    public List<EditorRequest> RemoveGeneratorsOf(string connectionId)
+    {
+        lock (_lock)
+        {
+            var ids = _generators.Where(g => g.Value.ConnectionId == connectionId).Select(g => g.Key).ToHashSet();
+            foreach (var id in ids)
+                _generators.Remove(id);
+            var running = new List<EditorRequest>();
+            foreach (var request in _requests.Values.Where(r => r.Generator != null && ids.Contains(r.Generator.SessionId)).ToList())
+            {
+                if (request.State == RequestState.Running)
+                {
+                    running.Add(request);
+                    continue;
+                }
+                _requests.Remove(request.RequestId);
+                if (_queues.TryGetValue(request.UserId, out var queue))
+                    queue.Remove(request.RequestId);
+            }
+            return running;
+        }
+    }
+
+    /// <summary>Queues a generator request in the user's FIFO; null when the session already has one.</summary>
+    public EditorRequest? EnqueueGenerator(GeneratorSession session, GeneratorJob job, DateTime now)
+    {
+        lock (_lock)
+        {
+            if (_requests.Values.Any(r => r.Generator?.SessionId == session.SessionId))
+                return null;
+            var request = new EditorRequest(++_nextRequestId, session.UserId, 0, string.Empty, 0, Guid.NewGuid(), false,
+                job.Text, job.Marks, null, now) { Generator = job };
+            _requests[request.RequestId] = request;
+            if (!_queues.TryGetValue(session.UserId, out var queue))
+                _queues[session.UserId] = queue = new List<long>();
+            queue.Add(request.RequestId);
+            return request;
+        }
+    }
+
     // ---------- requests ----------
 
     /// <summary>
@@ -273,7 +356,7 @@ public class AnimationConnections
     {
         lock (_lock)
         {
-            if (_requests.Values.Any(r => !r.IsAsk && r.AnimationId == animationId))
+            if (_requests.Values.Any(r => r.IsAnimation && r.AnimationId == animationId))
                 return null;
             var request = new EditorRequest(++_nextRequestId, userId, animationId, animationName, conversationId, sessionId,
                 sessionStarted, prompt, images, modelName, now)
@@ -367,7 +450,7 @@ public class AnimationConnections
     /// <summary>The request queued or running for the animation, or null.</summary>
     public EditorRequest? Running(long animationId)
     {
-        lock (_lock) return _requests.Values.FirstOrDefault(r => !r.IsAsk && r.AnimationId == animationId);
+        lock (_lock) return _requests.Values.FirstOrDefault(r => r.IsAnimation && r.AnimationId == animationId);
     }
 
     /// <summary>1-based position of a queued request in the queue of its user; null when running or unknown.</summary>
@@ -394,3 +477,49 @@ public class AnimationConnections
         lock (_lock) return _requests.TryGetValue(requestId, out var request) && request.AgentConnectionId == connectionId;
     }
 }
+
+/// <summary>
+/// One map generator session (095): the tab that opened it, the map it edits (or none), the Codex thread it continues
+/// and the number of the next image. In memory only (Q3 = B).
+/// </summary>
+public sealed class GeneratorSession
+{
+    private readonly object _lock = new();
+    private int _nextVersion = 1;
+    private string? _threadId;
+
+    public GeneratorSession(string sessionId, long userId, string connectionId, long? mapModelId)
+    {
+        SessionId = sessionId;
+        UserId = userId;
+        ConnectionId = connectionId;
+        MapModelId = mapModelId;
+    }
+
+    public string SessionId { get; }
+    public long UserId { get; }
+    public string ConnectionId { get; }
+    public long? MapModelId { get; }
+
+    /// <summary>The Codex thread to resume; null before the first request reached the Codex (or after "Nova conversa").</summary>
+    public string? ThreadId
+    {
+        get { lock (_lock) return _threadId; }
+        set { lock (_lock) _threadId = value; }
+    }
+
+    /// <summary>The number the next image will get (the output path of the next request).</summary>
+    public int NextVersion
+    {
+        get { lock (_lock) return _nextVersion; }
+    }
+
+    /// <summary>A new image arrived: its number, and the next one moves on.</summary>
+    public int TakeVersion()
+    {
+        lock (_lock) return _nextVersion++;
+    }
+}
+
+/// <summary>What a generator request carries (095): the user's text, the marked prints and the image it starts from.</summary>
+public sealed record GeneratorJob(string SessionId, string Text, IReadOnlyList<PromptImageInfo> Marks, string? BaseImage);

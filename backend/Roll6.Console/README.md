@@ -66,6 +66,23 @@ Publicar: `dotnet publish Roll6.Console -c Release -r win-x64 --self-contained f
 
 Fora de um pedido, o servidor pode mandar `writeFiles` (por exemplo, uma pose editada na página) e o console só grava.
 
+## Codex: o gerador de mapas (095)
+
+A página **Biblioteca › Mapas › Gerador** usa o **Codex** da sua máquina (não o Claude), pelo mesmo console:
+
+1. Instale e entre: `npm i -g @openai/codex` e `codex login` (verificado com o codex-cli 0.161.0; `codex features list`
+   deve mostrar `image_generation true`). Se o executável não estiver no PATH, ajuste `Roll6Console:CodexExecutable`
+   em `appsettings.json` (o padrão `codex` acha o `codex.cmd` do npm).
+2. Cada pedido roda `codex exec --json --skip-git-repo-check -s workspace-write -C <pasta de trabalho> [-i imagens] -`
+   (ou `codex exec … resume <conversa> …` nos pedidos seguintes da mesma aba), com o pedido no stdin. O sandbox
+   `workspace-write` só deixa o Codex gravar dentro da pasta de trabalho.
+3. As instruções de mapa visto de cima vêm do servidor; o console só grava as imagens de entrada (base e marcações) em
+   `mapas-gerados/<sessão>/entrada/`, passa-as com `-i` e acompanha `mapas-gerados/<sessão>/`.
+4. Imagens (`.png`, `.jpg`, `.jpeg`, `.webp`) acompanhadas são enviadas ao servidor como bytes em base64, até 10 MB
+   (maiores viram um aviso); o servidor valida e manda para a aba do gerador.
+
+As pastas `mapas-gerados/` podem ser apagadas quando quiser: nada nelas é usado depois que a aba fecha.
+
 ## Ferramentas de um pedido (094)
 
 Um pedido pode trazer `tools[]` (nome, descrição e esquema dos argumentos, montados pelo servidor — hoje o

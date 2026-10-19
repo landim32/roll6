@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Roll6.Console.Bridge;
 using Roll6.Console.Claude;
+using Roll6.Console.Codex;
 using Roll6.Console.Settings;
 using Roll6.Console.Tools;
 using Roll6.DTO.Realtime.Console;
@@ -140,6 +141,48 @@ public sealed class RequestRunnerTests : IDisposable
 
         _reporter.Outcomes.Should().ContainKey(13).WhoseValue.Message.Should().Be(RequestRunner.BUSY);
         _reporter.Outcomes[12].Kind.Should().Be("done");
+    }
+
+    [Fact]
+    public async Task ACodexRunAttachesThePicturesResumesTheThreadAndReportsImagesAsBase64()
+    {
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 9 };
+        var request = new RunInfo
+        {
+            RequestId = 31,
+            Engine = RunInfo.ENGINE_CODEX,
+            Resume = "01a1525c-287c-7241-82a1-6fca5b99a154",
+            Prompt = "<instrucoes_do_roll6>…",
+            Images = new List<PromptImageInfo> { new() { Png = Convert.ToBase64String(png), Caption = "marcado" } },
+            Files = new List<FileWriteInfo> { new() { Path = "mapas-gerados/abc/entrada/base.png", Content = Convert.ToBase64String(png), Encoding = FileEncodings.BASE64 } },
+            Watch = new List<string> { "mapas-gerados/abc/" },
+        };
+        IReadOnlyList<string>? seen = null;
+        string? stdin = null;
+        var codex = new FakeClaude((arguments, input, progress) =>
+        {
+            seen = arguments;
+            stdin = input;
+            progress.Report(new CodexStarted("01a1525c-287c-7241-82a1-6fca5b99a154"));
+            File.WriteAllBytes(Path.Combine(_root, "mapas-gerados", "abc", "versao-1.png"), png);
+            return new ClaudeOutcome(ClaudeOutcomeKind.Done);
+        });
+        var claude = new FakeClaude((_, _, _) => throw new InvalidOperationException("the Claude must not run"));
+        var runner = new RequestRunner(_settings, claude, _reporter, codex: codex);
+
+        await runner.RunAsync(request, afterRun: TimeSpan.FromMilliseconds(600));
+
+        File.ReadAllBytes(Path.Combine(_root, "mapas-gerados", "abc", "entrada", "base.png")).Should().Equal(png);
+        File.ReadAllBytes(Path.Combine(_root, ".roll6", "anexos", "31", "1.png")).Should().Equal(png);
+        seen.Should().ContainInOrder("resume", "01a1525c-287c-7241-82a1-6fca5b99a154");
+        seen!.Count(a => a == "-i").Should().Be(2);
+        stdin.Should().Be("<instrucoes_do_roll6>…");
+        _reporter.Events.Single(e => e.Kind == "started").Text.Should().Be("01a1525c-287c-7241-82a1-6fca5b99a154");
+        var image = _reporter.Changes.Single(c => c.Path == "mapas-gerados/abc/versao-1.png");
+        image.Encoding.Should().Be("base64");
+        Convert.FromBase64String(image.Content).Should().Equal(png);
+        _reporter.Changes.Should().NotContain(c => c.Path.Contains("entrada"), "the console's own writes are not reported back");
+        _reporter.Outcome!.Kind.Should().Be("done");
     }
 
     [Fact]

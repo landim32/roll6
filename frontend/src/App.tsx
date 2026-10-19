@@ -15,6 +15,7 @@ const CampaignCreatePage = lazy(() => import('./pages/library/CampaignCreatePage
 const CampaignEditPage = lazy(() => import('./pages/library/CampaignEditPage'));
 const MapsPage = lazy(() => import('./pages/library/MapsPage'));
 const MapEditPage = lazy(() => import('./pages/library/MapEditPage'));
+const MapGeneratorPage = lazy(() => import('./pages/library/MapGeneratorPage'));
 const CharactersPage = lazy(() => import('./pages/library/CharactersPage'));
 const CharacterEditPage = lazy(() => import('./pages/library/CharacterEditPage'));
 const NpcsPage = lazy(() => import('./pages/library/NpcsPage'));
@@ -59,6 +60,7 @@ export const App = () => {
           <Route path="maps" element={<MapsPage key="mine" subsection="mine" />} />
           <Route path="maps/search" element={<MapsPage key="search" subsection="search" />} />
           <Route path="maps/campaign" element={<MapsPage key="campaign" subsection="campaign" />} />
+          <Route path="maps/generator" element={<MapGeneratorPage />} />
           <Route path="maps/:id" element={<MapEditPage />} />
           <Route path="characters" element={<CharactersPage />} />
           <Route path="characters/:id" element={<CharacterEditPage />} />

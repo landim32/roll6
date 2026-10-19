@@ -154,7 +154,7 @@
   "library": {
     "sub": {
       "campaigns": { "mine": "Minhas campanhas", "search": "Buscar", "playing": "Jogando" },
-      "maps": { "mine": "Meus mapas", "search": "Buscar", "campaign": "Da campanha" },
+      "maps": { "mine": "Meus mapas", "search": "Buscar", "campaign": "Da campanha", "generator": "Gerador" },
       "tokens": { "mine": "Meus tokens", "search": "Buscar" },
       "weapons": { "mine": "Minhas armas", "search": "Buscar" },
       "animations": { "mine": "Minhas animações", "search": "Buscar" }
@@ -198,6 +198,75 @@
     "maps": {
       "discardTitle": "Descartar o mapa não salvo?",
       "discardMessage": "O mapa aberto na mesa tem alterações não salvas. Abrir outro mapa descarta essas alterações."
+    }
+  },
+  "mapGenerator": {
+    "title": "Gerador de mapas",
+    "editInGenerator": "Editar no gerador",
+    "titleEdit": "Gerador — {{name}}",
+    "backToMaps": "Voltar para Mapas",
+    "agentOn": "Console conectado ({{machine}})",
+    "agentOff": "Console desconectado",
+    "agentHelp": "O gerador usa o Codex do seu computador pelo Roll6.Console. Abra o console (com a sua chave de API e o Codex logado) para enviar pedidos.",
+    "agentHint": "Conecte o Roll6.Console para conversar com o Codex.",
+    "reconnecting": "Reconectando…",
+    "conversation": "Conversa com o Codex",
+    "empty": "Descreva o lugar do mapa: o que tem nele, o piso, as paredes, os móveis. O Codex desenha visto de cima.",
+    "placeholder": "Descreva o mapa ou o que mudar…",
+    "waitRunning": "Aguarde o Codex terminar…",
+    "topDownHint": "Os mapas saem sempre vistos de cima (planta baixa); descreva o lugar, não a câmera.",
+    "queued": "Na fila do console (posição {{position}})…",
+    "sending": "Enviando…",
+    "running": "O Codex está gerando o mapa…",
+    "thinking": "Pensando…",
+    "generating": "Gerando…",
+    "stopped": "Pedido parado.",
+    "failed": "O pedido ao Codex falhou.",
+    "send": "Enviar",
+    "stop": "Parar",
+    "newConversation": "Nova conversa",
+    "confirmNew": "Começar uma conversa nova com o Codex? As versões geradas continuam na tela.",
+    "tooLong": "No máximo {{max}} caracteres.",
+    "noImage": "Nenhuma imagem ainda. Escreva o pedido ao lado.",
+    "zoom": "Ampliar a imagem",
+    "versions": "Versões",
+    "versionLabel": "Versão {{version}}",
+    "original": "Original",
+    "savedBadge": "salvo",
+    "mark": "Marcar",
+    "openMap": "Abrir o mapa",
+    "marks": {
+      "caption": "Versão {{version}} do mapa, com marcações vermelhas do usuário apontando o que mudar.",
+      "edit": "Editar as marcações",
+      "remove": "Remover a imagem marcada",
+      "print": "Imagem marcada {{index}}",
+      "max": "No máximo {{count}} imagens marcadas por pedido."
+    },
+    "save": {
+      "button": "Salvar",
+      "title": "Salvar o mapa",
+      "defaultName": "Mapa gerado",
+      "how": "Como salvar",
+      "replace": "Substituir a imagem de \"{{name}}\"",
+      "replaceHint": "O mapa muda também nas campanhas que o usam; a grade e a máscara 3D continuam as mesmas.",
+      "asNew": "Criar um mapa novo",
+      "name": "Nome",
+      "columns": "Colunas",
+      "rows": "Linhas",
+      "gridHint": "Sugerido pela proporção da imagem; dá para ajustar depois no editor do mapa.",
+      "keepsGrid": "A grade continua com {{columns}} × {{rows}} hexágonos.",
+      "openMap": "Abrir o mapa",
+      "created": "Mapa \"{{name}}\" criado em Meus mapas.",
+      "replaced": "A imagem de \"{{name}}\" foi substituída."
+    },
+    "error": {
+      "busy": "Já há um pedido em andamento.",
+      "noAgent": "O Roll6.Console não está conectado.",
+      "invalid": "Pedido inválido (texto longo demais ou imagem inválida).",
+      "session": "A sessão do gerador acabou; recarregue a página.",
+      "offline": "Não foi possível conectar ao Roll6.",
+      "forbidden": "Só é possível editar no gerador os seus próprios mapas.",
+      "notFound": "Mapa não encontrado."
     }
   },
   "editor": {

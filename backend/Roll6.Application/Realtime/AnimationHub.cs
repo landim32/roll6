@@ -8,6 +8,7 @@ using Roll6.Domain.Animations;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
+using Roll6.Domain.MapGenerator;
 using Roll6.Domain.Models;
 using Roll6.DTO.Animation;
 using Roll6.DTO.Realtime.Animation;
@@ -42,6 +43,15 @@ public class AnimationHub : Hub
     public const string CONVERSATION_CLEARED_METHOD = "conversationCleared";
     /// <summary>094: the Claude asked for prints; only the tab that sent the request gets it.</summary>
     public const string PRINT_REQUESTED_METHOD = "printRequested";
+
+    // 095: the map generator's tab.
+    public const string GENERATOR_QUEUED_METHOD = "generatorQueued";
+    public const string GENERATOR_STARTED_METHOD = "generatorStarted";
+    public const string GENERATOR_PROGRESS_METHOD = "generatorProgress";
+    public const string GENERATOR_IMAGE_METHOD = "generatorImage";
+    public const string GENERATOR_FINISHED_METHOD = "generatorFinished";
+    public const string IGNORED_FILE = "Arquivo ignorado: {0}";
+    public const string INVALID_IMAGE = "A imagem {0} não é um PNG, JPEG ou WebP válido de até 10 MB.";
 
     /// <summary>094: the answer to a console's <c>ToolCall</c>.</summary>
     public const string TOOL_RESULT_METHOD = "toolResult";
@@ -94,6 +104,10 @@ public class AnimationHub : Hub
             await _dispatcher.PublishAskChangedAsync(agentUser);
             await DispatchAsync(agentUser);
         }
+        // 095: the generator sessions of this tab end; a running request is stopped on its console.
+        foreach (var running in _connections.RemoveGeneratorsOf(connectionId))
+            if (running.AgentConnectionId != null)
+                await Clients.Client(running.AgentConnectionId).SendAsync(STOP_METHOD, running.RequestId);
         // 094: prints this tab was taking for the Claude can no longer come.
         foreach (var request in _connections.RequestsOfEditor(connectionId))
             request.FailPendingPrints(PrintRequest.NO_EDITOR);
@@ -128,6 +142,20 @@ public class AnimationHub : Hub
             request.Append(text);
         if (claudeEvent.Kind == ClaudeEventInfo.STARTED)
             request.Started = true;
+        // 095: a generator request: the Codex thread is kept for the next request, the rest goes to its tab.
+        if (request.Generator is { } job)
+        {
+            if (_connections.GeneratorOf(job.SessionId) is not { } session)
+                return;
+            if (claudeEvent.Kind == ClaudeEventInfo.STARTED)
+            {
+                if (!string.IsNullOrWhiteSpace(claudeEvent.Text))
+                    session.ThreadId = claudeEvent.Text.Trim();
+                claudeEvent = new ClaudeEventInfo { Kind = ClaudeEventInfo.STARTED };
+            }
+            await SendGeneratorProgressAsync(session, request, claudeEvent);
+            return;
+        }
         // 093: a question's answer is only gathered here; the chat shows it once finished.
         if (!request.IsAsk)
             await SendProgressAsync(request, claudeEvent);
@@ -146,6 +174,11 @@ public class AnimationHub : Hub
         // 093: a question's run is read-only; nothing it reports about files is taken.
         if (request == null || request.IsAsk)
             return;
+        if (request.Generator is { } job)
+        {
+            await GeneratedFileAsync(request, job, info);
+            return;
+        }
         var animation = new Animation { AnimationId = request.AnimationId, Name = request.AnimationName };
         switch (AnimationRequestBuilder.Classify(animation, info.Path))
         {
@@ -418,6 +451,120 @@ public class AnimationHub : Hub
         });
 
     private Task SendAgentStatusAsync(long userId) => _dispatcher.SendAgentStatusAsync(userId);
+
+    // ---------- map generator (095) ----------
+
+    /// <summary>Opens the map generator for this tab — for a new map, or to edit one of the user's own maps.</summary>
+    public async Task<GeneratorOpenedInfo> OpenGenerator(long? mapModelId)
+    {
+        var userId = UserId;
+        if (mapModelId is long id)
+        {
+            try
+            {
+                await _dispatcher.OwnMapModelAsync(userId, id);
+            }
+            catch (KeyNotFoundException)
+            {
+                throw new HubException("not-found");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                throw new HubException("forbidden");
+            }
+        }
+        var session = _connections.OpenGenerator(Context.ConnectionId, userId, mapModelId);
+        return new GeneratorOpenedInfo { SessionId = session.SessionId, Agent = _connections.AgentStatusOf(userId), MapModelId = mapModelId };
+    }
+
+    /// <summary>A request of the generator tab: validated, queued for the user's console (one per session), dispatched.</summary>
+    public async Task<long> SendGeneratorRequest(GeneratorRequestInfo info)
+    {
+        if (!IsValid(info))
+            throw new HubException("invalid");
+        var session = _connections.GeneratorOf(info.SessionId);
+        if (session == null || session.ConnectionId != Context.ConnectionId)
+            throw new HubException("not-found");
+        if (!_connections.AgentStatusOf(session.UserId).Connected)
+            throw new HubException("no-agent");
+        var job = new GeneratorJob(session.SessionId, info.Text.Trim(), info.Images, string.IsNullOrEmpty(info.BaseImage) ? null : info.BaseImage);
+        var request = _connections.EnqueueGenerator(session, job, Now) ?? throw new HubException("busy");
+        var started = await DispatchAsync(session.UserId);
+        if (!started.Contains(request.RequestId))
+        {
+            await Clients.Caller.SendAsync(GENERATOR_QUEUED_METHOD, new GeneratorQueuedInfo
+            {
+                SessionId = session.SessionId,
+                RequestId = request.RequestId,
+                Position = _connections.QueuePosition(request.RequestId),
+            });
+        }
+        return request.RequestId;
+    }
+
+    /// <summary>"Nova conversa" of the generator: the next request starts a new Codex thread (refused while one runs).</summary>
+    public Task NewGeneratorConversation(string sessionId)
+    {
+        var session = _connections.GeneratorOf(sessionId);
+        if (session == null || session.ConnectionId != Context.ConnectionId)
+            throw new HubException("not-found");
+        if (_connections.GeneratorRequestOf(sessionId) != null)
+            throw new HubException("busy");
+        session.ThreadId = null;
+        return Task.CompletedTask;
+    }
+
+    private static bool IsValid(GeneratorRequestInfo? info)
+    {
+        if (info == null || info.Text == null || info.Text.Length > GeneratorRequestInfo.MAX_TEXT)
+            return false;
+        var images = info.Images ?? new List<PromptImageInfo>();
+        if (images.Count > GeneratorRequestInfo.MAX_IMAGES || (info.Text.Trim().Length == 0 && images.Count == 0))
+            return false;
+        if (images.Any(i => i == null || GeneratedImage.Decode(i.Png) == null))
+            return false;
+        return string.IsNullOrEmpty(info.BaseImage) || GeneratedImage.Decode(info.BaseImage) != null;
+    }
+
+    /// <summary>
+    /// A file of a generator run: an image in the session's folder (not its inputs) becomes the next version for the
+    /// tab, once its bytes are a valid PNG/JPEG/WebP of at most 10 MB; anything else is a notice.
+    /// </summary>
+    private async Task GeneratedFileAsync(EditorRequest request, GeneratorJob job, FileChangedInfo info)
+    {
+        if (_connections.GeneratorOf(job.SessionId) is not { } session)
+            return;
+        var path = (info.Path ?? string.Empty).Replace('\\', '/');
+        var name = Path.GetFileName(path);
+        if (!GeneratedImage.IsOutputOf(session.SessionId, path))
+        {
+            if (!path.Contains("/entrada/"))
+                await SendGeneratorProgressAsync(session, request, new ClaudeEventInfo { Kind = ClaudeEventInfo.NOTICE, Text = string.Format(IGNORED_FILE, name) });
+            return;
+        }
+        var image = info.IsBase64 ? GeneratedImage.Decode(info.Content) : null;
+        if (image is not { } valid)
+        {
+            await SendGeneratorProgressAsync(session, request, new ClaudeEventInfo { Kind = ClaudeEventInfo.NOTICE, Text = string.Format(INVALID_IMAGE, name) });
+            return;
+        }
+        await Clients.Client(session.ConnectionId).SendAsync(GENERATOR_IMAGE_METHOD, new GeneratorImageInfo
+        {
+            SessionId = session.SessionId,
+            RequestId = request.RequestId,
+            Version = session.TakeVersion(),
+            MediaType = valid.MediaType,
+            Data = info.Content,
+        });
+    }
+
+    private Task SendGeneratorProgressAsync(GeneratorSession session, EditorRequest request, ClaudeEventInfo claudeEvent) =>
+        Clients.Client(session.ConnectionId).SendAsync(GENERATOR_PROGRESS_METHOD, new GeneratorProgressInfo
+        {
+            SessionId = session.SessionId,
+            RequestId = request.RequestId,
+            Event = claudeEvent,
+        });
 
     internal static EditorMessageInfo ToDto(AnimationMessage message) => new()
     {

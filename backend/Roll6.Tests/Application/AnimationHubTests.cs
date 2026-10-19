@@ -88,6 +88,7 @@ public class AnimationHubTests
     private readonly Mock<IAskService> _asks = new();
     private readonly Mock<ICampaignRepository<Campaign>> _campaigns = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
+    private readonly Mock<IMapModelService> _mapModels = new();
     private AgentDispatcher? _dispatcher;
 
     private AgentDispatcher Dispatcher => _dispatcher ??= CreateDispatcher();
@@ -99,6 +100,7 @@ public class AnimationHubTests
         services.AddSingleton(_conversations.Object);
         services.AddSingleton(_asks.Object);
         services.AddSingleton(_campaigns.Object);
+        services.AddSingleton(_mapModels.Object);
         var hubClients = new Mock<IHubClients>();
         hubClients.Setup(c => c.Group(It.IsAny<string>())).Returns((string name) => Proxy("group:" + name));
         hubClients.Setup(c => c.Client(It.IsAny<string>())).Returns((string id) => Proxy("client:" + id));
@@ -569,5 +571,112 @@ public class AnimationHubTests
         run.SystemPrompt.Should().Contain("print_stage");
         AgentDispatcher.AskRun(_connections.EnqueueAsk(new AskJob(1, 500, 1, "Mesa", "Aria", "oi"), NOW)!, new AskJob(1, 500, 1, "Mesa", "Aria", "oi"))
             .Tools.Should().BeEmpty();
+    }
+
+    // ---------- 095: the map generator ----------
+
+    private static readonly string PNG64 = Convert.ToBase64String(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 7, 7 });
+
+    [Fact]
+    public async Task AGeneratorRequestRunsOnTheCodexWithTheTopDownRulesAndResumesItsThread()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        var tab = Hub("g1", 1, apiKey: false);
+        var opened = await tab.OpenGenerator(null);
+
+        var first = await tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "taverna com lareira" });
+
+        var run = Sent<RunInfo>("client:a1", "run")!;
+        run.Engine.Should().Be("codex");
+        run.Resume.Should().BeNull();
+        run.Prompt.Should().Contain("TOP-DOWN ORTHOGRAPHIC PLAN VIEW").And.Contain($"mapas-gerados/{opened.SessionId}/versao-1.png");
+        run.Watch.Should().Equal($"mapas-gerados/{opened.SessionId}/");
+        Sent<GeneratorStartedInfo>("client:g1", "generatorStarted")!.RequestId.Should().Be(first);
+
+        var console = Hub("a1", 1, apiKey: true);
+        await console.Progress(first, new ClaudeEventInfo { Kind = "started", Text = "01a1525c-287c-7241-82a1-6fca5b99a154" });
+        await console.FileChanged(first, new FileChangedInfo { Path = $"mapas-gerados/{opened.SessionId}/versao-1.png", Content = PNG64, Encoding = "base64" });
+        await console.Finished(first, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.DONE });
+
+        var image = Sent<GeneratorImageInfo>("client:g1", "generatorImage")!;
+        image.Version.Should().Be(1);
+        image.MediaType.Should().Be("image/png");
+        Sent<GeneratorFinishedInfo>("client:g1", "generatorFinished")!.Outcome.Kind.Should().Be("done");
+        Sent<GeneratorProgressInfo>("client:g1", "generatorProgress")!.Event.Text.Should().BeNull("the thread id stays on the server");
+        _stored.Should().BeEmpty("nothing of the generator is stored");
+
+        await tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "mais mesas", BaseImage = PNG64 });
+        var second = Sent<RunInfo>("client:a1", "run")!;
+        second.Resume.Should().Be("01a1525c-287c-7241-82a1-6fca5b99a154");
+        second.Prompt.Should().Contain($"versao-2.png").And.Contain("é o mapa atual");
+        second.Files.Should().ContainSingle(f => f.Encoding == "base64" && f.Path.Contains("/entrada/base-"));
+    }
+
+    [Fact]
+    public async Task GeneratorFilesThatAreNotValidImagesBecomeNotices()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        var tab = Hub("g1", 1, apiKey: false);
+        var opened = await tab.OpenGenerator(null);
+        var requestId = await tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "caverna" });
+        var console = Hub("a1", 1, apiKey: true);
+
+        await console.FileChanged(requestId, new FileChangedInfo { Path = $"mapas-gerados/{opened.SessionId}/versao-1.png", Content = Convert.ToBase64String("GIF89a"u8.ToArray()), Encoding = "base64" });
+        await console.FileChanged(requestId, new FileChangedInfo { Path = $"mapas-gerados/{opened.SessionId}/notas.txt", Content = "oi" });
+        await console.FileChanged(requestId, new FileChangedInfo { Path = $"mapas-gerados/{opened.SessionId}/entrada/base-1.png", Content = PNG64, Encoding = "base64" });
+
+        _sent.Should().NotContain(s => s.Method == "generatorImage");
+        var notices = _sent.Where(s => s.Method == "generatorProgress").Select(s => ((GeneratorProgressInfo)s.Args[0]!).Event.Text).ToList();
+        notices.Should().Equal("A imagem versao-1.png não é um PNG, JPEG ou WebP válido de até 10 MB.", "Arquivo ignorado: notas.txt");
+    }
+
+    [Fact]
+    public async Task TheGeneratorRefusesBadRequestsAndOtherTabs()
+    {
+        var tab = Hub("g1", 1, apiKey: false);
+        var opened = await tab.OpenGenerator(null);
+
+        var noAgent = () => tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "oi" });
+        await noAgent.Should().ThrowAsync<HubException>().WithMessage("no-agent");
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        var empty = () => tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = " " });
+        await empty.Should().ThrowAsync<HubException>().WithMessage("invalid");
+        var notImage = () => tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "oi", BaseImage = Convert.ToBase64String("texto"u8.ToArray()) });
+        await notImage.Should().ThrowAsync<HubException>().WithMessage("invalid");
+        var otherTab = () => Hub("g2", 1, apiKey: false).SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "oi" });
+        await otherTab.Should().ThrowAsync<HubException>().WithMessage("not-found");
+
+        await tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "oi" });
+        var busy = () => tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "de novo" });
+        await busy.Should().ThrowAsync<HubException>().WithMessage("busy");
+    }
+
+    [Fact]
+    public async Task OnlyAnOwnMapOpensForEditing()
+    {
+        _mapModels.Setup(s => s.GetByIdAsync(40)).ReturnsAsync(new Roll6.DTO.MapModel.MapModelInfo { MapModelId = 40, UserId = 1, Name = "Taverna" });
+        _mapModels.Setup(s => s.GetByIdAsync(41)).ReturnsAsync(new Roll6.DTO.MapModel.MapModelInfo { MapModelId = 41, UserId = 2, Name = "Alheio" });
+        _mapModels.Setup(s => s.GetByIdAsync(42)).ThrowsAsync(new KeyNotFoundException());
+        var tab = Hub("g1", 1, apiKey: false);
+
+        (await tab.OpenGenerator(40)).MapModelId.Should().Be(40);
+        var other = () => tab.OpenGenerator(41);
+        await other.Should().ThrowAsync<HubException>().WithMessage("forbidden");
+        var missing = () => tab.OpenGenerator(42);
+        await missing.Should().ThrowAsync<HubException>().WithMessage("not-found");
+    }
+
+    [Fact]
+    public async Task AClosedTabStopsItsRunningGeneratorRequest()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        var tab = Hub("g1", 1, apiKey: false);
+        var opened = await tab.OpenGenerator(null);
+        var requestId = await tab.SendGeneratorRequest(new GeneratorRequestInfo { SessionId = opened.SessionId, Text = "floresta" });
+
+        await tab.OnDisconnectedAsync(null);
+
+        _sent.Should().Contain(s => s.Target == "client:a1" && s.Method == "stop" && (long)s.Args[0]! == requestId);
+        _connections.GeneratorOf(opened.SessionId).Should().BeNull();
     }
 }

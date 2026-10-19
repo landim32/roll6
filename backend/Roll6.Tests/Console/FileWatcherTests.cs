@@ -75,6 +75,30 @@ public sealed class FileWatcherTests : IDisposable
     }
 
     [Fact]
+    public void AnImageIsReportedAsItsBytesInBase64()
+    {
+        var bytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3 };
+        File.WriteAllBytes(Path.Combine(_root, "animacoes", "versao-1.png"), bytes);
+
+        _events.TryTake(out var settled, WAIT).Should().BeTrue();
+        settled.Path.Should().Be("animacoes/versao-1.png");
+        Convert.FromBase64String(settled.Content).Should().Equal(bytes);
+    }
+
+    [Fact]
+    public void AnImageOverTheLimitIsAnnouncedWithoutItsBytes()
+    {
+        var large = new List<(string, long)>();
+        _watcher.FileTooLarge += (path, length) => { lock (large) large.Add((path, length)); };
+        File.WriteAllBytes(Path.Combine(_root, "animacoes", "enorme.png"), new byte[FileWriter.MAX_BINARY_BYTES + 1]);
+
+        _watcher.Flush();
+
+        lock (large) large.Should().ContainSingle().Which.Item2.Should().Be(FileWriter.MAX_BINARY_BYTES + 1);
+        _events.TryTake(out _, TimeSpan.FromMilliseconds(400)).Should().BeFalse();
+    }
+
+    [Fact]
     public void TheOwnWriteIsNotReportedBack()
     {
         var path = Path.Combine(_root, "animacoes", "own.json");

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
-import { MapIcon, PencilIcon } from '../../components/ui/icons';
+import { MagicIcon, MapIcon, PencilIcon } from '../../components/ui/icons';
 import { MakeCurrentMapButton } from '../../components/campaign/MakeCurrentMapButton';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
 import { CardGrid } from '../../components/library/CardGrid';
@@ -14,7 +14,7 @@ import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { mapModelService } from '../../Services/mapModelService';
 import { mapService } from '../../Services/mapService';
-import { mapEditPath } from '../../lib/libraryRoutes';
+import { mapEditPath, mapGeneratorPath } from '../../lib/libraryRoutes';
 import type { MapSubsection } from '../../lib/libraryRoutes';
 import { visibleCampaignMaps } from '../../lib/viewerMap';
 import { canMakeCurrent } from '../../lib/currentMap';
@@ -106,10 +106,17 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
   });
 
   const editButton = (mapModelId: number, map: MapInfo | null) => (
-    <button type="button" className="btn btn-sm btn-outline-secondary" title={t('mapModal.edit')} aria-label={t('mapModal.edit')}
-      onClick={() => navigate(map ? `${mapEditPath(mapModelId)}?map=${map.mapId}` : mapEditPath(mapModelId))}>
-      <PencilIcon size={14} />
-    </button>
+    <>
+      <button type="button" className="btn btn-sm btn-outline-secondary" title={t('mapModal.edit')} aria-label={t('mapModal.edit')}
+        onClick={() => navigate(map ? `${mapEditPath(mapModelId)}?map=${map.mapId}` : mapEditPath(mapModelId))}>
+        <PencilIcon size={14} />
+      </button>
+      {/* 095: the map's image as the starting point of the generator. */}
+      <button type="button" className="btn btn-sm btn-outline-secondary" title={t('mapGenerator.editInGenerator')}
+        aria-label={t('mapGenerator.editInGenerator')} onClick={() => navigate(mapGeneratorPath(mapModelId))}>
+        <MagicIcon size={14} />
+      </button>
+    </>
   );
 
   const figure = (imageUrl: string | null, name: string) => (imageUrl ? <img src={imageUrl} alt={name} loading="lazy" /> : undefined);

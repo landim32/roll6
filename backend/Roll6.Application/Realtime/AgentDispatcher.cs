@@ -4,8 +4,10 @@ using Roll6.Domain.Animations;
 using Roll6.Domain.Asks;
 using Roll6.Domain.Enums;
 using Roll6.Domain.Interfaces;
+using Roll6.Domain.MapGenerator;
 using Roll6.Domain.Models;
 using Roll6.Domain.Realtime;
+using Roll6.DTO.MapModel;
 using Roll6.DTO.Realtime;
 using Roll6.DTO.Realtime.Animation;
 using Roll6.DTO.Realtime.Console;
@@ -76,7 +78,11 @@ public sealed class AgentDispatcher : IAskDispatcher
             RunInfo run;
             try
             {
-                run = request.Ask is { } ask ? AskRun(request, ask) : await AnimationRunAsync(request);
+                run = request.Ask is { } ask
+                    ? AskRun(request, ask)
+                    : request.Generator is { } job
+                        ? GeneratorRun(request, job, _connections.GeneratorOf(job.SessionId) ?? throw new InvalidOperationException("O gerador foi fechado."))
+                        : await AnimationRunAsync(request);
             }
             catch (Exception ex)
             {
@@ -86,7 +92,13 @@ public sealed class AgentDispatcher : IAskDispatcher
                 continue;
             }
             await _hub.Clients.Client(agentConnectionId).SendAsync(AnimationHub.RUN_METHOD, run);
-            if (!request.IsAsk)
+            if (request.Generator is { } startedJob && _connections.GeneratorOf(startedJob.SessionId) is { } session)
+            {
+                await _hub.Clients.Client(session.ConnectionId).SendAsync(AnimationHub.GENERATOR_STARTED_METHOD,
+                    new GeneratorStartedInfo { SessionId = session.SessionId, RequestId = request.RequestId, Machine = request.Machine });
+                _ = TimeOutGeneratorAsync(request.RequestId);
+            }
+            else if (request.IsAnimation)
             {
                 await _hub.Clients.Group(AnimationConnections.GroupName(request.AnimationId)).SendAsync(AnimationHub.REQUEST_STARTED_METHOD,
                     new RequestStartedInfo { RequestId = request.RequestId, AnimationId = request.AnimationId, Machine = request.Machine });
@@ -114,6 +126,76 @@ public sealed class AgentDispatcher : IAskDispatcher
         ReadOnly = true,
     };
 
+    /// <summary>How long a generator run may take before the server stops it (095; shortened by the tests).</summary>
+    public TimeSpan GeneratorTimeout { get; set; } = TimeSpan.FromMinutes(5);
+
+    public const string GENERATOR_TIMED_OUT = "O Codex demorou demais (mais de 5 minutos) e o pedido foi parado.";
+
+    /// <summary>
+    /// A generator request's run (095, contracts/console-engine.md): the Codex, the session's thread, the fixed top-down
+    /// rules and the user's text (<see cref="MapGeneratorPrompt"/>), the base image and the marked prints written as
+    /// files under the session's "entrada/" (the console attaches every base64 file with -i), and the session folder
+    /// watched for the new image.
+    /// </summary>
+    public static RunInfo GeneratorRun(EditorRequest request, GeneratorJob job, GeneratorSession session)
+    {
+        var files = new List<FileWriteInfo>();
+        string? basePath = null;
+        if (!string.IsNullOrEmpty(job.BaseImage))
+        {
+            basePath = GeneratedImage.InputPath(session.SessionId, $"base-{request.RequestId}.png");
+            files.Add(new FileWriteInfo { Path = basePath, Content = job.BaseImage, Encoding = FileEncodings.BASE64 });
+        }
+        var marks = new List<string>();
+        for (var i = 0; i < job.Marks.Count; i++)
+        {
+            var path = GeneratedImage.InputPath(session.SessionId, $"marcacao-{request.RequestId}-{i + 1}.png");
+            marks.Add(path);
+            files.Add(new FileWriteInfo { Path = path, Content = job.Marks[i].Png, Encoding = FileEncodings.BASE64 });
+        }
+        return new RunInfo
+        {
+            RequestId = request.RequestId,
+            SessionId = request.SessionId,
+            Engine = RunInfo.ENGINE_CODEX,
+            Resume = session.ThreadId,
+            SystemPrompt = string.Empty,
+            Prompt = MapGeneratorPrompt.Build(job.Text, GeneratedImage.OutputPath(session.SessionId, session.NextVersion), basePath, marks),
+            Images = new List<PromptImageInfo>(),
+            Files = files,
+            Watch = new List<string> { GeneratedImage.Folder(session.SessionId) },
+        };
+    }
+
+    /// <summary>A generator run still going after <see cref="GeneratorTimeout"/> is stopped on its console.</summary>
+    private async Task TimeOutGeneratorAsync(long requestId)
+    {
+        try
+        {
+            await Task.Delay(GeneratorTimeout, _time);
+            var request = _connections.Get(requestId);
+            if (request is not { State: RequestState.Running, AgentConnectionId: { } agent })
+                return;
+            request.TimedOut = true;
+            await _hub.Clients.Client(agent).SendAsync(AnimationHub.STOP_METHOD, requestId);
+        }
+        catch
+        {
+            // Best effort.
+        }
+    }
+
+    /// <summary>The map the generator edits must be the user's own (095); returns it, or throws like the services.</summary>
+    public async Task<MapModelInfo> OwnMapModelAsync(long userId, long mapModelId)
+    {
+        using var scope = _scopes.CreateScope();
+        var models = scope.ServiceProvider.GetRequiredService<IMapModelService>();
+        var model = await models.GetByIdAsync(mapModelId);
+        if (model.UserId != userId)
+            throw new UnauthorizedAccessException();
+        return model;
+    }
+
     private async Task<RunInfo> AnimationRunAsync(EditorRequest request)
     {
         using var scope = _scopes.CreateScope();
@@ -136,6 +218,24 @@ public sealed class AgentDispatcher : IAskDispatcher
     {
         // 094: a print still on its way answers the Claude that the request is over.
         request.FailPendingPrints(PrintRequest.ENDED);
+        // 095: a generator request only tells its tab; nothing is stored (Q3 = B).
+        if (request.Generator is { } job)
+        {
+            if (_connections.GeneratorOf(job.SessionId) is { } session)
+            {
+                var ended = request.TimedOut
+                    ? new RequestOutcomeInfo { Kind = RequestOutcomeInfo.FAILED, Message = GENERATOR_TIMED_OUT }
+                    : outcome;
+                await _hub.Clients.Client(session.ConnectionId).SendAsync(AnimationHub.GENERATOR_FINISHED_METHOD, new GeneratorFinishedInfo
+                {
+                    SessionId = session.SessionId,
+                    RequestId = request.RequestId,
+                    Outcome = ended,
+                    Text = request.Text.Trim(),
+                });
+            }
+            return;
+        }
         using var scope = _scopes.CreateScope();
         if (request.Ask is { } ask)
         {
@@ -246,7 +346,8 @@ public sealed class AgentDispatcher : IAskDispatcher
 
     public async Task SendAgentStatusAsync(long userId)
     {
-        var editors = _connections.EditorsOfUser(userId);
+        // 095: generator tabs follow the agent too.
+        var editors = _connections.EditorsOfUser(userId).Concat(_connections.GeneratorConnectionsOfUser(userId)).Distinct().ToList();
         if (editors.Count > 0)
             await _hub.Clients.Clients(editors).SendAsync(AnimationHub.AGENT_STATUS_METHOD, _connections.AgentStatusOf(userId));
     }

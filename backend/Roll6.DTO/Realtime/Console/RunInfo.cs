@@ -21,6 +21,19 @@ public class FileWriteInfo
 
     [JsonPropertyName("content")]
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>095: "text" (default) or "base64" — the console writes the decoded bytes.</summary>
+    [JsonPropertyName("encoding")]
+    public string? Encoding { get; set; }
+
+    public bool IsBase64 => string.Equals(Encoding, FileEncodings.BASE64, StringComparison.OrdinalIgnoreCase);
+}
+
+/// <summary>How a file's content travels (095): plain text, or the bytes in base64 (images).</summary>
+public static class FileEncodings
+{
+    public const string TEXT = "text";
+    public const string BASE64 = "base64";
 }
 
 /// <summary>A watched file that changed (hub method <c>FileChanged</c>): its relative path and its whole text.</summary>
@@ -31,6 +44,12 @@ public class FileChangedInfo
 
     [JsonPropertyName("content")]
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>095: "text" or "base64" (image files are reported as their bytes in base64).</summary>
+    [JsonPropertyName("encoding")]
+    public string? Encoding { get; set; }
+
+    public bool IsBase64 => string.Equals(Encoding, FileEncodings.BASE64, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>
@@ -76,6 +95,22 @@ public class RunInfo
     /// </summary>
     [JsonPropertyName("readOnly")]
     public bool ReadOnly { get; set; }
+
+    public const string ENGINE_CLAUDE = "claude";
+    public const string ENGINE_CODEX = "codex";
+
+    /// <summary>
+    /// 095: which CLI runs the request — "claude" (default, 086) or "codex" (the map generator). Read-only runs are
+    /// always Claude.
+    /// </summary>
+    [JsonPropertyName("engine")]
+    public string? Engine { get; set; }
+
+    /// <summary>095: the engine's own session to continue (the Codex thread id); null = a new one.</summary>
+    [JsonPropertyName("resume")]
+    public string? Resume { get; set; }
+
+    public bool IsCodex => !ReadOnly && string.Equals(Engine, ENGINE_CODEX, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Tools offered to the Claude in this run (094): exposed by the console on a local MCP server for the run and

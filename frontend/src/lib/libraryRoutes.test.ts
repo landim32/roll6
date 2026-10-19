@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CAMPAIGN_SECTIONS, LIBRARY_SECTIONS, animationEditorPath, animationPath, campaignEditPath, campaignNewPath, characterPath, idParam,
   isAnimationEditorPath, isCampaignSection, isLibrarySection, libraryPath, mapEditPath, npcPath, sectionOf, tokenPath, weaponPath,
-  LIBRARY_SUBSECTIONS, legacyTabPath, subsectionOf, subsectionPath,
+  LIBRARY_SUBSECTIONS, legacyTabPath, mapGeneratorPath, subsectionOf, subsectionPath,
 } from './libraryRoutes';
 
 describe('library routes (087)', () => {
@@ -63,7 +63,10 @@ describe('animation editor route (089)', () => {
 describe('library submenus (090)', () => {
   it('lists the submenus in the menu order', () => {
     expect(LIBRARY_SUBSECTIONS.campaigns).toEqual(['mine', 'search', 'playing']);
-    expect(LIBRARY_SUBSECTIONS.maps).toEqual(['mine', 'search', 'campaign']);
+    expect(LIBRARY_SUBSECTIONS.maps).toEqual(['mine', 'search', 'campaign', 'generator']);
+    expect(subsectionOf('/library/maps/generator')).toEqual({ section: 'maps', subsection: 'generator' });
+    expect(mapGeneratorPath()).toBe('/library/maps/generator');
+    expect(mapGeneratorPath(7)).toBe('/library/maps/generator?model=7');
     expect(LIBRARY_SUBSECTIONS.tokens).toEqual(['mine', 'search']);
     expect(LIBRARY_SUBSECTIONS.weapons).toEqual(['mine', 'search']);
     expect(LIBRARY_SUBSECTIONS.animations).toEqual(['mine', 'search']);
