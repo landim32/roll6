@@ -1,11 +1,18 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import {
-  CircleGeometry, Clock, Color, DirectionalLight, Group, HemisphereLight, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene,
-  WebGLRenderer,
+  AnimationMixer, CircleGeometry, Clock, Color, DirectionalLight, Group, HemisphereLight, Mesh, MeshBasicMaterial,
+  PerspectiveCamera, Scene, WebGLRenderer,
 } from 'three';
 import type { Bone, Object3D, Quaternion } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { instantiate, loadModel } from '../../story/loadModel';
+import type { ModelAsset } from '../../story/loadModel';
+import { HOLDER } from '../../story/attachWeapons';
+import { forgetSockets, measureSockets } from '../../story/socketAnchors';
+import { createWeaponSockets } from '../../story/weaponSockets';
+import { loadAnimations } from '../../../lib/animationCache';
+import { AUTO_CLIPS, clipChoiceIds } from '../../../lib/modelAnimations';
+import type { SocketWeapons } from '../../../types/weapon';
 import { restFrame } from '../../story/threeClips';
 import { isMixamoSkeleton, normalizeBoneName } from '../../../lib/modelAnimations';
 import type { AnimationFile } from '../../../lib/animationFormat';
@@ -75,16 +82,23 @@ interface AnimationStageProps {
   onSave: (file: AnimationFile) => void;
   onStatus: (status: StageStatus) => void;
   labels: { dragHint: string; saving: string; notMixamo: string; notEditable: string; blocked: string; noAnimation: string };
+  /** The chosen token's weapons on their sockets (092), drawn like the table's 3D view. */
+  weapons?: SocketWeapons;
+  /** The "Armas" toggle (092). */
+  showWeapons?: boolean;
+  /** The token's idle choice (056/059): the sockets are measured on its first frame, as the table does (085). */
+  idleClip?: string | null;
 }
 
 /**
  * The 3D stage of the animation editor (086; the roll6anime viewer's `main.ts` of 062–066 as a React component): the
  * chosen token's model playing the animation with the Roll6's own converter, orbit camera, the "Esqueleto" lines, the
- * bone gizmo of the pose editor and the print of the view. Loaded lazily: `three` never reaches the main bundle.
+ * bone gizmo of the pose editor and the print of the view. Since 092 the token's weapons ride their sockets, measured
+ * like the table measures them. Loaded lazily: `three` never reaches the main bundle.
  */
 export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
   modelUrl, content, contentVersion, animationName, skeleton, editingAllowed, editingReason, zoom,
-  onModelLoaded, onModelError, onAnimationError, onFrame, onSave, onStatus, labels,
+  onModelLoaded, onModelError, onAnimationError, onFrame, onSave, onStatus, labels, weapons, showWeapons = true, idleClip = null,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scene = useRef<Scene | null>(null);
@@ -100,6 +114,17 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
   const boneLabel = useRef<HTMLDivElement>(null);
   const openUrl = useRef<string | null>(null);
+  /** The loaded model, its asset and its height in its own units (the weapons' grips are in that unit, 083). */
+  const modelRef = useRef<{ model: Object3D; asset: ModelAsset; height: number } | null>(null);
+  const weaponsRef = useRef({ weapons, showWeapons, idleClip });
+  weaponsRef.current = { weapons, showWeapons, idleClip };
+  /** Shows or hides the carried weapons (092): their holders hang under the sockets' bones. */
+  const applyWeaponsVisibility = (model: Object3D) => {
+    model.traverse((node) => {
+      if (node.name.startsWith(HOLDER)) node.visible = weaponsRef.current.showWeapons;
+    });
+  };
+  const weaponSockets = useRef(createWeaponSockets((model) => applyWeaponsVisibility(model)));
   /** The latest props, read by the frame loop and the pointer handlers. */
   const latest = useRef({ content, animationName, skeleton, editingAllowed, editingReason, onFrame, onSave, onStatus, onAnimationError, labels, zoom });
   latest.current = { content, animationName, skeleton, editingAllowed, editingReason, onFrame, onSave, onStatus, onAnimationError, labels, zoom };
@@ -257,6 +282,37 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Measures the sockets as the table does (085, research R2): on the first frame of the token's own idle animation —
+   * a library one loaded first — or on the rest pose without one; then the weapons hang there and ride the bones, so
+   * they follow the edited animation at any instant. The editor's player puts the edited pose back right after.
+   */
+  async function hangWeapons() {
+    const loaded = modelRef.current;
+    if (!loaded) return;
+    const { model, asset, height } = loaded;
+    const choices = { ...AUTO_CLIPS, idle: weaponsRef.current.idleClip ?? null };
+    const library = await loadAnimations(clipChoiceIds(choices));
+    if (modelRef.current?.model !== model) return;
+    const idle = asset.clips(choices, library).idle;
+    const mixer = new AnimationMixer(model);
+    if (idle) {
+      mixer.clipAction(idle).play();
+      mixer.update(0);
+    } else {
+      player.current?.restPose();
+    }
+    model.updateMatrixWorld(true);
+    forgetSockets(model);
+    measureSockets(model);
+    mixer.stopAllAction();
+    mixer.uncacheRoot(model);
+    weaponSockets.current.reset();
+    weaponSockets.current.sync(model, height, weaponsRef.current.weapons);
+    applyWeaponsVisibility(model);
+    player.current?.refresh();
+  }
+
   // The model: opened when the token changes.
   useEffect(() => {
     openUrl.current = modelUrl;
@@ -269,6 +325,8 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
     skeletonView.current = null;
     player.current = null;
     mixamo.current = false;
+    modelRef.current = null;
+    weaponSockets.current.reset();
     if (!modelUrl) return;
     let cancelled = false;
     loadModel(modelUrl)
@@ -290,6 +348,8 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
         mixamo.current = isMixamoSkeleton(asset.boneNames);
         frameCamera();
         onModelLoaded({ mixamo: mixamo.current, bones: asset.boneNames.length });
+        modelRef.current = { model, asset, height };
+        void hangWeapons();
         showAnimation(false);
       })
       .catch((error: unknown) => {
@@ -310,6 +370,23 @@ export const AnimationStage = forwardRef<StageHandle, AnimationStageProps>(({
     showAnimation(keep);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, contentVersion, animationName]);
+
+  // Another token on the same model, or another grip (092): the loaded model carries them at once.
+  useEffect(() => {
+    const loaded = modelRef.current;
+    if (loaded) weaponSockets.current.sync(loaded.model, loaded.height, weapons);
+  }, [weapons]);
+
+  // Another idle choice: the sockets are measured again on it.
+  useEffect(() => {
+    void hangWeapons();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idleClip]);
+
+  useEffect(() => {
+    const loaded = modelRef.current;
+    if (loaded) applyWeaponsVisibility(loaded.model);
+  }, [showWeapons]);
 
   useEffect(() => {
     skeletonView.current?.setEnabled(skeleton);

@@ -32,6 +32,8 @@ export interface RequestPayload {
   modelName: string | null;
   /** The tab's edit version (091): the Claude works on what the stage shows, unsaved changes included. */
   content?: AnimationFile | null;
+  /** The weapons the model on the stage carries (092), e.g. "Escudo (mão esquerda)"; at most 5. */
+  modelWeapons?: string[];
 }
 
 export type ClaudeEventKind = 'started' | 'text' | 'tool' | 'notice';

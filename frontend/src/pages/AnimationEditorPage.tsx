@@ -12,6 +12,8 @@ import type { PrintAttachment } from '../lib/editorState';
 import { caption } from '../lib/printCaption';
 import type { Mark } from '../lib/markup';
 import { clampZoom } from '../lib/previewZoom';
+import { hasWeapons, readWeaponsToggle, weaponItems, writeWeaponsToggle } from '../lib/editorWeapons';
+import { socketWeaponsOf } from '../lib/weaponGrip';
 import type { AnimationFile } from '../lib/animationFormat';
 import type { TokenInfo } from '../types/token';
 import { AnimationTimeline } from '../components/animations/editor/AnimationTimeline';
@@ -88,6 +90,12 @@ const EditorBody = () => {
 
   const token = useMemo(() => tokens.find((item) => item.tokenId === tokenId) ?? null, [tokens, tokenId]);
   const modelUrl = token?.modelFileUrl ?? null;
+  // 092: the token's weapons on the stage, the "Armas" toggle and their names for the print and the Claude.
+  const [showWeapons, setShowWeaponsState] = useState(readWeaponsToggle);
+  const setShowWeapons = (on: boolean) => { setShowWeaponsState(on); writeWeaponsToggle(on); };
+  const stageWeapons = useMemo(() => (token ? socketWeaponsOf(token) : undefined), [token]);
+  const armed = hasWeapons(token);
+  const visibleWeapons = useMemo(() => (showWeapons ? weaponItems(token) : []), [showWeapons, token]);
   const busy = isBusy(state);
 
   useEffect(() => {
@@ -152,12 +160,13 @@ const EditorBody = () => {
       skeleton: markup.print.skeleton,
       pose: markup.print.pose,
       marks: result.marks,
+      weapons: visibleWeapons,
     });
     const marked = await downscale(result.marked, PRINT_MAX_SIDE);
     if (markup.existing) replacePrint({ ...markup.existing, marked, marks: result.marks, caption: text });
     else attachPrint({ original: markup.original, marked, marks: result.marks, caption: text });
     setMarkup(null);
-  }, [attachPrint, markup, replacePrint, state.animation?.name]);
+  }, [attachPrint, markup, replacePrint, state.animation?.name, visibleWeapons]);
 
   const editPrint = useCallback((print: PrintAttachment) => {
     // The caption of a stored print keeps its capture; only the marks are redone.
@@ -178,6 +187,7 @@ const EditorBody = () => {
                 <Suspense fallback={<div className="stm-editor-stage text-body-secondary p-3">{t('editor.stage.loading')}</div>}>
                   <AnimationStage ref={stage} modelUrl={modelUrl} content={state.content} contentVersion={state.contentVersion}
                     animationName={state.animation?.name ?? ''} skeleton={skeleton && desktop} editingAllowed={editingAllowed && desktop}
+                    weapons={stageWeapons} showWeapons={showWeapons} idleClip={token?.modelIdleClip ?? null}
                     editingReason={editingReason} zoom={zoom}
                     onModelLoaded={(info) => setMixamo(info.mixamo)}
                     onModelError={() => { setMixamo(null); toast.error(t('editor.stage.modelError')); }}
@@ -202,6 +212,11 @@ const EditorBody = () => {
                     onClick={() => setSkeleton(!skeleton)} title={t(skeleton ? 'editor.skeleton.hide' : 'editor.skeleton.show')}>
                     {t('editor.skeleton.label')}
                   </button>
+                  <button type="button" className={`btn ${armed && showWeapons ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    aria-pressed={armed && showWeapons} disabled={!armed} onClick={() => setShowWeapons(!showWeapons)}
+                    title={t(!armed ? 'editor.weapons.none' : showWeapons ? 'editor.weapons.hide' : 'editor.weapons.show')}>
+                    {t('editor.weapons.label')}
+                  </button>
                   <button type="button" className="btn btn-outline-secondary d-inline-flex align-items-center gap-1" disabled={!editingAllowed || history.undo === 0}
                     onClick={() => { void undo(); }} title={t('editor.edit.undo')} aria-label={t('editor.edit.undo')}>
                     <ArrowCounterclockwiseIcon size={14} />{history.undo}
@@ -217,7 +232,7 @@ const EditorBody = () => {
             <AnimationTimeline handle={timeline}
               onPlay={() => stage.current?.play()} onPause={() => stage.current?.pause()} onSeek={(seconds) => stage.current?.seek(seconds)} />
           </div>
-          <EditorConversation modelName={token?.name ?? null} onAttach={modelUrl && desktop ? capture : null} onEditPrint={editPrint} />
+          <EditorConversation modelName={token?.name ?? null} modelWeapons={visibleWeapons} onAttach={modelUrl && desktop ? capture : null} onEditPrint={editPrint} />
         </div>
       )}
       <PrintMarkupModal original={markup?.original ?? null} initialMarks={(markup?.existing?.marks as Mark[] | undefined) ?? []}

@@ -633,6 +633,15 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
   a `MutationObserver` + image loads, only while the user is at the end; always after an own send). Editing is blocked while a request runs
   (`editor.edit.blockedRunning`) or the skeleton is not Mixamo. On phones the stage stacks over the conversation and
   the skeleton, gizmo, undo/redo and "Anexar print" are hidden. `roll6:editor-skeleton` remembers the toggle.
+  **Weapons on the stage (092)**: the chosen token's weapons ride their sockets — `socketWeaponsOf(token)` →
+  `AnimationStage` props `weapons`/`showWeapons`/`idleClip`, the shared `createWeaponSockets` (same placement as the 3D
+  view and the token preview); the sockets are measured once per model on the first frame of the **token's own idle**
+  (a library one loaded through `lib/animationCache`), else the rest pose, then `Player.refresh()` puts the edited pose
+  back, so the weapons follow the edited animation at any instant. The "Esqueleto" see-through skips the weapon holders
+  (`HOLDER`: their materials are shared). "Armas" toggle next to "Esqueleto" (`lib/editorWeapons`, `roll6:editor-weapons`,
+  disabled without weapons); the print caption adds "O modelo carrega: …" and each request sends `modelWeapons`
+  (`RequestInfo.ModelWeapons`, ≤ 5 × ≤ 120 chars, `invalid` otherwise) → the line "Armas do modelo: …" of
+  `AnimationPromptContext`.
 
 ```bash
 cd backend
@@ -775,6 +784,8 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - PostgreSQL — `campaigns.image`, `weapons.thumbnail_image`, `animations.thumbnail_image` (`varchar(260) null`); migration `AddLibraryImages` + `database/migrations/090-library-images.sql`. (090-library-grid-submenus)
 - C# 12 / .NET 8 (animation hub); TypeScript 5 / React 18 (editor) + existing only (SignalR, React Router 6.30 data router, `three` lazy). **No new dependency.** (091-animation-editor-save)
 - No schema change: the edit version lives in the editor tab; the hub relays the Claude's files as `draftVersion` instead of storing them. (091-animation-editor-save)
+- TypeScript 5 / React 18 (editor stage) + C# 12 / .NET 8 (one hub field) — existing only (`three` lazy, the 082/083/085 weapon modules). **No new dependency.** (092-editor-token-weapons)
+- No schema change: `roll6:editor-weapons` (localStorage) holds the stage's weapons toggle; `RequestInfo.modelWeapons` adds one context line for the Claude. (092-editor-token-weapons)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -786,6 +797,7 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 092-editor-token-weapons: the animation editor's stage shows the chosen token with its weapons on their sockets (placed like the table: sockets measured on the token's idle first frame, then riding the bones through the edited animation); an "Armas" toggle hides them; the print caption and the Claude's context (`RequestInfo.modelWeapons` → "Armas do modelo: …") name the weapons and their sockets. No schema, REST or MCP change
 - 091-animation-editor-save: the animation editor saves only on "Salvar" — turned bones, undo/redo and the Claude's files (relayed by the hub as `draftVersion`, never stored) change the tab's edit version; "Descartar" reverts, a badge shows unsaved changes and leaving asks; each request sends the edit version (`RequestInfo.content`) so the Claude works on what is on screen; the conversation follows new content while at the bottom; "Incluir animação" asks only name and type, creates a 1 s rest-pose animation and opens its editor. No schema, REST or MCP change
 - 090-library-grid-submenus: the library's list tabs become submenus of the left menu, each with its own address (Campanhas: Minhas campanhas · Buscar · Jogando; Mapas: Meus mapas · Buscar · Da campanha; Tokens, Armas, Animações: Minhas · Buscar; old `?tab=` addresses redirect); every list is a card grid — campaigns and maps in 3 columns with their picture, characters, NPCs, tokens, weapons and animations in 4 (3 on phones); campaigns get a picture sent by the master (`campaigns.image`, `PUT /api/campaign/{id}/image`); weapons and animations get a stored thumbnail drawn by the site (the model in its pose; a standard skeleton in the animation's key pose), cleared by a new file/pose/content and drawn live — and stored by the owner — while missing; "Incluir" pages replace the "Enviar" tabs. Migration `AddLibraryImages`; MCP `set_campaign_image` + `image`/`thumbnailImage` parameters (121 operations / 122 tools)
 - 087-library-fullscreen: a full-screen library at `/library/...` (top bar with "← Voltar para campanha" in yellow and the user menu, left menu Campanhas · Mapas · Personagens · NPCs · Tokens · Armas · Animações, one address per list/new/edit page and per campaign section) replaces the campaign settings, campaigns, maps, map edit, select/include/edit character, NPC edit, token edit, weapons and animations windows; the gear, the character combo, the map pencils, "Outras campanhas…"/"Mapas…" and the NPC card pencil go there; the user menu's "Animações"/"Armas" became "Biblioteca" and the menu is shared with the animation editor; unsaved pages ask before leaving (data router + `useBlocker`). Frontend only

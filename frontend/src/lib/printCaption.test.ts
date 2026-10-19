@@ -32,4 +32,11 @@ describe('print caption (086, from 062/064/065)', () => {
     expect(caption({ ...base, marks: [{ kind: 'arrow', points: [{ x: 0, y: 0 }, { x: 50, y: 50 }] }] }))
       .toMatch(/Marcações em vermelho .*: 1 seta\.$/);
   });
+
+  it('names the weapons the model carries (092)', () => {
+    expect(caption({ ...base, weapons: ['Espada longa (mão direita)', 'Escudo (mão esquerda)'] }))
+      .toContain('O modelo carrega: Espada longa (mão direita), Escudo (mão esquerda).');
+    expect(caption({ ...base, weapons: [] })).not.toContain('O modelo carrega');
+    expect(caption(base)).not.toContain('O modelo carrega');
+  });
 });

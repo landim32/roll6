@@ -247,6 +247,12 @@
       "show": "Mostrar o esqueleto",
       "hide": "Esconder o esqueleto"
     },
+    "weapons": {
+      "label": "Armas",
+      "show": "Mostrar as armas do token",
+      "hide": "Esconder as armas",
+      "none": "Este token não tem armas"
+    },
     "edit": {
       "pending": "Alteração na edição — clique em Salvar para gravar na biblioteca.",
       "drag": "arraste um anel para girar",

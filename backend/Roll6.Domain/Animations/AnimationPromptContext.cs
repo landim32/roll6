@@ -12,7 +12,7 @@ public static class AnimationPromptContext
     /// The context text, in Portuguese. <paramref name="animationPath"/> is the working file as the Claude sees it
     /// ("animacoes/7-aceno.json"); <paramref name="modelName"/> the token shown on the stage, or null.
     /// </summary>
-    public static string Build(string animationPath, string? modelName)
+    public static string Build(string animationPath, string? modelName, IReadOnlyList<string>? modelWeapons = null)
     {
         var lines = new List<string>
         {
@@ -22,6 +22,9 @@ public static class AnimationPromptContext
         };
         if (!string.IsNullOrWhiteSpace(modelName))
             lines.Add($"Modelo mostrado na tela: {modelName} (um token do Roll6; só para referência, não o altere).");
+        // 092: the weapons it carries on the stage.
+        if (modelWeapons is { Count: > 0 })
+            lines.Add($"Armas do modelo: {string.Join(", ", modelWeapons)} — elas acompanham as mãos e o corpo, mas não fazem parte do arquivo da animação.");
         lines.Add("Grave e altere arquivos com as ferramentas Write/Edit. No Bash, rode só comandos python simples, como o validar.py (sem heredoc, \"&&\", \";\" ou \"|\"): o resto não tem permissão.");
         lines.Add("Não envie a animação ao Roll6: o editor já recebe cada versão gravada no arquivo.");
         lines.Add("Imagens anexadas ao pedido são prints da vista 3D do editor, cada uma com a legenda do instante da animação e de onde a câmera olha: use-as para ver a pose que o usuário está comentando.");

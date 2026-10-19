@@ -52,6 +52,8 @@ public sealed class EditorRequest
     public string? ModelName { get; }
     /// <summary>The editor's edit version sent with the request (091); null = the library's content.</summary>
     public JsonElement? Content { get; init; }
+    /// <summary>The weapons of the model shown (092), for the Claude's context.</summary>
+    public IReadOnlyList<string> ModelWeapons { get; init; } = Array.Empty<string>();
     public DateTime QueuedAt { get; }
     public DateTime StartedAt { get; internal set; }
     public RequestState State { get; internal set; } = RequestState.Queued;
@@ -171,14 +173,18 @@ public class AnimationConnections
     /// </summary>
     public EditorRequest? Enqueue(long userId, long animationId, string animationName, long conversationId, Guid sessionId,
         bool sessionStarted, string prompt, IReadOnlyList<PromptImageInfo> images, string? modelName, DateTime now,
-        JsonElement? content = null)
+        JsonElement? content = null, IReadOnlyList<string>? modelWeapons = null)
     {
         lock (_lock)
         {
             if (_requests.Values.Any(r => r.AnimationId == animationId))
                 return null;
             var request = new EditorRequest(++_nextRequestId, userId, animationId, animationName, conversationId, sessionId,
-                sessionStarted, prompt, images, modelName, now) { Content = content };
+                sessionStarted, prompt, images, modelName, now)
+            {
+                Content = content,
+                ModelWeapons = modelWeapons ?? Array.Empty<string>(),
+            };
             _requests[request.RequestId] = request;
             if (!_queues.TryGetValue(userId, out var queue))
                 _queues[userId] = queue = new List<long>();

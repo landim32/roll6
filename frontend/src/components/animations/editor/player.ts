@@ -105,11 +105,25 @@ export class Player {
     this.mixer.stopAllAction();
     this.action = null;
     this.state = NO_PLAYBACK;
+    this.restPose();
+  }
+
+  /** Every node back to its loaded transform (the rig's rest pose), without touching the animation. */
+  restPose(): void {
     for (const { node, position, quaternion, scale } of this.rest) {
       node.position.copy(position);
       node.quaternion.copy(quaternion);
       node.scale.copy(scale);
     }
+  }
+
+  /**
+   * Poses the model again as the player has it (092): after something else posed it (the sockets measured on the
+   * token's idle), the rest pose comes back and the edited clip is applied at its instant.
+   */
+  refresh(): void {
+    this.restPose();
+    if (this.action && !this.frozen) this.mixer.update(0);
   }
 
   play(): void {

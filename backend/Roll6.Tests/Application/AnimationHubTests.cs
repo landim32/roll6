@@ -231,6 +231,28 @@ public class AnimationHubTests
     }
 
     [Fact]
+    public async Task TheWeaponsOfTheModelReachTheContextAndAreBounded()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        var browser = Hub("b1", 1, apiKey: false);
+
+        var tooMany = () => browser.SendRequest(new RequestInfo
+        {
+            AnimationId = 7, Text = "oi", ModelWeapons = Enumerable.Range(1, RequestInfo.MAX_WEAPONS + 1).Select(i => $"Arma {i}").ToList(),
+        });
+        await tooMany.Should().ThrowAsync<HubException>().WithMessage("invalid");
+        var tooLong = () => browser.SendRequest(new RequestInfo
+        {
+            AnimationId = 7, Text = "oi", ModelWeapons = new List<string> { new('x', RequestInfo.MAX_WEAPON_TEXT + 1) },
+        });
+        await tooLong.Should().ThrowAsync<HubException>().WithMessage("invalid");
+
+        await browser.SendRequest(new RequestInfo { AnimationId = 7, Text = "oi", ModelWeapons = new List<string> { "Espada (mão direita)" } });
+
+        Sent<RunInfo>("client:a1", "run")!.SystemPrompt.Should().Contain("Armas do modelo: Espada (mão direita)");
+    }
+
+    [Fact]
     public async Task ARequestWithAnInvalidEditVersionIsRefused()
     {
         await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
