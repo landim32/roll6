@@ -204,6 +204,39 @@ describe('edit version and explicit save (091)', () => {
   });
 });
 
+describe('editor save fixes', () => {
+  const turned: AnimationFile = { ...FILE, duration: 2 };
+
+  it('a reconnection keeps the unsaved edit and only marks a changed saved version', () => {
+    const dirty = edited(opened(INITIAL_STATE, OPEN), turned, false);
+    const same = opened(dirty, OPEN);
+    expect(same.content).toBe(turned);
+    expect(isDirty(same)).toBe(true);
+    expect(same.savedChanged).toBe(false);
+    expect(same.contentVersion).toBe(dirty.contentVersion);
+    const elsewhere: AnimationFile = { ...FILE, duration: 3 };
+    const changed = opened(dirty, { ...OPEN, content: elsewhere });
+    expect(changed.content).toBe(turned);
+    expect(changed.savedContent).toBe(elsewhere);
+    expect(changed.savedChanged).toBe(true);
+  });
+
+  it('a reconnection of a clean tab takes the library version', () => {
+    const clean = opened(INITIAL_STATE, OPEN);
+    const elsewhere: AnimationFile = { ...FILE, duration: 3 };
+    const again = opened(clean, { ...OPEN, content: elsewhere });
+    expect(again.content).toBe(elsewhere);
+    expect(again.contentVersion).toBe(clean.contentVersion + 1);
+  });
+
+  it('the user line goes before a Claude line that arrived before SendRequest returned', () => {
+    const early = requestStarted(opened(INITIAL_STATE, OPEN), { animationId: 7, requestId: 3, machine: 'PC-A' });
+    const state = sent(early, 3, 'vire a cabeça', [], '2026-10-19T12:00:00Z');
+    expect(state.messages.map((m) => m.key).slice(-2)).toEqual(['sent-3', 'run-3']);
+    expect(state.request).toMatchObject({ id: 3, state: early.request?.state });
+  });
+});
+
 describe('name and type from the bar', () => {
   it('takes the saved animation and keeps the edit version', () => {
     const state = edited(opened(INITIAL_STATE, OPEN), { ...OPEN.content, duration: 2 } as AnimationFile, false);

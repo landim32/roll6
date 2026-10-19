@@ -130,13 +130,16 @@ export const opened = (state: EditorState, info: EditorStateInfo): EditorState =
     };
     if (request.state === REQUEST_STATE.running) messages.push(runningMessage(info.running.requestId, info.running.text));
   }
+  // A reconnection opens again: unsaved changes of the same animation stay, like a version saved elsewhere.
+  const keep = state.animation?.animationId === info.animation.animationId && isDirty(state);
+  const edit = keep
+    ? { savedChanged: state.savedChanged || versionText(info.content) !== versionText(state.savedContent) }
+    : { content: info.content, savedChanged: false, contentVersion: state.contentVersion + 1 };
   return {
     ...state,
+    ...edit,
     animation: info.animation,
-    content: info.content,
     savedContent: info.content,
-    savedChanged: false,
-    contentVersion: state.contentVersion + 1,
     conversationId: info.conversation.animationConversationId,
     messages,
     agent: info.agent,
@@ -146,10 +149,13 @@ export const opened = (state: EditorState, info: EditorStateInfo): EditorState =
 
 export const agentStatus = (state: EditorState, agent: AgentStatus): EditorState => ({ ...state, agent });
 
-/** The user sent a request (the hub accepted it): the user line with this tab's thumbnails, the attachments cleared. */
-export const sent = (state: EditorState, requestId: number, text: string, thumbnails: string[], now: string): EditorState => ({
-  ...state,
-  messages: [...state.messages, {
+/**
+ * The user sent a request (the hub accepted it): the user line with this tab's thumbnails, the attachments cleared.
+ * The hub may announce the request (queued, started, progress) before `SendRequest` returns, so the user line goes
+ * before the Claude line of that request and a newer request state is kept.
+ */
+export const sent = (state: EditorState, requestId: number, text: string, thumbnails: string[], now: string): EditorState => {
+  const line: EditorMessage = {
     key: `sent-${requestId}`,
     animationMessageId: null,
     role: CONVERSATION_ROLE.user,
@@ -160,10 +166,14 @@ export const sent = (state: EditorState, requestId: number, text: string, thumbn
     prints: [],
     createdAt: now,
     running: false,
-  }],
-  request: { id: requestId, state: REQUEST_STATE.queued, position: null, machine: null },
-  attachments: [],
-});
+  };
+  const at = state.messages.findIndex((m) => m.key === RUNNING_KEY(requestId));
+  const messages = at < 0 ? [...state.messages, line] : [...state.messages.slice(0, at), line, ...state.messages.slice(at)];
+  const request: EditorRequestState = state.request?.id === requestId
+    ? state.request
+    : { id: requestId, state: REQUEST_STATE.queued, position: null, machine: null };
+  return { ...state, messages, request, attachments: [] };
+};
 
 export const requestQueued = (state: EditorState, info: RequestQueued): EditorState =>
   state.animation && info.animationId !== state.animation.animationId

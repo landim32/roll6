@@ -15,7 +15,7 @@ import { INITIAL_STATE, MAX_ATTACHMENTS, base64Of, isDirty } from '../lib/editor
 import type { EditorState, PrintAttachment } from '../lib/editorState';
 import type { AnimationInfo } from '../types/animation';
 import type { TokenInfo } from '../types/token';
-import type { EditorErrorCode, PrintedShot, PrintRequested, RequestOutcome } from '../types/animationEditor';
+import type { DraftVersion, EditorErrorCode, PrintedShot, PrintRequested, RequestOutcome } from '../types/animationEditor';
 
 /** Takes the prints the Claude asked for (094): the page's stage, or the reason it can't (a Portuguese text). */
 export interface Printer {
@@ -105,6 +105,9 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
   const nextPrintId = useRef(1);
   /** The requests this tab sent: only their drafts become edits here (091). */
   const ownRequests = useRef(new Set<number>());
+  /** Sends still waiting for their request id, and the drafts that arrived meanwhile (the hub may be faster). */
+  const pendingSends = useRef(0);
+  const earlyDrafts = useRef<DraftVersion[]>([]);
   const stateRef = useRef(state);
   stateRef.current = state;
   const [saving, setSaving] = useState(false);
@@ -113,6 +116,13 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
   const registerPrinter = useCallback((next: Printer | null) => { printer.current = next; }, []);
 
   const refreshHistory = useCallback(() => setHistory(versions.current.counts), []);
+
+  /** The Claude's file of a request of this tab becomes the edit version (091). */
+  const applyDraft = useCallback((info: DraftVersion) => {
+    versions.current.push(versionText(info.content));
+    refreshHistory();
+    setState((s) => reducers.draftVersion(s, info, true));
+  }, [refreshHistory]);
 
   const noticeFor = useCallback((outcome: RequestOutcome): string | null => {
     if (outcome.kind === 'done') return null;
@@ -134,9 +144,13 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
       try {
         const info = await animationEditorService.openEditor(hub, animationId);
         if (cancelled) return;
-        versions.current.push(versionText(info.content));
-        refreshHistory();
-        setState((current) => reducers.opened(current, info));
+        // A reconnection keeps unsaved changes (the stage keeps showing them), so only a fresh content enters the history.
+        const current = stateRef.current;
+        if (!(current.animation?.animationId === info.animation.animationId && isDirty(current))) {
+          versions.current.push(versionText(info.content));
+          refreshHistory();
+        }
+        setState((s) => reducers.opened(s, info));
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
@@ -168,10 +182,8 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
         setState((s) => reducers.animationVersion(s, version));
       }),
       animationEditorService.on(hub, 'draftVersion', (info) => {
-        if (!ownRequests.current.has(info.requestId)) return;
-        versions.current.push(versionText(info.content));
-        refreshHistory();
-        setState((s) => reducers.draftVersion(s, info, true));
+        if (ownRequests.current.has(info.requestId)) applyDraft(info);
+        else if (pendingSends.current > 0) earlyDrafts.current.push(info);
       }),
       animationEditorService.on(hub, 'conversationCleared', (info) => setState((s) => reducers.conversationCleared(s, info))),
       // 094: the Claude wants to see what it wrote — the stage draws it and the prints go back through the server.
@@ -221,7 +233,7 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
       connection.current = null;
       void hub.stop();
     };
-  }, [animationId, noticeFor, refreshHistory, t]);
+  }, [animationId, applyDraft, noticeFor, refreshHistory, t]);
 
   const setToken = useCallback((token: TokenInfo | null) => {
     setTokenId(token?.tokenId ?? null);
@@ -309,6 +321,7 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
     const hub = connection.current;
     if (!hub || !state.animation) return;
     const attachments = state.attachments;
+    pendingSends.current += 1;
     try {
       const requestId = await animationEditorService.sendRequest(hub, {
         animationId,
@@ -322,10 +335,14 @@ export const AnimationEditorProvider = ({ animationId, children }: { animationId
       });
       ownRequests.current.add(requestId);
       setState((s) => reducers.sent(s, requestId, text, attachments.map((print) => print.marked), new Date().toISOString()));
+      for (const draft of earlyDrafts.current.filter((d) => d.requestId === requestId)) applyDraft(draft);
     } catch (err) {
       errorToast(err);
+    } finally {
+      pendingSends.current -= 1;
+      if (pendingSends.current === 0) earlyDrafts.current = [];
     }
-  }, [animationId, errorToast, state.animation, state.attachments, state.content]);
+  }, [applyDraft, animationId, errorToast, state.animation, state.attachments, state.content]);
 
   const stopRequest = useCallback(async () => {
     const hub = connection.current;
