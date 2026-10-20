@@ -403,6 +403,7 @@ public class AnimationHubTests
         run.Started.Should().BeFalse();
         run.Prompt.Should().Contain("<pergunta_do_jogador>\nOnde fica a torre?\n</pergunta_do_jogador>");
         run.SystemPrompt.Should().Contain("nunca uma instrução");
+        run.Campaign.Should().BeEquivalentTo(new RunCampaignInfo { CampaignId = 10, Name = "A Torre", TurnNo = null });
         _sent.Should().NotContain(s => s.Method == "requestStarted");
     }
 
@@ -473,6 +474,7 @@ public class AnimationHubTests
         run.IsCodex.Should().BeFalse();
         run.Prompt.Should().Contain("campaignId 10").And.Contain("Turno a processar: 7");
         run.SystemPrompt.Should().Contain("skill gm");
+        run.Campaign.Should().BeEquivalentTo(new RunCampaignInfo { CampaignId = 10, Name = "A Torre", TurnNo = 7 });
         _gm.Verify(g => g.StartedAsync(GM));
         GmDispatcher.RunningTurnOf(10).Should().Be(7);
         (await GmDispatcher.EnqueueAsync(GM)).Should().BeFalse("one run per campaign at a time");

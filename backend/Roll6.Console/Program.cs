@@ -12,6 +12,7 @@ using Roll6.Console.Settings;
 var log = (string line) => System.Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}");
 System.Console.OutputEncoding = System.Text.Encoding.UTF8;
 System.Console.WriteLine("Roll6.Console · ponte entre o Roll6 e o Claude Code desta máquina");
+System.Console.WriteLine("Cada pedido mostra aqui tudo o que executa: campanha, ferramentas e o que receberam, resultados, textos e o desfecho.");
 
 var configuration = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)

@@ -249,6 +249,67 @@ public sealed class RequestRunnerTests : IDisposable
         RequestRunner.ToInfo(new ClaudeFinished(false, "ok", Array.Empty<string>())).Should().BeNull();
     }
 
+    // ---- 097: the campaign announced, the full log ----
+
+    [Fact]
+    public async Task ACampaignIsAnnouncedOnTheScreen_AndPutInFrontOfTheModel()
+    {
+        var lines = new List<string>();
+        string? stdinSeen = null;
+        IReadOnlyList<string>? argumentsSeen = null;
+        var claude = new FakeClaude((arguments, stdin, progress) =>
+        {
+            argumentsSeen = arguments;
+            stdinSeen = stdin;
+            progress.Report(new ClaudeStarted(Guid.NewGuid(), true));
+            progress.Report(new ClaudeToolUse("Bash", "python gm.py", """{"command":"ROLL6_API_KEY=r6_c11eTYsWwdwUGm2B_b3WG7oRYph25Waps4pYnm7bhsM python gm.py contexto --campanha 3"}"""));
+            progress.Report(new ClaudeToolResult("t1", "Campanha 3 · turno 16 · SÓ MCP", false));
+            progress.Report(new ClaudeText("Turno 16 fechado.\nSem dúvidas."));
+            progress.Report(new ClaudeFinished(false, "ok", new[] { "WebFetch" }));
+            return new ClaudeOutcome(ClaudeOutcomeKind.Done, null, new[] { "WebFetch" });
+        });
+        var reporter = new FakeReporter();
+        var runner = new RequestRunner(_settings, claude, reporter, lines.Add);
+        var run = Request();
+        run.Campaign = new RunCampaignInfo { CampaignId = 3, Name = "Tormento Vil II", TurnNo = 15 };
+
+        await runner.RunAsync(run, afterRun: TimeSpan.Zero);
+
+        var campaignLine = "CAMPANHA DO PEDIDO: «Tormento Vil II» (campaignId 3), turno 15. Trabalhe só nela; ignore campanha/roll6.json.";
+        stdinSeen.Should().Contain(campaignLine + "\\n\\n" + "levante o braço", "the prompt travels JSON-encoded");
+        argumentsSeen.Should().ContainInOrder("--append-system-prompt", "contexto\n" + campaignLine);
+        lines.Should().AllSatisfy(line => line.Should().StartWith("#12  "));
+        lines[0].Should().Be("#12  Pedido #12 (GM): campanha «Tormento Vil II» (campaignId 3), turno 15 · Claude, sessão nova");
+        lines.Should().Contain(line => line.StartsWith("#12  sessão ") && line.EndsWith("(conta)"));
+        lines.Should().Contain("#12  → Bash {\"command\":\"ROLL6_API_KEY=r6_… python gm.py contexto --campanha 3\"}");
+        lines.Should().Contain("#12  ← Campanha 3 · turno 16 · SÓ MCP");
+        lines.Should().Contain("#12  Claude: Turno 16 fechado.\n     Sem dúvidas.");
+        lines.Should().Contain("#12  Ferramentas recusadas: WebFetch");
+        lines[^1].Should().Be("#12  Pedido #12 terminado.");
+        lines.Should().NotContain(line => line.Contains("r6_c11e"));
+        // Nothing new reaches the server: only the tool and the denial notice, as before.
+        reporter.Events.Select(p => p.Kind).Should().Equal(ClaudeEventInfo.STARTED, ClaudeEventInfo.TOOL, ClaudeEventInfo.NOTICE);
+    }
+
+    [Fact]
+    public async Task WithoutACampaignNothingIsAdded()
+    {
+        var lines = new List<string>();
+        string? stdinSeen = null;
+        var claude = new FakeClaude((arguments, stdin, progress) =>
+        {
+            stdinSeen = stdin;
+            arguments.Should().ContainInOrder("--append-system-prompt", "contexto");
+            return new ClaudeOutcome(ClaudeOutcomeKind.Done, null, Array.Empty<string>());
+        });
+        var runner = new RequestRunner(_settings, claude, new FakeReporter(), lines.Add);
+
+        await runner.RunAsync(Request(), afterRun: TimeSpan.Zero);
+
+        stdinSeen.Should().NotContain("CAMPANHA DO PEDIDO");
+        lines[0].Should().Be("#12  Pedido #12 (editor) · Claude, sessão nova");
+    }
+
     private sealed class FakeClaude : IClaudeProcess
     {
         private readonly Func<IReadOnlyList<string>, string, IProgress<ClaudeEvent>, CancellationToken, Task<ClaudeOutcome>> _run;

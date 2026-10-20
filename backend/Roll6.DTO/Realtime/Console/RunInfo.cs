@@ -118,6 +118,26 @@ public class RunInfo
     /// </summary>
     [JsonPropertyName("tools")]
     public List<ToolInfo> Tools { get; set; } = new();
+
+    /// <summary>
+    /// 097: the campaign the request is about (GM runs with the turn, asks without one; null for editor and generator
+    /// requests). The console announces it — on its screen and in front of the prompt — and never interprets it.
+    /// </summary>
+    [JsonPropertyName("campaign")]
+    public RunCampaignInfo? Campaign { get; set; }
+}
+
+/// <summary>The campaign a request belongs to (097): its id and name in the Roll6, and the turn when the request is about one.</summary>
+public class RunCampaignInfo
+{
+    [JsonPropertyName("campaignId")]
+    public long CampaignId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("turnNo")]
+    public int? TurnNo { get; set; }
 }
 
 /// <summary>One event of a running request (hub method <c>Progress</c>, client method <c>requestProgress</c>).</summary>

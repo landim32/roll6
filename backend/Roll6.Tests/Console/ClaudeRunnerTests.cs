@@ -145,7 +145,7 @@ public sealed class ClaudeRunnerTests : IDisposable
         var outcome = await Run(settings, events);
 
         outcome.Kind.Should().Be(ClaudeOutcomeKind.Done, outcome.Message);
-        events.Select(item => item.GetType().Name).Should().Equal(nameof(ClaudeStarted), nameof(ClaudeTextDelta), nameof(ClaudeFinished));
+        events.Where(item => item is not (ClaudeText or ClaudeToolResult)).Select(item => item.GetType().Name).Should().Equal(nameof(ClaudeStarted), nameof(ClaudeTextDelta), nameof(ClaudeFinished));
         outcome.ToInfo().Kind.Should().Be("done");
     }
 
