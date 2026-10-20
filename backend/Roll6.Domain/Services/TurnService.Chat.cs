@@ -302,6 +302,12 @@ public partial class TurnService : IChatService
             {
                 item.Text = $"Turno {t.TurnNo} finalizado";
             }
+            else if (t.TurnType == TurnType.GmNotice)
+            {
+                // 096: "O GM começou a processar o turno 7." — the GM mode's line, never deleted from the chat.
+                item.DisplayName = t.DisplayName ?? Gm.GmTurn.DISPLAY_NAME;
+                item.Text = t.Description;
+            }
             else if (t.TurnType == TurnType.Poke)
             {
                 // "Rodrigo cutucou Ana e Bruno" (043): a discreet line, never deleted from the chat.
@@ -462,6 +468,7 @@ public partial class TurnService : IChatService
         TurnType.Poll => "poll",
         TurnType.Question => "question",
         TurnType.Answer => "answer",
+        TurnType.GmNotice => "gm",
         _ => type.ToString()
     };
 

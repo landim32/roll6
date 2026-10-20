@@ -28,6 +28,8 @@ public class CampaignService : ICampaignService
     private readonly IUserNotificationRepository<UserNotification> _inboxRepository;
     private readonly IImageStorageAppService _imageStorage;
     private readonly IMapTokenService _mapTokenService;
+    private readonly IGmService _gmService;
+    private readonly IGmDispatcher _gmDispatcher;
 
     public CampaignService(
         ICampaignRepository<Campaign> repository,
@@ -45,8 +47,12 @@ public class CampaignService : ICampaignService
         IImageStorageAppService imageStorage,
         ICampaignNotificationPrefRepository<CampaignNotificationPref> notificationPrefRepository,
         IUserNotificationRepository<UserNotification> inboxRepository,
-        IMapTokenService mapTokenService)
+        IMapTokenService mapTokenService,
+        IGmService gmService,
+        IGmDispatcher gmDispatcher)
     {
+        _gmService = gmService;
+        _gmDispatcher = gmDispatcher;
         _mapTokenService = mapTokenService;
         _notificationPrefRepository = notificationPrefRepository;
         _inboxRepository = inboxRepository;
@@ -187,6 +193,26 @@ public class CampaignService : ICampaignService
     /// Switches the pending notice over the chat (072, master, any status, free mode or not). The same value is a
     /// no-op; a change reaches every screen through <c>campaign.changed</c>.
     /// </summary>
+    /// <summary>
+    /// Switches the GM mode (096, master, any status). The same value is a no-op; a change reaches every screen through
+    /// <c>campaign.changed</c>. On: a turn already complete is handed to the GM at once. Off: a queued or running GM run
+    /// of the campaign is stopped.
+    /// </summary>
+    public async Task<CampaignInfo> SetGmModeAsync(long userId, long campaignId, CampaignGmModeInfo info)
+    {
+        var campaign = await GetOwnedAsync(userId, campaignId);
+        if (campaign.GmMode == info.GmMode)
+            return await MapToDtoAsync(campaign);
+        campaign.SetGmMode(info.GmMode);
+        var result = await MapToDtoAsync(await _repository.UpdateAsync(campaign));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.CAMPAIGN_CHANGED, campaignId, userId, data: result));
+        if (info.GmMode)
+            await _gmService.CheckAsync(campaignId, "mode-on");
+        else
+            await _gmDispatcher.StopAsync(campaignId);
+        return result;
+    }
+
     public async Task<CampaignInfo> SetPendingNoticeAsync(long userId, long campaignId, CampaignPendingNoticeInfo info)
     {
         var campaign = await GetOwnedAsync(userId, campaignId);
@@ -353,6 +379,7 @@ public class CampaignService : ICampaignService
         Status = (int)campaign.Status,
         FreeMode = campaign.FreeMode,
         PendingNotice = campaign.PendingNotice,
+        GmMode = campaign.GmMode,
         Image = campaign.Image,
         ImageUrl = _imageStorage.GetUrl(campaign.Image),
         CurrentTurn = campaign.CurrentTurn,

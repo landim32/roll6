@@ -23,6 +23,8 @@ export const TABLE_EVENT = {
   chatUpdated: 'chat.updated',
   /** The master's Roll6.Console connected or dropped (093); data = { available }. */
   askChanged: 'ask.changed',
+  /** A GM run of the campaign started or ended (096); data = { running, turnNo }. */
+  gmChanged: 'gm.changed',
   resync: 'resync',
 } as const;
 

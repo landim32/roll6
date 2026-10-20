@@ -843,7 +843,8 @@
         "life": "PV do personagem",
         "fatigue": "Fadiga do personagem",
         "poke": "Cutucada",
-        "pokeMaster": "Cutucada no mestre"
+        "pokeMaster": "Cutucada no mestre",
+        "gm": "Modo GM: turno não fechado"
       }
     },
     "preview": {
@@ -1107,6 +1108,10 @@
     "freeModeOnTitle": "Modo livre ligado — toque para desligar",
     "freeModeOffTitle": "Modo livre desligado — toque para ligar",
     "freeBadge": "Turno livre",
+    "gmBadge": "Modo GM",
+    "gmNoConsole": "GM sem console",
+    "gmRunning": "GM processando o turno {{no}}…",
+    "gmTitle": "Modo GM: o Claude do mestre fecha o turno quando todos os personagens agirem",
     "update": "Alteração",
     "narration": "Narração",
     "fields": {
@@ -1279,6 +1284,9 @@
     "showChanges": "Ver mudanças de status",
     "pendingNotice": "Aviso de quem falta jogar",
     "pendingNoticeHint": "Mostra ou esconde, para toda a mesa, as fotos piscando de quem ainda não jogou no turno",
+    "gmMode": "Modo GM",
+    "gmModeHint": "O Claude do mestre fecha o turno sozinho, pelo Roll6.Console, quando todos os personagens agirem",
+    "gmModeOffline": "Sem o Roll6.Console conectado o GM não processa nada; o modo fica ligado esperando",
     "pendingLabel": "Personagens que ainda não jogaram neste turno",
     "pendingNone": "{{name}}: ainda não moveu nem agiu — ver no mapa",
     "pendingMoved": "{{name}}: já moveu, falta agir — ver no mapa",

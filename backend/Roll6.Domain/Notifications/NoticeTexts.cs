@@ -77,6 +77,9 @@ public static class NoticeTexts
     /// <summary>N7b (074): a player pokes the master when every character already acted.</summary>
     public static string PokeMaster(string pokerFirstName) => $"{pokerFirstName} está cutucando você: todos já agiram";
 
+    /// <summary>N9 (096): a GM run left the turn open — "GM: o turno 7 não foi fechado — o console caiu".</summary>
+    public static string Gm(int turnNo, string reason) => Ellipsize($"GM: o turno {turnNo} não foi fechado — {Plain(reason).TrimEnd('.')}");
+
     /// <summary>Who a poke of the master names in the chat line: "Ana cutucou o mestre".</summary>
     public const string MASTER = "o mestre";
 

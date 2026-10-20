@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
+using Roll6.Domain.Gm;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -89,6 +90,8 @@ public class AnimationHubTests
     private readonly Mock<ICampaignRepository<Campaign>> _campaigns = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly Mock<IMapModelService> _mapModels = new();
+    // 096: the GM mode's checks and lines, reached through a scope like the chat.
+    private readonly Mock<IGmService> _gm = new();
     private AgentDispatcher? _dispatcher;
 
     private AgentDispatcher Dispatcher => _dispatcher ??= CreateDispatcher();
@@ -101,6 +104,7 @@ public class AnimationHubTests
         services.AddSingleton(_asks.Object);
         services.AddSingleton(_campaigns.Object);
         services.AddSingleton(_mapModels.Object);
+        services.AddSingleton(_gm.Object);
         var hubClients = new Mock<IHubClients>();
         hubClients.Setup(c => c.Group(It.IsAny<string>())).Returns((string name) => Proxy("group:" + name));
         hubClients.Setup(c => c.Client(It.IsAny<string>())).Returns((string id) => Proxy("client:" + id));
@@ -444,6 +448,89 @@ public class AnimationHubTests
         await Dispatcher.StopAsync(500);
 
         _connections.FindByTurn(500).Should().BeNull();
+    }
+
+    // ---- 096: GM runs through the same agents ----
+
+    private static readonly GmJob GM = new(10, 7, 1, "A Torre");
+
+    private IGmDispatcher GmDispatcher => Dispatcher;
+
+    [Fact]
+    public async Task AGmRunReachesTheMastersAgentAsAFreshWritableRun()
+    {
+        await Hub("a1", 1, apiKey: true).RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        _gm.Verify(g => g.CheckOwnerAsync(1), "the console connecting checks the master's campaigns");
+
+        (await GmDispatcher.EnqueueAsync(GM)).Should().BeTrue();
+
+        var run = Sent<RunInfo>("client:a1", "run");
+        run!.ReadOnly.Should().BeFalse("the skill writes the repository and runs its scripts");
+        run.Started.Should().BeFalse("a fresh session per run");
+        run.Files.Should().BeEmpty();
+        run.Watch.Should().BeEmpty();
+        run.Tools.Should().BeEmpty();
+        run.IsCodex.Should().BeFalse();
+        run.Prompt.Should().Contain("campaignId 10").And.Contain("Turno a processar: 7");
+        run.SystemPrompt.Should().Contain("skill gm");
+        _gm.Verify(g => g.StartedAsync(GM));
+        GmDispatcher.RunningTurnOf(10).Should().Be(7);
+        (await GmDispatcher.EnqueueAsync(GM)).Should().BeFalse("one run per campaign at a time");
+        _sent.Should().NotContain(s => s.Method == "requestStarted", "no editor tab follows a GM run");
+    }
+
+    [Fact]
+    public async Task TheEndOfAGmRunReachesTheTurnService()
+    {
+        var console = Hub("a1", 1, apiKey: true);
+        await console.RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        await GmDispatcher.EnqueueAsync(GM);
+        var requestId = Sent<RunInfo>("client:a1", "run")!.RequestId;
+
+        await console.Progress(requestId, new ClaudeEventInfo { Kind = ClaudeEventInfo.TEXT, Text = "Turno fechado." });
+        await console.Finished(requestId, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.DONE });
+
+        _gm.Verify(g => g.CompleteAsync(GM, It.Is<GmOutcome>(o => o.Kind == RequestOutcomeInfo.DONE && o.Text == "Turno fechado."
+            && !o.TimedOut && !o.StoppedByMaster)));
+        GmDispatcher.RunningTurnOf(10).Should().BeNull();
+        _sent.Should().NotContain(s => s.Method == "requestProgress", "nothing of a GM run is streamed to editors");
+    }
+
+    [Fact]
+    public async Task TheMasterStopsAGmRun_QueuedOrRunning()
+    {
+        // Queued (no console yet): dropped at once, reported as stopped by the master.
+        await GmDispatcher.EnqueueAsync(GM);
+        await GmDispatcher.StopAsync(10);
+        _gm.Verify(g => g.CompleteAsync(GM, It.Is<GmOutcome>(o => o.StoppedByMaster)));
+        _connections.GmRequestOf(10).Should().BeNull();
+
+        // Running: the console gets "stop" and its Finished carries the flag.
+        var console = Hub("a1", 1, apiKey: true);
+        await console.RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        await GmDispatcher.EnqueueAsync(GM);
+        var requestId = Sent<RunInfo>("client:a1", "run")!.RequestId;
+        await GmDispatcher.StopAsync(10);
+        _sent.Should().Contain(s => s.Target == "client:a1" && s.Method == AnimationHub.STOP_METHOD);
+        await console.Finished(requestId, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.STOPPED });
+        _gm.Verify(g => g.CompleteAsync(GM, It.Is<GmOutcome>(o => o.Kind == RequestOutcomeInfo.STOPPED && o.StoppedByMaster && !o.TimedOut)));
+        await GmDispatcher.StopAsync(10);
+    }
+
+    [Fact]
+    public async Task AGmRunThatTakesTooLongIsStoppedOnItsConsole()
+    {
+        Dispatcher.GmTimeout = TimeSpan.FromMilliseconds(30);
+        var console = Hub("a1", 1, apiKey: true);
+        await console.RegisterAgent(new AgentRegisterInfo { Machine = "PC-A" });
+        await GmDispatcher.EnqueueAsync(GM);
+        var requestId = Sent<RunInfo>("client:a1", "run")!.RequestId;
+
+        await Task.Delay(400);
+
+        _sent.Should().Contain(s => s.Target == "client:a1" && s.Method == AnimationHub.STOP_METHOD);
+        await console.Finished(requestId, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.STOPPED });
+        _gm.Verify(g => g.CompleteAsync(GM, It.Is<GmOutcome>(o => o.TimedOut && !o.StoppedByMaster)));
     }
 
     // ---------- 094: prints asked by the Claude ----------

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Roll6.Domain.Interfaces;
 using Roll6.Application.Realtime;
 using Roll6.DTO.Realtime.Console;
 
@@ -160,5 +161,31 @@ public class AnimationConnectionsTests
         connections.NextRunnable(1, DateTime.UtcNow)!.Value.Request.Should().BeSameAs(animation);
         connections.FindByTurn(500).Should().BeSameAs(ask);
         connections.Running(0).Should().BeNull("an animation lookup never returns a question");
+    }
+
+    // ---- 096: GM runs ----
+
+    [Fact]
+    public void AGmRunIsOnePerCampaign_OnTheMastersQueue()
+    {
+        var job = new GmJob(10, 7, 1, "A Torre");
+        var ask = _connections.EnqueueAsk(new AskJob(10, 500, 1, "A Torre", "Aria", "oi"), NOW);
+
+        var gm = _connections.EnqueueGm(job, NOW);
+
+        gm!.IsGm.Should().BeTrue();
+        gm.IsAnimation.Should().BeFalse();
+        gm.IsAsk.Should().BeFalse();
+        gm.UserId.Should().Be(1);
+        _connections.EnqueueGm(job with { TurnNo = 8 }, NOW).Should().BeNull("one run per campaign at a time");
+        _connections.EnqueueGm(new GmJob(11, 7, 1, "Outra"), NOW).Should().NotBeNull("another campaign of the same master");
+        _connections.GmRequestOf(10).Should().BeSameAs(gm);
+        _connections.GmRequestOf(12).Should().BeNull();
+
+        _connections.AddAgent("a1", 1, "PC-A", "mesa");
+        _connections.NextRunnable(1, NOW)!.Value.Request.Should().BeSameAs(ask, "the queue is first come, first served");
+        _connections.Finish(gm.RequestId);
+        _connections.GmRequestOf(10).Should().BeNull();
+        _connections.EnqueueGm(job, NOW).Should().NotBeNull("the campaign is free again");
     }
 }

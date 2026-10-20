@@ -41,4 +41,7 @@ public static class TableEventType
 
     /// <summary>The master's Roll6.Console connected or dropped (093): "Perguntar" becomes available or not. Data = { available }.</summary>
     public const string ASK_CHANGED = "ask.changed";
+
+    /// <summary>A GM run of the campaign started or ended (096). Data = { running, turnNo }.</summary>
+    public const string GM_CHANGED = "gm.changed";
 }

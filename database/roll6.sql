@@ -2560,5 +2560,20 @@ BEGIN
     VALUES ('20261019021709_AddChatAsk', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261020031658_AddCampaignGmMode') THEN
+    ALTER TABLE campaigns ADD gm_mode boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261020031658_AddCampaignGmMode') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261020031658_AddCampaignGmMode', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

@@ -18,7 +18,9 @@ public enum NoticeKind
     /// <summary>N7: "Rodrigo está cutucando você" — the poked players.</summary>
     Poke = 7,
     /// <summary>N7b: "Ana está cutucando você: todos já agiram" — the master (074).</summary>
-    PokeMaster = 8
+    PokeMaster = 8,
+    /// <summary>N9: "GM: o turno 7 não foi fechado — …" — the master, when a GM run leaves the turn open (096).</summary>
+    Gm = 9
 }
 
 /// <summary>

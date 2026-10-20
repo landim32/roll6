@@ -105,6 +105,7 @@ public class Roll6Context : DbContext
             entity.Property(e => e.FreeMode).HasColumnName("free_mode").HasDefaultValue(false);
             // 072: true is the database default too, so the sentinel is true and an explicit false is written.
             entity.Property(e => e.PendingNotice).HasColumnName("pending_notice").HasDefaultValue(true).HasSentinel(true);
+            entity.Property(e => e.GmMode).HasColumnName("gm_mode").HasDefaultValue(false);
             entity.Property(e => e.Image).HasColumnName("image").HasMaxLength(260);
             // Map the table follows (017); a map belongs to its campaign, so no navigation both ways.
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.CurrentMapId)

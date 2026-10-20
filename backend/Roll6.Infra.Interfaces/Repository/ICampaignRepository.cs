@@ -10,6 +10,8 @@ public interface ICampaignRepository<TModel> where TModel : class
     Task<List<TModel>> ListByIdsAsync(IEnumerable<long> ids);
     /// <summary>The ids of the campaigns the user masters (093: where "Perguntar" depends on their console).</summary>
     Task<List<long>> ListIdsByOwnerAsync(long userId);
+    /// <summary>Ids of the campaigns the user masters with the GM mode on (096).</summary>
+    Task<List<long>> ListGmModeIdsByOwnerAsync(long userId);
     /// <summary>Campaigns of all users (or only of <paramref name="ownerUserId"/>), optionally filtered by name.</summary>
     Task<(List<TModel> Items, int TotalCount)> ListPagedAsync(string? search, int skip, int take, long? ownerUserId);
     /// <summary>

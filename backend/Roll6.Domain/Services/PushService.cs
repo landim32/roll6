@@ -35,7 +35,7 @@ public class PushService : IPushService
     /// <summary>The kinds the master can simulate (074).</summary>
     public static readonly IReadOnlyList<string> SIMULATED_KINDS = new[]
     {
-        "message", "action", "pending", "pendingLast", "turnFinished", "life", "fatigue", "poke", "pokeMaster"
+        "message", "action", "pending", "pendingLast", "turnFinished", "life", "fatigue", "poke", "pokeMaster", "gm"
     };
 
     private static readonly JsonSerializerOptions JSON = new(JsonSerializerDefaults.Web) { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -195,6 +195,7 @@ public class PushService : IPushService
             "life" => (character.Name, NoticeTexts.Life(Math.Max(0, character.Life / 2), character.Life)),
             "fatigue" => (character.Name, NoticeTexts.Fatigue(Math.Max(0, character.Energy / 2), character.Energy)),
             "poke" => (null, NoticeTexts.Poke(player)),
+            "gm" => (null, NoticeTexts.Gm(campaign.CurrentTurn, "o console do mestre caiu")),
             _ => (null, NoticeTexts.PokeMaster(player))
         };
         var title = NoticeTexts.SimulationTitle(NoticeTexts.Title(speaker, campaign.Name));

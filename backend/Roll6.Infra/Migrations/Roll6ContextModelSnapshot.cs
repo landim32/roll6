@@ -276,6 +276,12 @@ namespace Roll6.Infra.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("free_mode");
 
+                    b.Property<bool>("GmMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("gm_mode");
+
                     b.Property<string>("Image")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")

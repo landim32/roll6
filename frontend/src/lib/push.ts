@@ -53,7 +53,7 @@ export const subscriptionBody = (json: SubscriptionJson, userAgent: string) => {
 
 /** The kinds the master can simulate (074), in the order of the select. */
 export const SIMULATE_KINDS = [
-  'message', 'action', 'pending', 'pendingLast', 'turnFinished', 'life', 'fatigue', 'poke', 'pokeMaster',
+  'message', 'action', 'pending', 'pendingLast', 'turnFinished', 'life', 'fatigue', 'poke', 'pokeMaster', 'gm',
 ] as const;
 
 export type SimulateKind = (typeof SIMULATE_KINDS)[number];

@@ -3123,3 +3123,6 @@ button.stm-library-card-open:focus-visible { outline: 2px solid var(--stm-accent
   .stm-generator-stage { flex: 1 1 auto; aspect-ratio: auto; }
   .stm-generator-conversation { flex: 1 1 40%; min-height: 0; }
 }
+
+/* 096: the GM mode's lines in the chat — the poke line in the info color. */
+.stm-chat-gm { color: var(--bs-info); }

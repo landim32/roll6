@@ -31,6 +31,10 @@ public class CampaignInfo
     [JsonPropertyName("pendingNotice")]
     public bool PendingNotice { get; set; } = true;
 
+    /// <summary>GM mode (096): the master's console closes the turn by itself when every approved character has acted.</summary>
+    [JsonPropertyName("gmMode")]
+    public bool GmMode { get; set; }
+
     /// <summary>Map the master opened last; players follow it (017).</summary>
     [JsonPropertyName("currentMapId")]
     public long? CurrentMapId { get; set; }

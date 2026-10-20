@@ -117,6 +117,20 @@ public static class TableNotices
         TargetUserIds = new[] { masterUserId }
     };
 
+    /// <summary>
+    /// N9 (096): a GM run ended with the turn still open — the master only. The actor is nobody (0): the master is the
+    /// one to tell, and an actor is never notified.
+    /// </summary>
+    public static TableNotice Gm(long campaignId, long masterUserId, int turnNo, string reason) => new()
+    {
+        Kind = NoticeKind.Gm,
+        CampaignId = campaignId,
+        ActorUserId = 0,
+        Speaker = "Modo GM",
+        Body = NoticeTexts.Gm(turnNo, reason),
+        TargetUserIds = new[] { masterUserId }
+    };
+
     /// <summary>N7: "Rodrigo está cutucando você".</summary>
     public static TableNotice Poke(long campaignId, long actorUserId, string pokerFirstName, IEnumerable<long> poked) => new()
     {

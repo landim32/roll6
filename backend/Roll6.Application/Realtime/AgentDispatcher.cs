@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Roll6.Domain.Animations;
 using Roll6.Domain.Asks;
 using Roll6.Domain.Enums;
+using Roll6.Domain.Gm;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.MapGenerator;
 using Roll6.Domain.Models;
@@ -23,7 +24,7 @@ namespace Roll6.Application.Realtime;
 /// session, the console allowed to read only. Scoped services (the animation content, the conversation, the chat) are
 /// reached through a scope, because this is a singleton.
 /// </summary>
-public sealed class AgentDispatcher : IAskDispatcher
+public sealed class AgentDispatcher : IAskDispatcher, IGmDispatcher
 {
     private readonly IHubContext<AnimationHub> _hub;
     private readonly AnimationConnections _connections;
@@ -55,6 +56,83 @@ public sealed class AgentDispatcher : IAskDispatcher
         await DispatchAsync(job.MasterUserId);
     }
 
+    // ---------- GM mode (096) ----------
+
+    /// <summary>How long a GM run may take before the server stops it (096; shortened by the tests).</summary>
+    public TimeSpan GmTimeout { get; set; } = TimeSpan.FromMinutes(10);
+
+    async Task<bool> IGmDispatcher.EnqueueAsync(GmJob job)
+    {
+        if (_connections.EnqueueGm(job, Now) == null)
+            return false;
+        await DispatchAsync(job.MasterUserId);
+        return true;
+    }
+
+    int? IGmDispatcher.RunningTurnOf(long campaignId) => _connections.GmRequestOf(campaignId)?.Gm?.TurnNo;
+
+    /// <summary>The master turned the mode off: a running run is stopped on its console, a queued one dropped at once.</summary>
+    async Task IGmDispatcher.StopAsync(long campaignId)
+    {
+        var request = _connections.GmRequestOf(campaignId);
+        if (request == null)
+            return;
+        request.StoppedByMaster = true;
+        if (request.State == RequestState.Running && request.AgentConnectionId != null)
+        {
+            await _hub.Clients.Client(request.AgentConnectionId).SendAsync(AnimationHub.STOP_METHOD, request.RequestId);
+            return;
+        }
+        var dropped = _connections.Finish(request.RequestId);
+        if (dropped != null)
+            await FinishAsync(dropped, new RequestOutcomeInfo { Kind = RequestOutcomeInfo.STOPPED, Message = GmTurn.Stopped() });
+    }
+
+    /// <summary>
+    /// A GM run (096, contracts/console-gm-run.md): a fresh session, not read-only (the skill writes the repository and
+    /// runs its scripts), nothing written, watched or offered, and a prompt made only of server-owned data.
+    /// </summary>
+    public static RunInfo GmRun(EditorRequest request, GmJob job) => new()
+    {
+        RequestId = request.RequestId,
+        SessionId = Guid.NewGuid(),
+        Started = false,
+        SystemPrompt = GmPrompt.SystemPrompt(),
+        Prompt = GmPrompt.UserPrompt(job.CampaignId, job.CampaignName, job.TurnNo),
+        Images = new List<PromptImageInfo>(),
+        Files = new List<FileWriteInfo>(),
+        Watch = new List<string>(),
+        ReadOnly = false,
+    };
+
+    /// <summary>The master's console connected (096): every campaign he masters with the mode on is checked. Never throws.</summary>
+    public async Task OnAgentConnectedAsync(long userId)
+    {
+        try
+        {
+            using var scope = _scopes.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<IGmService>().CheckOwnerAsync(userId);
+        }
+        catch
+        {
+            // Best effort: the next action checks again.
+        }
+    }
+
+    /// <summary>The console took a GM run: the chat line and the running state (096). Never fails the dispatch.</summary>
+    private async Task GmStartedAsync(GmJob job)
+    {
+        try
+        {
+            using var scope = _scopes.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<IGmService>().StartedAsync(job);
+        }
+        catch
+        {
+            // The run goes on; the end of it tells the table what happened.
+        }
+    }
+
     public async Task StopAsync(long turnId)
     {
         var request = _connections.FindByTurn(turnId);
@@ -80,6 +158,8 @@ public sealed class AgentDispatcher : IAskDispatcher
             {
                 run = request.Ask is { } ask
                     ? AskRun(request, ask)
+                    : request.Gm is { } gm
+                    ? GmRun(request, gm)
                     : request.Generator is { } job
                         ? GeneratorRun(request, job, _connections.GeneratorOf(job.SessionId) ?? throw new InvalidOperationException("O gerador foi fechado."))
                         : await AnimationRunAsync(request);
@@ -96,7 +176,12 @@ public sealed class AgentDispatcher : IAskDispatcher
             {
                 await _hub.Clients.Client(session.ConnectionId).SendAsync(AnimationHub.GENERATOR_STARTED_METHOD,
                     new GeneratorStartedInfo { SessionId = session.SessionId, RequestId = request.RequestId, Machine = request.Machine });
-                _ = TimeOutGeneratorAsync(request.RequestId);
+                _ = TimeOutAsync(request.RequestId, GeneratorTimeout);
+            }
+            else if (request.Gm is { } startedGm)
+            {
+                await GmStartedAsync(startedGm);
+                _ = TimeOutAsync(request.RequestId, GmTimeout);
             }
             else if (request.IsAnimation)
             {
@@ -167,12 +252,12 @@ public sealed class AgentDispatcher : IAskDispatcher
         };
     }
 
-    /// <summary>A generator run still going after <see cref="GeneratorTimeout"/> is stopped on its console.</summary>
-    private async Task TimeOutGeneratorAsync(long requestId)
+    /// <summary>A run still going after <paramref name="timeout"/> (the generator's, the GM's) is stopped on its console.</summary>
+    private async Task TimeOutAsync(long requestId, TimeSpan timeout)
     {
         try
         {
-            await Task.Delay(GeneratorTimeout, _time);
+            await Task.Delay(timeout, _time);
             var request = _connections.Get(requestId);
             if (request is not { State: RequestState.Running, AgentConnectionId: { } agent })
                 return;
@@ -218,6 +303,14 @@ public sealed class AgentDispatcher : IAskDispatcher
     {
         // 094: a print still on its way answers the Claude that the request is over.
         request.FailPendingPrints(PrintRequest.ENDED);
+        // 096: a GM run tells the turn service how it ended; the chat lines and the notice are its business.
+        if (request.Gm is { } gmJob)
+        {
+            using var gmScope = _scopes.CreateScope();
+            await gmScope.ServiceProvider.GetRequiredService<IGmService>().CompleteAsync(gmJob, new GmOutcome(outcome.Kind, outcome.Message,
+                outcome.PermissionDenials, request.TimedOut, request.StoppedByMaster, request.Text.Trim()));
+            return;
+        }
         // 095: a generator request only tells its tab; nothing is stored (Q3 = B).
         if (request.Generator is { } job)
         {

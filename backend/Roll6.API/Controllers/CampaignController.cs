@@ -162,6 +162,21 @@ public class CampaignController : ApiControllerBase
         }
     }
 
+    /// <summary>Switches the GM mode (096, master, any status): the master's console closes the turn by itself when every character has acted.</summary>
+    [HttpPut("{id:long}/gm-mode")]
+    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetGmMode(long id, [FromBody] CampaignGmModeInfo info)
+    {
+        try
+        {
+            return Ok(await _campaignService.SetGmModeAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Shows or hides the notice over the chat with who still owes a play this turn (072, master, any status).</summary>
     [HttpPut("{id:long}/pending-notice")]
     [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]

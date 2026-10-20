@@ -127,6 +127,8 @@ public class AnimationHub : Hub
         await SendAgentStatusAsync(userId);
         await _dispatcher.PublishAskChangedAsync(userId);
         await DispatchAsync(userId);
+        // 096: a turn that got ready while the console was away is processed now.
+        await _dispatcher.OnAgentConnectedAsync(userId);
         return new AgentRegisteredInfo { UserName = Context.User?.FindFirstValue("name") ?? string.Empty };
     }
 
@@ -156,8 +158,8 @@ public class AnimationHub : Hub
             await SendGeneratorProgressAsync(session, request, claudeEvent);
             return;
         }
-        // 093: a question's answer is only gathered here; the chat shows it once finished.
-        if (!request.IsAsk)
+        // 093: a question's answer is only gathered here; the chat shows it once finished. 096: a GM run's too.
+        if (!request.IsAsk && !request.IsGm)
             await SendProgressAsync(request, claudeEvent);
     }
 

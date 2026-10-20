@@ -99,7 +99,7 @@ interface ChatContextType {
   editAnswer: (item: ChatItemInfo, text: string) => Promise<void>;
 }
 
-const NO_ASK: AskStatusInfo = { available: false, waitingTurnId: null };
+const NO_ASK: AskStatusInfo = { available: false, waitingTurnId: null, gmRunningTurn: null };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -307,7 +307,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       setExtraPolls((current) => current.filter((p) => p.key !== itemKey));
     } else if (event.type === TABLE_EVENT.turnChanged || event.type === TABLE_EVENT.turnFinished) {
       void refreshRecent();
-    } else if (event.type === TABLE_EVENT.askChanged) {
+    } else if (event.type === TABLE_EVENT.askChanged || event.type === TABLE_EVENT.gmChanged) {
+      // 093/096: the master's console came or went, or a GM run started or ended — the status says it all.
       if (event.campaignId === campaignRef.current) void refreshAsk();
     } else if (event.type === TABLE_EVENT.resync) {
       void refreshRecent();

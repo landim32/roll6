@@ -314,3 +314,12 @@ describe('093: questions and answers', () => {
     expect(replyExcerpt(question)).toBe('Pergunta: Posso abrir a porta?');
   });
 });
+
+describe('GM mode lines (096)', () => {
+  it('a gm line is untouchable, like the poke, and copies its text', () => {
+    const viewer = { userId: 1, isMaster: true, currentTurn: 3, ownerOf: () => 1 };
+    const line = permissionsFor(item(5, { kind: 'gm', characterId: null, userId: 1, turnNo: 3, text: 'O GM começou a processar o turno 3.' }), viewer);
+    expect(line).toMatchObject({ canDelete: false, canReply: false, canReact: false, canConvert: null });
+    expect(copyableText(line)).toBe('O GM começou a processar o turno 3.');
+  });
+});

@@ -135,6 +135,7 @@ public class NoticeDispatcher
         NoticeKind.Fatigue => "fatigue",
         NoticeKind.Poke => "poke",
         NoticeKind.PokeMaster => "pokeMaster",
+        NoticeKind.Gm => "gm",
         _ => kind.ToString()
     };
 }

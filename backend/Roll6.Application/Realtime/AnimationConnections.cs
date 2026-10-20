@@ -60,8 +60,15 @@ public sealed class EditorRequest
     public bool IsAsk => Ask != null;
     /// <summary>095: a request of the map generator (a Codex run), instead of an animation request.</summary>
     public GeneratorJob? Generator { get; init; }
+
+    /// <summary>096: a GM run — the master's Claude closing a turn of the campaign.</summary>
+    public GmJob? Gm { get; init; }
+    public bool IsGm => Gm != null;
+
+    /// <summary>096: the master turned the mode off while this run was queued or running.</summary>
+    public bool StoppedByMaster { get; set; }
     /// <summary>An animation editor request (neither a question nor a generator request).</summary>
-    public bool IsAnimation => Ask == null && Generator == null;
+    public bool IsAnimation => Ask == null && Generator == null && Gm == null;
     /// <summary>095: the generator run went past its time and was stopped by the server.</summary>
     public bool TimedOut { get; set; }
     public DateTime QueuedAt { get; }
@@ -391,6 +398,33 @@ public class AnimationConnections
             queue.Add(request.RequestId);
             return request;
         }
+    }
+
+    /// <summary>
+    /// Queues a GM run (096) on the master's FIFO; null while a run of the same campaign is already queued or running
+    /// (one run per campaign at a time).
+    /// </summary>
+    public EditorRequest? EnqueueGm(GmJob job, DateTime now)
+    {
+        lock (_lock)
+        {
+            if (_requests.Values.Any(r => r.Gm?.CampaignId == job.CampaignId))
+                return null;
+            var request = new EditorRequest(++_nextRequestId, job.MasterUserId, 0, string.Empty, 0, Guid.NewGuid(), false,
+                string.Empty, Array.Empty<PromptImageInfo>(), null, now) { Gm = job };
+            _requests[request.RequestId] = request;
+            if (!_queues.TryGetValue(job.MasterUserId, out var queue))
+                _queues[job.MasterUserId] = queue = new List<long>();
+            queue.Add(request.RequestId);
+            return request;
+        }
+    }
+
+    /// <summary>The queued or running GM run of a campaign (096), if any.</summary>
+    public EditorRequest? GmRequestOf(long campaignId)
+    {
+        lock (_lock)
+            return _requests.Values.FirstOrDefault(r => r.Gm?.CampaignId == campaignId);
     }
 
     /// <summary>The queued or running job of a question (093), if any.</summary>
