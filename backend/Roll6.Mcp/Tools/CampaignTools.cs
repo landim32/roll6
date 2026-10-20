@@ -189,6 +189,29 @@ public static class CampaignTools
         [Description("true = show the pending pictures over the chat; false = hide them for everyone.")] bool pendingNotice) =>
         api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/pending-notice", new CampaignPendingNoticeInfo { PendingNotice = pendingNotice });
 
+    [McpServerTool(Name = "set_campaign_gm_mode", Title = "Set campaign GM mode", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/campaign/{id}/gm-mode")]
+    [Description("""
+        What it does: turns the campaign's GM mode on or off (096). While on, the campaign master's local Claude —
+        running on his machine through the Roll6.Console, with the skill "gm" of his campaign folder — closes the turn
+        by itself whenever every approved character has a valid action in the current turn: it resolves the actions by
+        the rules, returns pieces that moved beyond their Deslocamento, writes the narration and calls process_turn,
+        without asking anybody. Nothing runs on a partial turn, outside the Active status or without the master's
+        console connected (then the run starts as soon as the console connects). The chat shows "O GM começou a
+        processar o turno N." (kind gm) and, when a run leaves the turn open, why; the master also gets a notice. Turning
+        the mode off stops a run in progress and leaves the turn open. get_ask_status tells whether a run is going on
+        (gmRunningTurn).
+        Who can use it: only the master, in any campaign status.
+        Returns: the updated campaign (gmMode).
+        Common errors: 403 not the master, 404 not found.
+        Related tools: get_ask_status, get_turn_state, process_turn, set_campaign_free_mode, finish_turn.
+        """)]
+    public static Task<CallToolResult> SetCampaignGmMode(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("true = the master's console closes complete turns by itself; false = the master closes them.")] bool gmMode) =>
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/gm-mode", new CampaignGmModeInfo { GmMode = gmMode });
+
     [McpServerTool(Name = "set_campaign_image", Title = "Set campaign image", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/image")]
     [Description("""

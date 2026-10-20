@@ -328,6 +328,27 @@ public class Turn
         };
     }
 
+    /// <summary>
+    /// A line of the GM mode (096): "O GM começou a processar o turno 7." and the like — the master's user, no character,
+    /// shown as "GM"; a discreet line, never deleted, replied to or reacted to.
+    /// </summary>
+    public static Turn GmNotice(long campaignId, long? mapId, int turnNo, long masterUserId, string text)
+    {
+        if (turnNo < 1)
+            throw new DomainValidationException("turnNo", "O turno deve ser maior que zero.");
+        return new Turn
+        {
+            CampaignId = campaignId,
+            MapId = mapId,
+            TurnNo = turnNo,
+            TurnType = TurnType.GmNotice,
+            UserId = masterUserId,
+            DisplayName = Gm.GmTurn.DISPLAY_NAME,
+            Description = Guard.RequiredText(Gm.GmTurn.Excerpt(text, Gm.GmTurn.MAX_LINE), "description", MAX_DESCRIPTION),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
     public static Turn TurnFinished(long campaignId, long? mapId, int turnNo, long userId)
     {
         if (turnNo < 1)

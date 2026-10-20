@@ -69,6 +69,14 @@ class CampaignService {
     return this.handleResponse<CampaignInfo>(response);
   }
 
+  /** 096: the GM mode — the master's console closes complete turns by itself (master only). */
+  async setGmMode(id: number, gmMode: boolean): Promise<CampaignInfo> {
+    const response = await fetch(`${API_BASE}/${id}/gm-mode`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ gmMode }),
+    });
+    return this.handleResponse<CampaignInfo>(response);
+  }
+
   async setCurrentMap(id: number, mapId: number | null): Promise<CampaignInfo> {
     const response = await fetch(`${API_BASE}/${id}/current-map`, {
       method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ mapId }),

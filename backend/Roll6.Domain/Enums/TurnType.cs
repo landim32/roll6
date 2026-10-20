@@ -35,7 +35,12 @@ public enum TurnType
     /// </summary>
     Question = 13,
     /// <summary>The answer of the master's Claude to a <see cref="Question"/> (093), replying to it.</summary>
-    Answer = 14
+    Answer = 14,
+    /// <summary>
+    /// A line of the GM mode about a turn (096): started, stopped, failed, ended without closing. The master's user, no
+    /// character; like <see cref="Poke"/>, neither a conversation entry nor a turn record.
+    /// </summary>
+    GmNotice = 15
 }
 
 /// <summary>Groups of <see cref="TurnType"/> (041).</summary>

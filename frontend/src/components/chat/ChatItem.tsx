@@ -3,10 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PollCard } from './PollCard';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
-import {
-  Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, LockFillIcon, MoveIcon, PencilIcon,
-  QuestionCircleIcon,
-} from '../ui/icons';
+import { Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, LockFillIcon, MoveIcon, PencilIcon, QuestionCircleIcon, RobotIcon } from '../ui/icons';
 import { ChatBubbleGestures } from './ChatBubbleGestures';
 import { ReactionsBadge } from './ReactionsBadge';
 import { ReplyQuote } from './ReplyQuote';
@@ -112,6 +109,14 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
   ) : <div className={`${className}${whisperClass}${flash ? ' is-flash' : ''}`} title={title}>{children}</div>);
 
   switch (item.kind) {
+    case CHAT_KIND.gm:
+      // 096: a line of the GM mode, like the poke.
+      return (
+        <div className="stm-chat-poke stm-chat-gm" role="note">
+          <RobotIcon size={12} /> <span>{item.text}</span> <time className="stm-chat-time">{timeOf(item.createdAt)}</time>
+        </div>
+      );
+
     case CHAT_KIND.poke:
       return (
         <div className="stm-chat-poke" role="note">

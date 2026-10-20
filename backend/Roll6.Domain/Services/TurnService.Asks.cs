@@ -48,7 +48,13 @@ public partial class TurnService : IAskService
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
         var waiting = await _repository.GetWaitingAskAsync(campaign.CampaignId, userId);
-        return new AskStatusInfo { Available = _askDispatcher.IsAgentConnected(campaign.UserId), WaitingTurnId = waiting?.TurnId };
+        return new AskStatusInfo
+        {
+            Available = _askDispatcher.IsAgentConnected(campaign.UserId),
+            WaitingTurnId = waiting?.TurnId,
+            // 096: the turn a GM run is queued or running for.
+            GmRunningTurn = _gm.RunningTurnOf(campaign.CampaignId),
+        };
     }
 
     public async Task CompleteAsync(long turnId, string text)

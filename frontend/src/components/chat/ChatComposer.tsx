@@ -14,7 +14,7 @@ import { addRecipient, mentionAt, mentionOptions, removeMention, removeRecipient
 import type { MentionMatch, WhisperRecipient } from '../../lib/whisper';
 import { pickClipboardImage } from '../../lib/clipboardImage';
 import { replyExcerpt } from '../../lib/chatItems';
-import { BarChartLineIcon, Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, QuestionCircleIcon, SendIcon } from '../ui/icons';
+import { BarChartLineIcon, Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, QuestionCircleIcon, RobotIcon, SendIcon } from '../ui/icons';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -55,7 +55,7 @@ export const ChatComposer = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const { party } = useCharacter();
-  const { currentCampaign, isMaster, setPendingNotice } = useCampaign();
+  const { currentCampaign, isMaster, setPendingNotice, setGmMode } = useCampaign();
   // 047: who the next entry is whispered to; empty = public. Cleared after every send (clarification B).
   const [recipients, setRecipients] = useState<WhisperRecipient[]>([]);
   const [mention, setMention] = useState<MentionMatch | null>(null);
@@ -295,6 +295,16 @@ export const ChatComposer = () => {
     }
   };
 
+  /** 096: the master lets his console close the turns by itself — a campaign flag, like the pending notice. */
+  const gmMode = currentCampaign?.gmMode === true;
+  const onToggleGm = async () => {
+    try {
+      await setGmMode(!gmMode);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    }
+  };
+
   /** 3d6 drawn by the server; whatever is typed becomes the roll's reason ("Ataque com espada"). */
   const onRoll = async () => {
     const reason = text.trim() || null;
@@ -438,6 +448,18 @@ export const ChatComposer = () => {
                         {pendingNotice ? <EyeIcon size={24} /> : <EyeSlashIcon size={24} />}
                       </span>
                       <span>{t('chat.pendingNotice')}</span>
+                    </DropdownMenu.Item>
+                  )}
+                  {isMaster && (
+                    // 096: the GM mode — the master's console closes complete turns by itself.
+                    <DropdownMenu.Item className={`stm-chat-attach-item${gmMode ? ' is-on' : ''}`}
+                      onSelect={(event) => { event.preventDefault(); void onToggleGm(); }}
+                      aria-checked={gmMode} role="menuitemcheckbox"
+                      title={askStatus.available ? t('chat.gmModeHint') : t('chat.gmModeOffline')}>
+                      <span className="stm-chat-attach-icon is-view">
+                        <RobotIcon size={24} />
+                      </span>
+                      <span>{t('chat.gmMode')}</span>
                     </DropdownMenu.Item>
                   )}
                 </DropdownMenu.Content>

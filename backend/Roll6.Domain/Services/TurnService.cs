@@ -38,6 +38,7 @@ public partial class TurnService : ITurnService
     private readonly IImageStorageAppService _imageStorage;
     private readonly IRealtimeNotifier _notifier;
     private readonly IAskDispatcher _askDispatcher;
+    private readonly IGmDispatcher _gm;
     private readonly INotificationQueue _queue;
     private readonly IChatReactionRepository<ChatReaction> _chatReactionRepository;
     private readonly IChatPollRepository<ChatPollOption, ChatPollVote> _chatPollRepository;
@@ -68,7 +69,8 @@ public partial class TurnService : ITurnService
         ITurnWhisperRepository<TurnWhisperTarget> whisperRepository,
         INotificationQueue queue,
         IRealtimeNotifier notifier,
-        IAskDispatcher askDispatcher)
+        IAskDispatcher askDispatcher,
+        IGmDispatcher gmDispatcher)
     {
         _whisperRepository = whisperRepository;
         _chatPollRepository = chatPollRepository;
@@ -82,6 +84,7 @@ public partial class TurnService : ITurnService
         _mapModelRepository = mapModelRepository;
         _notifier = notifier;
         _askDispatcher = askDispatcher;
+        _gm = gmDispatcher;
         _userRepository = userRepository;
         _repository = repository;
         _campaignRepository = campaignRepository;
@@ -219,6 +222,8 @@ public partial class TurnService : ITurnService
         await PublishTurnChangedAsync(campaign.CampaignId, userId);
         // 074: a replaced action is not a new one for "Falta…" (the missing list did not change).
         await NotifyActionAsync(campaign, userId, actor.CharacterId, actor.MapNpcId, info.Description, firstAction: cancelled.Count == 0);
+        // 096: the last action of a complete turn hands it to the GM.
+        await CheckAsync(campaign.CampaignId, "action");
         return result;
     }
 
@@ -279,11 +284,8 @@ public partial class TurnService : ITurnService
     {
         var campaign = await GetMasteredCampaignAsync(userId, campaignId);
         campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
-        var entries = await _repository.ListByCampaignTurnAsync(campaignId, campaign.CurrentTurn);
-        var acted = entries.Where(e => e.TurnType == TurnType.Action && e.CharacterId.HasValue)
-            .Select(e => e.CharacterId!.Value).ToHashSet();
-        var participations = await _campaignCharacterRepository.ListByCampaignAsync(campaignId, approvedOnly: true);
-        var missingIds = participations.Select(p => p.CharacterId).Where(id => !acted.Contains(id)).Distinct().ToList();
+        var (approvedIds, acted) = await ActedAsync(campaign);
+        var missingIds = approvedIds.Where(id => !acted.Contains(id)).ToList();
 
         // 054: in free mode nobody owes the play — the turn finishes at once (and the mode stays on).
         if (missingIds.Count > 0 && !info.Force && !campaign.FreeMode)

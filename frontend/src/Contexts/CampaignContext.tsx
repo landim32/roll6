@@ -34,6 +34,8 @@ interface CampaignContextType {
   setFreeMode: (freeMode: boolean) => Promise<CampaignInfo>;
   /** The master shows or hides the pending notice over the chat for everyone (072). Throws the API error. */
   setPendingNotice: (pendingNotice: boolean) => Promise<CampaignInfo>;
+  /** 096: the GM mode of the current campaign (master only). */
+  setGmMode: (gmMode: boolean) => Promise<CampaignInfo>;
   /** The master sets or removes (null) the campaign's picture on the library cards (090). Throws the API error. */
   setCampaignImage: (image: string | null) => Promise<CampaignInfo>;
   // State management
@@ -170,6 +172,13 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
     return campaign;
   }, [currentCampaignId, selectCampaign]);
 
+  const setGmMode = useCallback(async (gmMode: boolean): Promise<CampaignInfo> => {
+    if (currentCampaignId === null) throw new Error('no campaign');
+    const campaign = await campaignService.setGmMode(currentCampaignId, gmMode);
+    selectCampaign(campaign);
+    return campaign;
+  }, [currentCampaignId, selectCampaign]);
+
   const setCampaignImage = useCallback(async (image: string | null): Promise<CampaignInfo> => {
     if (currentCampaignId === null) throw new Error('no campaign');
     const campaign = await campaignService.setImage(currentCampaignId, image);
@@ -180,8 +189,8 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo<CampaignContextType>(() => ({
     currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug,
-    refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, setPendingNotice, setCampaignImage, selectCampaign, clearError,
-  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, setPendingNotice, setCampaignImage, selectCampaign, clearError]);
+    refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, setPendingNotice, setGmMode, setCampaignImage, selectCampaign, clearError,
+  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, setPendingNotice, setGmMode, setCampaignImage, selectCampaign, clearError]);
 
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 };

@@ -25,7 +25,7 @@ public static class ChatTools
         null characterId is the master; open = true while some approved character has not voted — the master's vote
         doesn't count — and the poll is pinned at the bottom of the chat until then; closed = true once the master closed
         it with close_chat_poll: no more votes, never open, only the result), movement | action | actionResult | characterUpdate | narration (the turn
-        records — text is the same line as get_turn_summary), poke ("Ana cutucou Bruno") or turnFinished (the divider
+        records — text is the same line as get_turn_summary), poke ("Ana cutucou Bruno"), gm (a line of the GM mode, 096: "O GM começou a processar o turno 7.") or turnFinished (the divider
         "Turno N finalizado"). An action with cancelled = true was replaced, reset or deleted ("Ação cancelada") and no
         longer counts in the turn. whisper (when not null) means only its recipients, the author and the master see the
         entry; whisperHidden = true is a whispered action you are not in (its text is "está sussurrando!").
@@ -57,7 +57,7 @@ public static class ChatTools
         [Description("Optional: cursor of the first item you have, to read older items.")] string? before = null,
         [Description("Optional: cursor of the last item you have, to read newer items.")] string? after = null,
         [Description("Optional: how many items (1–100, default 50).")] int? limit = null,
-        [Description("Optional: only these kinds, comma separated — text, image, audio, roll, poll, poke, movement, action, actionResult, characterUpdate, narration, turnFinished. Example: \"poll\".")] string? kind = null) =>
+        [Description("Optional: only these kinds, comma separated — text, image, audio, roll, poll, poke, gm, movement, action, actionResult, characterUpdate, narration, turnFinished. Example: \"poll\".")] string? kind = null) =>
         api.SendAsync(HttpMethod.Get, $"/api/campaign/{campaignId}/chat", null, ("before", before), ("after", after), ("limit", limit), ("kind", kind));
 
     [McpServerTool(Name = "get_chat_message", Title = "Get one chat entry", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -300,7 +300,8 @@ public static class ChatTools
         What it does: tells whether "Perguntar" (093) is available in the campaign now — the master's Roll6.Console is
         connected — and which of your questions is still waiting for its answer (one at a time).
         Who can use it: the campaign master or a player with an approved character.
-        Returns: { available, waitingTurnId (null when none) }.
+        Returns: { available, waitingTurnId (null when none), gmRunningTurn (096: the turn a GM run is queued or running
+        for, null when none) }.
         Common errors: 403 not in the campaign, 404 campaign not found.
         Related tools: ask_question, list_chat_messages.
         """)]

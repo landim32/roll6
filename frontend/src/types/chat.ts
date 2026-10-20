@@ -23,6 +23,8 @@ export const CHAT_KIND = {
   question: 'question',
   /** The answer of the master's Claude to a question (093), replying to it. */
   answer: 'answer',
+  /** A line of the GM mode (096): "O GM começou a processar o turno 7." — a gray line like the poke, never touched. */
+  gm: 'gm',
 } as const;
 
 /** Where a question to the master's Claude stands (093). */
@@ -33,6 +35,8 @@ export type AskState = (typeof ASK_STATE)[keyof typeof ASK_STATE];
 export interface AskStatusInfo {
   available: boolean;
   waitingTurnId: number | null;
+  /** 096: the turn a GM run is queued or running for in this campaign, else null. */
+  gmRunningTurn: number | null;
 }
 
 export type ChatKind = (typeof CHAT_KIND)[keyof typeof CHAT_KIND];

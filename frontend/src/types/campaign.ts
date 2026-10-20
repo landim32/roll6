@@ -19,6 +19,8 @@ export interface CampaignInfo {
   freeMode: boolean;
   /** Pending notice over the chat (072) — see `lib/freeMode.showPending`. A missing value reads as true. */
   pendingNotice?: boolean;
+  /** GM mode (096) — see `lib/gmMode`. A missing value reads as false. */
+  gmMode?: boolean;
   /** Campaign map the master opened last; players follow it (017). */
   currentMapId: number | null;
   /** The campaign's picture on the library cards (090): the stored name and its presigned URL; null without one. */

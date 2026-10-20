@@ -18,6 +18,8 @@ public interface ICampaignService
     Task<CampaignInfo> SetStatusAsync(long userId, long campaignId, CampaignStatusInfo info);
     Task<CampaignInfo> SetFreeModeAsync(long userId, long campaignId, CampaignFreeModeInfo info);
     Task<CampaignInfo> SetPendingNoticeAsync(long userId, long campaignId, CampaignPendingNoticeInfo info);
+    /// <summary>Switches the GM mode (096, master, any status).</summary>
+    Task<CampaignInfo> SetGmModeAsync(long userId, long campaignId, CampaignGmModeInfo info);
     Task<CampaignInfo> SetImageAsync(long userId, long campaignId, CampaignImageInfo info);
     Task DeleteAsync(long userId, long campaignId);
 

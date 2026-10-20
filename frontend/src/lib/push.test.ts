@@ -46,7 +46,7 @@ describe('testing notifications (074)', () => {
     expect(testSummaryKey([{ result: 'gone' }])).toBe('notifications.test.noneSent');
   });
 
-  it('offers the nine kinds the server simulates, in order', () => {
-    expect(SIMULATE_KINDS).toEqual(['message', 'action', 'pending', 'pendingLast', 'turnFinished', 'life', 'fatigue', 'poke', 'pokeMaster']);
+  it('offers the ten kinds the server simulates, in order', () => {
+    expect(SIMULATE_KINDS).toEqual(['message', 'action', 'pending', 'pendingLast', 'turnFinished', 'life', 'fatigue', 'poke', 'pokeMaster', 'gm']);
   });
 });

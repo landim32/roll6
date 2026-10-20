@@ -81,6 +81,8 @@ public partial class TurnService
                 await PublishUpdatedAsync(campaign, userId, previous);
             await PublishTurnChangedAsync(campaign.CampaignId, userId);
             await NotifyActionAsync(campaign, userId, characterId, null, turn.Description, firstAction: cancelled.Count == 0);
+            // 096: a message turned into the last missing action hands the turn to the GM.
+            await CheckAsync(campaign.CampaignId, "action");
         }
         else if (to == "message")
         {

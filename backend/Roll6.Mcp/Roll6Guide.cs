@@ -290,6 +290,20 @@ public static class Roll6Guide
         - `private = true`: only the author and the master see the question and the answer. The master corrects an answer
           with `edit_answer` (shown "editada pelo mestre") or deletes it with `delete_chat_message`.
 
+        ## GM mode
+        - `set_campaign_gm_mode` (096): while on, the master's local Claude closes the turn by itself through his
+          Roll6.Console with the skill `gm` of his campaign folder, whenever every approved character has a valid action
+          in the current turn (nothing runs on a partial turn, outside the Active status or without the console; a
+          turn that got ready while the console was away is processed when it connects). The skill reads the table
+          (get_turn_data/get_turn_state), returns pieces that moved beyond their Deslocamento to the farthest legal
+          point of their route, resolves the actions by the rules, records the master's repository and calls
+          process_turn — without asking anybody; doubts go into the narration's last paragraph for the master.
+        - The chat shows kind `gm` lines: "O GM começou a processar o turno N." when a run starts and, when a run ends
+          with the turn still open (failed, stopped, 10 minutes, the skill missing), why; the master also gets a
+          notice. `get_ask_status.gmRunningTurn` tells whether a run is going on; turning the mode off stops it and the
+          turn stays open — the master then closes it with process_turn or finish_turn, or waits for the next action.
+        - One run per campaign at a time; GM runs share the master's console queue with the chat questions.
+
         ## Chat
         - Each campaign has one **chat**, and it is the campaign's whole timeline: what the players and the master say
           (text, photo, audio), **every turn record** (moves, actions, action results, character/NPC changes,

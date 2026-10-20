@@ -83,6 +83,22 @@ A página **Biblioteca › Mapas › Gerador** usa o **Codex** da sua máquina (
 
 As pastas `mapas-gerados/` podem ser apagadas quando quiser: nada nelas é usado depois que a aba fecha.
 
+## Modo GM (096)
+
+Com o **Modo GM** ligado numa campanha sua (clipe de papel do chat › "Modo GM"), o Roll6 manda a este console, toda vez
+que o último personagem aprovado agir, um pedido para **fechar o turno**: o Claude roda a skill **`gm`** do seu
+repositório (`.claude/skills/gm/`), que lê a mesa, confere os movimentos, resolve as ações pelas regras, registra o
+repositório e chama `process_turn` — sem pedir nada a ninguém. É um pedido comum do console (não é somente leitura):
+`claude -p --permission-mode acceptEdits --allowedTools <ClaudeAllowedTools>`, sessão nova a cada turno, sem arquivos
+nem pastas acompanhadas. A skill fala com o roll6 pelo `roll6.py` (a chave do `~/.claude.json`), então nenhuma
+ferramenta de MCP precisa ser pré-aprovada; `Bash(python:*)` basta.
+
+- Sem console conectado nada é processado; quando ele conecta, um turno que ficou pronto é processado na hora.
+- Um pedido do GM dura no máximo 10 minutos; o Roll6 manda `stop` depois disso, e também quando o mestre desliga o
+  modo. O chat mostra "O GM começou a processar o turno N." e, se o turno ficar aberto, o motivo.
+- Sem a skill `gm` no repositório, o Claude responde `GM_NOT_CONFIGURED` e o chat avisa que ela não está configurada.
+  Um modelo da skill está em `specs/096-campaign-gm-mode/contracts/skill-gm.md`.
+
 ## Ferramentas de um pedido (094)
 
 Um pedido pode trazer `tools[]` (nome, descrição e esquema dos argumentos, montados pelo servidor — hoje o

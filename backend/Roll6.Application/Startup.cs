@@ -100,6 +100,8 @@ public static class Startup
         services.AddScoped<ITurnService>(sp => sp.GetRequiredService<TurnService>());
         services.AddScoped<IChatService>(sp => sp.GetRequiredService<TurnService>());
         services.AddScoped<IAskService>(sp => sp.GetRequiredService<TurnService>());
+        // 096: the GM mode's checks and chat lines live on the turn service too.
+        services.AddScoped<IGmService>(sp => sp.GetRequiredService<TurnService>());
         services.AddScoped<ICampaignPlanRepository<CampaignPlan>, CampaignPlanRepository>();
         services.AddScoped<ICampaignPlanService, CampaignPlanService>();
         services.AddScoped<IApiKeyRepository<ApiKey>, ApiKeyRepository>();
@@ -115,6 +117,7 @@ public static class Startup
         // 093: hands work to the consoles from the hub and from REST (chat questions).
         services.AddSingleton<AgentDispatcher>();
         services.AddSingleton<IAskDispatcher>(sp => sp.GetRequiredService<AgentDispatcher>());
+        services.AddSingleton<IGmDispatcher>(sp => sp.GetRequiredService<AgentDispatcher>());
         services.AddHostedService<Roll6.Application.Asks.AskTimeoutWorker>();
         services.AddSingleton<IAnimationNotifier, AnimationNotifier>();
         services.AddSingleton<SignalRRealtimeNotifier>();

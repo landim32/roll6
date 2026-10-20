@@ -43,6 +43,12 @@ public class Campaign
     /// </summary>
     public bool PendingNotice { get; set; } = true;
 
+    /// <summary>
+    /// GM mode (096): while on, the master's Claude — through his Roll6.Console — closes the turn by itself whenever
+    /// every approved character has acted. Off for every campaign from before; switched by the master in any status.
+    /// </summary>
+    public bool GmMode { get; set; }
+
     /// <summary>The campaign's picture on the library cards (090), sent by the master. Null = the default figure.</summary>
     public string? Image { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -107,6 +113,13 @@ public class Campaign
     public void SetPendingNotice(bool pendingNotice)
     {
         PendingNotice = pendingNotice;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Switches the GM mode (096; master only, checked by the service, allowed in any status).</summary>
+    public void SetGmMode(bool gmMode)
+    {
+        GmMode = gmMode;
         UpdatedAt = DateTime.UtcNow;
     }
 

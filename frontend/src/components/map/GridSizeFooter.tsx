@@ -6,6 +6,8 @@ import { useRealtime } from '../../hooks/useRealtime';
 import { useCampaign } from '../../hooks/useCampaign';
 import { statusNoticeKey } from '../../lib/campaignStatus';
 import { isFreeMode } from '../../lib/freeMode';
+import { GM_BADGE, gmBadge } from '../../lib/gmMode';
+import { useChat } from '../../hooks/useChat';
 import { REALTIME_STATUS } from '../../types/realtime';
 
 interface GridSizeFooterProps {
@@ -23,14 +25,24 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
   const { session } = useAuth();
   const { status } = useRealtime();
   const offline = !!session && status !== REALTIME_STATUS.connected;
-  const { currentCampaign } = useCampaign();
+  const { currentCampaign, isMaster } = useCampaign();
   const statusNotice = currentCampaign ? statusNoticeKey(currentCampaign.status) : null;
+  // 096: the GM mode, as the chat's status reports it (the master's console, a run in progress).
+  const { askStatus } = useChat();
+  const gm = gmBadge(currentCampaign, askStatus, isMaster);
 
   return (
     <footer className="stm-footer">
       {turnNo !== null && <span className="badge stm-turn-badge">{t('turn.label', { no: turnNo })}</span>}
       {turnNo !== null && isFreeMode(currentCampaign) && (
         <span className="badge text-bg-info" title={t('turn.freeModeTitle')}>{t('turn.freeBadge')}</span>
+      )}
+      {turnNo !== null && gm !== GM_BADGE.off && (
+        <span className={`badge ${gm === GM_BADGE.running ? 'text-bg-primary' : gm === GM_BADGE.noConsole ? 'text-bg-warning' : 'text-bg-info'}`}
+          title={t('turn.gmTitle')}>
+          {gm === GM_BADGE.running ? t('turn.gmRunning', { no: askStatus.gmRunningTurn })
+            : gm === GM_BADGE.noConsole ? t('turn.gmNoConsole') : t('turn.gmBadge')}
+        </span>
       )}
       {statusNotice && <span className="badge text-bg-secondary" title={t('campaignStatus.blockedPlay')}>{t(statusNotice)}</span>}
       {offline && (

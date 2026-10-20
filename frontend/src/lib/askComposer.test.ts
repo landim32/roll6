@@ -11,9 +11,9 @@ describe('ask composer (093)', () => {
   });
 
   it('is offline without the console, waiting with an own question, else ready', () => {
-    expect(askAvailability({ available: false, waitingTurnId: null })).toBe('offline');
-    expect(askAvailability({ available: false, waitingTurnId: 7 })).toBe('offline');
-    expect(askAvailability({ available: true, waitingTurnId: 7 })).toBe('waiting');
-    expect(askAvailability({ available: true, waitingTurnId: null })).toBe('ready');
+    expect(askAvailability({ available: false, waitingTurnId: null, gmRunningTurn: null })).toBe('offline');
+    expect(askAvailability({ available: false, waitingTurnId: 7, gmRunningTurn: null })).toBe('offline');
+    expect(askAvailability({ available: true, waitingTurnId: 7, gmRunningTurn: null })).toBe('waiting');
+    expect(askAvailability({ available: true, waitingTurnId: null, gmRunningTurn: null })).toBe('ready');
   });
 });

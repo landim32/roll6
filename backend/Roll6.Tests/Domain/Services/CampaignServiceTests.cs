@@ -31,6 +31,8 @@ public class CampaignServiceTests
     private readonly Mock<IUserNotificationRepository<UserNotification>> _inbox = new();
     private readonly Mock<ICampaignPlanRepository<CampaignPlan>> _campaignPlanRepository = new();
     private readonly Mock<IMapTokenService> _mapTokenService = new();
+    private readonly Mock<IGmService> _gmService = new();
+    private readonly Mock<IGmDispatcher> _gmDispatcher = new();
     private readonly CampaignService _service;
 
     public CampaignServiceTests()
@@ -50,7 +52,8 @@ public class CampaignServiceTests
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
             _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
             _unitOfWork.Object, _turnRepository.Object, _notifier.Object, _campaignPlanRepository.Object,
-            _chatReadRepository.Object, _imageStorage.Object, _notificationPrefs.Object, _inbox.Object, _mapTokenService.Object);
+            _chatReadRepository.Object, _imageStorage.Object, _notificationPrefs.Object, _inbox.Object, _mapTokenService.Object,
+            _gmService.Object, _gmDispatcher.Object);
         _mapTokenService.Setup(s => s.ListOverlapsAsync(It.IsAny<long>())).ReturnsAsync(new List<IReadOnlyList<string>>());
     }
 
@@ -412,6 +415,52 @@ public class CampaignServiceTests
     public async Task SetPendingNotice_NotMaster_IsForbidden()
     {
         var act = () => _service.SetPendingNoticeAsync(2, 10, new CampaignPendingNoticeInfo { PendingNotice = false });
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    // ---- 096: GM mode ----
+
+    [Fact]
+    public async Task SetGmMode_On_PublishesCampaignChanged_AndChecksTheTurn()
+    {
+        var result = await _service.SetGmModeAsync(1, 10, new CampaignGmModeInfo { GmMode = true });
+
+        result.GmMode.Should().BeTrue();
+        _repository.Verify(r => r.UpdateAsync(It.Is<Campaign>(c => c.GmMode)));
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CAMPAIGN_CHANGED
+            && ((CampaignInfo)e.Data!).GmMode)), Times.Once);
+        _gmService.Verify(g => g.CheckAsync(10, "mode-on"), Times.Once);
+        _gmDispatcher.Verify(d => d.StopAsync(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetGmMode_Off_StopsARunInProgress()
+    {
+        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "Campanha", GmMode = true });
+
+        var result = await _service.SetGmModeAsync(1, 10, new CampaignGmModeInfo { GmMode = false });
+
+        result.GmMode.Should().BeFalse();
+        _gmDispatcher.Verify(d => d.StopAsync(10), Times.Once);
+        _gmService.Verify(g => g.CheckAsync(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetGmMode_SameValue_DoesNothing()
+    {
+        var result = await _service.SetGmModeAsync(1, 10, new CampaignGmModeInfo { GmMode = false });
+
+        result.GmMode.Should().BeFalse();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+        _gmService.Verify(g => g.CheckAsync(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetGmMode_NotMaster_IsForbidden()
+    {
+        var act = () => _service.SetGmModeAsync(2, 10, new CampaignGmModeInfo { GmMode = true });
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
