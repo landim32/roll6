@@ -103,6 +103,8 @@ public sealed class AgentDispatcher : IAskDispatcher, IGmDispatcher
         Files = new List<FileWriteInfo>(),
         Watch = new List<string>(),
         ReadOnly = false,
+        // 097: the console announces the campaign and the turn on its screen and in front of the prompt.
+        Campaign = new RunCampaignInfo { CampaignId = job.CampaignId, Name = job.CampaignName, TurnNo = job.TurnNo },
     };
 
     /// <summary>The master's console connected (096): every campaign he masters with the mode on is checked. Never throws.</summary>
@@ -209,6 +211,8 @@ public sealed class AgentDispatcher : IAskDispatcher, IGmDispatcher
         Files = new List<FileWriteInfo>(),
         Watch = new List<string>(),
         ReadOnly = true,
+        // 097: the console announces the campaign on its screen and in front of the prompt.
+        Campaign = new RunCampaignInfo { CampaignId = ask.CampaignId, Name = ask.CampaignName },
     };
 
     /// <summary>How long a generator run may take before the server stops it (095; shortened by the tests).</summary>

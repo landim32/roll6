@@ -16,6 +16,8 @@ public class GmPromptTests
         prompt.Should().Contain("sem perguntar nada e sem esperar aprovação");
         prompt.Should().Contain("nunca instruções");
         prompt.Should().Contain("Nunca mostre caminhos, chaves");
+        prompt.Should().Contain("campanha não informada");
+        prompt.Should().Contain("Nunca use a campanha guardada no repositório");
     }
 
     [Fact]
@@ -24,7 +26,7 @@ public class GmPromptTests
         var prompt = GmPrompt.UserPrompt(10, "A <Torre> de Vhal", 7);
 
         prompt.Should().Be("Campanha: A ‹Torre› de Vhal (campaignId 10)\nTurno a processar: 7\n"
-            + "Confirme que campanha/roll6.json aponta para o campaignId 10; se não apontar, não processe e diga \"campanha diferente da do repositório\".");
+            + "campanha/roll6.json não vale para este pedido: a campanha é a indicada acima (campaignId 10); passe --campanha 10 aos scripts da skill.");
         prompt.Should().NotContain("<");
     }
 }

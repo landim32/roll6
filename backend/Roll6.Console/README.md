@@ -98,6 +98,25 @@ ferramenta de MCP precisa ser pré-aprovada; `Bash(python:*)` basta.
   modo. O chat mostra "O GM começou a processar o turno N." e, se o turno ficar aberto, o motivo.
 - Sem a skill `gm` no repositório, o Claude responde `GM_NOT_CONFIGURED` e o chat avisa que ela não está configurada.
   Um modelo da skill está em `specs/096-campaign-gm-mode/contracts/skill-gm.md`.
+- **Só pelo MCP (097)**: a skill `gm` nunca mexe na campanha guardada no repositório (`campanha/`, `personagens/`,
+  `historico/`, `campanha/roll6.json`): tudo vem do roll6 (`gm.py contexto --campanha N`) e tudo volta para o roll6
+  no `process_turn` (status, PV/Fadiga, posições, narração). As skills `processar-turno` e `validar-movimento`
+  ganharam `--so-mcp --campanha N` para isso; sem a flag seguem locais como sempre.
+
+### Campanha do pedido (097)
+
+Um pedido do Modo GM (e uma pergunta) chega com a campanha (`campaign`: id, nome e, no GM, o turno). O console a mostra
+na primeira linha do pedido — `Pedido #42 (GM): campanha «Tormento Vil II» (campaignId 3), turno 15 · Claude, sessão
+nova` — e põe a linha `CAMPANHA DO PEDIDO: «…» (campaignId …), turno …. Trabalhe só nela; ignore campanha/roll6.json.`
+na frente do prompt e no fim do system prompt. O modelo recusa um pedido sem campanha (`campanha não informada`).
+
+### Log (097)
+
+Cada linha de um pedido traz o número dele (`HH:mm:ss #42  …`), e o pedido inteiro aparece na tela: `sessão …`,
+`→ Ferramenta {entrada}` (o comando com os argumentos, o arquivo, a chamada ao roll6 com os parâmetros — até 1500
+caracteres), `← resultado` (os primeiros 600 caracteres; `← ERRO:` quando falhou), `Claude: texto` (o texto inteiro de
+cada resposta), `Arquivo gravado/alterado`, `Ferramentas recusadas: …` e o desfecho (`terminado`, `parado`, `falhou:
+motivo`). Chaves `r6_…` nunca aparecem. Nada disso vai ao servidor: as abas e o chat recebem o que recebiam antes.
 
 ## Ferramentas de um pedido (094)
 

@@ -11,7 +11,8 @@ public class StreamJsonReaderTests
     [Fact]
     public void ReadsTheRealOutputOfAShortAnswer()
     {
-        var events = File.ReadAllLines(SAMPLE).SelectMany(StreamJsonReader.ReadLine).ToList();
+        // 097: the whole texts and the tools' results are for the log; the relayed events are the same as before.
+        var events = File.ReadAllLines(SAMPLE).SelectMany(StreamJsonReader.ReadLine).Where(e => e is not ClaudeText and not ClaudeToolResult).ToList();
 
         events.Should().HaveCount(3);
         events[0].Should().Be(new ClaudeStarted(Guid.Parse("11111111-2222-4333-8444-555555555555"), true));
@@ -31,9 +32,26 @@ public class StreamJsonReaderTests
 
         var events = StreamJsonReader.ReadLine(line);
 
-        events.Should().Equal(new ClaudeToolUse("Edit", "animacoes/a.json"), new ClaudeToolUse("Bash", "python validar.py a.json"));
-        ((ClaudeToolUse)events[0]).Describe().Should().Be("Editando animacoes/a.json");
-        ((ClaudeToolUse)events[1]).Describe().Should().Be("Executando python validar.py a.json");
+        events.Should().Equal(new ClaudeText("Vou editar."),
+            new ClaudeToolUse("Edit", "animacoes/a.json", """{"file_path":"animacoes/a.json"}"""),
+            new ClaudeToolUse("Bash", "python validar.py a.json", """{"command":"python validar.py a.json"}"""));
+        ((ClaudeToolUse)events[1]).Describe().Should().Be("Editando animacoes/a.json");
+        ((ClaudeToolUse)events[2]).Describe().Should().Be("Executando python validar.py a.json");
+    }
+
+    [Fact]
+    public void TheToolsResultsComeBackAsUserMessages_ForTheLogOnly()
+    {
+        const string text = """
+            {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"Campanha 3 · turno 16\n\nSÓ MCP"}]}}
+            """;
+        const string array = """
+            {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","is_error":true,"content":[{"type":"text","text":"Traceback"},{"type":"text","text":"boom"}]}]}}
+            """;
+
+        StreamJsonReader.ReadLine(text).Should().Equal(new ClaudeToolResult("t1", "Campanha 3 · turno 16 SÓ MCP", false));
+        StreamJsonReader.ReadLine(array).Should().Equal(new ClaudeToolResult("t2", "Traceback boom", true));
+        StreamJsonReader.ReadLine("""{"type":"user","message":{"content":[{"type":"text","text":"oi"}]}}""").Should().BeEmpty();
     }
 
     [Fact]

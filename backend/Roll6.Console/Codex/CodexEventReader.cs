@@ -39,9 +39,13 @@ public static class CodexEventReader
                     break;
                 var kind = Text(item, "type");
                 if (type == "item.completed" && kind == "agent_message" && Text(item, "text") is { Length: > 0 } message)
+                {
                     yield return new ClaudeTextDelta(message.TrimEnd() + "\n\n");
+                    // 097: the whole message for the console's log.
+                    yield return new ClaudeText(message.TrimEnd());
+                }
                 else if (type == "item.started" && kind == "command_execution")
-                    yield return new ClaudeToolUse("Shell", Cut(Text(item, "command")));
+                    yield return new ClaudeToolUse("Shell", Cut(Text(item, "command")), Text(item, "command"));
                 break;
             case "turn.completed":
                 yield return new ClaudeFinished(false, null, Array.Empty<string>());

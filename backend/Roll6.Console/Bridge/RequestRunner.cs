@@ -77,13 +77,14 @@ public sealed class RequestRunner
         }
         try
         {
-            _log(run.ReadOnly
-                ? $"Pedido #{run.RequestId} (pergunta, somente leitura): rodando o Claude…"
-                : run.IsCodex
-                    ? $"Pedido #{run.RequestId}: rodando o Codex…"
-                    : $"Pedido #{run.RequestId}: rodando o Claude…");
+            Log(run, LogLines.Header(run));
             var outcome = await ExecuteAsync(run, cancellation.Token, afterRun ?? AfterRun);
-            _log($"Pedido #{run.RequestId} terminado.");
+            Log(run, outcome.Kind switch
+            {
+                RequestOutcomeInfo.STOPPED => $"Pedido #{run.RequestId} parado.",
+                RequestOutcomeInfo.FAILED => $"Pedido #{run.RequestId} falhou: {outcome.Message}",
+                _ => $"Pedido #{run.RequestId} terminado.",
+            });
             await _reporter.FinishedAsync(run.RequestId, outcome);
         }
         finally
@@ -97,6 +98,19 @@ public sealed class RequestRunner
         }
     }
 
+    /// <summary>097: every line of a request carries its id, and never the API key.</summary>
+    private void Log(RunInfo run, string text) => Line(run.RequestId, text);
+
+    private void Line(long? requestId, string text) => _log(LogLines.Redact(LogLines.Prefix(requestId, text)));
+
+    /// <summary>097: the campaign line in front of the prompt, when the request names one.</summary>
+    public static string PromptOf(RunInfo run) =>
+        run.Campaign is { } campaign ? LogLines.CampaignLine(campaign) + "\n\n" + run.Prompt : run.Prompt;
+
+    /// <summary>097: the campaign line at the end of the system prompt, when the request names one.</summary>
+    public static string SystemPromptOf(RunInfo run) =>
+        run.Campaign is { } campaign ? run.SystemPrompt.TrimEnd() + "\n" + LogLines.CampaignLine(campaign) : run.SystemPrompt;
+
     /// <summary>Kills the running request (its outcome comes back as Stopped); nothing for another id.</summary>
     public void Stop(long requestId)
     {
@@ -108,7 +122,7 @@ public sealed class RequestRunner
     }
 
     /// <summary>Files the server sends outside a request (<c>writeFiles</c>): written, nothing else.</summary>
-    public void WriteFiles(IEnumerable<FileWriteInfo> files, FileWatcher? watcher = null)
+    public void WriteFiles(IEnumerable<FileWriteInfo> files, FileWatcher? watcher = null, long? requestId = null)
     {
         foreach (var file in files)
         {
@@ -117,7 +131,7 @@ public sealed class RequestRunner
                 var full = FileWriter.Resolve(_settings.ClaudeWorkingDirectory, file.Path);
                 if (full == null)
                 {
-                    _log($"Ignorado (fora da pasta de trabalho): {file.Path}");
+                    Line(requestId, $"Ignorado (fora da pasta de trabalho): {file.Path}");
                     continue;
                 }
                 watcher?.Ignore(full, file.Content);
@@ -125,11 +139,11 @@ public sealed class RequestRunner
                     ? FileWriter.WriteBytes(_settings.ClaudeWorkingDirectory, file.Path, file.Content)
                     : FileWriter.Write(_settings.ClaudeWorkingDirectory, file.Path, file.Content);
                 if (written)
-                    _log($"Arquivo gravado: {file.Path}");
+                    Line(requestId, $"Arquivo gravado: {file.Path}");
             }
             catch (Exception ex) when (ex is IOException or FormatException)
             {
-                _log($"Falha ao gravar {file.Path}: {ex.Message}");
+                Line(requestId, $"Falha ao gravar {file.Path}: {ex.Message}");
             }
         }
     }
@@ -144,7 +158,7 @@ public sealed class RequestRunner
             run = new RunInfo
             {
                 RequestId = run.RequestId, SessionId = run.SessionId, Started = false, SystemPrompt = run.SystemPrompt,
-                Prompt = run.Prompt, Images = run.Images, ReadOnly = true,
+                Prompt = run.Prompt, Images = run.Images, ReadOnly = true, Campaign = run.Campaign,
             };
         if (run.Files.Any(f => FileWriter.Resolve(root, f.Path) == null) || run.Watch.Any(w => FileWriter.Resolve(root, w.TrimEnd('/', '\\')) == null))
             return new RequestOutcomeInfo { Kind = RequestOutcomeInfo.FAILED, Message = FileWriter.OUTSIDE };
@@ -153,7 +167,7 @@ public sealed class RequestRunner
         var reports = new List<Task>();
         watcher.FileSettled += (path, content) =>
         {
-            _log($"Arquivo alterado: {path}");
+            Log(run, $"Arquivo alterado: {path}");
             lock (reports)
                 reports.Add(_reporter.FileChangedAsync(run.RequestId, new FileChangedInfo
                 {
@@ -165,7 +179,7 @@ public sealed class RequestRunner
         };
         watcher.FileTooLarge += (path, length) =>
         {
-            _log($"Imagem grande demais: {path}");
+            Log(run, $"Imagem grande demais: {path}");
             lock (reports)
                 reports.Add(_reporter.ProgressAsync(run.RequestId, new ClaudeEventInfo
                 {
@@ -174,16 +188,36 @@ public sealed class RequestRunner
                 }));
         };
         // The files the server sent are written before the watcher starts, so their own write is never reported.
-        WriteFiles(run.Files, watcher);
+        WriteFiles(run.Files, watcher, run.RequestId);
         watcher.Start();
 
         var progress = new SyncProgress<ClaudeEvent>(claudeEvent =>
         {
+            // 097: the whole run on the screen — the server receives only what it received before (ToInfo).
+            switch (claudeEvent)
+            {
+                case ClaudeStarted started:
+                    Log(run, $"sessão {started.SessionId} ({(started.UsesAccount ? "conta" : "chave")})");
+                    break;
+                case CodexStarted codexStarted:
+                    Log(run, $"conversa do Codex {codexStarted.ThreadId}");
+                    break;
+                case ClaudeToolUse tool:
+                    Log(run, $"→ {tool.Tool} {tool.Input ?? tool.Target}".TrimEnd());
+                    break;
+                case ClaudeToolResult result:
+                    Log(run, (result.IsError ? "← ERRO: " : "← ") + result.Text);
+                    break;
+                case ClaudeText text:
+                    Log(run, $"{(run.IsCodex ? "Codex" : "Claude")}: {text.Text.Trim()}");
+                    break;
+                case ClaudeFinished { PermissionDenials.Count: > 0 } finished:
+                    Log(run, $"Ferramentas recusadas: {string.Join(", ", finished.PermissionDenials)}");
+                    break;
+            }
             var info = ToInfo(claudeEvent);
             if (info == null)
                 return;
-            if (claudeEvent is ClaudeToolUse tool)
-                _log($"  {tool.Describe()}");
             lock (reports)
                 reports.Add(_reporter.ProgressAsync(run.RequestId, info));
         });
@@ -201,12 +235,12 @@ public sealed class RequestRunner
                 }
                 catch (FormatException)
                 {
-                    _log($"Imagem inválida no pedido #{run.RequestId}; ignorada.");
+                    Log(run, "Imagem inválida; ignorada.");
                 }
             }
             images.AddRange(run.Files.Where(f => f.IsBase64).Select(f => FileWriter.Resolve(root, f.Path)!));
             var codexArguments = CodexRunner.Arguments(_settings, run.Resume, images);
-            var codexOutcome = await _codex.RunAsync(codexArguments, run.Prompt, progress, cancellation);
+            var codexOutcome = await _codex.RunAsync(codexArguments, PromptOf(run), progress, cancellation);
             return await AfterRunAsync(codexOutcome, reports, cancellation, afterRun);
         }
 
@@ -214,8 +248,8 @@ public sealed class RequestRunner
         await using var tools = run.Tools.Count > 0
             ? await _toolHosts.StartAsync(run.Tools, (call, ct) => CallToolAsync(run.RequestId, call, watcher, reports, ct), cancellation)
             : null;
-        var arguments = ClaudeRunner.Arguments(_settings, run.SessionId, run.Started, run.SystemPrompt, run.ReadOnly, tools);
-        var outcome = await _claude.RunAsync(arguments, PromptMessage.Build(run.Prompt, run.Images), progress, cancellation);
+        var arguments = ClaudeRunner.Arguments(_settings, run.SessionId, run.Started, SystemPromptOf(run), run.ReadOnly, tools);
+        var outcome = await _claude.RunAsync(arguments, PromptMessage.Build(PromptOf(run), run.Images), progress, cancellation);
         return await AfterRunAsync(outcome, reports, cancellation, afterRun);
     }
 
@@ -237,7 +271,7 @@ public sealed class RequestRunner
     /// </summary>
     private async Task<ToolResultInfo> CallToolAsync(long requestId, ToolCallInfo call, FileWatcher watcher, List<Task> reports, CancellationToken cancellation)
     {
-        _log($"Pedido #{requestId}: ferramenta {call.Name}…");
+        Line(requestId, $"ferramenta {call.Name}…");
         watcher.Flush();
         Task[] pending;
         lock (reports)
