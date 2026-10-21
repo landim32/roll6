@@ -762,10 +762,24 @@
     "act": "Agir",
     "actGroup": "Ação",
     "actOn": "Agir sobre…",
+    "repeated": "Ação repetida…",
+    "repeatedActive": "Ação repetida ativa",
     "resetTurn": "Resetar turno",
     "posture": "Postura",
     "editNpc": "Editar NPC",
     "removeNpc": "Retirar do mapa"
+  },
+  "repeated": {
+    "title": "Ação repetida — {{name}}",
+    "explain": "A ação repetida vale como a ação do personagem no início de cada turno, até você removê-la, declarar outra ação ou o mestre encerrá-la quando ela se cumprir. Se ele ainda não agiu neste turno, ela já vale agora. Para um melhor resultado, descreva bem: o que fazer, contra quem e até quando.",
+    "example": "Ex.: “Enquanto existirem inimigos vivos nesta sala, preparo o machado e ataco de forma repetida, sem ataque total, até não existir mais nenhum inimigo.”",
+    "label": "Ação repetida",
+    "placeholder": "O que o personagem faz a cada turno, e até quando…",
+    "save": "Salvar",
+    "remove": "Remover ação repetida",
+    "saved": "Ação repetida ativada.",
+    "savedNow": "Ação repetida ativada e já registrada neste turno.",
+    "removed": "Ação repetida removida."
   },
   "posture": {
     "label": "Postura",
@@ -1316,6 +1330,7 @@
     "speakAs": "Falar como {{name}}",
     "actionCancelled": "Ação cancelada",
     "actionTarget": "sobre {{target}}",
+    "repeated": "repetida",
     "cancelActionTitle": "Cancelar ação",
     "cancelActionMessage": "A ação fica no chat como \"Ação cancelada\" e deixa de contar no turno. Continuar?",
     "cancelAction": "Cancelar ação",

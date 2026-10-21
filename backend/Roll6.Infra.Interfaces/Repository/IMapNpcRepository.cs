@@ -7,6 +7,8 @@ public interface IMapNpcRepository<TModel> where TModel : class
     Task<List<TModel>> ListByIdsAsync(IEnumerable<long> ids);
     /// <summary>The active (not removed) instances on the map.</summary>
     Task<List<TModel>> ListByMapAsync(long mapId);
+    /// <summary>Active instances on the campaign's non-deleted maps with a repeated action (099).</summary>
+    Task<List<TModel>> ListRepeatingAsync(long campaignId);
     /// <summary>Active occurrences of the NPC on any map of the campaign.</summary>
     Task<List<long>> ListIdsByCampaignAndNpcAsync(long campaignId, long npcId);
     /// <summary>Active instances per NPC across the campaign's maps (051, "Retirar da campanha" tells how many leave).</summary>

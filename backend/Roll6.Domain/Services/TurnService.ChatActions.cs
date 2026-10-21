@@ -71,12 +71,18 @@ public partial class TurnService
             turn.ToAction(campaign.CurrentMapId);
             // 044/073: one valid action per character and turn, in any mode.
             var cancelled = await CancelValidActionsAsync(campaign, characterId, null, except: turn.TurnId);
+            // 099: declaring another action ends the character's repeated action.
+            var repeat = await RepeatToClearAsync(campaign, characterId, null);
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 foreach (var previous in cancelled)
                     await _repository.UpdateAsync(previous);
                 await _repository.UpdateAsync(turn);
+                if (repeat != null)
+                    await SaveRepeatHolderAsync(repeat);
             });
+            if (repeat != null)
+                await PublishRepeatChangedAsync(campaign.CampaignId, userId);
             foreach (var previous in cancelled)
                 await PublishUpdatedAsync(campaign, userId, previous);
             await PublishTurnChangedAsync(campaign.CampaignId, userId);

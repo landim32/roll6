@@ -17,6 +17,21 @@ public class TurnController : ApiControllerBase
     }
 
     /// <summary>"Agir": action of the piece's character (owner or master) or NPC occurrence (master).</summary>
+    /// <summary>"Ação repetida" (099): sets, replaces or (empty description) removes an actor's standing order.</summary>
+    [HttpPut("repeated-action")]
+    [ProducesResponseType(typeof(TurnRepeatResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetRepeated([FromBody] TurnRepeatInfo info)
+    {
+        try
+        {
+            return Ok(await _service.SetRepeatedAsync(CurrentUserId, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpPost("action")]
     [ProducesResponseType(typeof(TurnInfo), StatusCodes.Status201Created)]
     public async Task<IActionResult> Act([FromBody] TurnActInfo info)

@@ -369,6 +369,13 @@ public static class Roll6Guide
           the target moved or left. The chat, `get_turn_summary` and `get_turn_data.actions` end the line with
           "→ sobre …"; entries carry `target`. Resolve against the pointed piece (by `mapTokenId`/`mapNpcId`/
           `characterId`, not by name); a whispered action hides its target with its text.
+        - **"Ação repetida"** (099): `set_repeated_action` gives a character or NPC occurrence a standing order that is
+          recorded as its action at the start of every turn (`repeated: "turnStart"`) — and right away when it has not
+          acted yet (`"declared"`). It stops when removed (empty description), when the actor declares another action, or
+          when whoever processes the turn sends `clearRepeatedAction: true` in `process_turn` because its goal was met
+          ("until the orc dies" and the orc died). `get_turn_data` shows each actor's `repeatedAction`; the summary
+          marks "(ação repetida)". Automatic actions count as acted, but the GM mode only runs a turn with at least one
+          declared action, so a fight never runs by itself.
         - `reset_turn` deletes a piece's entries of the current turn and moves it back if the former hex is free.
         - Every entry records who made it (`userId`/`userName`); moves record the movement points spent (`moved`); any
           change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the

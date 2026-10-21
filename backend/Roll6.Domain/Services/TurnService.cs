@@ -217,11 +217,17 @@ public partial class TurnService : ITurnService
         // 044: one valid action per actor and turn — the previous one stays in the chat as "Ação cancelada". Since 073
         // also in free mode (054 used to keep every action there).
         var cancelled = await CancelValidActionsAsync(campaign, actor.CharacterId, actor.CharacterId.HasValue ? null : actor.MapNpcId);
+        // 099: declaring another action ends the actor's repeated action.
+        var repeat = await RepeatToClearAsync(campaign, actor.CharacterId, actor.CharacterId.HasValue ? null : actor.MapNpcId);
         var saved = await SaveEntryAsync(turn, whisper, async () =>
         {
             foreach (var previous in cancelled)
                 await _repository.UpdateAsync(previous);
+            if (repeat != null)
+                await SaveRepeatHolderAsync(repeat);
         });
+        if (repeat != null)
+            await PublishRepeatChangedAsync(campaign.CampaignId, userId);
         var result = (await MapToDtoAsync(new List<Turn> { saved }, await LoadWhispersAsync(new[] { saved }))).Single();
         foreach (var previous in cancelled)
             await PublishUpdatedAsync(campaign, userId, previous);
@@ -309,9 +315,13 @@ public partial class TurnService : ITurnService
         campaign.AdvanceTurn();
         // The chat shows where the turn ended (041).
         var divider = Turn.TurnFinished(campaignId, campaign.CurrentMapId, finished, userId);
+        // 099: every active repeated action is the actor's action of the new turn.
+        var repeated = await RepeatedActionsAsync(campaign, userId);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _repository.InsertAsync(divider);
+            foreach (var action in repeated)
+                await _repository.InsertAsync(action);
             await _campaignRepository.UpdateAsync(campaign);
         });
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
@@ -492,6 +502,14 @@ public partial class TurnService : ITurnService
         return TurnTarget.Piece(info.X, info.Y, distance, piece.MapTokenId, kind, TurnTarget.SIDE_OBJECT, piece.Name, look: piece.Look);
     }
 
+    /// <summary>"declared" / "turnStart" for an action from a repeated action (099); null otherwise.</summary>
+    private static string? RepeatKind(RepeatSource? repeated) => repeated switch
+    {
+        RepeatSource.Declared => "declared",
+        RepeatSource.TurnStart => "turnStart",
+        _ => null
+    };
+
     /// <summary>The target snapshot as read (098); null when there is none.</summary>
     private static TurnTargetInfo? ToTargetInfo(TurnTarget? target) => target == null ? null : new TurnTargetInfo
     {
@@ -598,6 +616,7 @@ public partial class TurnService : ITurnService
             Moved = t.Moved,
             Changes = t.Changes?.Select(c => new TurnChangeInfo { Field = c.Field, Before = c.Before, After = c.After }).ToList(),
             Target = ToTargetInfo(t.Target),
+            Repeated = RepeatKind(t.Repeated),
             CreatedAt = t.CreatedAt
         }).ToList();
     }

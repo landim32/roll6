@@ -28,6 +28,13 @@ public static class GmTurn
     public static bool Complete(IReadOnlyCollection<long> approvedCharacterIds, IReadOnlySet<long> actedCharacterIds) =>
         approvedCharacterIds.Count > 0 && approvedCharacterIds.All(actedCharacterIds.Contains);
 
+    /// <summary>
+    /// 099 (Q1 = B): the GM runs only for a complete turn in which somebody declared something — a turn made only of the
+    /// actions repeated automatically at its start waits for a player or the master, so the fight never runs by itself.
+    /// </summary>
+    public static bool Complete(IReadOnlyCollection<long> approvedCharacterIds, IReadOnlySet<long> actedCharacterIds, bool anyDeclared) =>
+        anyDeclared && Complete(approvedCharacterIds, actedCharacterIds);
+
     public static string Started(int turnNo) => $"O GM começou a processar o turno {turnNo}.";
 
     public static string Stopped() => "O GM foi interrompido.";

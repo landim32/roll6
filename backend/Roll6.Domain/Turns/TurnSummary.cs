@@ -28,6 +28,9 @@ public sealed record SummaryLine
 
     /// <summary>What an action is about (098); null without a target or when masked for the reader.</summary>
     public TurnTarget? Target { get; init; }
+
+    /// <summary>An action from a repeated action (099).</summary>
+    public RepeatSource? Repeated { get; init; }
 }
 
 /// <summary>Where a character/NPC piece is (column/row, odd-q) and where it looks.</summary>
@@ -93,7 +96,8 @@ public static class TurnSummary
             TurnType.Movement => $"{actor}: {Movement(line)}",
             // 098: "→ sobre …" names the hex or the piece the action is about, as it was when declared.
             TurnType.Action => $"{actor}: \"{Escape(line.Description)}\""
-                + (line.Target == null ? string.Empty : $" → sobre {Escape(line.Target.Describe())}"),
+                + (line.Target == null ? string.Empty : $" → sobre {Escape(line.Target.Describe())}")
+                + (line.Repeated == null ? string.Empty : " (ação repetida)"),
             TurnType.ActionResult => $"{author ?? actor}: Resultado para {actor}: {Escape(line.Description)}",
             TurnType.Narration => Narration(author, line.Description),
             TurnType.CharacterUpdate => author == null

@@ -40,6 +40,14 @@ public class CampaignCharacterRepository : ICampaignCharacterRepository<Campaign
         return await query.OrderBy(e => e.Status).ThenBy(e => e.CampaignCharacterId).ToListAsync();
     }
 
+    public async Task<List<CampaignCharacter>> ListRepeatingAsync(long campaignId)
+    {
+        return await _context.CampaignCharacters.AsNoTracking()
+            .Where(e => e.CampaignId == campaignId && e.Status == CampaignCharacterStatus.Approved && e.RepeatedAction != null)
+            .OrderBy(e => e.CampaignCharacterId)
+            .ToListAsync();
+    }
+
     public async Task<List<CampaignCharacter>> ListInvitesByUserAsync(long userId)
     {
         return await _context.CampaignCharacters.AsNoTracking()

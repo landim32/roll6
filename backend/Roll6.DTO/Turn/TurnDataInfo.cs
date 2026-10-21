@@ -73,6 +73,10 @@ public class TurnDataCharacterInfo
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 
+    /// <summary>The actor's repeated action (099, "Ação repetida"): its standing order applied at every turn start; null = none.</summary>
+    [JsonPropertyName("repeatedAction")]
+    public string? RepeatedAction { get; set; }
+
     /// <summary>1 standing ("Em pé"), 2 down ("Caído"), 3 out of combat ("Fora de combate") (031).</summary>
     [JsonPropertyName("posture")]
     public int Posture { get; set; } = 1;
@@ -125,6 +129,10 @@ public class TurnDataNpcInfo
 
     [JsonPropertyName("status")]
     public string? Status { get; set; }
+
+    /// <summary>The actor's repeated action (099, "Ação repetida"): its standing order applied at every turn start; null = none.</summary>
+    [JsonPropertyName("repeatedAction")]
+    public string? RepeatedAction { get; set; }
 
     /// <summary>1 standing ("Em pé"), 2 down ("Caído"), 3 out of combat ("Fora de combate") (031).</summary>
     [JsonPropertyName("posture")]

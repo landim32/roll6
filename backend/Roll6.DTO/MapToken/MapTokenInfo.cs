@@ -101,6 +101,10 @@ public class MapTokenInfo
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 
+    /// <summary>The actor's repeated action (099, "Ação repetida"): its standing order applied at every turn start; null = none.</summary>
+    [JsonPropertyName("repeatedAction")]
+    public string? RepeatedAction { get; set; }
+
     [JsonPropertyName("move")]
     public int Move { get; set; }
 

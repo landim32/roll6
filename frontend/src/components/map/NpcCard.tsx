@@ -9,7 +9,7 @@ import { NPC_DRAG_TYPE } from '../../lib/mapTokens';
 import type { MapTokenInfo } from '../../types/mapToken';
 import { NPC_CATEGORY } from '../../types/npc';
 import type { CampaignNpcInfo } from '../../types/npc';
-import { PencilIcon, XIcon } from '../ui/icons';
+import { ArrowRepeatIcon, PencilIcon, XIcon } from '../ui/icons';
 import { PostureBadge } from '../ui/PostureBadge';
 import { POSTURE } from '../../types/mapToken';
 
@@ -79,6 +79,10 @@ export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstan
                   {turnNo !== null && <TurnStatusDot status={occurrenceStatus(entries, piece.mapNpcId!)} />}
                   <span className="text-truncate">{piece.name}</span>
                   <PostureBadge posture={piece.posture} />
+                  {piece.repeatedAction && (
+                    <span className="stm-repeat-mark" title={`${t('hexMenu.repeatedActive')}: ${piece.repeatedAction}`}
+                      aria-label={t('hexMenu.repeatedActive')}><ArrowRepeatIcon size={12} /></span>
+                  )}
                   {onEditInstance && (
                     <button type="button" className="btn btn-link btn-sm p-0 ms-auto" aria-label={t('npcs.editInstance', { name: piece.name })}
                       title={t('npcs.editInstance', { name: piece.name })} onClick={() => onEditInstance(piece)}>

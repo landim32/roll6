@@ -12,7 +12,9 @@ public static class TurnTools
     private const string ENTRY = """
         Returns: the entry { turnId, campaignId, mapId, turnNo, turnType (1 Movement, 2 Action, 3 ActionResult,
         4 CharacterUpdate, 5 Narration), characterId, npcId, mapNpcId, actorName, userId, userName, beforeX, beforeY,
-        beforeLook, x, y, look, moved, description, changes, target, createdAt }. target (098, actions declared with
+        beforeLook, x, y, look, moved, description, changes, target, repeated, createdAt }. repeated (099) = "declared"
+        (an action recorded when its repeated action was set) or "turnStart" (applied automatically when the turn
+        started), null otherwise. target (098, actions declared with
         "Agir sobre…") = { x, y, distance (hexes from the actor's piece), mapTokenId | null (empty hex), kind
         character|npc|object, kindLabel, side self|ally|enemy|neutral|object, sideLabel, name, characterId, mapNpcId,
         look, lookName, posture, postureLabel, status, currentLife, totalLife, currentEnergy, totalEnergy, text } — a
@@ -68,6 +70,34 @@ public static class TurnTools
                 Target = targetX is int tx && targetY is int ty ? new TurnTargetInsertInfo { X = tx, Y = ty, MapTokenId = targetMapTokenId } : null
             });
 
+    [McpServerTool(Name = "set_repeated_action", Title = "Set repeated action", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/turn/repeated-action")]
+    [Description("""
+        What it does: "Ação repetida" (099) — sets, replaces or removes the standing order of a character or NPC
+        occurrence. While active it is recorded as the actor's action at the start of every turn (repeated:
+        "turnStart"), until it is removed (empty description), the actor declares another action (act_in_turn or a
+        message converted into an action) or whoever processes the turn sends clearRepeatedAction in process_turn. When
+        set while the actor has no valid action in the current turn, it is recorded right away (repeated: "declared",
+        notices and the GM check like act_in_turn). Describe it well: what to do, against whom and until when — e.g.
+        "While there are enemies alive in this room, ready the axe and attack, no all-out attack, until none is left".
+        Automatic turn-start actions count as acted for the pending list, but the GM mode only runs a turn in which at
+        least one action was declared.
+        Who can use it: like act_in_turn — a player for his own approved character (piece or campaignId + characterId)
+        or an ally NPC he commands; the master for any character or NPC piece.
+        Returns: { active, description, applied } (applied = the entry recorded now, or null).
+        Common errors: 400 description over 2000 characters or neither/both ways of naming the actor (key mapTokenId),
+        403 not your piece or character, 404 not found, 409 campaign not active (setting only; removing always works).
+        Related tools: act_in_turn, process_turn (clearRepeatedAction), get_turn_data (repeatedAction).
+        """)]
+    public static Task<CallToolResult> SetRepeatedAction(
+        Roll6ApiClient api,
+        [Description("The standing order (up to 2000 characters); empty or omitted removes the repeated action.")] string? description = null,
+        [Description(McpDocs.MAP_TOKEN_ID + " A character or NPC piece. Omit it to name a character by campaignId + characterId.")] long? mapTokenId = null,
+        [Description("For a character without a piece: the campaign (together with characterId).")] long? campaignId = null,
+        [Description("For a character without a piece: the character approved in that campaign (together with campaignId).")] long? characterId = null) =>
+        api.SendAsync(HttpMethod.Put, "/api/turn/repeated-action",
+            new TurnRepeatInfo { MapTokenId = mapTokenId, CampaignId = campaignId, CharacterId = characterId, Description = description });
+
     [McpServerTool(Name = "get_turn_summary", Title = "Get turn summary", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/turn/summary")]
     [Description("""
@@ -97,7 +127,9 @@ public static class TurnTools
         current/total life and energy, status, x/y/look/lookName) and "actions": the "## Ações" markdown of the turn (moves,
         actions, results, changes, narration, with who made them; an action declared with "Agir sobre…" ends with
         "→ sobre <the piece or the hex, with its distance and data at declaration time>" — resolve it against that piece, by
-        identity, not by name; the structured target is on the entries of get_turn_state / list_turn_entries).
+        identity, not by name; the structured target is on the entries of get_turn_state / list_turn_entries). Each
+        character and NPC carries repeatedAction (099): its standing order, applied as its action at every turn start
+        ("(ação repetida)" in the actions); when its goal is met send clearRepeatedAction: true in process_turn.
         Who can use it: the campaign master or a player with an approved character in the campaign.
         Returns: { campaignId, turnNo, currentTurn, mapId, characters[], npcs[], actions }. Without turnNo it is the turn in
         progress (values are always the current ones).
@@ -130,8 +162,8 @@ public static class TurnTools
     public static Task<CallToolResult> ProcessTurn(
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
-        [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, posture?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessCharacterInfo>? characters = null,
-        [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, posture?, x?, y?, look? }]; omit unchanged fields.")] List<TurnProcessNpcInfo>? npcs = null,
+        [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, clearRepeatedAction?, posture?, x?, y?, look? }]; omit unchanged fields. clearRepeatedAction: true removes the character's repeated action (099) when its goal was met, so the next turn does not apply it.")] List<TurnProcessCharacterInfo>? characters = null,
+        [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, clearRepeatedAction?, posture?, x?, y?, look? }]; omit unchanged fields. clearRepeatedAction: true removes the instance's repeated action (099).")] List<TurnProcessNpcInfo>? npcs = null,
         [Description("What happened in the turn, in plain text or markdown (up to 10000 characters); stays in the turn log.")] string? narration = null) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/process", new TurnProcessInfo
         {

@@ -35,6 +35,10 @@ public abstract class TurnProcessPieceInfo
     [JsonPropertyName("clearStatus")]
     public bool ClearStatus { get; set; }
 
+    /// <summary>099: the actor's repeated action is fulfilled — remove it so the next turn does not apply it.</summary>
+    [JsonPropertyName("clearRepeatedAction")]
+    public bool ClearRepeatedAction { get; set; }
+
     /// <summary>New column (together with y).</summary>
     [JsonPropertyName("x")]
     public int? X { get; set; }

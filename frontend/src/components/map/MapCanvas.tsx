@@ -15,6 +15,8 @@ import { useTokenMovement } from '../../hooks/useTokenMovement';
 import { useTurn } from '../../hooks/useTurn';
 import { hexCenter, isInsideGrid, lookToward } from '../../lib/hexGrid';
 import { pickTarget } from '../../lib/actionTarget';
+import { repeatedActionOf } from '../../lib/repeatedAction';
+import type { RepeatedTarget } from '../modals/RepeatedActionModal';
 import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewHexes, previewOf } from '../../lib/movement';
 import { hasEntries, hasMoved, lastActions, movementTrails } from '../../lib/turnStatus';
 import { commandsNpc } from '../../lib/npcCategory';
@@ -52,6 +54,8 @@ interface MapCanvasProps {
   onEditNpc: (piece: MapTokenInfo) => void;
   /** "Agir" on a piece (the page opens the action modal, 016). */
   onAct: (target: ActTarget) => void;
+  /** "Ação repetida…" on a piece (099): the page opens the repeated-action window. */
+  onRepeated: (target: RepeatedTarget) => void;
   /** "Resetar turno" on a piece (the page confirms first, 016). */
   onResetTurn: (target: { mapTokenId: number; name: string }) => void;
   /** A modal opened from the hex menu (tokens or delete confirmation) is still open: the hex stays selected. */
@@ -71,7 +75,7 @@ const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y ==
  * The hex under the mouse is highlighted; the master clicks a hex for its menu and drops party cards
  * on hexes (011).
  */
-export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onResetTurn, picking = false }: MapCanvasProps) => {
+export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRepeated, onResetTurn, picking = false }: MapCanvasProps) => {
   const { t } = useTranslation();
   const { draft, hexSize, view, panBy, zoomIn, zoomOut, centerOn, resizeMode, canEdit, setImageLayout } = useMapEditor();
   const { mapTokens, canPlace, canPlaceOwn, placeCharacter, moveToken, setPosture } = useMapToken();
@@ -472,6 +476,12 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
             ? () => startTargeting({
               mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
             }) : undefined}
+          onRepeated={menuToken && canTakeTurn(menuToken)
+            ? () => onRepeated({
+              mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
+              current: repeatedActionOf(menuToken),
+            }) : undefined}
+          repeatedActive={repeatedActionOf(menuToken) !== null}
           onResetTurn={menuToken && canTakeTurn(menuToken) && hasEntries(turnEntries, menuToken)
             ? () => onResetTurn({ mapTokenId: menuToken.mapTokenId, name: menuToken.name }) : undefined}
           posture={menuToken?.posture ?? null}

@@ -48,6 +48,37 @@ public class CampaignCharacter
 
     /// <summary>Standing, down or out of combat in this campaign (031); every piece of the character shows it.</summary>
     public Posture Posture { get; set; } = Posture.Standing;
+
+    /// <summary>
+    /// The standing order of this actor (099, "Ação repetida"): applied as its action at the start of every turn until it
+    /// is removed, replaced by another action or cleared by whoever processes the turn. Null = none.
+    /// </summary>
+    public string? RepeatedAction { get; set; }
+
+    /// <summary>Who set <see cref="RepeatedAction"/> (the author of the actions it applies).</summary>
+    public long? RepeatedActionUserId { get; set; }
+
+    /// <summary>Sets the repeated action (099); false when it is already this text by the same user.</summary>
+    public bool SetRepeatedAction(string? text, long userId)
+    {
+        var value = Guard.RequiredText(text, "description", Turn.MAX_DESCRIPTION);
+        if (RepeatedAction == value && RepeatedActionUserId == userId)
+            return false;
+        RepeatedAction = value;
+        RepeatedActionUserId = userId;
+        return true;
+    }
+
+    /// <summary>Removes the repeated action (099); false when there was none.</summary>
+    public bool ClearRepeatedAction()
+    {
+        if (RepeatedAction == null)
+            return false;
+        RepeatedAction = null;
+        RepeatedActionUserId = null;
+        return true;
+    }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

@@ -37,6 +37,8 @@ export interface CampaignCharacterInfo {
   currentMove: number;
   /** Free-text condition of the character in this campaign (not the participation `status`). */
   characterStatus: string | null;
+  /** The character's repeated action in this campaign (099); null = none. */
+  repeatedAction?: string | null;
   /** Standing, down or out of combat in this campaign (031). */
   posture: Posture;
   /** The character's token; without one, placing it on the map asks for a token. */

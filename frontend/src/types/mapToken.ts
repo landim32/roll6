@@ -75,6 +75,8 @@ export interface MapTokenInfo {
   look: number;
   /** NPC pieces (071): Inimigo 1, Neutro 2, Aliado 3 in the campaign; null for characters and objects. */
   npcCategory?: number | null;
+  /** The actor's repeated action (099): the participation's for characters, the instance's for NPCs. */
+  repeatedAction?: string | null;
   /** NPC pieces (071): the player commanding this ally (owner of its approved master character); null when none. */
   commanderUserId?: number | null;
   /**

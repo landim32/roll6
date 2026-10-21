@@ -307,6 +307,7 @@ public class CampaignCharacterService : ICampaignCharacterService
             CharacterMove = info.CharacterMove,
             CurrentMove = info.CurrentMove,
             CharacterStatus = info.CharacterStatus,
+            RepeatedAction = info.RepeatedAction,
             Posture = info.Posture,
             CharacterTokenId = info.CharacterTokenId,
             CreatedAt = info.CreatedAt,
@@ -387,6 +388,7 @@ public class CampaignCharacterService : ICampaignCharacterService
                 CharacterMove = character?.Move ?? 0,
                 CurrentMove = p.CurrentMove,
                 CharacterStatus = p.CharacterStatus,
+                RepeatedAction = p.RepeatedAction, // 099
                 Posture = (int)p.Posture,
                 CharacterTokenId = character?.TokenId,
                 CreatedAt = p.CreatedAt,

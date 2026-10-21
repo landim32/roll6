@@ -28,7 +28,10 @@ public partial class TurnService : IGmService
         if (!_gm.IsAgentConnected(campaign.UserId))
             return;
         var (approved, acted) = await ActedAsync(campaign);
-        if (!GmTurn.Complete(approved, acted))
+        // 099 (Q1 = B): actions repeated automatically at the turn start alone never hand the turn to the GM.
+        var anyDeclared = (await _repository.ListByCampaignTurnAsync(campaign.CampaignId, campaign.CurrentTurn))
+            .Any(e => e.TurnType == TurnType.Action && e.Repeated != RepeatSource.TurnStart);
+        if (!GmTurn.Complete(approved, acted, anyDeclared))
             return;
         await _gm.EnqueueAsync(new GmJob(campaign.CampaignId, campaign.CurrentTurn, campaign.UserId, campaign.Name));
     }

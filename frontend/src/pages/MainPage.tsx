@@ -11,6 +11,8 @@ import type { MapTokenInfo } from '../types/mapToken';
 import { PartyPanel } from '../components/map/PartyPanel';
 import { TopMenu } from '../components/menu/TopMenu';
 import { ActModal } from '../components/modals/ActModal';
+import { RepeatedActionModal } from '../components/modals/RepeatedActionModal';
+import type { RepeatedTarget } from '../components/modals/RepeatedActionModal';
 import { CampaignCharacterModal } from '../components/modals/CampaignCharacterModal';
 import { GridSizeModal } from '../components/modals/GridSizeModal';
 import { ImageModal } from '../components/modals/ImageModal';
@@ -77,6 +79,8 @@ export const MainPage = () => {
   const [editingInstance, setEditingInstance] = useState<MapTokenInfo | null>(null);
   /** Piece acting ("Agir") and piece waiting for the "Resetar turno" confirmation (016). */
   const [acting, setActing] = useState<ActTarget | null>(null);
+  /** Piece whose repeated action is open (099). */
+  const [repeating, setRepeating] = useState<RepeatedTarget | null>(null);
   const [toReset, setToReset] = useState<{ mapTokenId: number; name: string } | null>(null);
   const { reset: resetTurn } = useTurn();
   const { addToken, changeToken, placeCharacter, deleteToken } = useMapToken();
@@ -170,8 +174,9 @@ export const MainPage = () => {
               onDeleteToken={setToDelete}
               onEditNpc={setEditingInstance}
               onAct={setActing}
+              onRepeated={setRepeating}
               onResetTurn={setToReset}
-              picking={tokenPick !== null || toDelete !== null || acting !== null}
+              picking={tokenPick !== null || toDelete !== null || acting !== null || repeating !== null}
             />
           )}
           <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })}
@@ -223,6 +228,7 @@ export const MainPage = () => {
         danger
       />
       <ActModal open={acting !== null} piece={acting} onClose={() => setActing(null)} />
+      <RepeatedActionModal piece={repeating} onClose={() => setRepeating(null)} />
       <ConfirmModal
         open={toReset !== null}
         onOpenChange={(o) => { if (!o) setToReset(null); }}
