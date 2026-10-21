@@ -85,7 +85,8 @@ public partial class TurnService
                 MovedTotal = spent.GetValueOrDefault(key),
                 Description = e.Description,
                 Changes = e.Changes,
-                Target = e.Target
+                Target = e.Target,
+                Repeated = e.Repeated
             });
         }
         return lines;
@@ -148,6 +149,7 @@ public partial class TurnService
                         CurrentMove = p.CurrentMove,
                         Move = character.Move,
                         Status = p.CharacterStatus,
+                        RepeatedAction = p.RepeatedAction,
                         Posture = (int)p.Posture,
                         MapTokenId = piece?.MapTokenId,
                         X = piece?.X,
@@ -174,6 +176,7 @@ public partial class TurnService
                         CurrentEnergy = o.CurrentEnergy,
                         TotalEnergy = npc?.Energy ?? o.CurrentEnergy,
                         Status = o.Status,
+                        RepeatedAction = o.RepeatedAction,
                         Posture = (int)o.Posture,
                         X = piece?.X,
                         Y = piece?.Y,
@@ -244,6 +247,9 @@ public partial class TurnService
         var moved = new List<PieceChange>();
         var updatedParticipations = new List<CampaignCharacter>();
         var updatedOccurrences = new List<MapNpc>();
+        // 099: repeated actions the batch declares fulfilled — not applied to the next turn.
+        var clearedParticipations = new HashSet<long>();
+        var clearedInstances = new HashSet<long>();
 
         (int X, int Y, int Look)? Target(string prefix, TurnProcessPieceInfo item, MapToken? piece)
         {
@@ -332,6 +338,12 @@ public partial class TurnService
                 updatedParticipations.Add(participation);
                 turns.Add(Turn.CharacterUpdate(campaignId, mapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes));
             }
+            if (item.ClearRepeatedAction && participation.ClearRepeatedAction())
+            {
+                if (!updatedParticipations.Contains(participation))
+                    updatedParticipations.Add(participation);
+                clearedParticipations.Add(participation.CampaignCharacterId);
+            }
             if (target != null && piece != null && target != (piece.X, piece.Y, piece.Look))
                 moved.Add(new PieceChange { Key = $"{prefix}.x", Piece = piece, Target = target });
         }
@@ -373,6 +385,12 @@ public partial class TurnService
                 occurrence.ChangePosture((int)posture);
                 updatedOccurrences.Add(occurrence);
                 turns.Add(Turn.CharacterUpdate(campaignId, mapId, null, occurrence.NpcId, occurrence.MapNpcId, campaign.CurrentTurn, userId, changes));
+            }
+            if (item.ClearRepeatedAction && occurrence.ClearRepeatedAction())
+            {
+                if (!updatedOccurrences.Contains(occurrence))
+                    updatedOccurrences.Add(occurrence);
+                clearedInstances.Add(occurrence.MapNpcId);
             }
             if (target != null && piece != null && target != (piece.X, piece.Y, piece.Look))
                 moved.Add(new PieceChange { Key = $"{prefix}.x", Piece = piece, Target = target });
@@ -426,6 +444,8 @@ public partial class TurnService
         campaign.AdvanceTurn();
         // The chat shows where the turn ended, after its narration (041).
         turns.Add(Turn.TurnFinished(campaignId, mapId, finished, userId));
+        // 099: the repetitions still active start the new turn (the ones cleared above do not).
+        turns.AddRange(await RepeatedActionsAsync(campaign, userId, clearedParticipations, clearedInstances));
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             foreach (var participation in updatedParticipations)

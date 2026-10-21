@@ -67,6 +67,17 @@ export interface ActionTargetWrite {
   mapTokenId?: number | null;
 }
 
+/** How an action came from a repeated action (099). */
+export type RepeatKind = 'declared' | 'turnStart';
+
+/** The repeated action after a change (099). */
+export interface TurnRepeatResultInfo {
+  active: boolean;
+  description: string | null;
+  /** Recorded right away because the actor had not acted in the turn. */
+  applied: TurnInfo | null;
+}
+
 /** One entry of a campaign turn: a move (before/after), an action, an action result or a character change. */
 export interface TurnInfo {
   turnId: number;
@@ -101,6 +112,8 @@ export interface TurnInfo {
   whisperHidden?: boolean;
   /** What the action is about (098); null without a target or on a masked whispered action. */
   target?: TurnTargetInfo | null;
+  /** An action from a repeated action (099): set right away, or applied at the turn start. */
+  repeated?: RepeatKind | null;
 }
 
 /** Current turn of a campaign with its entries (chronological). */

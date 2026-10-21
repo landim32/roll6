@@ -27,6 +27,9 @@ public class TurnSummaryTests
         TurnSummary.Line(onHex).Should().Be("Cedric (José): \"Corro\" → sobre o hex (12, 4), a 5 hexes");
 
         TurnSummary.Line(Line(TurnType.Action, "Cedric (José)") with { Description = "Defendo" }).Should().Be("Cedric (José): \"Defendo\"");
+        // 099: an action from a repeated action says so.
+        TurnSummary.Line(Line(TurnType.Action, "Cedric (José)") with { Description = "Ataco", Repeated = RepeatSource.TurnStart })
+            .Should().Be("Cedric (José): \"Ataco\" (ação repetida)");
     }
 
     [Fact]

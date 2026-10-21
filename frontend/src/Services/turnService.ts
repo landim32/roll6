@@ -1,5 +1,7 @@
 import type { WhisperPayload } from '../lib/whisper';
-import type { ActionTargetWrite, TurnFinishResultInfo, TurnInfo, TurnNarrationInfo, TurnResetResultInfo, TurnStateInfo } from '../types/turn';
+import type {
+  ActionTargetWrite, TurnFinishResultInfo, TurnInfo, TurnNarrationInfo, TurnRepeatResultInfo, TurnResetResultInfo, TurnStateInfo,
+} from '../types/turn';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 import type { ActionTarget } from '../lib/chatComposer';
 
@@ -48,6 +50,14 @@ class TurnService {
       body: JSON.stringify({ ...target, description, replyToTurnId, ...whisper, ...(actionTarget ? { target: actionTarget } : {}) }),
     });
     return this.handleResponse<TurnInfo>(response);
+  }
+
+  /** "Ação repetida" (099): sets, replaces or (null/empty) removes the actor's standing order. */
+  async setRepeated(target: ActionTarget, description: string | null): Promise<TurnRepeatResultInfo> {
+    const response = await fetch(`${API_URL}/api/turn/repeated-action`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify({ ...target, description }),
+    });
+    return this.handleResponse<TurnRepeatResultInfo>(response);
   }
 
   /** Deletes the piece's entries of the current turn and undoes its move. */

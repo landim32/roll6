@@ -20,7 +20,8 @@ public static class ChatTools
         ask {state waiting|answered|failed} (questions), editedAt (answers), target (actions, 098: what the action is
         about — { x, y, distance, mapTokenId|null, kind, kindLabel, side self|ally|enemy|neutral|object, sideLabel, name,
         characterId, mapNpcId, look, lookName, posture, postureLabel, status, currentLife, totalLife, currentEnergy,
-        totalEnergy, text }, a snapshot taken when declared; null without one or on a masked whispered action) }.
+        totalEnergy, text }, a snapshot taken when declared; null without one or on a masked whispered action), repeated
+        (actions, 099: "declared" | "turnStart" when it came from a repeated action) }.
         kind question / answer (093): a question to the master's local Claude and its answer (displayName "Claude do
         mestre", replyTo = the question); a private one has whisper set (only its author and the master see it).
         kind is text | image | audio | roll | poll (what people said, rolled or asked; a roll has dice = the three faces

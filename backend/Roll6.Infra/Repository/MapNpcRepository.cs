@@ -33,6 +33,15 @@ public class MapNpcRepository : IMapNpcRepository<MapNpc>
             .ToListAsync();
     }
 
+    public async Task<List<MapNpc>> ListRepeatingAsync(long campaignId)
+    {
+        return await _context.MapNpcs.AsNoTracking()
+            .Where(e => e.RemovedAt == null && e.RepeatedAction != null
+                && _context.Maps.Any(m => m.MapId == e.MapId && m.CampaignId == campaignId && m.Status != Roll6.Domain.Enums.MapStatus.Deleted))
+            .OrderBy(e => e.MapNpcId)
+            .ToListAsync();
+    }
+
     public async Task<List<long>> ListIdsByCampaignAndNpcAsync(long campaignId, long npcId)
     {
         return await _context.MapNpcs

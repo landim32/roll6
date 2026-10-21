@@ -59,6 +59,9 @@ public class Turn
     /// </summary>
     public TurnTarget? Target { get; set; }
 
+    /// <summary>An action that came from a repeated action (099): declared when set, or applied at a turn start.</summary>
+    public RepeatSource? Repeated { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     private DateTime? _pollChatAt;
@@ -423,6 +426,7 @@ public class Turn
         DisplayName = Guard.RequiredText(displayName, "displayName", 260);
         DisplayImage = displayImage;
         Target = null; // 098: a message is about nobody
+        Repeated = null; // 099: nor does it repeat
     }
 
     /// <summary>Who may delete it from the chat: the author their own message; the master any message and narrations.</summary>
@@ -499,13 +503,19 @@ public class Turn
     /// now; only a piece on a map declares one, so <paramref name="mapId"/> is required with a target.
     /// </summary>
     public static Turn Action(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,
-        long userId, string? description, TurnTarget? target)
+        long userId, string? description, TurnTarget? target) =>
+        Action(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, userId, description, target, null);
+
+    /// <summary>An action, optionally from a repeated action (099).</summary>
+    public static Turn Action(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,
+        long userId, string? description, TurnTarget? target, RepeatSource? repeated)
     {
         if (target != null && mapId == null)
             throw new DomainValidationException("target", "A ação sobre um hex precisa de uma peça no mapa.");
         var turn = Create(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, userId, TurnType.Action);
         turn.Description = RequiredText(description);
         turn.Target = target;
+        turn.Repeated = repeated;
         return turn;
     }
 

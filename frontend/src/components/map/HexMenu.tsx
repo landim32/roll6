@@ -1,7 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
-import { CheckIcon, CrosshairIcon, MoveIcon, PencilIcon, PlusIcon, SpeechIcon, SwapIcon, TrashIcon, UndoIcon } from '../ui/icons';
+import {
+  ArrowRepeatIcon, CrosshairIcon, HeartbreakIcon, MoveIcon, PencilIcon, PersonFillDownIcon, PersonStandingIcon, PlusIcon, SpeechIcon,
+  SwapIcon, TrashIcon, UndoIcon,
+} from '../ui/icons';
+import type { IconProps } from '../ui/icons';
 import { POSTURES } from '../../types/mapToken';
 import type { Posture } from '../../types/mapToken';
 
@@ -21,6 +26,10 @@ interface HexMenuProps {
   onAct?: () => void;
   /** "Agir sobre…" (098): like "Agir", after picking the hex the action is about; same availability. */
   onActOn?: () => void;
+  /** "Ação repetida…" (099): the actor's standing order; same availability as "Agir". */
+  onRepeated?: () => void;
+  /** The actor has an active repeated action (099): the item shows a marker. */
+  repeatedActive?: boolean;
   /** "Resetar turno" (016): only when the piece has entries in the turn in progress. */
   onResetTurn?: () => void;
   /** Current posture of the piece's character/NPC (031); with `onPosture` the three postures are offered. */
@@ -36,6 +45,13 @@ interface HexMenuProps {
   onClose: () => void;
 }
 
+/** The icon of each posture in the menu's row (099). */
+const POSTURE_ICON: Record<Posture, (props: IconProps) => ReactElement> = {
+  1: PersonStandingIcon,
+  2: PersonFillDownIcon,
+  3: HeartbreakIcon,
+};
+
 /** Gap between the click point and the menu (px). */
 const OFFSET = 10;
 /** Minimum distance from the container edges (px). */
@@ -48,7 +64,7 @@ const MARGIN = 8;
  * (Mover, Agir, Resetar turno) of their own characters.
  */
 export const HexMenu = ({
-  left, top, token = null, onAdd, onChange, onDelete, onMove, onAct, onActOn, onResetTurn, posture = null, onPosture, canManage = true,
+  left, top, token = null, onAdd, onChange, onDelete, onMove, onAct, onActOn, onRepeated, repeatedActive = false, onResetTurn, posture = null, onPosture, canManage = true,
   onEditNpc, deleteLabel, onClose,
 }: HexMenuProps) => {
   const { t } = useTranslation();
@@ -113,7 +129,7 @@ export const HexMenu = ({
         </button>
       )}
       {/* 098: "Agir sobre…" and "Agir" share one "Ação" group, like the postures. */}
-      {token && (onActOn || onAct) && (
+      {token && (onActOn || onAct || onRepeated) && (
         <div role="group" aria-label={t('hexMenu.actGroup')}>
           <div className="stm-float-menu-section">{t('hexMenu.actGroup')}</div>
           {onActOn && (
@@ -128,6 +144,16 @@ export const HexMenu = ({
               <SpeechIcon size={18} />
             </button>
           )}
+          {onRepeated && (
+            <button type="button" className="stm-float-menu-item" role="menuitem" onClick={choose(onRepeated)}
+              title={repeatedActive ? t('hexMenu.repeatedActive') : undefined}>
+              <span>
+                {t('hexMenu.repeated')}
+                {repeatedActive && <span className="stm-float-menu-dot" role="img" aria-label={t('hexMenu.repeatedActive')} />}
+              </span>
+              <ArrowRepeatIcon size={18} />
+            </button>
+          )}
         </div>
       )}
       {token && onResetTurn && (
@@ -139,20 +165,27 @@ export const HexMenu = ({
       {token && onPosture && (
         <div role="group" aria-label={t('hexMenu.posture')}>
           <div className="stm-float-menu-section">{t('hexMenu.posture')}</div>
-          {POSTURES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className="stm-float-menu-item"
-              role="menuitemradio"
-              aria-checked={value === posture}
-              disabled={value === posture}
-              onClick={choose(() => onPosture(value))}
-            >
-              <span>{t(`posture.${value}`)}</span>
-              {value === posture && <CheckIcon size={18} />}
-            </button>
-          ))}
+          {/* 099: one row of three icons instead of three rows. */}
+          <div className="stm-float-menu-iconrow">
+            {POSTURES.map((value) => {
+              const PostureIcon = POSTURE_ICON[value];
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`stm-float-menu-icon${value === posture ? ' is-current' : ''}`}
+                  role="menuitemradio"
+                  aria-checked={value === posture}
+                  aria-label={t(`posture.${value}`)}
+                  title={t(`posture.${value}`)}
+                  disabled={value === posture}
+                  onClick={choose(() => onPosture(value))}
+                >
+                  <PostureIcon size={20} />
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
       {/* 071: the player commanding an ally edits its instance too, without the master's items. */}

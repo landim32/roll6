@@ -13,6 +13,9 @@ public class GmTurnTests
         GmTurn.Complete(new[] { 1L, 2L }, new HashSet<long> { 1, 2, 9 }).Should().BeTrue("an NPC or a removed character does not matter");
         GmTurn.Complete(new[] { 1L, 2L }, new HashSet<long> { 1 }).Should().BeFalse();
         GmTurn.Complete(Array.Empty<long>(), new HashSet<long>()).Should().BeFalse("nobody to wait for is not a turn to close");
+        // 099 (Q1 = B): a turn made only of automatic repeated actions waits for a declaration.
+        GmTurn.Complete(new[] { 1L }, new HashSet<long> { 1 }, anyDeclared: false).Should().BeFalse();
+        GmTurn.Complete(new[] { 1L }, new HashSet<long> { 1 }, anyDeclared: true).Should().BeTrue();
     }
 
     [Fact]

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PollCard } from './PollCard';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
-import { CrosshairIcon, Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, LockFillIcon, MoveIcon, PencilIcon, QuestionCircleIcon, RobotIcon } from '../ui/icons';
+import { ArrowRepeatIcon, CrosshairIcon, Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, LockFillIcon, MoveIcon, PencilIcon, QuestionCircleIcon, RobotIcon } from '../ui/icons';
 import { ChatBubbleGestures } from './ChatBubbleGestures';
 import { ReactionsBadge } from './ReactionsBadge';
 import { ReplyQuote } from './ReplyQuote';
@@ -178,6 +178,11 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
             {cancelled && <div className="stm-chat-cancelled-label">{t('chat.actionCancelled')}</div>}
             <div className="stm-chat-captioned">
               <span className="stm-chat-kind-icon"><LightningIcon size={12} /></span>
+              {item.repeated && (
+                <span className="badge text-bg-secondary stm-chat-repeated" title={t('hexMenu.repeatedActive')}>
+                  <ArrowRepeatIcon size={10} /> {t('chat.repeated')}
+                </span>
+              )}
               {item.whisperHidden
                 ? <em className="stm-chat-plain stm-chat-text">{item.description ?? ''}</em>
                 : <span className="stm-chat-plain stm-chat-text">{item.description ?? ''}</span>}

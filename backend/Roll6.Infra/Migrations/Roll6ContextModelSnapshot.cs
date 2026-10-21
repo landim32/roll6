@@ -385,6 +385,15 @@ namespace Roll6.Infra.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("posture");
 
+                    b.Property<string>("RepeatedAction")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("repeated_action");
+
+                    b.Property<long?>("RepeatedActionUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("repeated_action_user_id");
+
                     b.Property<string>("Sheet")
                         .HasMaxLength(20000)
                         .HasColumnType("character varying(20000)")
@@ -995,6 +1004,15 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("removed_at");
 
+                    b.Property<string>("RepeatedAction")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("repeated_action");
+
+                    b.Property<long?>("RepeatedActionUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("repeated_action_user_id");
+
                     b.Property<string>("Status")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
@@ -1599,6 +1617,10 @@ namespace Roll6.Infra.Migrations
                     b.Property<DateTime?>("PollClosedAt")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("poll_closed_at");
+
+                    b.Property<int?>("Repeated")
+                        .HasColumnType("integer")
+                        .HasColumnName("repeated");
 
                     b.Property<long?>("ReplyToTurnId")
                         .HasColumnType("bigint")

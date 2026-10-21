@@ -162,6 +162,9 @@ public class ChatItemInfo
     /// <summary>What an action is about (098, "Agir sobre…"); null without a target or on a masked whispered action.</summary>
     [JsonPropertyName("target")]
     public TurnTargetInfo? Target { get; set; }
+    /// <summary>An action from a repeated action (099): "declared" (when it was set) or "turnStart" (applied automatically); null otherwise.</summary>
+    [JsonPropertyName("repeated")]
+    public string? Repeated { get; set; }
 }
 
 /// <summary>The state of a question (093): "waiting", "answered" or "failed".</summary>

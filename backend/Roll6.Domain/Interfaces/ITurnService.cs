@@ -22,6 +22,9 @@ public interface ITurnService
     /// <summary>Finished turns before `before` (default: the turn in progress), newest first (028).</summary>
     Task<TurnHistoryPageInfo> GetHistoryAsync(long userId, long campaignId, int? before, int? limit);
     Task<TurnInfo> ActAsync(long userId, TurnActInfo info);
+
+    /// <summary>"Ação repetida" (099): sets, replaces or (empty text) removes an actor's standing order.</summary>
+    Task<TurnRepeatResultInfo> SetRepeatedAsync(long userId, TurnRepeatInfo info);
     Task<TurnResetResultInfo> ResetAsync(long userId, TurnPieceInfo info);
     Task<TurnFinishResultInfo> FinishAsync(long userId, long campaignId, TurnFinishInfo info);
     Task<TurnInfo> CreateAsync(long userId, TurnInsertInfo info);

@@ -8,7 +8,7 @@ import { PARTICIPATION_MODE } from '../../lib/campaignCharacterForm';
 import { PARTICIPATION_DRAG_TYPE } from '../../lib/mapTokens';
 import type { ParticipationMode } from '../../lib/campaignCharacterForm';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
-import { EyeIcon, PencilIcon } from '../ui/icons';
+import { ArrowRepeatIcon, EyeIcon, PencilIcon } from '../ui/icons';
 import { PostureBadge } from '../ui/PostureBadge';
 import { POSTURE } from '../../types/mapToken';
 
@@ -48,6 +48,10 @@ export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: 
           {turnNo !== null && <TurnStatusDot status={characterStatus(entries, member.characterId)} />}
           <span title={member.characterName}>{member.characterName}</span>
           <PostureBadge posture={member.posture} />
+          {member.repeatedAction && (
+            <span className="stm-repeat-mark" title={`${t('hexMenu.repeatedActive')}: ${member.repeatedAction}`}
+              aria-label={t('hexMenu.repeatedActive')}><ArrowRepeatIcon size={12} /></span>
+          )}
           <button
             type="button"
             className="btn btn-link btn-sm p-0 ms-auto"

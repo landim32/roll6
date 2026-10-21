@@ -58,10 +58,14 @@ public partial class TurnService
             // Every turn skipped ends here: one divider each in the chat (041).
             var dividers = Enumerable.Range(previous, info.TurnNo - previous)
                 .Select(turnNo => Turn.TurnFinished(campaignId, campaign.CurrentMapId, turnNo, userId)).ToList();
+            // 099: the repeated actions start the turn reached (the skipped ones get nothing).
+            var repeated = await RepeatedActionsAsync(campaign, userId);
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 foreach (var divider in dividers)
                     await _repository.InsertAsync(divider);
+                foreach (var action in repeated)
+                    await _repository.InsertAsync(action);
                 await _campaignRepository.UpdateAsync(campaign);
             });
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,

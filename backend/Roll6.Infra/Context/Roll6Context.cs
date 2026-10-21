@@ -343,6 +343,9 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CurrentEnergy).HasColumnName("current_energy").IsRequired();
             entity.Property(e => e.CurrentMove).HasColumnName("current_move").IsRequired();
             entity.Property(e => e.CharacterStatus).HasColumnName("character_status").HasMaxLength(260);
+            // Repeated action (099): the standing order applied at each turn start.
+            entity.Property(e => e.RepeatedAction).HasColumnName("repeated_action").HasMaxLength(Turn.MAX_DESCRIPTION);
+            entity.Property(e => e.RepeatedActionUserId).HasColumnName("repeated_action_user_id");
             entity.Property(e => e.Sheet).HasColumnName("sheet").HasMaxLength(20000);
             entity.Property(e => e.SheetFile).HasColumnName("sheet_file").HasMaxLength(260);
             entity.Property(e => e.Posture).HasColumnName("posture").HasConversion<int>().HasDefaultValue(Posture.Standing).HasSentinel((Posture)0);
@@ -448,6 +451,9 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CurrentEnergy).HasColumnName("current_energy");
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(260);
             entity.Property(e => e.Posture).HasColumnName("posture").HasConversion<int>().HasDefaultValue(Posture.Standing).HasSentinel((Posture)0);
+            // Repeated action (099): the standing order applied at each turn start.
+            entity.Property(e => e.RepeatedAction).HasColumnName("repeated_action").HasMaxLength(Turn.MAX_DESCRIPTION);
+            entity.Property(e => e.RepeatedActionUserId).HasColumnName("repeated_action_user_id");
             // Instances (051): own Deslocamento and a soft removal that keeps the turn entries named.
             entity.Property(e => e.CurrentMove).HasColumnName("current_move");
             entity.Property(e => e.RemovedAt).HasColumnName("removed_at").HasColumnType(TIMESTAMP);
@@ -489,6 +495,7 @@ public class Roll6Context : DbContext
                         (a, b) => JsonSerializer.Serialize(a, TURN_CHANGE_JSON) == JsonSerializer.Serialize(b, TURN_CHANGE_JSON),
                         v => JsonSerializer.Serialize(v, TURN_CHANGE_JSON).GetHashCode(),
                         v => v == null ? null : v.Select(c => new TurnChange(c.Field, c.Before, c.After)).ToList()));
+            entity.Property(e => e.Repeated).HasColumnName("repeated").HasConversion<int?>(); // 099
             // What an action is about (098) as one JSON object: the hex, the distance and the piece's snapshot.
             entity.Property(e => e.Target).HasColumnName("target").HasColumnType("jsonb")
                 .HasConversion(

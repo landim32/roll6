@@ -2590,5 +2590,48 @@ BEGIN
     VALUES ('20261021010517_AddTurnTarget', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261021184235_AddRepeatedAction') THEN
+    ALTER TABLE turns ADD repeated integer;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261021184235_AddRepeatedAction') THEN
+    ALTER TABLE map_npcs ADD repeated_action character varying(2000);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261021184235_AddRepeatedAction') THEN
+    ALTER TABLE map_npcs ADD repeated_action_user_id bigint;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261021184235_AddRepeatedAction') THEN
+    ALTER TABLE campaign_characters ADD repeated_action character varying(2000);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261021184235_AddRepeatedAction') THEN
+    ALTER TABLE campaign_characters ADD repeated_action_user_id bigint;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261021184235_AddRepeatedAction') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261021184235_AddRepeatedAction', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

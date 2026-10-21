@@ -432,6 +432,7 @@ public partial class MapTokenService : IMapTokenService
                 info.TotalLife = character?.Life ?? participation.CurrentLife;
                 info.TotalEnergy = character?.Energy ?? participation.CurrentEnergy;
                 info.Status = participation.CharacterStatus;
+                info.RepeatedAction = participation.RepeatedAction; // 099
                 info.Sheet = participation.Sheet;
                 info.Posture = (int)participation.Posture;
                 info.Space = MapOccupancyLoader.PieceSpace(token, participation.Posture);
@@ -451,6 +452,7 @@ public partial class MapTokenService : IMapTokenService
                 info.TotalLife = npc?.Life ?? mapNpc.CurrentLife;
                 info.TotalEnergy = npc?.Energy ?? mapNpc.CurrentEnergy;
                 info.Status = mapNpc.Status;
+                info.RepeatedAction = mapNpc.RepeatedAction; // 099
                 info.Posture = (int)mapNpc.Posture;
                 info.Space = MapOccupancyLoader.PieceSpace(token, mapNpc.Posture);
                 // 051: the instance's own Deslocamento.

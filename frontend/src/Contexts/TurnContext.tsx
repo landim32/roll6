@@ -12,7 +12,7 @@ import { markAllTurnsRead, markTurnRead, trackTurn } from '../lib/turnStatus';
 import type { TurnSeen } from '../lib/turnStatus';
 import type { WhisperPayload } from '../lib/whisper';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
-import type { ActionTargetWrite, TurnFinishResultInfo, TurnInfo, TurnResetResultInfo } from '../types/turn';
+import type { ActionTargetWrite, TurnFinishResultInfo, TurnInfo, TurnRepeatResultInfo, TurnResetResultInfo } from '../types/turn';
 import type { ActionTarget } from '../lib/chatComposer';
 
 /** The turn is polled this often while the tab is visible (same rhythm as the party panel). */
@@ -53,6 +53,8 @@ interface TurnContextType {
     actionTarget?: ActionTargetWrite | null) => Promise<TurnInfo>;
   /** Also reloads the pieces (the move may be undone). */
   reset: (mapTokenId: number) => Promise<TurnResetResultInfo>;
+  /** "Ação repetida" (099): sets, replaces or (null) removes the actor's standing order; reloads the turn and the pieces. */
+  setRepeated: (target: ActionTarget, description: string | null) => Promise<TurnRepeatResultInfo>;
   /** Master: finishes the turn; without `force` it only lists who still has to act. */
   finish: (force: boolean) => Promise<TurnFinishResultInfo>;
   /** Entries of any turn of the current campaign (summary). */
@@ -182,6 +184,12 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
     return result;
   }, [run, refresh, refreshMapTokens]);
 
+  const setRepeated = useCallback(async (target: ActionTarget, description: string | null) => {
+    const result = await run(() => turnService.setRepeated(target, description));
+    await Promise.all([refresh(), refreshMapTokens()]);
+    return result;
+  }, [run, refresh, refreshMapTokens]);
+
   const finish = useCallback(async (force: boolean) => {
     const result = await run(() => turnService.finish(requireCampaign(), force));
     if (result.finished) await refresh();
@@ -212,7 +220,7 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
   ];
 
   const value: TurnContextType = {
-    turnNo, entries, notifications, loading, error, refresh, dismiss: markRead, markRead, markAllRead, clearError, act, reset,
+    turnNo, entries, notifications, loading, error, refresh, dismiss: markRead, markRead, markAllRead, clearError, act, reset, setRepeated,
     finish, listTurn,
   };
   return <TurnContext.Provider value={value}>{children}</TurnContext.Provider>;

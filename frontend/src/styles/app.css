@@ -1598,6 +1598,20 @@ button.stm-chat-quote { cursor: pointer; }
   color: var(--bs-secondary-color);
 }
 
+/* 099: a repeated action in the chat and on the cards. */
+.stm-chat-repeated {
+  margin-right: 0.35rem;
+  font-size: 0.65rem;
+  vertical-align: middle;
+}
+
+.stm-repeat-mark {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.25rem;
+  color: var(--stm-accent);
+}
+
 /* "Agir sobre…" (098): what the action is about, under its text. */
 .stm-chat-action-target {
   display: flex;
@@ -2333,8 +2347,57 @@ button.stm-chat-quote { cursor: pointer; }
   text-align: left;
 }
 
-.stm-float-menu-item + .stm-float-menu-item {
+.stm-float-menu-item + .stm-float-menu-item,
+.stm-float-menu > [role='group'] + .stm-float-menu-item {
   border-top: 0.5px solid rgba(255, 255, 255, 0.14);
+}
+
+/* 099: no hairline between the items of one group — only between groups (the group header carries its own rule). */
+.stm-float-menu [role='group'] > .stm-float-menu-item + .stm-float-menu-item {
+  border-top: 0;
+}
+
+/* 099: the postures as one row of three icons. */
+.stm-float-menu-iconrow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 2px 12px 10px;
+}
+
+.stm-float-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+}
+
+.stm-float-menu-icon:hover,
+.stm-float-menu-icon:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  outline: none;
+}
+
+.stm-float-menu-icon.is-current,
+.stm-float-menu-icon:disabled {
+  background: rgba(var(--stm-accent-rgb), 0.22);
+  color: var(--stm-accent);
+  opacity: 1;
+}
+
+/* 099: an active repeated action. */
+.stm-float-menu-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--stm-accent);
+  vertical-align: middle;
 }
 
 .stm-float-menu-item:hover,
