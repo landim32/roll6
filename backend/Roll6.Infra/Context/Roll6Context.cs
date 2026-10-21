@@ -14,6 +14,12 @@ public class Roll6Context : DbContext
     private const string TIMESTAMP = "timestamp without time zone";
     private static readonly JsonSerializerOptions TURN_CHANGE_JSON = new(JsonSerializerDefaults.Web);
 
+    /// <summary>The action's target snapshot (098): camelCase, nulls left out (an empty hex is just x/y/distance).</summary>
+    private static readonly JsonSerializerOptions TURN_TARGET_JSON = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
     public Roll6Context(DbContextOptions<Roll6Context> options) : base(options)
     {
     }
@@ -483,6 +489,15 @@ public class Roll6Context : DbContext
                         (a, b) => JsonSerializer.Serialize(a, TURN_CHANGE_JSON) == JsonSerializer.Serialize(b, TURN_CHANGE_JSON),
                         v => JsonSerializer.Serialize(v, TURN_CHANGE_JSON).GetHashCode(),
                         v => v == null ? null : v.Select(c => new TurnChange(c.Field, c.Before, c.After)).ToList()));
+            // What an action is about (098) as one JSON object: the hex, the distance and the piece's snapshot.
+            entity.Property(e => e.Target).HasColumnName("target").HasColumnType("jsonb")
+                .HasConversion(
+                    target => target == null ? null : JsonSerializer.Serialize(target, TURN_TARGET_JSON),
+                    json => json == null ? null : JsonSerializer.Deserialize<TurnTarget>(json, TURN_TARGET_JSON),
+                    new ValueComparer<TurnTarget?>(
+                        (a, b) => JsonSerializer.Serialize(a, TURN_TARGET_JSON) == JsonSerializer.Serialize(b, TURN_TARGET_JSON),
+                        v => JsonSerializer.Serialize(v, TURN_TARGET_JSON).GetHashCode(),
+                        v => v == null ? null : JsonSerializer.Deserialize<TurnTarget>(JsonSerializer.Serialize(v, TURN_TARGET_JSON), TURN_TARGET_JSON)));
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             // Place in the chat (050): created_at, or the last vote of a poll.
             entity.Property(e => e.ChatAt).HasColumnName("chat_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()")

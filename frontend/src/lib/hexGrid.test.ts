@@ -2,7 +2,28 @@ import { describe, expect, it } from 'vitest';
 import {
   axialToOffset, gridPath, gridPixelSize, HEX_SIZE, hexCenter, hexCorners, hexPath, hexRound, isInsideGrid, offsetToAxial,
   pixelToHex, neighbor, turnCost, movementField, movementCost, pathTo, arrivalCost, lookToward, footprint, footprintLocal,
+  distance,
 } from './hexGrid';
+
+// 098: cube distance over odd-q offsets; the same cases are in HexGridTests.Distance_ReferenceCases.
+describe('distance', () => {
+  it.each([
+    [0, 0, 0, 0, 0],
+    [0, 0, 1, 0, 1],
+    [1, 0, 2, 1, 1],
+    [0, 0, 2, 0, 2],
+    [0, 0, 0, 3, 3],
+    [0, 0, 3, 2, 4],
+    [2, 3, 5, 1, 3],
+  ])('(%i, %i) → (%i, %i) = %i', (x1, y1, x2, y2, expected) => {
+    expect(distance({ x: x1, y: y1 }, { x: x2, y: y2 })).toBe(expected);
+    expect(distance({ x: x2, y: y2 }, { x: x1, y: y1 })).toBe(expected);
+  });
+
+  it('neighbours are one apart', () => {
+    for (let look = 0; look < 6; look += 1) expect(distance({ x: 3, y: 3 }, neighbor(3, 3, look))).toBe(1);
+  });
+});
 
 // Reference values shared with backend/Roll6.Tests/Domain/Grid/HexGridTests.cs.
 describe('hex size', () => {

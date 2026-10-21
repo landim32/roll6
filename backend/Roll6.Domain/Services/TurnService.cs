@@ -184,16 +184,22 @@ public partial class TurnService : ITurnService
         Campaign campaign;
         long? mapId;
         (long? CharacterId, long? NpcId, long? MapNpcId) actor;
+        TurnTarget? target = null;
         if (info.MapTokenId is long mapTokenId && info.CampaignId == null && info.CharacterId == null)
         {
             var (piece, map, pieceCampaign) = await GetPieceAsync(mapTokenId);
             campaign = pieceCampaign;
             actor = await ResolveActorAsync(userId, piece, campaign);
             mapId = map.MapId;
+            // 098: "Ação sobre…" — the hex (and the piece on it, as it is now) the action is about.
+            if (info.Target != null)
+                target = await ResolveTargetAsync(map, piece, campaign, info.Target, actor.CharacterId, actor.MapNpcId);
         }
         else if (info.MapTokenId == null && info.CampaignId is long campaignId && info.CharacterId is long characterId)
         {
             // 080: a character of the campaign acts from the chat without a piece on any map.
+            if (info.Target != null)
+                throw new DomainValidationException("target", "A ação sobre um hex precisa de uma peça no mapa.");
             campaign = await _campaignRepository.GetByIdAsync(campaignId)
                 ?? throw new KeyNotFoundException("Campanha não encontrada.");
             actor = await ResolveCharacterActorAsync(userId, campaign, characterId);
@@ -204,7 +210,7 @@ public partial class TurnService : ITurnService
                 "Informe a peça (mapTokenId) ou a campanha e o personagem (campaignId e characterId).");
         campaign.EnsurePlayable(); // 049: the turn moves only while the campaign is active
         var turn = Turn.Action(campaign.CampaignId, mapId, actor.CharacterId, actor.NpcId, actor.MapNpcId,
-            campaign.CurrentTurn, userId, info.Description);
+            campaign.CurrentTurn, userId, info.Description, target);
         // 047: a whispered action still is the actor's action of the turn; only who reads its text changes.
         var whisper = await ResolveWhisperAsync(campaign, userId, actor.CharacterId, info.WhisperCharacterIds, info.WhisperMaster);
         await ApplyReplyAsync(turn, info.ReplyToTurnId);
@@ -422,6 +428,97 @@ public partial class TurnService : ITurnService
     }
 
     /// <summary>
+    /// 098: the target of an action — a hex inside the actor's map and, when a piece covers it, a snapshot of that piece
+    /// as the table shows it now (the one drawn on top when several share the hex in free mode; or the one the caller
+    /// saw, which must cover the hex). Nothing is re-read later: the target may move or leave before the turn is
+    /// processed, and the record says what the player aimed at.
+    /// </summary>
+    private async Task<TurnTarget> ResolveTargetAsync(Map map, MapToken actor, Campaign campaign, TurnTargetInsertInfo info,
+        long? actorCharacterId, long? actorMapNpcId)
+    {
+        var layout = await _occupancy.LoadAsync(map);
+        if (!HexGrid.IsInsideGrid(info.X, info.Y, layout.Columns, layout.Rows))
+            throw new DomainValidationException("target", "O hex está fora do mapa.");
+        var covering = layout.Occupancy.PiecesAt(info.X, info.Y);
+        long? mapTokenId;
+        if (info.MapTokenId is long seen)
+        {
+            if (!covering.Contains(seen))
+                throw new DomainValidationException("target", "Não há essa peça nesse hex.");
+            mapTokenId = seen;
+        }
+        else
+            mapTokenId = covering.Count == 0 ? null : covering.Max();
+        var distance = HexGrid.Distance(actor.X, actor.Y, info.X, info.Y);
+        if (mapTokenId == null)
+            return TurnTarget.Hex(info.X, info.Y, distance);
+
+        var piece = mapTokenId == actor.MapTokenId ? actor
+            : await _mapTokenRepository.GetByIdAsync(mapTokenId.Value) ?? throw new DomainValidationException("target", "Não há essa peça nesse hex.");
+        var kind = piece.TokenType switch
+        {
+            MapTokenType.Character => TurnTarget.KIND_CHARACTER,
+            MapTokenType.Npc => TurnTarget.KIND_NPC,
+            _ => TurnTarget.KIND_OBJECT
+        };
+        if (piece.MapTokenId == actor.MapTokenId)
+            return TurnTarget.Piece(info.X, info.Y, distance, piece.MapTokenId, kind, TurnTarget.SIDE_SELF, piece.Name,
+                characterId: actorCharacterId, mapNpcId: actorMapNpcId, look: piece.Look);
+        if (piece.CampaignCharacterId is long participationId)
+        {
+            var participation = await _campaignCharacterRepository.GetByIdAsync(participationId);
+            var character = participation == null ? null : await _characterRepository.GetByIdAsync(participation.CharacterId);
+            return TurnTarget.Piece(info.X, info.Y, distance, piece.MapTokenId, kind, TurnTarget.SIDE_ALLY,
+                character?.Name ?? piece.Name, characterId: participation?.CharacterId, look: piece.Look,
+                posture: participation == null ? null : (int)participation.Posture, status: participation?.CharacterStatus,
+                currentLife: participation?.CurrentLife, totalLife: character?.Life,
+                currentEnergy: participation?.CurrentEnergy, totalEnergy: character?.Energy);
+        }
+        if (piece.MapNpcId is long mapNpcId)
+        {
+            var instance = await _mapNpcRepository.GetByIdAsync(mapNpcId);
+            var npc = instance == null ? null : await _npcRepository.GetByIdAsync(instance.NpcId);
+            var campaignNpc = instance == null ? null : await _campaignNpcRepository.GetAsync(campaign.CampaignId, instance.NpcId);
+            var side = campaignNpc?.Category switch
+            {
+                NpcCategory.Ally => TurnTarget.SIDE_ALLY,
+                NpcCategory.Neutral => TurnTarget.SIDE_NEUTRAL,
+                _ => TurnTarget.SIDE_ENEMY
+            };
+            return TurnTarget.Piece(info.X, info.Y, distance, piece.MapTokenId, kind, side, instance?.Name ?? piece.Name,
+                mapNpcId: mapNpcId, look: piece.Look, posture: instance == null ? null : (int)instance.Posture, status: instance?.Status,
+                currentLife: instance?.CurrentLife, totalLife: npc?.Life, currentEnergy: instance?.CurrentEnergy, totalEnergy: npc?.Energy);
+        }
+        return TurnTarget.Piece(info.X, info.Y, distance, piece.MapTokenId, kind, TurnTarget.SIDE_OBJECT, piece.Name, look: piece.Look);
+    }
+
+    /// <summary>The target snapshot as read (098); null when there is none.</summary>
+    private static TurnTargetInfo? ToTargetInfo(TurnTarget? target) => target == null ? null : new TurnTargetInfo
+    {
+        X = target.X,
+        Y = target.Y,
+        Distance = target.Distance,
+        MapTokenId = target.MapTokenId,
+        Kind = target.Kind,
+        KindLabel = target.KindLabel(),
+        Side = target.Side,
+        SideLabel = target.SideLabel(),
+        Name = target.Name,
+        CharacterId = target.CharacterId,
+        MapNpcId = target.MapNpcId,
+        Look = target.Look,
+        LookName = target.Look is int look ? TurnSummary.Direction(look) : null,
+        Posture = target.Posture,
+        PostureLabel = target.PostureLabel(),
+        Status = target.Status,
+        CurrentLife = target.CurrentLife,
+        TotalLife = target.TotalLife,
+        CurrentEnergy = target.CurrentEnergy,
+        TotalEnergy = target.TotalEnergy,
+        Text = target.Describe()
+    };
+
+    /// <summary>
     /// 080: a character acting without a piece — the same checks as a character piece: its current owner with an approved
     /// participation, or the campaign master for any participation of the campaign.
     /// </summary>
@@ -500,6 +597,7 @@ public partial class TurnService : ITurnService
             WhisperHidden = whispers.Masked.Contains(t.TurnId),
             Moved = t.Moved,
             Changes = t.Changes?.Select(c => new TurnChangeInfo { Field = c.Field, Before = c.Before, After = c.After }).ToList(),
+            Target = ToTargetInfo(t.Target),
             CreatedAt = t.CreatedAt
         }).ToList();
     }

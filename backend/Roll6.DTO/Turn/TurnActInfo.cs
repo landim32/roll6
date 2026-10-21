@@ -33,4 +33,28 @@ public class TurnActInfo
 
     [JsonPropertyName("whisperMaster")]
     public bool? WhisperMaster { get; set; }
+
+    /// <summary>
+    /// "Ação sobre…" (098): the hex the action is about, only with <see cref="MapTokenId"/> (a piece on a map). The
+    /// server records the piece under it (if any) as it is now and the distance from the actor's piece.
+    /// </summary>
+    [JsonPropertyName("target")]
+    public TurnTargetInsertInfo? Target { get; set; }
+}
+
+/// <summary>The hex an action is about (098), on the actor's map.</summary>
+public class TurnTargetInsertInfo
+{
+    [JsonPropertyName("x")]
+    public int X { get; set; }
+
+    [JsonPropertyName("y")]
+    public int Y { get; set; }
+
+    /// <summary>
+    /// Optional: the piece the caller saw on the hex; it must be on the same map and cover the hex. Omitted: the piece
+    /// covering the hex is taken (the one drawn on top when several share it), or none.
+    /// </summary>
+    [JsonPropertyName("mapTokenId")]
+    public long? MapTokenId { get; set; }
 }

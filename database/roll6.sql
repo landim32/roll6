@@ -2575,5 +2575,20 @@ BEGIN
     VALUES ('20261020031658_AddCampaignGmMode', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261021010517_AddTurnTarget') THEN
+    ALTER TABLE turns ADD target jsonb;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261021010517_AddTurnTarget') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261021010517_AddTurnTarget', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

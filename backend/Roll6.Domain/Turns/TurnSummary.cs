@@ -25,6 +25,9 @@ public sealed record SummaryLine
 
     public string? Description { get; init; }
     public IReadOnlyList<TurnChange>? Changes { get; init; }
+
+    /// <summary>What an action is about (098); null without a target or when masked for the reader.</summary>
+    public TurnTarget? Target { get; init; }
 }
 
 /// <summary>Where a character/NPC piece is (column/row, odd-q) and where it looks.</summary>
@@ -88,7 +91,9 @@ public static class TurnSummary
         return line.Type switch
         {
             TurnType.Movement => $"{actor}: {Movement(line)}",
-            TurnType.Action => $"{actor}: \"{Escape(line.Description)}\"",
+            // 098: "→ sobre …" names the hex or the piece the action is about, as it was when declared.
+            TurnType.Action => $"{actor}: \"{Escape(line.Description)}\""
+                + (line.Target == null ? string.Empty : $" → sobre {Escape(line.Target.Describe())}"),
             TurnType.ActionResult => $"{author ?? actor}: Resultado para {actor}: {Escape(line.Description)}",
             TurnType.Narration => Narration(author, line.Description),
             TurnType.CharacterUpdate => author == null

@@ -21,6 +21,52 @@ export interface TurnChangeInfo {
   after: string | null;
 }
 
+/** Kind of the piece an action is about (098). */
+export type TargetKind = 'character' | 'npc' | 'object';
+
+/** Side of the piece an action is about (098): the actor's own piece, an ally (characters, ally NPCs), an enemy, a neutral or an object. */
+export type TargetSide = 'self' | 'ally' | 'enemy' | 'neutral' | 'object';
+
+/**
+ * What an action is about (098, "Ação sobre…"), as it was when declared: the hex, the distance from the actor's piece
+ * and, with a piece on the hex, its identity and what the table showed of it. Null on a masked whispered action.
+ */
+export interface TurnTargetInfo {
+  x: number;
+  y: number;
+  distance: number;
+  /** The piece that covered the hex; null = empty hex (every field below is null too). */
+  mapTokenId: number | null;
+  kind: TargetKind | null;
+  /** "personagem", "NPC" or "objeto". */
+  kindLabel: string | null;
+  side: TargetSide | null;
+  /** "si mesmo", "aliado", "inimigo", "neutro" or "objeto". */
+  sideLabel: string | null;
+  name: string | null;
+  characterId: number | null;
+  mapNpcId: number | null;
+  look: number | null;
+  lookName: string | null;
+  posture: number | null;
+  postureLabel: string | null;
+  status: string | null;
+  currentLife: number | null;
+  totalLife: number | null;
+  currentEnergy: number | null;
+  totalEnergy: number | null;
+  /** The target as the summary line says it. */
+  text: string;
+}
+
+/** The hex an action is about, as sent with the action (098). */
+export interface ActionTargetWrite {
+  x: number;
+  y: number;
+  /** The piece seen on the hex, when there was one. */
+  mapTokenId?: number | null;
+}
+
 /** One entry of a campaign turn: a move (before/after), an action, an action result or a character change. */
 export interface TurnInfo {
   turnId: number;
@@ -53,6 +99,8 @@ export interface TurnInfo {
   whisper?: boolean;
   /** A whispered action the reader is not in (047): the description is "está sussurrando!". */
   whisperHidden?: boolean;
+  /** What the action is about (098); null without a target or on a masked whispered action. */
+  target?: TurnTargetInfo | null;
 }
 
 /** Current turn of a campaign with its entries (chronological). */

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
-import { CheckIcon, MoveIcon, PencilIcon, PlusIcon, SpeechIcon, SwapIcon, TrashIcon, UndoIcon } from '../ui/icons';
+import { CheckIcon, CrosshairIcon, MoveIcon, PencilIcon, PlusIcon, SpeechIcon, SwapIcon, TrashIcon, UndoIcon } from '../ui/icons';
 import { POSTURES } from '../../types/mapToken';
 import type { Posture } from '../../types/mapToken';
 
@@ -19,6 +19,8 @@ interface HexMenuProps {
   onMove?: () => void;
   /** "Agir" (016): records an action of the piece's character/NPC; absent for objects or others' pieces. */
   onAct?: () => void;
+  /** "Ação sobre…" (098): like "Agir", after picking the hex the action is about; same availability. */
+  onActOn?: () => void;
   /** "Resetar turno" (016): only when the piece has entries in the turn in progress. */
   onResetTurn?: () => void;
   /** Current posture of the piece's character/NPC (031); with `onPosture` the three postures are offered. */
@@ -46,7 +48,7 @@ const MARGIN = 8;
  * (Mover, Agir, Resetar turno) of their own characters.
  */
 export const HexMenu = ({
-  left, top, token = null, onAdd, onChange, onDelete, onMove, onAct, onResetTurn, posture = null, onPosture, canManage = true,
+  left, top, token = null, onAdd, onChange, onDelete, onMove, onAct, onActOn, onResetTurn, posture = null, onPosture, canManage = true,
   onEditNpc, deleteLabel, onClose,
 }: HexMenuProps) => {
   const { t } = useTranslation();
@@ -110,8 +112,14 @@ export const HexMenu = ({
           <MoveIcon size={18} />
         </button>
       )}
+      {token && onActOn && (
+        <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove} onClick={choose(onActOn)}>
+          <span>{t('hexMenu.actOn')}</span>
+          <CrosshairIcon size={18} />
+        </button>
+      )}
       {token && onAct && (
-        <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove} onClick={choose(onAct)}>
+        <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove && !onActOn} onClick={choose(onAct)}>
           <span>{t('hexMenu.act')}</span>
           <SpeechIcon size={18} />
         </button>

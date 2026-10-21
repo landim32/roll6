@@ -1,4 +1,5 @@
 import { pollCopyText } from './chatPoll';
+import { targetLabel } from './actionTarget';
 import { CHAT_KIND } from '../types/chat';
 import { REACTION } from '../types/chat';
 import type { ChatChangeInfo, ChatItemInfo, ChatKind, ChatReactionInfo, ReactionKind } from '../types/chat';
@@ -158,7 +159,10 @@ export const copyableText = (item: ChatItemInfo): string | null => {
   const value = item.kind === CHAT_KIND.action || item.kind === CHAT_KIND.actionResult
     ? item.description ?? item.text
     : item.text ?? item.description;
-  return value?.trim() ? value.trim() : null;
+  if (!value?.trim()) return null;
+  // 098: an action copied with what it is about.
+  return item.kind === CHAT_KIND.action && item.target && !item.whisperHidden
+    ? `${value.trim()} — sobre ${targetLabel(item.target)}` : value.trim();
 };
 
 const firstWord = (name: string): string => name.trim().split(/\s+/)[0] ?? name;

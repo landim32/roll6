@@ -80,4 +80,8 @@ public class TurnInfo
     /// <summary>A whispered action the reader is not in (047): the description is "está sussurrando!".</summary>
     [JsonPropertyName("whisperHidden")]
     public bool WhisperHidden { get; set; }
+
+    /// <summary>What the action is about (098, "Ação sobre…"); null without a target or on a masked whispered action.</summary>
+    [JsonPropertyName("target")]
+    public TurnTargetInfo? Target { get; set; }
 }

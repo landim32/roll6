@@ -77,6 +77,19 @@ public static class HexGrid
         return AxialToOffset(q + dq, r + dr);
     }
 
+    /// <summary>
+    /// Hexes between two positions (098): the guide's "Distances" — the cube distance over the axial pair,
+    /// max(|dq|, |dr|, |dq + dr|). 0 on the same hex, 1 for neighbours.
+    /// </summary>
+    public static int Distance(int x1, int y1, int x2, int y2)
+    {
+        var (q1, r1) = OffsetToAxial(x1, y1);
+        var (q2, r2) = OffsetToAxial(x2, y2);
+        var dq = q2 - q1;
+        var dr = r2 - r1;
+        return Math.Max(Math.Abs(dq), Math.Max(Math.Abs(dr), Math.Abs(dq + dr)));
+    }
+
     /// <summary>Sizes a token may take, in hexes (031).</summary>
     public static readonly IReadOnlyList<int> ALLOWED_SPACES = new[] { 1, 2, 3, 7, 10 };
 

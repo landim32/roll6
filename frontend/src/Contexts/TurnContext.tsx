@@ -12,7 +12,7 @@ import { markAllTurnsRead, markTurnRead, trackTurn } from '../lib/turnStatus';
 import type { TurnSeen } from '../lib/turnStatus';
 import type { WhisperPayload } from '../lib/whisper';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
-import type { TurnFinishResultInfo, TurnInfo, TurnResetResultInfo } from '../types/turn';
+import type { ActionTargetWrite, TurnFinishResultInfo, TurnInfo, TurnResetResultInfo } from '../types/turn';
 import type { ActionTarget } from '../lib/chatComposer';
 
 /** The turn is polled this often while the tab is visible (same rhythm as the party panel). */
@@ -48,7 +48,9 @@ interface TurnContextType {
   // API
   /** Records the piece's action (044: replacing its previous one of the turn), optionally answering a chat entry. */
   /** 080: by piece (`{ mapTokenId }`) or, for a character without one, by `{ campaignId, characterId }`. */
-  act: (target: ActionTarget, description: string, replyToTurnId?: number | null, whisper?: WhisperPayload) => Promise<TurnInfo>;
+  /** 098: `actionTarget` ("Ação sobre…") is the hex the action is about, only with a piece as the actor. */
+  act: (target: ActionTarget, description: string, replyToTurnId?: number | null, whisper?: WhisperPayload,
+    actionTarget?: ActionTargetWrite | null) => Promise<TurnInfo>;
   /** Also reloads the pieces (the move may be undone). */
   reset: (mapTokenId: number) => Promise<TurnResetResultInfo>;
   /** Master: finishes the turn; without `force` it only lists who still has to act. */
@@ -168,8 +170,8 @@ export const TurnProvider = ({ children }: { children: ReactNode }) => {
   }, [campaignId]);
 
   const act = useCallback(async (target: ActionTarget, description: string, replyToTurnId: number | null = null,
-    whisper: WhisperPayload = {}) => {
-    const result = await run(() => turnService.act(target, description, replyToTurnId, whisper));
+    whisper: WhisperPayload = {}, actionTarget: ActionTargetWrite | null = null) => {
+    const result = await run(() => turnService.act(target, description, replyToTurnId, whisper, actionTarget));
     await refresh();
     return result;
   }, [run, refresh]);

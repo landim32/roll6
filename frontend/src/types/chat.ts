@@ -2,6 +2,8 @@
  * The campaign chat (041). The chat is the campaign's whole timeline: what people say, every turn record and the
  * end-of-turn dividers — mirror of the backend ChatItemInfo / ChatPageInfo.
  */
+import type { TurnTargetInfo } from './turn';
+
 
 export const CHAT_KIND = {
   text: 'text',
@@ -111,6 +113,8 @@ export interface ChatItemInfo {
   ask?: { state: AskState } | null;
   /** When the master corrected an answer (093). */
   editedAt?: string | null;
+  /** What an action is about (098, "Ação sobre…"); null without a target or on a masked whispered action. */
+  target?: TurnTargetInfo | null;
   deleted: boolean;
   canDelete: boolean;
 }

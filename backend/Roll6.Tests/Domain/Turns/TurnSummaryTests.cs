@@ -10,6 +10,25 @@ public class TurnSummaryTests
 {
     private static SummaryLine Line(TurnType type, string actor, string? author = null) => new() { Type = type, Actor = actor, Author = author };
 
+    /// <summary>098: an action with a target says what it is about; one without is written as before.</summary>
+    [Fact]
+    public void Line_ActionWithTarget_AppendsSobre_Escaped()
+    {
+        var onPiece = Line(TurnType.Action, "Cedric (José)") with
+        {
+            Description = "Ataco com a espada",
+            Target = TurnTarget.Piece(9, 7, 3, 133, TurnTarget.KIND_NPC, TurnTarget.SIDE_ENEMY, "Goblin *2*", mapNpcId: 41, look: 2,
+                posture: 2, status: "atordoado", currentLife: 5, totalLife: 12, currentEnergy: 3, totalEnergy: 10)
+        };
+        TurnSummary.Line(onPiece).Should().Be(
+            "Cedric (José): \"Ataco com a espada\" → sobre Goblin \\*2\\* (inimigo, NPC) em (9, 7), a 3 hexes, olhando para o Sudeste, Caído, PV 5/12, Fadiga 3/10, status: \"atordoado\"");
+
+        var onHex = Line(TurnType.Action, "Cedric (José)") with { Description = "Corro", Target = TurnTarget.Hex(12, 4, 5) };
+        TurnSummary.Line(onHex).Should().Be("Cedric (José): \"Corro\" → sobre o hex (12, 4), a 5 hexes");
+
+        TurnSummary.Line(Line(TurnType.Action, "Cedric (José)") with { Description = "Defendo" }).Should().Be("Cedric (José): \"Defendo\"");
+    }
+
     [Fact]
     public void Build_ReproducesTheExampleOfTheSpec()
     {

@@ -172,7 +172,7 @@ export const MainPage = () => {
               onEditNpc={setEditingInstance}
               onAct={setActing}
               onResetTurn={setToReset}
-              picking={tokenPick !== null || toDelete !== null}
+              picking={tokenPick !== null || toDelete !== null || acting !== null}
             />
           )}
           <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })}
