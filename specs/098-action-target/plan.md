@@ -1,12 +1,12 @@
-# Implementation Plan: "Ação sobre…" — a ação declarada sobre um hex do mapa
+# Implementation Plan: "Agir sobre…" — a ação declarada sobre um hex do mapa
 
 **Branch**: `098-action-target` | **Date**: 2026-10-20 | **Spec**: [spec.md](spec.md)
 **Input**: Feature specification from `/specs/098-action-target/spec.md`
 
 ## Summary
 
-A piece's menu gets **"Ação sobre…"** right above "Agir": the map enters a one-click targeting mode, the chosen hex
-stays marked and the action window opens titled after the target ("Ação sobre Goblin guerreiro" / "Ação sobre o hex
+A piece's menu gets **"Agir sobre…"** right above "Agir": the map enters a one-click targeting mode, the chosen hex
+stays marked and the action window opens titled after the target ("Agir sobre Goblin guerreiro" / "Agir sobre o hex
 (9, 7)"). The action is sent with `target: { x, y, mapTokenId? }`; the server resolves the piece under that hex (if any),
 computes the hex distance from the actor's piece (`HexGrid.Distance`, Red Blob cube distance, mirrored in
 `lib/hexGrid.ts`) and stores a **snapshot** of the target in a new `turns.target` jsonb column (`TurnTarget`: hex,
@@ -113,7 +113,7 @@ frontend/src/
 ├── lib/chatItems.ts (+ targetLabel), lib/chatItems.test.ts
 ├── types/turn.ts, types/chat.ts       # TurnTargetInfo, target fields
 ├── Services/turnService.ts, Contexts/TurnContext.tsx   # act(target, …, actionTarget?)
-├── components/map/HexMenu.tsx         # "Ação sobre…" above "Agir" (onActOn)
+├── components/map/HexMenu.tsx         # "Agir sobre…" above "Agir" (onActOn)
 ├── components/map/MapCanvas.tsx       # targeting mode (hover, click = pick, Esc/right click = cancel, crosshair)
 ├── components/modals/ActModal.tsx     # title with the target, sends it, Enter submits
 ├── components/chat/ChatItem.tsx       # "sobre …" under an action

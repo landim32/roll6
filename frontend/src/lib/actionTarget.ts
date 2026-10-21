@@ -5,7 +5,7 @@ import type { MapTokenInfo } from '../types/mapToken';
 import type { ActionTargetWrite, TargetKind, TargetSide, TurnTargetInfo } from '../types/turn';
 
 /**
- * "Ação sobre…" (098): what the map picked for an action — the hex and, when a piece covers it, that piece as the
+ * "Agir sobre…" (098): what the map picked for an action — the hex and, when a piece covers it, that piece as the
  * table shows it. Pure; the server resolves and records the real snapshot (this only names the target in the window
  * and tells the server which piece the player saw).
  */

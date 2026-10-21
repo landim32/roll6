@@ -1,9 +1,9 @@
-# Feature Specification: "Ação sobre…" — a ação declarada sobre um hex do mapa
+# Feature Specification: "Agir sobre…" — a ação declarada sobre um hex do mapa
 
 **Feature Branch**: `098-action-target`
 **Created**: 2026-10-20
 **Status**: Draft
-**Input**: User description: "Crie uma opção chamada "Ação sobre...": no mesmo menu da ação, coloque o "Ação sobre..." acima do "Ação"; a ação sobre quer que selecione um hex; pode ser um hex com um aliado, inimigo ou vazio; quando um aliado ou inimigo estiver no hex, deve pegar informações dele para passar para o modelo; quando o hex estiver vazio deve apenas informar qual hex é; altere as skills "processar-turno" e "gm" para receber essa informação na pasta c:\repos\gurps-adventure; em qualquer ação, pressionar Enter deve funcionar como o clique no botão."
+**Input**: User description: "Crie uma opção chamada "Agir sobre...": no mesmo menu da ação, coloque o "Agir sobre..." acima do "Ação"; a ação sobre quer que selecione um hex; pode ser um hex com um aliado, inimigo ou vazio; quando um aliado ou inimigo estiver no hex, deve pegar informações dele para passar para o modelo; quando o hex estiver vazio deve apenas informar qual hex é; altere as skills "processar-turno" e "gm" para receber essa informação na pasta c:\repos\gurps-adventure; em qualquer ação, pressionar Enter deve funcionar como o clique no botão."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -19,16 +19,16 @@ qualquer outra, mas **carregando o alvo**: quem está lá, ou o hex. Quem resolv
 **Why this priority**: é o recurso em si; sem o alvo, "ataco o goblin" obriga o modelo a adivinhar qual goblin, onde,
 e a que distância.
 
-**Independent Test**: com uma peça própria no mapa e um NPC inimigo a três hexes, "Ação sobre…" → clique no NPC →
+**Independent Test**: com uma peça própria no mapa e um NPC inimigo a três hexes, "Agir sobre…" → clique no NPC →
 "Ataco com a espada" → a ação aparece no chat com o alvo nomeado e os dados do turno a trazem com a peça alvo
 (nome, tipo, posição, distância) para quem processa.
 
 **Acceptance Scenarios**:
 
-1. **Given** o menu de uma peça com a qual o jogador pode agir, **When** o menu abre, **Then** "Ação sobre…" aparece
+1. **Given** o menu de uma peça com a qual o jogador pode agir, **When** o menu abre, **Then** "Agir sobre…" aparece
    logo acima de "Agir", com a mesma disponibilidade (quem pode agir pode agir sobre).
-2. **Given** "Ação sobre…" escolhido, **When** o jogador clica num hex do mapa, **Then** o hex fica marcado e a janela
-   da ação abre com o alvo descrito no título ("Ação sobre Goblin guerreiro", "Ação sobre o hex (9,7)"); Esc ou um
+2. **Given** "Agir sobre…" escolhido, **When** o jogador clica num hex do mapa, **Then** o hex fica marcado e a janela
+   da ação abre com o alvo descrito no título ("Agir sobre Goblin guerreiro", "Agir sobre o hex (9,7)"); Esc ou um
    clique fora do mapa cancela a escolha sem abrir a janela.
 3. **Given** um hex com um aliado ou inimigo (um personagem ou um NPC), **When** a ação é confirmada, **Then** ela
    carrega os dados dessa peça como a mesa os mostra: nome, se é personagem ou NPC e de que lado (aliado, inimigo,
@@ -68,7 +68,7 @@ sem precisar adivinhá-lo pelo texto: o alcance e a distância vêm do alvo, o a
 
 ### User Story 3 - Enter confirma a ação (Priority: P2)
 
-Em qualquer janela de ação — "Agir" e "Ação sobre…" —, com o texto escrito, **Enter** confirma como se o botão tivesse
+Em qualquer janela de ação — "Agir" e "Agir sobre…" —, com o texto escrito, **Enter** confirma como se o botão tivesse
 sido clicado; **Shift+Enter** quebra a linha. Nada muda no botão.
 
 **Why this priority**: é o pedido explícito e um atrito pequeno mas constante.
@@ -96,16 +96,16 @@ no texto; com o texto vazio, Enter não envia.
   ação com alvo por uma sem.
 - Uma ação convertida de mensagem do chat (044) ou declarada pelo chat sem peça (080) não tem alvo.
 - Um hex fora da grade não pode ser escolhido.
-- Jogador que não pode agir com a peça (não é dele, campanha não ativa) não vê "Ação sobre…", como não vê "Agir".
+- Jogador que não pode agir com a peça (não é dele, campanha não ativa) não vê "Agir sobre…", como não vê "Agir".
 - Sussurro (047): uma ação sussurrada com alvo mascara o alvo junto com o texto para quem não a vê.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: O menu de uma peça MUST oferecer **"Ação sobre…"** imediatamente acima de "Agir", a quem pode agir com a
+- **FR-001**: O menu de uma peça MUST oferecer **"Agir sobre…"** imediatamente acima de "Agir", a quem pode agir com a
   peça, nas mesmas condições.
-- **FR-002**: "Ação sobre…" MUST entrar num modo de escolha em que um clique num hex da grade escolhe o alvo (a peça
+- **FR-002**: "Agir sobre…" MUST entrar num modo de escolha em que um clique num hex da grade escolhe o alvo (a peça
   do hex, se houver, ou o hex vazio); o hex escolhido fica marcado; Esc, um clique fora do mapa ou um novo menu cancela.
 - **FR-003**: Escolhido o alvo, a janela da ação MUST abrir dizendo o alvo no título e MUST enviar a ação com o alvo.
 - **FR-004**: Uma ação com alvo MUST guardar: o hex (coordenadas e rótulo da mesa), a distância em hexes da peça que

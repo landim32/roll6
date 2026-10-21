@@ -1,4 +1,4 @@
-# Specification Quality Checklist: "Ação sobre…"
+# Specification Quality Checklist: "Agir sobre…"
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-10-20

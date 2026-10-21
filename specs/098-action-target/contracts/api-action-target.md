@@ -52,7 +52,7 @@ the line is exactly as before. It feeds `get_turn_summary`, `get_turn_data.actio
 ## MCP `act_in_turn`
 
 New optional parameters `targetX`, `targetY` (together; only with `mapTokenId`) and `targetMapTokenId`. Description:
-"Ação sobre…: the hex the action is about — with a piece there, its data at this moment (name, kind, side, posture,
+"Agir sobre…: the hex the action is about — with a piece there, its data at this moment (name, kind, side, posture,
 status, PV/Fadiga, facing) and the distance in hexes are recorded with the action and shown to the master and the GM;
 an empty hex records only the hex and the distance." `ENTRY` and the chat `ITEM` descriptions document `target`;
 `get_turn_data` says the actions text carries "→ sobre …"; the guide's "Turns" section gets the paragraph. No new tool.

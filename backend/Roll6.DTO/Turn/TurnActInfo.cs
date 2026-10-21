@@ -35,7 +35,7 @@ public class TurnActInfo
     public bool? WhisperMaster { get; set; }
 
     /// <summary>
-    /// "Ação sobre…" (098): the hex the action is about, only with <see cref="MapTokenId"/> (a piece on a map). The
+    /// "Agir sobre…" (098): the hex the action is about, only with <see cref="MapTokenId"/> (a piece on a map). The
     /// server records the piece under it (if any) as it is now and the distance from the actor's piece.
     /// </summary>
     [JsonPropertyName("target")]

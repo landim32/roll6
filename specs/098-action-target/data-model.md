@@ -1,4 +1,4 @@
-# Data Model: "Ação sobre…" (098)
+# Data Model: "Agir sobre…" (098)
 
 ## `TurnTarget` (value object, `Roll6.Domain/Models/TurnTarget.cs`)
 

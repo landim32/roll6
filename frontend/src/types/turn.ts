@@ -28,7 +28,7 @@ export type TargetKind = 'character' | 'npc' | 'object';
 export type TargetSide = 'self' | 'ally' | 'enemy' | 'neutral' | 'object';
 
 /**
- * What an action is about (098, "Ação sobre…"), as it was when declared: the hex, the distance from the actor's piece
+ * What an action is about (098, "Agir sobre…"), as it was when declared: the hex, the distance from the actor's piece
  * and, with a piece on the hex, its identity and what the table showed of it. Null on a masked whispered action.
  */
 export interface TurnTargetInfo {

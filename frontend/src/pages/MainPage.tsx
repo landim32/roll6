@@ -16,7 +16,8 @@ import { GridSizeModal } from '../components/modals/GridSizeModal';
 import { ImageModal } from '../components/modals/ImageModal';
 import { SaveMapModal } from '../components/modals/SaveMapModal';
 import { useNavigate } from 'react-router-dom';
-import { campaignEditPath } from '../lib/libraryRoutes';
+import { npcPath } from '../lib/libraryRoutes';
+import type { CampaignNpcInfo } from '../types/npc';
 import { NpcPickerModal } from '../components/modals/NpcPickerModal';
 import { TokenModal } from '../components/modals/TokenModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -68,10 +69,8 @@ export const MainPage = () => {
   /** "Incluir NPC" window and the NPC whose pencil was clicked (014). */
   const [npcPickerOpen, setNpcPickerOpen] = useState(false);
   const navigate = useNavigate();
-  /** The NPC card's pencil (087): its campaign data and its library page are edited on the campaign page. */
-  const editNpc = () => {
-    if (currentCampaign) navigate(campaignEditPath(currentCampaign.slug, 'npcs'));
-  };
+  /** The NPC card's pencil opens that NPC's own page in the library (098; 087 sent it to the campaign's NPC list). */
+  const editNpc = (npc: CampaignNpcInfo) => navigate(npcPath(npc.npcId));
   /** Piece waiting for the delete confirmation; with `mapNpcId` it is an NPC instance leaving the map (051). */
   const [toDelete, setToDelete] = useState<{ mapTokenId: number; name: string; mapNpcId: number | null } | null>(null);
   /** NPC instance open in "Editar NPC" (051). */

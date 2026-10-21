@@ -12,22 +12,26 @@ interface CampaignNpcFieldsProps {
   /** The approved characters of the campaign: who may be an ally's master. */
   party: readonly CampaignCharacterInfo[];
   onChange: (category: NpcCategory, master: number | null) => void;
+  /** Inside a card (098): no legend, small selects stacked one under the other, no hint. */
+  compact?: boolean;
 }
 
 /**
  * "Nesta campanha" of an NPC (071): its category in this campaign and, only for allies, the master character whose
  * owner commands it. Choosing Inimigo or Neutro clears the master.
  */
-export const CampaignNpcFields = ({ idPrefix, category, master, party, onChange }: CampaignNpcFieldsProps) => {
+export const CampaignNpcFields = ({ idPrefix, category, master, party, onChange, compact = false }: CampaignNpcFieldsProps) => {
   const { t } = useTranslation();
   const id = (field: string) => `${idPrefix}-${field}`;
+  const select = compact ? 'form-select form-select-sm' : 'form-select';
+  const label = compact ? 'form-label small mb-1' : 'form-label';
   return (
-    <fieldset className="mt-3">
-      <legend className="fs-6 fw-semibold">{t('npcs.campaignSection')}</legend>
+    <fieldset className={compact ? '' : 'mt-3'}>
+      {!compact && <legend className="fs-6 fw-semibold">{t('npcs.campaignSection')}</legend>}
       <div className="row g-2">
-        <div className="col-sm-5">
-          <label className="form-label" htmlFor={id('category')}>{t('npcs.categoryLabel')}</label>
-          <select id={id('category')} className="form-select" value={String(category)}
+        <div className={compact ? 'col-12' : 'col-sm-5'}>
+          <label className={label} htmlFor={id('category')}>{t('npcs.categoryLabel')}</label>
+          <select id={id('category')} className={select} value={String(category)}
             onChange={(e) => {
               const next = toCategory(e.target.value);
               onChange(next, next === NPC_CATEGORY.ally ? master : null);
@@ -36,9 +40,9 @@ export const CampaignNpcFields = ({ idPrefix, category, master, party, onChange 
           </select>
         </div>
         {category === NPC_CATEGORY.ally && (
-          <div className="col-sm-7">
-            <label className="form-label" htmlFor={id('master')}>{t('npcs.master')}</label>
-            <select id={id('master')} className="form-select" value={master === null ? '' : String(master)}
+          <div className={compact ? 'col-12' : 'col-sm-7'}>
+            <label className={label} htmlFor={id('master')}>{t('npcs.master')}</label>
+            <select id={id('master')} className={select} value={master === null ? '' : String(master)}
               onChange={(e) => onChange(category, e.target.value === '' ? null : Number(e.target.value))}>
               <option value="">{t('npcs.masterNone')}</option>
               {party.map((member) => (
@@ -47,7 +51,7 @@ export const CampaignNpcFields = ({ idPrefix, category, master, party, onChange 
                 </option>
               ))}
             </select>
-            <div className="form-text">{t('npcs.masterHint')}</div>
+            {!compact && <div className="form-text">{t('npcs.masterHint')}</div>}
           </div>
         )}
       </div>

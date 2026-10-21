@@ -360,7 +360,7 @@ public static class Roll6Guide
           (`act_in_turn`, text — a new one cancels the previous). A character acts **with or without a piece**:
           `act_in_turn` takes its piece (`mapTokenId`) or, for a character not on any map, `campaignId` + `characterId`
           (balloons only show over pieces); NPC occurrences always act through their piece.
-        - **"Ação sobre…"** (098): an action of a piece may be *about a hex* — `act_in_turn` with `targetX`/`targetY`
+        - **"Agir sobre…"** (098): an action of a piece may be *about a hex* — `act_in_turn` with `targetX`/`targetY`
           (and optionally `targetMapTokenId`, the piece seen there). The server records, with the action, the hex, the
           distance in hexes from the actor's piece and a **snapshot** of the piece covering the hex as it was at that
           moment (kind character/npc/object, side self/ally/enemy/neutral/object — characters are allies to each other,

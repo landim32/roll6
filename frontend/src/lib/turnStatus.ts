@@ -70,7 +70,7 @@ export const pieceKey = (piece: TurnPiece): string | null => {
 export interface ActTarget extends TurnPiece {
   mapTokenId: number;
   name: string;
-  /** "Ação sobre…" (098): the hex (and the piece on it) the action is about, picked on the map. */
+  /** "Agir sobre…" (098): the hex (and the piece on it) the action is about, picked on the map. */
   target?: ActionTargetPick | null;
 }
 

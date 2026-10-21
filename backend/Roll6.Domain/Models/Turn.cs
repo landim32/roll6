@@ -54,7 +54,7 @@ public class Turn
     public List<TurnChange>? Changes { get; set; }
 
     /// <summary>
-    /// What an action is about (098, "Ação sobre…"): a snapshot taken when it was declared. Only an Action of a piece
+    /// What an action is about (098, "Agir sobre…"): a snapshot taken when it was declared. Only an Action of a piece
     /// on a map has one; <see cref="ToMessage"/> drops it and <see cref="ToAction"/> never sets one.
     /// </summary>
     public TurnTarget? Target { get; set; }
@@ -495,7 +495,7 @@ public class Turn
         Action(campaignId, mapId, characterId, npcId, mapNpcId, turnNo, userId, description, null);
 
     /// <summary>
-    /// An action with what it is about (098, "Ação sobre…"): a hex of the actor's map and the piece on it as it was
+    /// An action with what it is about (098, "Agir sobre…"): a hex of the actor's map and the piece on it as it was
     /// now; only a piece on a map declares one, so <paramref name="mapId"/> is required with a target.
     /// </summary>
     public static Turn Action(long campaignId, long? mapId, long? characterId, long? npcId, long? mapNpcId, int turnNo,

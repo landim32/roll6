@@ -48,7 +48,7 @@ interface TurnContextType {
   // API
   /** Records the piece's action (044: replacing its previous one of the turn), optionally answering a chat entry. */
   /** 080: by piece (`{ mapTokenId }`) or, for a character without one, by `{ campaignId, characterId }`. */
-  /** 098: `actionTarget` ("Ação sobre…") is the hex the action is about, only with a piece as the actor. */
+  /** 098: `actionTarget` ("Agir sobre…") is the hex the action is about, only with a piece as the actor. */
   act: (target: ActionTarget, description: string, replyToTurnId?: number | null, whisper?: WhisperPayload,
     actionTarget?: ActionTargetWrite | null) => Promise<TurnInfo>;
   /** Also reloads the pieces (the move may be undone). */

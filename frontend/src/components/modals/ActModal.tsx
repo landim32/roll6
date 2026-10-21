@@ -13,7 +13,7 @@ const MAX_ACTION = 2000;
 
 interface ActModalProps {
   open: boolean;
-  /** Piece acting (its character or NPC occurrence); with `target` it is an "Ação sobre…" (098). */
+  /** Piece acting (its character or NPC occurrence); with `target` it is an "Agir sobre…" (098). */
   piece: ActTarget | null;
   onClose: () => void;
 }

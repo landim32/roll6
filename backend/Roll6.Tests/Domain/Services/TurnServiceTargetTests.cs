@@ -7,7 +7,7 @@ using Roll6.DTO.Turn;
 
 namespace Roll6.Tests.Domain.Services;
 
-/// <summary>098: "Ação sobre…" — the target of an action, resolved on the actor's map and stored as a snapshot.</summary>
+/// <summary>098: "Agir sobre…" — the target of an action, resolved on the actor's map and stored as a snapshot.</summary>
 public partial class TurnServiceTests
 {
     private static TurnActInfo ActOn(long piece, int x, int y, long? seen = null, string text = "Ataco") => new()
