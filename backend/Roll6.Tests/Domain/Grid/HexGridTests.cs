@@ -122,6 +122,31 @@ public class HexGridTests
         HexGrid.MovementCost(2, 2, 0, 5, 0, 0, 5, 5, Blocked).Should().BeNull();
     }
 
+    /// <summary>098: cube distance over odd-q offsets; the same cases are in hexGrid.test.ts.</summary>
+    [Theory]
+    [InlineData(0, 0, 0, 0, 0)]
+    [InlineData(0, 0, 1, 0, 1)]
+    [InlineData(1, 0, 2, 1, 1)]
+    [InlineData(0, 0, 2, 0, 2)]
+    [InlineData(0, 0, 0, 3, 3)]
+    [InlineData(0, 0, 3, 2, 4)]
+    [InlineData(2, 3, 5, 1, 3)]
+    public void Distance_ReferenceCases(int x1, int y1, int x2, int y2, int expected)
+    {
+        HexGrid.Distance(x1, y1, x2, y2).Should().Be(expected);
+        HexGrid.Distance(x2, y2, x1, y1).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Distance_NeighborsAreOneApart()
+    {
+        foreach (var look in Enumerable.Range(0, 6))
+        {
+            var (x, y) = HexGrid.Neighbor(3, 3, look);
+            HexGrid.Distance(3, 3, x, y).Should().Be(1);
+        }
+    }
+
     [Fact]
     public void Neighbor_EachSideFromEvenAndOddColumns()
     {

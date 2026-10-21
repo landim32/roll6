@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Roll6.DTO.Turn;
 
 namespace Roll6.DTO.Chat;
 
@@ -157,6 +158,10 @@ public class ChatItemInfo
     /// <summary>An answer the master corrected (kind "answer", 093); null when it is as the Claude wrote it.</summary>
     [JsonPropertyName("editedAt")]
     public DateTime? EditedAt { get; set; }
+
+    /// <summary>What an action is about (098, "Ação sobre…"); null without a target or on a masked whispered action.</summary>
+    [JsonPropertyName("target")]
+    public TurnTargetInfo? Target { get; set; }
 }
 
 /// <summary>The state of a question (093): "waiting", "answered" or "failed".</summary>

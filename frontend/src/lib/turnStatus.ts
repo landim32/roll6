@@ -3,6 +3,7 @@ import { movementField, pathTo } from './hexGrid';
 import type { MoveState } from './hexGrid';
 import { TURN_TYPE } from '../types/turn';
 import type { TurnInfo } from '../types/turn';
+import type { ActionTargetPick } from './actionTarget';
 
 /** Card circle: red until it moves, yellow after moving, green once it acted. */
 export const TURN_STATUS = {
@@ -69,6 +70,8 @@ export const pieceKey = (piece: TurnPiece): string | null => {
 export interface ActTarget extends TurnPiece {
   mapTokenId: number;
   name: string;
+  /** "Ação sobre…" (098): the hex (and the piece on it) the action is about, picked on the map. */
+  target?: ActionTargetPick | null;
 }
 
 /** Text of the action the piece already took in the turn in progress, or '' when it has not acted (the "Agir" field starts with it). */

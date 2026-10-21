@@ -1,5 +1,5 @@
 import type { WhisperPayload } from '../lib/whisper';
-import type { TurnFinishResultInfo, TurnInfo, TurnNarrationInfo, TurnResetResultInfo, TurnStateInfo } from '../types/turn';
+import type { ActionTargetWrite, TurnFinishResultInfo, TurnInfo, TurnNarrationInfo, TurnResetResultInfo, TurnStateInfo } from '../types/turn';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 import type { ActionTarget } from '../lib/chatComposer';
 
@@ -40,9 +40,12 @@ class TurnService {
 
   /** Records an action of the piece's character/NPC in the current turn. */
   /** 080: the action names its piece or, for a character without one, the campaign and the character. */
-  async act(target: ActionTarget, description: string, replyToTurnId: number | null = null, whisper: WhisperPayload = {}): Promise<TurnInfo> {
+  /** 098: `actionTarget` ("Ação sobre…") is the hex the action is about, only with a piece as the actor. */
+  async act(target: ActionTarget, description: string, replyToTurnId: number | null = null, whisper: WhisperPayload = {},
+    actionTarget: ActionTargetWrite | null = null): Promise<TurnInfo> {
     const response = await fetch(`${API_URL}/api/turn/action`, {
-      method: 'POST', headers: getHeaders(true), body: JSON.stringify({ ...target, description, replyToTurnId, ...whisper }),
+      method: 'POST', headers: getHeaders(true),
+      body: JSON.stringify({ ...target, description, replyToTurnId, ...whisper, ...(actionTarget ? { target: actionTarget } : {}) }),
     });
     return this.handleResponse<TurnInfo>(response);
   }

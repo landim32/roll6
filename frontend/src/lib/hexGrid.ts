@@ -132,6 +132,18 @@ export const neighbor = (x: number, y: number, look: number): Offset => {
   return { x: offset.x + 0, y: offset.y + 0 };
 };
 
+/**
+ * Hexes between two positions (098): the guide's "Distances" — the cube distance over the axial pair,
+ * max(|dq|, |dr|, |dq + dr|). 0 on the same hex, 1 for neighbours. Mirror of HexGrid.Distance.
+ */
+export const distance = (a: Offset, b: Offset): number => {
+  const from = offsetToAxial(a.x, a.y);
+  const to = offsetToAxial(b.x, b.y);
+  const dq = to.q - from.q;
+  const dr = to.r - from.r;
+  return Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr));
+};
+
 /** Sizes a token may take, in hexes (031). Mirror of HexGrid.ALLOWED_SPACES. */
 export const ALLOWED_SPACES: readonly number[] = [1, 2, 3, 7, 10];
 

@@ -360,6 +360,15 @@ public static class Roll6Guide
           (`act_in_turn`, text — a new one cancels the previous). A character acts **with or without a piece**:
           `act_in_turn` takes its piece (`mapTokenId`) or, for a character not on any map, `campaignId` + `characterId`
           (balloons only show over pieces); NPC occurrences always act through their piece.
+        - **"Ação sobre…"** (098): an action of a piece may be *about a hex* — `act_in_turn` with `targetX`/`targetY`
+          (and optionally `targetMapTokenId`, the piece seen there). The server records, with the action, the hex, the
+          distance in hexes from the actor's piece and a **snapshot** of the piece covering the hex as it was at that
+          moment (kind character/npc/object, side self/ally/enemy/neutral/object — characters are allies to each other,
+          NPCs by their campaign category —, name, posture, status, PV/Fadiga, facing); an empty hex records only the
+          hex and the distance. It is never re-read: whoever processes the turn sees what the player aimed at even if
+          the target moved or left. The chat, `get_turn_summary` and `get_turn_data.actions` end the line with
+          "→ sobre …"; entries carry `target`. Resolve against the pointed piece (by `mapTokenId`/`mapNpcId`/
+          `characterId`, not by name); a whispered action hides its target with its text.
         - `reset_turn` deletes a piece's entries of the current turn and moves it back if the former hex is free.
         - Every entry records who made it (`userId`/`userName`); moves record the movement points spent (`moved`); any
           change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the

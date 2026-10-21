@@ -289,6 +289,11 @@ body,
   }
 }
 
+/* "Ação sobre…" (098): the map waits for the hex the action is about. */
+.stm-map.is-targeting {
+  cursor: crosshair;
+}
+
 .stm-map {
   position: absolute;
   inset: 0;
@@ -1590,6 +1595,16 @@ button.stm-chat-quote { cursor: pointer; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  color: var(--bs-secondary-color);
+}
+
+/* "Ação sobre…" (098): what the action is about, under its text. */
+.stm-chat-action-target {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
   color: var(--bs-secondary-color);
 }
 

@@ -13,7 +13,8 @@ import { useMapToken } from '../../hooks/useMapToken';
 import { useNpc } from '../../hooks/useNpc';
 import { useTokenMovement } from '../../hooks/useTokenMovement';
 import { useTurn } from '../../hooks/useTurn';
-import { hexCenter, lookToward } from '../../lib/hexGrid';
+import { hexCenter, isInsideGrid, lookToward } from '../../lib/hexGrid';
+import { pickTarget } from '../../lib/actionTarget';
 import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewHexes, previewOf } from '../../lib/movement';
 import { hasEntries, hasMoved, lastActions, movementTrails } from '../../lib/turnStatus';
 import { commandsNpc } from '../../lib/npcCategory';
@@ -102,6 +103,42 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
 
   // Another map (or campaign) closes the menu.
   useEffect(() => closeMenu(), [draft.mapId, closeMenu]);
+
+  /**
+   * "Ação sobre…" (098): the piece whose action waits for the hex it is about. While set, the next click on a hex
+   * inside the grid picks the target and opens the action window; Esc, the right button, a click outside the grid,
+   * another map or the piece leaving the map cancel it.
+   */
+  const [targeting, setTargeting] = useState<ActTarget | null>(null);
+  useEffect(() => setTargeting(null), [draft.mapId]);
+  useEffect(() => {
+    if (targeting && !mapTokens.some((token) => token.mapTokenId === targeting.mapTokenId)) setTargeting(null);
+  }, [mapTokens, targeting]);
+  useEffect(() => {
+    if (!targeting) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTargeting(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [targeting]);
+
+  const startTargeting = (actor: ActTarget) => {
+    setTargeting(actor);
+    toast.info(t('turn.targetHint'));
+  };
+
+  /** The click that picks the target: a hex inside the grid opens the window; anything else cancels. */
+  const pickTargetHex = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!targeting) return;
+    const hex = hexAt(event);
+    const actor = mapTokens.find((token) => token.mapTokenId === targeting.mapTokenId);
+    setTargeting(null);
+    if (!hex || !actor || !isInsideGrid(hex, draft.gridWidth, draft.gridHeight)) return;
+    const onThisMap = mapTokens.filter((token) => token.mapId === actor.mapId);
+    setPickedHex(hex);
+    onAct({ ...targeting, target: pickTarget(hex, actor, onThisMap) });
+  };
 
   // Opening a map shows the user's chosen character centered and zoomed in, once its pieces are loaded.
   const centeredFor = useRef<number | null>(null);
@@ -244,6 +281,10 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
       && Math.abs(event.clientX - start.x) < CLICK_TOLERANCE
       && Math.abs(event.clientY - start.y) < CLICK_TOLERANCE;
     if (!clicked || resizeMode) return;
+    if (targeting) {
+      pickTargetHex(event);
+      return;
+    }
     if (movement.active) {
       void clickWhileMoving(event);
       return;
@@ -370,13 +411,18 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
   return (
     <>
       <svg
-        className={`stm-map${panning ? ' stm-panning' : ''}`}
+        className={`stm-map${panning ? ' stm-panning' : ''}${targeting ? ' is-targeting' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={stopPan}
         onPointerLeave={() => hover(null)}
         onContextMenu={(event) => {
+          if (targeting) {
+            event.preventDefault();
+            setTargeting(null);
+            return;
+          }
           if (!movement.active) return;
           event.preventDefault();
           movement.cancel();
@@ -420,6 +466,10 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
           onMove={menuToken && canMove(menuToken) ? () => movement.start(menuToken) : undefined}
           onAct={menuToken && canTakeTurn(menuToken)
             ? () => onAct({
+              mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
+            }) : undefined}
+          onActOn={menuToken && canTakeTurn(menuToken)
+            ? () => startTargeting({
               mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
             }) : undefined}
           onResetTurn={menuToken && canTakeTurn(menuToken) && hasEntries(turnEntries, menuToken)

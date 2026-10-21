@@ -1604,6 +1604,10 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("reply_to_turn_id");
 
+                    b.Property<string>("Target")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("target");
+
                     b.Property<int>("TurnNo")
                         .HasColumnType("integer")
                         .HasColumnName("turn_no");

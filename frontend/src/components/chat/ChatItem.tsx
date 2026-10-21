@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PollCard } from './PollCard';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
-import { Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, LockFillIcon, MoveIcon, PencilIcon, QuestionCircleIcon, RobotIcon } from '../ui/icons';
+import { CrosshairIcon, Dice1Icon, Dice2Icon, Dice3Icon, Dice4Icon, Dice5Icon, Dice6Icon, HandIndexIcon, LightningIcon, LockFillIcon, MoveIcon, PencilIcon, QuestionCircleIcon, RobotIcon } from '../ui/icons';
 import { ChatBubbleGestures } from './ChatBubbleGestures';
 import { ReactionsBadge } from './ReactionsBadge';
 import { ReplyQuote } from './ReplyQuote';
@@ -11,6 +11,7 @@ import { ASK_STATE, CHAT_KIND } from '../../types/chat';
 import type { ChatItemInfo } from '../../types/chat';
 import { authorLabel, chatLabel, formatChanges, formatMovement, isMasterVoice, nameColor, rollTotal, shortName } from '../../lib/chatItems';
 import { formatSeconds } from '../../lib/audioFormat';
+import { targetLabel } from '../../lib/actionTarget';
 
 const MarkdownView = lazy(() => import('../ui/MarkdownView'));
 
@@ -182,6 +183,11 @@ export const ChatItem = ({ item, continued, own, userId, flash, onActions, onRep
                 : <span className="stm-chat-plain stm-chat-text">{item.description ?? ''}</span>}
               {meta}
             </div>
+            {item.target && !item.whisperHidden && (
+              <div className="stm-chat-action-target" title={item.target.text}>
+                <CrosshairIcon size={12} /> {t('chat.actionTarget', { target: targetLabel(item.target) })}
+              </div>
+            )}
             {reactions}
             {whisperFooter}
           </div>

@@ -112,6 +112,7 @@ public partial class TurnService
         foreach (var entry in list.Where(t => t.IsWhisper && t.TurnType == TurnType.Action && !data.CanSee(t, viewerId, isMaster)))
         {
             entry.Description = WhisperAudience.MASKED_TEXT;
+            entry.Target = null; // 098: who the whisper is about is hidden with its text
             data.Masked.Add(entry.TurnId);
         }
         return data;

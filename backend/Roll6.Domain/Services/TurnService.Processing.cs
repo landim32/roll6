@@ -84,7 +84,8 @@ public partial class TurnService
                 Moved = e.Moved,
                 MovedTotal = spent.GetValueOrDefault(key),
                 Description = e.Description,
-                Changes = e.Changes
+                Changes = e.Changes,
+                Target = e.Target
             });
         }
         return lines;

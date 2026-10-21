@@ -21,8 +21,13 @@ Files only; the repository is not committed by the feature. Local use (no flag) 
 
 ```text
 gm.py contexto --campanha N [--turno T] [--json]     # always só-MCP
-gm.py fechar turno.json --campanha N
+gm.py fechar gm-turnos/turno-T.json --campanha N     # the batch written with the Write tool, never under .claude/
+gm.py fechar - --campanha N < lote.json              # or from stdin
 ```
+
+- The batch file lives in `gm-turnos/` at the repository root: `acceptEdits` refuses writes under `.claude/` and
+  outside the working directory, the Bash validator refuses JSON inside a command (`'{"…"}'`), and PowerShell is not
+  an allowed tool — the skill's "Nunca" list says so.
 
 - `--campanha` required (exit 3 `campanha não informada`); `campanha/roll6.json` never read.
 - `contexto` prints, in order: the table (`processar_turno.py contexto --so-mcp --campanha N`), the moves

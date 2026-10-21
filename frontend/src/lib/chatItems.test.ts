@@ -162,6 +162,15 @@ describe('copyableText', () => {
   it('copies the message, the action text and the narration', () => {
     expect(copyableText(item(1, { kind: CHAT_KIND.text, text: '  Olá mesa  ' }))).toBe('Olá mesa');
     expect(copyableText(item(2, { kind: CHAT_KIND.action, description: 'Ataco o orc', text: 'Ana: Ataco o orc' }))).toBe('Ataco o orc');
+    // 098: an action about a piece copies its target too.
+    expect(copyableText(item(2, {
+      kind: CHAT_KIND.action, description: 'Ataco o orc', text: 'Ana: Ataco o orc',
+      target: {
+        x: 9, y: 7, distance: 3, mapTokenId: 43, kind: 'npc', kindLabel: 'NPC', side: 'enemy', sideLabel: 'inimigo', name: 'Orc',
+        characterId: null, mapNpcId: 92, look: 2, lookName: 'Sudeste', posture: 1, postureLabel: 'Em pé', status: null,
+        currentLife: 5, totalLife: 12, currentEnergy: 3, totalEnergy: 10, text: 'Orc (inimigo, NPC) em (9, 7), a 3 hexes',
+      },
+    }))).toBe('Ataco o orc — sobre Orc (inimigo, NPC) · (9, 7) · 3 hexes');
     expect(copyableText(item(3, { kind: CHAT_KIND.narration, text: '## Cena\nA porta range.' }))).toBe('## Cena\nA porta range.');
   });
 

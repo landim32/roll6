@@ -339,6 +339,7 @@ public partial class TurnService : IChatService
         item.AuthorLabel = line?.Author;
         item.Text = line == null ? null : TurnSummary.Line(line);
         item.Description = t.TurnType is TurnType.Action or TurnType.ActionResult ? t.Description : null;
+        item.Target = ToTargetInfo(t.Target); // 098: null without a target or when the whispered action was masked
         if (t is { BeforeX: int bx, BeforeY: int by, BeforeLook: int bl })
             item.Before = new ChatPointInfo { X = bx, Y = by, Look = bl, LookName = TurnSummary.Direction(bl) };
         if (t is { X: int x, Y: int y, Look: int l })

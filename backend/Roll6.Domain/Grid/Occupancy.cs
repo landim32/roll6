@@ -70,6 +70,9 @@ public class Occupancy
     /// <summary>The piece on the hex (the first one when pieces overlap), or null.</summary>
     public long? PieceAt(int x, int y) => _hexes.TryGetValue((x, y), out var ids) ? ids[0] : null;
 
+    /// <summary>Every piece whose shape covers the hex, in the order they were built (098: the action's target).</summary>
+    public IReadOnlyList<long> PiecesAt(int x, int y) => _hexes.TryGetValue((x, y), out var ids) ? ids : Array.Empty<long>();
+
     /// <summary>True when a piece other than <paramref name="exceptMapTokenId"/> takes the hex.</summary>
     public bool IsBlocked(int x, int y, long? exceptMapTokenId) =>
         _hexes.TryGetValue((x, y), out var ids) && ids.Any(id => id != exceptMapTokenId);
