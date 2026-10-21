@@ -289,7 +289,7 @@ body,
   }
 }
 
-/* "Ação sobre…" (098): the map waits for the hex the action is about. */
+/* "Agir sobre…" (098): the map waits for the hex the action is about. */
 .stm-map.is-targeting {
   cursor: crosshair;
 }
@@ -1598,7 +1598,7 @@ button.stm-chat-quote { cursor: pointer; }
   color: var(--bs-secondary-color);
 }
 
-/* "Ação sobre…" (098): what the action is about, under its text. */
+/* "Agir sobre…" (098): what the action is about, under its text. */
 .stm-chat-action-target {
   display: flex;
   align-items: center;
@@ -3071,6 +3071,7 @@ button.stm-library-card-open:focus-visible { outline: 2px solid var(--stm-accent
 .stm-library-card-fallback svg { width: 32%; height: 32%; }
 .stm-library-card-title { display: block; padding: 0.5rem 0.75rem 0; font-weight: 600; }
 .stm-library-card-meta { padding: 0.125rem 0.75rem 0; min-width: 0; }
+.stm-library-card-extra { padding: 0.5rem 0.75rem 0; min-width: 0; }
 .stm-library-card-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: auto; padding: 0.5rem 0.75rem 0.625rem; }
 .stm-library-card-actions:empty { display: none; }
 .stm-library-card-meta + .stm-library-card-actions, .stm-library-card-open + .stm-library-card-actions { padding-top: 0.5rem; }

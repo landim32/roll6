@@ -13,7 +13,7 @@ public static class TurnTools
         Returns: the entry { turnId, campaignId, mapId, turnNo, turnType (1 Movement, 2 Action, 3 ActionResult,
         4 CharacterUpdate, 5 Narration), characterId, npcId, mapNpcId, actorName, userId, userName, beforeX, beforeY,
         beforeLook, x, y, look, moved, description, changes, target, createdAt }. target (098, actions declared with
-        "Ação sobre…") = { x, y, distance (hexes from the actor's piece), mapTokenId | null (empty hex), kind
+        "Agir sobre…") = { x, y, distance (hexes from the actor's piece), mapTokenId | null (empty hex), kind
         character|npc|object, kindLabel, side self|ally|enemy|neutral|object, sideLabel, name, characterId, mapNpcId,
         look, lookName, posture, postureLabel, status, currentLife, totalLife, currentEnergy, totalEnergy, text } — a
         snapshot of the piece as it was when the action was declared (never re-read); null without a target or on a
@@ -36,7 +36,7 @@ public static class TurnTools
         he commands (its master character is his — update_campaign_npc); the master for any character of the campaign or
         any NPC piece.
         Objects can't act.
-        "Ação sobre…" (098): with a piece as the actor, targetX + targetY name the hex the action is about — with a piece
+        "Agir sobre…" (098): with a piece as the actor, targetX + targetY name the hex the action is about — with a piece
         there, its data at this moment (name, kind, side, posture, status, PV/Fadiga, facing) and the distance in hexes
         are recorded with the action and shown in the chat, the summary and the turn data ("→ sobre …") to the master and
         the GM; an empty hex records only the hex and the distance. The own hex is "si mesmo".
@@ -56,8 +56,8 @@ public static class TurnTools
         [Description("Optional: turnId of a chat entry this action answers (shown as a quote).")] long? replyToTurnId = null,
         [Description("Optional whisper (047): ids of characters approved in the campaign who may see it (not your own). Others don't get a whispered message at all; a whispered action shows them \"está sussurrando!\". The master always sees whispers.")] List<long>? whisperCharacterIds = null,
         [Description("Optional whisper (047): true to whisper to the master (not when you are the master).")] bool? whisperMaster = null,
-        [Description("Optional \"Ação sobre…\" (098): column of the hex the action is about, with targetY; only with mapTokenId.")] int? targetX = null,
-        [Description("Optional \"Ação sobre…\" (098): row of the hex the action is about, with targetX.")] int? targetY = null,
+        [Description("Optional \"Agir sobre…\" (098): column of the hex the action is about, with targetY; only with mapTokenId.")] int? targetX = null,
+        [Description("Optional \"Agir sobre…\" (098): row of the hex the action is about, with targetX.")] int? targetY = null,
         [Description("Optional (098): the piece seen on that hex (it must cover it). Omitted: the piece covering the hex, or none.")] long? targetMapTokenId = null) =>
         api.SendAsync(HttpMethod.Post, "/api/turn/action",
             new TurnActInfo
@@ -95,7 +95,7 @@ public static class TurnTools
         character's permanent move —, status and,
         when it has a piece on the current map, x/y/look/lookName), every NPC occurrence on the current map (mapNpcId, name,
         current/total life and energy, status, x/y/look/lookName) and "actions": the "## Ações" markdown of the turn (moves,
-        actions, results, changes, narration, with who made them; an action declared with "Ação sobre…" ends with
+        actions, results, changes, narration, with who made them; an action declared with "Agir sobre…" ends with
         "→ sobre <the piece or the hex, with its distance and data at declaration time>" — resolve it against that piece, by
         identity, not by name; the structured target is on the entries of get_turn_state / list_turn_entries).
         Who can use it: the campaign master or a player with an approved character in the campaign.

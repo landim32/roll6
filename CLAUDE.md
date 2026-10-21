@@ -104,7 +104,7 @@ Solution lives in `backend/` (`Roll6.sln`): `DTO` → `Infra.Interfaces` → `Do
   `turnService.act(target, …)`/`TurnContext.act(target, …)`; the composer's ⚡ switch is enabled for any approved
   character (the `chat.placeToAct` warning is gone). MCP `act_in_turn`: optional `mapTokenId`, new `campaignId`/
   `characterId` (still 115 operations / 116 tools).
-- "Ação sobre…" (098): an action of a piece may be about a hex.
+- "Agir sobre…" (098): an action of a piece may be about a hex.
   - **Data**: `turns.target jsonb null` (`Turn.Target`, `Domain/Models/TurnTarget` — a **snapshot** taken when the action
     is declared, never re-read: `x`/`y`, `distance` (`HexGrid.Distance`, Red Blob cube distance, mirrored by
     `lib/hexGrid.distance`), and with a piece on the hex `mapTokenId`, `kind` character|npc|object, `side`
@@ -123,11 +123,11 @@ Solution lives in `backend/` (`Roll6.sln`): `DTO` → `Infra.Interfaces` → `Do
     `o hex (12, 4), a 5 hexes`; own piece: `si mesmo em (4, 4)`), so `get_turn_summary`, `get_turn_data.actions` and the
     chat `text` carry it; `MaskForViewerAsync` also drops the target of a masked whispered action.
   - **Frontend**: pure `lib/actionTarget` (`pickTarget` — piece covering the hex, last of the list wins —, `targetTitle`,
-    `toTargetWrite`, `targetLabel`, `submitsOnEnter`); `HexMenu` item **"Ação sobre…"** (`onActOn`, `CrosshairIcon`)
-    right above "Agir", same availability; `MapCanvas` targeting mode (`targeting` state, `.is-targeting` crosshair
+    `toTargetWrite`, `targetLabel`, `submitsOnEnter`); `HexMenu` item **"Agir sobre…"** (`onActOn`, `CrosshairIcon`)
+    right above "Agir" inside one "Ação" group (`hexMenu.actGroup`, a section header like "Postura"), same availability; `MapCanvas` targeting mode (`targeting` state, `.is-targeting` crosshair
     cursor, toast `turn.targetHint`; a click on a hex inside the grid calls `onAct({ …, target })` and keeps the hex
     selected while `ActModal` is open — `MainPage` passes `acting !== null` into `picking`; Esc, right click, a click
-    outside the grid, another map or the actor's piece leaving cancel); `ActModal` titled `turn.actOnTitle` ("Ação sobre
+    outside the grid, another map or the actor's piece leaving cancel); `ActModal` titled `turn.actOnTitle` ("Agir sobre
     {{target}} — {{name}}"), sends the target through `turnService.act(…, actionTarget)`, and **Enter submits /
     Shift+Enter breaks the line** in every action window (FR-008); `ChatItem` shows `chat.actionTarget` ("sobre Goblin 2
     (inimigo, NPC) · (9, 7) · 3 hexes") under an action and `copyableText` appends " — sobre …".
@@ -615,7 +615,9 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
   - **Table entry points**: the gear and "Gerenciar personagens" → `campaignEditPath(slug)`; "Selecionar personagem" →
     `/library/characters`; "Incluir personagem" → `/library/characters/new`; "Outras campanhas…" →
     `/library/campaigns/search`; "Mapas…" → `/library/maps`; map pencils → `mapEditPath`; the NPC card pencil →
-    the campaign's NPCs section, whose rows now hold the category/master (`CampaignNpcFields`) and "Retirar da campanha".
+    the NPC's own page (`npcPath`, since 098 — 087 sent it to the campaign's NPCs section); that section is a 4-column
+    `CardGrid` of `LibraryCard`s (098: large picture, category badge, the compact `CampaignNpcFields` in the card's `extra`
+    slot, pencil and "Retirar da campanha").
   - **Still windows at the table** (in-play): `TokenModal` as the piece/character token **picker** (Meus · Buscar ·
     Incluir; no edit pencil), `NpcPickerModal`, `CampaignCharacterModal` (party card), `MapNpcFormModal`, `ImageModal`,
     `SaveMapModal`, `TransferCharacterModal` (from the character page) and the confirmations.
@@ -1020,7 +1022,7 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
-- 098-action-target: "Ação sobre…" above "Agir" in the piece menu — the player picks a hex on the map and the action is
+- 098-action-target: "Agir sobre…" above "Agir" in the piece menu — the player picks a hex on the map and the action is
   recorded with a snapshot of what was there (piece identity, kind, side, name, posture, status, PV/Fadiga, facing) and the
   distance in hexes, or only the hex; shown in the chat ("sobre …"), the summary and the turn data ("→ sobre …"), hidden
   with a masked whisper; the table skills print and resolve against the pointed piece; Enter sends the action window.

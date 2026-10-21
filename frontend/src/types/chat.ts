@@ -113,7 +113,7 @@ export interface ChatItemInfo {
   ask?: { state: AskState } | null;
   /** When the master corrected an answer (093). */
   editedAt?: string | null;
-  /** What an action is about (098, "Ação sobre…"); null without a target or on a masked whispered action. */
+  /** What an action is about (098, "Agir sobre…"); null without a target or on a masked whispered action. */
   target?: TurnTargetInfo | null;
   deleted: boolean;
   canDelete: boolean;

@@ -159,7 +159,7 @@ public class ChatItemInfo
     [JsonPropertyName("editedAt")]
     public DateTime? EditedAt { get; set; }
 
-    /// <summary>What an action is about (098, "Ação sobre…"); null without a target or on a masked whispered action.</summary>
+    /// <summary>What an action is about (098, "Agir sobre…"); null without a target or on a masked whispered action.</summary>
     [JsonPropertyName("target")]
     public TurnTargetInfo? Target { get; set; }
 }

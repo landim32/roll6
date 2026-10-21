@@ -1,4 +1,4 @@
-# Tasks: "Ação sobre…" — a ação declarada sobre um hex do mapa
+# Tasks: "Agir sobre…" — a ação declarada sobre um hex do mapa
 
 **Input**: Design documents from `/specs/098-action-target/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/api-action-target.md,
@@ -82,7 +82,7 @@ and `npm test -- hexGrid` pass; the migration exists.
 
 ## Phase 3: User Story 1 — Declarar uma ação sobre um hex (Priority: P1) 🎯 MVP
 
-**Goal**: "Ação sobre…" above "Agir" → pick a hex → the action is saved with the target snapshot and shown in the
+**Goal**: "Agir sobre…" above "Agir" → pick a hex → the action is saved with the target snapshot and shown in the
 chat, the summary and the turn reads.
 
 **Independent Test**: quickstart steps 1–5 and 8 (table, chat, `GET /api/campaign/{id}/turn`, `get_turn_data`).
@@ -138,8 +138,8 @@ chat, the summary and the turn reads.
       labels, singular)
 - [X] T023 [P] [US1] Add `CrosshairIcon` (Bootstrap Icons "crosshair" path, `currentColor`, `size`) to
       `frontend/src/components/ui/icons.tsx`
-- [X] T024 [P] [US1] i18n in `frontend/src/i18n/locales/pt-BR.json`: `hexMenu.actOn` "Ação sobre…",
-      `turn.actOnTitle` "Ação sobre {{target}} — {{name}}", `turn.targetHint` "Clique no hex do alvo (Esc cancela)",
+- [X] T024 [P] [US1] i18n in `frontend/src/i18n/locales/pt-BR.json`: `hexMenu.actOn` "Agir sobre…",
+      `turn.actOnTitle` "Agir sobre {{target}} — {{name}}", `turn.targetHint` "Clique no hex do alvo (Esc cancela)",
       `chat.actionTarget` "sobre {{target}}"
 - [X] T025 [US1] `frontend/src/components/map/HexMenu.tsx`: prop `onActOn?: () => void` rendered **above** the "Agir"
       item (`CrosshairIcon`, `autoFocus={!onMove}` moves to it when present), same visibility rule as `onAct`
@@ -218,7 +218,7 @@ targeted action prints "→ sobre …"; `--json` carries `acoes[].alvo`; `gm.py 
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [X] T040 [P] Update `CLAUDE.md` (hand-maintained sections, keep BOM + CRLF): a "Ação sobre… (098)" bullet under the
+- [X] T040 [P] Update `CLAUDE.md` (hand-maintained sections, keep BOM + CRLF): a "Agir sobre… (098)" bullet under the
       turn/action notes (the `turns.target` snapshot, resolution rule, summary text, mask, frontend targeting mode,
       Enter, skills, MCP parameters, still 125 operations / 126 tools) and a "Recent Changes" entry
 - [X] T041 [P] `backend/Roll6.Console/README.md` / MCP guide consistency check: nothing to change in the console;

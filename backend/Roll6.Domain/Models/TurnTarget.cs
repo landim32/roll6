@@ -3,7 +3,7 @@ using Roll6.Domain.Turns;
 namespace Roll6.Domain.Models;
 
 /// <summary>
-/// What an action is about (098, "Ação sobre…"): a hex of the actor's map, the distance from the actor's piece and,
+/// What an action is about (098, "Agir sobre…"): a hex of the actor's map, the distance from the actor's piece and,
 /// when a piece covered the hex, a <b>snapshot</b> of that piece as the table showed it when the action was declared
 /// — never re-read afterwards (the target may move, fall or leave the map before the turn is processed). Stored as
 /// JSON in <c>turns.target</c>; null = an action without a target.

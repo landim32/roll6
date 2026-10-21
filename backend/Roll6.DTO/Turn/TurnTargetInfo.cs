@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Roll6.DTO.Turn;
 
 /// <summary>
-/// What an action is about (098, "Ação sobre…"), as it was when the action was declared: the hex, the distance in
+/// What an action is about (098, "Agir sobre…"), as it was when the action was declared: the hex, the distance in
 /// hexes from the actor's piece and, when a piece covered the hex, that piece's identity and what the table showed of
 /// it (never re-read afterwards). Null on an action without a target and on a whispered action masked for the reader.
 /// </summary>

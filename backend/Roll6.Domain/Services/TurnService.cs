@@ -191,7 +191,7 @@ public partial class TurnService : ITurnService
             campaign = pieceCampaign;
             actor = await ResolveActorAsync(userId, piece, campaign);
             mapId = map.MapId;
-            // 098: "Ação sobre…" — the hex (and the piece on it, as it is now) the action is about.
+            // 098: "Agir sobre…" — the hex (and the piece on it, as it is now) the action is about.
             if (info.Target != null)
                 target = await ResolveTargetAsync(map, piece, campaign, info.Target, actor.CharacterId, actor.MapNpcId);
         }

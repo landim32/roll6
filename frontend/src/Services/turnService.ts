@@ -40,7 +40,7 @@ class TurnService {
 
   /** Records an action of the piece's character/NPC in the current turn. */
   /** 080: the action names its piece or, for a character without one, the campaign and the character. */
-  /** 098: `actionTarget` ("Ação sobre…") is the hex the action is about, only with a piece as the actor. */
+  /** 098: `actionTarget` ("Agir sobre…") is the hex the action is about, only with a piece as the actor. */
   async act(target: ActionTarget, description: string, replyToTurnId: number | null = null, whisper: WhisperPayload = {},
     actionTarget: ActionTargetWrite | null = null): Promise<TurnInfo> {
     const response = await fetch(`${API_URL}/api/turn/action`, {

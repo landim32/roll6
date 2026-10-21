@@ -19,7 +19,7 @@ interface HexMenuProps {
   onMove?: () => void;
   /** "Agir" (016): records an action of the piece's character/NPC; absent for objects or others' pieces. */
   onAct?: () => void;
-  /** "Ação sobre…" (098): like "Agir", after picking the hex the action is about; same availability. */
+  /** "Agir sobre…" (098): like "Agir", after picking the hex the action is about; same availability. */
   onActOn?: () => void;
   /** "Resetar turno" (016): only when the piece has entries in the turn in progress. */
   onResetTurn?: () => void;
@@ -112,17 +112,23 @@ export const HexMenu = ({
           <MoveIcon size={18} />
         </button>
       )}
-      {token && onActOn && (
-        <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove} onClick={choose(onActOn)}>
-          <span>{t('hexMenu.actOn')}</span>
-          <CrosshairIcon size={18} />
-        </button>
-      )}
-      {token && onAct && (
-        <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove && !onActOn} onClick={choose(onAct)}>
-          <span>{t('hexMenu.act')}</span>
-          <SpeechIcon size={18} />
-        </button>
+      {/* 098: "Agir sobre…" and "Agir" share one "Ação" group, like the postures. */}
+      {token && (onActOn || onAct) && (
+        <div role="group" aria-label={t('hexMenu.actGroup')}>
+          <div className="stm-float-menu-section">{t('hexMenu.actGroup')}</div>
+          {onActOn && (
+            <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove} onClick={choose(onActOn)}>
+              <span>{t('hexMenu.actOn')}</span>
+              <CrosshairIcon size={18} />
+            </button>
+          )}
+          {onAct && (
+            <button type="button" className="stm-float-menu-item" role="menuitem" autoFocus={!onMove && !onActOn} onClick={choose(onAct)}>
+              <span>{t('hexMenu.act')}</span>
+              <SpeechIcon size={18} />
+            </button>
+          )}
+        </div>
       )}
       {token && onResetTurn && (
         <button type="button" className="stm-float-menu-item" role="menuitem" onClick={choose(onResetTurn)}>

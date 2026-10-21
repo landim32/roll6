@@ -1,4 +1,4 @@
-# Research: "Ação sobre…" (098)
+# Research: "Agir sobre…" (098)
 
 No `NEEDS CLARIFICATION` remained in the spec; this file records the design decisions behind the plan.
 
@@ -61,7 +61,7 @@ No `NEEDS CLARIFICATION` remained in the spec; this file records the design deci
 
 ## D6 — Targeting mode on the map
 
-- **Decision**: `MapCanvas` gets a `targeting: ActTarget | null` state. "Ação sobre…" (`onActOn`, above "Agir",
+- **Decision**: `MapCanvas` gets a `targeting: ActTarget | null` state. "Agir sobre…" (`onActOn`, above "Agir",
   `CrosshairIcon`) sets it; while set, the svg has `.is-targeting` (crosshair cursor), hover keeps highlighting the hex
   (the existing `HexHighlight`, whole footprint when a piece is there), a click (< 4 px, same tolerance as the menu)
   on a hex inside the grid calls `onAct({ ...actor, target: pickTarget(hex, pieceAt) })` and marks the hex with
@@ -76,7 +76,7 @@ No `NEEDS CLARIFICATION` remained in the spec; this file records the design deci
 
 - **Decision**: `ActModal`'s textarea gets `onKeyDown`: Enter without Shift (and not while composing) → `preventDefault`
   + `form.requestSubmit()`; the submit keeps its guard (empty/whitespace does nothing). The same handler serves "Agir"
-  and "Ação sobre…" since they are the same modal.
+  and "Agir sobre…" since they are the same modal.
 - **Rationale**: FR-008; `ChatComposer` already does Enter/Shift+Enter the same way.
 
 ## D8 — Skills
@@ -94,4 +94,4 @@ No `NEEDS CLARIFICATION` remained in the spec; this file records the design deci
 
 - **Decision**: `act_in_turn` takes `targetX`, `targetY`, `targetMapTokenId` (all optional; the pair required
   together, only with `mapTokenId`); `ENTRY`/`ITEM` descriptions document `target`; the guide's "Turns" paragraph
-  explains "Ação sobre…". No new tool (125 operations / 126 tools unchanged).
+  explains "Agir sobre…". No new tool (125 operations / 126 tools unchanged).

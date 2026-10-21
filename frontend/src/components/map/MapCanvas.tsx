@@ -105,7 +105,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRese
   useEffect(() => closeMenu(), [draft.mapId, closeMenu]);
 
   /**
-   * "Ação sobre…" (098): the piece whose action waits for the hex it is about. While set, the next click on a hex
+   * "Agir sobre…" (098): the piece whose action waits for the hex it is about. While set, the next click on a hex
    * inside the grid picks the target and opens the action window; Esc, the right button, a click outside the grid,
    * another map or the piece leaving the map cancel it.
    */

@@ -12,6 +12,8 @@ interface LibraryCardProps {
   /** Small line under the title (owner, master…). */
   meta?: ReactNode;
   badges?: ReactNode;
+  /** Extra content between the meta line and the actions (e.g. the campaign fields of an NPC). */
+  extra?: ReactNode;
   /** Icon-only buttons (each with `title` + `aria-label`). */
   actions?: ReactNode;
   /** What clicking the card does (open on the table, open the page). */
@@ -24,7 +26,7 @@ interface LibraryCardProps {
  * One item of a library list as a card (090): the picture on top at a fixed ratio, the name, a meta line, badges and
  * the actions of the row it replaced. The picture and the name open the item; the actions sit apart so they never do.
  */
-export const LibraryCard = ({ title, figure, fallback, ratio, meta, badges, actions, onOpen, muted }: LibraryCardProps) => {
+export const LibraryCard = ({ title, figure, fallback, ratio, meta, badges, extra, actions, onOpen, muted }: LibraryCardProps) => {
   const body = (
     <>
       <span className={`stm-library-card-figure ratio ${ratio === 'wide' ? 'ratio-16x9' : 'ratio-1x1'}`}>
@@ -44,6 +46,7 @@ export const LibraryCard = ({ title, figure, fallback, ratio, meta, badges, acti
           {badges && <div className="d-flex flex-wrap gap-1">{badges}</div>}
         </div>
       )}
+      {extra && <div className="stm-library-card-extra">{extra}</div>}
       {actions && <div className="stm-library-card-actions">{actions}</div>}
     </div>
   );
