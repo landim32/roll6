@@ -50,6 +50,12 @@ public class CampaignCharacter
     public Posture Posture { get; set; } = Posture.Standing;
 
     /// <summary>
+    /// Whether the turn waits for this character's action: one out of combat owes none — it leaves the pending list,
+    /// the "Falta…" notice, the poke and the GM mode's check (it may still act).
+    /// </summary>
+    public bool OwesAction() => Posture != Posture.OutOfCombat;
+
+    /// <summary>
     /// The standing order of this actor (099, "Ação repetida"): applied as its action at the start of every turn until it
     /// is removed, replaced by another action or cleared by whoever processes the turn. Null = none.
     /// </summary>

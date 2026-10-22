@@ -10,6 +10,7 @@ import { useTurn } from '../../hooks/useTurn';
 import { useCampaign } from '../../hooks/useCampaign';
 import { showPending } from '../../lib/freeMode';
 import { hexCenter } from '../../lib/hexGrid';
+import { isOutOfCombat } from '../../lib/pieceDrawing';
 import { LAYOUT_MODE } from '../../lib/layoutMode';
 import { TURN_STATUS, characterStatus } from '../../lib/turnStatus';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
@@ -20,7 +21,7 @@ const FOCUS_ZOOM = 1.5;
 /**
  * Floating over the top of the chat: the round pictures of the characters that still owe their play this turn — red
  * border when they neither moved nor acted, yellow when they only moved — blinking slowly. A tap goes to the map, on
- * that character's piece.
+ * that character's piece. Characters out of combat are not waited for.
  */
 export const PendingPlayers = () => {
   const { t } = useTranslation();
@@ -31,7 +32,9 @@ export const PendingPlayers = () => {
   const { layoutMode, setLayoutMode } = useChat();
   const { currentCampaign } = useCampaign();
 
+  // An out-of-combat character owes no play (the server leaves it out of "Falta…", the poke and the GM mode too).
   const pending = useMemo(() => (turnNo === null ? [] : party
+    .filter((member) => !isOutOfCombat(member))
     .map((member) => ({ member, status: characterStatus(entries, member.characterId) }))
     .filter(({ status }) => status !== TURN_STATUS.acted)), [turnNo, party, entries]);
 

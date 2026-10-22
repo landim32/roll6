@@ -81,7 +81,7 @@ public partial class TurnService
     private async Task NotifyPendingAsync(Campaign campaign, long userId)
     {
         var approved = (await _campaignCharacterRepository.ListByCampaignAsync(campaign.CampaignId, approvedOnly: true))
-            .Select(p => p.CharacterId).Distinct().ToList();
+            .Where(p => p.OwesAction()).Select(p => p.CharacterId).Distinct().ToList();
         if (approved.Count == 0)
             return;
         var acted = (await _repository.ListByCampaignTurnAsync(campaign.CampaignId, campaign.CurrentTurn))
@@ -136,7 +136,8 @@ public partial class TurnService
             .Where(e => e.TurnType == TurnType.Action && e.CharacterId.HasValue)
             .Select(e => e.CharacterId!.Value)
             .ToHashSet();
-        var missing = await _characterRepository.ListByIdsAsync(approved.Select(p => p.CharacterId).Where(c => !acted.Contains(c)).Distinct());
+        var missing = await _characterRepository.ListByIdsAsync(approved.Where(p => p.OwesAction()).Select(p => p.CharacterId)
+            .Where(c => !acted.Contains(c)).Distinct());
         var pokedIds = missing.Select(c => c.UserId).Where(u => u != userId).Distinct().ToList();
         if (pokedIds.Count == 0)
             return campaign.UserId == userId ? new PokeResultInfo { Poked = 0 } : await PokeMasterAsync(campaign, userId);

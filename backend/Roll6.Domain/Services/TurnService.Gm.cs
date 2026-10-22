@@ -43,13 +43,13 @@ public partial class TurnService : IGmService
     }
 
     /// <summary>
-    /// The approved characters of the campaign and those with a valid action in the current turn — the one computation
+    /// The approved characters of the campaign that owe an action (not out of combat) and those with a valid action in the current turn — the one computation
     /// behind "Finalizar turno"'s pending list, the "Falta…" notice and the GM mode.
     /// </summary>
     private async Task<(List<long> Approved, HashSet<long> Acted)> ActedAsync(Campaign campaign)
     {
         var approved = (await _campaignCharacterRepository.ListByCampaignAsync(campaign.CampaignId, approvedOnly: true))
-            .Select(p => p.CharacterId).Distinct().ToList();
+            .Where(p => p.OwesAction()).Select(p => p.CharacterId).Distinct().ToList();
         var acted = (await _repository.ListByCampaignTurnAsync(campaign.CampaignId, campaign.CurrentTurn))
             .Where(e => e.TurnType == TurnType.Action && e.CharacterId.HasValue)
             .Select(e => e.CharacterId!.Value)
