@@ -31,6 +31,8 @@ interface MapGeneratorContextType {
   removeAttachment: (id: number) => void;
   /** The version was saved as a map (the page stops asking before leaving for it). */
   markSaved: (version: number) => void;
+  /** The image editor (100) applied its edits: a new version from <c>from</c>, selected. */
+  applyEdit: (image: { url: string; base64: string; mediaType: string }, from: number) => void;
 }
 
 const MapGeneratorContext = createContext<MapGeneratorContextType | undefined>(undefined);
@@ -199,14 +201,16 @@ export const MapGeneratorProvider = ({ mapModelId, children }: { mapModelId: num
   const replaceAttachment = useCallback((attachment: GeneratorAttachment) => setState((s) => reducers.replaceAttachment(s, attachment)), []);
   const removeAttachment = useCallback((id: number) => setState((s) => reducers.removeAttachment(s, id)), []);
   const markSaved = useCallback((version: number) => setState((s) => reducers.saved(s, version)), []);
+  const applyEdit = useCallback((image: { url: string; base64: string; mediaType: string }, from: number) =>
+    setState((s) => reducers.edited(s, { ...image, from })), []);
 
   const dirty = isDirty(state);
 
   const value = useMemo<MapGeneratorContextType>(() => ({
     state, loading, error, connected, baseModel, dirty, sendRequest, stopRequest, newConversation, select, attach,
-    replaceAttachment, removeAttachment, markSaved,
+    replaceAttachment, removeAttachment, markSaved, applyEdit,
   }), [state, loading, error, connected, baseModel, dirty, sendRequest, stopRequest, newConversation, select, attach,
-    replaceAttachment, removeAttachment, markSaved]);
+    replaceAttachment, removeAttachment, markSaved, applyEdit]);
 
   return <MapGeneratorContext.Provider value={value}>{children}</MapGeneratorContext.Provider>;
 };

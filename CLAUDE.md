@@ -884,6 +884,18 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
     `mapModelService.create`; in an edit session also "Substituir a imagem de …" (`mapModelService.update` keeping
     grid, mask and the rest). `useLeaveGuard(dirty)`. Own map cards in `MapsPage` get "Editar no gerador"
     (`MagicIcon`). Texts `mapGenerator.*`.
+  - **Image editor (100)**: "Editar" (next to "Marcar", disabled while a request runs) opens
+    `components/mapGenerator/MapImageEditor` — a full-screen window on the selected version's real pixels, with zoom
+    (wheel, pinch, ±, fit) and pan (tool, space, two fingers) — and `ImageEditorToolbar`: **pincel** (colour,
+    eyedropper, size 1–200, opacity), **clonar** (origin by Alt+click or "Origem" + tap; the first stroke fixes the
+    offset, Q2 = B), **cortar** (rectangle with 8 handles, free or locked ratio, ≥ 64 × 64) and **girar** (90° and
+    flips, Q1 = A); Ctrl+Z/Ctrl+Y. The pure `lib/imageEdit` keeps the edits as an operation log (`EditOp`,
+    `EditHistory`, `MAX_UNDO` 50 — older ops folded into the base — checkpoints every 10, `clampRect`, `sizeAfter`,
+    `mapPoint`, `interpolate`) and draws them (`StrokeLayer`: dabs at full strength on a layer laid with the stroke's
+    opacity; clone samples the image as it was when the stroke began). "Aplicar" → PNG → reducer `edited` = version
+    `max + 1` with `editedFrom` ("editada de vN" on the strip); `imageArrived` now renumbers a Codex image whose
+    number is already taken (dropping only a repeated report). Nothing leaves the tab; the page's leave guard counts
+    an editor with edits.
   - **Live**: a real console run drew a pure plan-view taverna after the Codex rejected its own first try for showing
     wall faces (research T024/T034).
 
@@ -892,6 +904,32 @@ cd backend
 dotnet run --project Roll6.Console                 # needs ROLL6_API_KEY (and ROLL6_URL=http://localhost:5119 against the dev API)
 dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../dist/roll6-console
 ```
+
+## Versioning and commit messages
+
+Versions are computed by **GitVersion** (`GitVersion.yml`, `mode: ContinuousDelivery`) in `.github/workflows/version-tag.yml`
+on every push to `main`, which tags `vX.Y.Z`; `create-release.yml` then creates a GitHub release **only when the major or
+minor number changed** (a patch gets a tag, no release). The increment comes from the commit messages since the last tag
+(`commit-message-incrementing: Enabled`); without a matching message `main` still bumps the **patch** (`increment: Patch`).
+The project reached **1.0.0** on 2026-10-22 by the user's request: the production commit of v0.67.1 was tagged `v1.0.0`
+(with its release) by hand; GitVersion counts from the highest tag, so the next `feat:` is 1.1.0 and the next `fix:` 1.0.1.
+
+| Prefix (start of a line of the message) | Bump | Use it for |
+|---|---|---|
+| `fix:` (or `patch:`) | patch `1.0.0 → 1.0.1` | **small corrections**: a bug, a wrong text, a broken layout, a deploy/console fix, docs or tests alone |
+| `feat:` (or `feature:`, `minor:`) | minor `1.0.1 → 1.1.0` | **a complete feature** — normally one Spec Kit feature (`NNN-…`) delivered |
+| `major:` / `breaking:` | major `1.1.0 → 2.0.0` | **only when the user explicitly asks for a major version** — never on our own |
+| `+semver: none` / `+semver: skip` | none | a commit that must not move the version |
+
+- The regexes are case-insensitive and match **any line** of the message, body included: never start a body line with
+  `major:`, `breaking:`, `feat:` or `fix:` by accident (it would bump that level). Write those words mid-sentence.
+- The highest bump among the commits since the last tag wins (a `feat:` and a `fix:` in the same PR → minor). GitHub's
+  merge commit ("Merge pull request #N from …") carries the **PR title** in its body, so the PR title counts too: give it
+  the same prefix as the commit (`gh pr create --title "fix: …"`).
+- Pick the prefix by the size of the change, not by the branch name: a Spec Kit feature that only polishes or corrects
+  something already delivered (e.g. a renamed menu item, a layout tweak after a table test) is a `fix:`.
+- Commit messages are written to a file and committed with `git commit -F` (Portuguese summary line after the prefix,
+  the feature number in parentheses, e.g. `feat: ação repetida e menu da peça mais compacto (099)`).
 
 ## Environments
 
@@ -903,7 +941,7 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 | SSL / Swagger | dev cert / on | none / on | Cloudflare + the server's reverse proxy (shared `emagine-network`) / off |
 
 - Settings reach the app only through the default providers with the `__` convention (`Jwt__Secret`, `S3__BucketName`, `ConnectionStrings__Roll6Context`); AWS credentials use the SDK's `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`. Don't add `AddEnvironmentVariables("PREFIX")`.
-- `.env` and `.env.prod` are git-ignored; keep `.env.example` / `.env.prod.example` in sync when adding settings, plus the heredoc in `.github/workflows/deploy-prod.yml` (runs on every push to `main` and manually; SSH deploy to `/opt/roll6`, one at a time). Workflows copied from AvaBot: `version-tag.yml` (GitVersion, `GitVersion.yml`, tags `vX.Y.Z` on `main`; `feat:`/`minor:` bumps minor, `fix:` patch, `breaking:` major) and `create-release.yml` (GitHub release when major/minor changes).
+- `.env` and `.env.prod` are git-ignored; keep `.env.example` / `.env.prod.example` in sync when adding settings, plus the heredoc in `.github/workflows/deploy-prod.yml` (runs on every push to `main` and manually; SSH deploy to `/opt/roll6`, one at a time). Workflows copied from AvaBot: `version-tag.yml` (GitVersion, `GitVersion.yml`, tags `vX.Y.Z` on `main`; see "Versioning and commit messages") and `create-release.yml` (GitHub release when major/minor changes).
 - Production secrets (GitHub): `PROD_SSH_HOST`/`USER`/`PASSWORD`(/`PORT`), `ROLL6_CONNECTION_STRING` (external PostgreSQL), `ROLL6_JWT_SECRET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`; the S3 folder is fixed (`roll6`) in the compose file.
 - Startup migrations are toggled by `Database:ApplyMigrationsOnStartup`.
 - Docker must not be run on the dev machine (constitution); compose files are for homolog/prod hosts.
@@ -1044,6 +1082,8 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - PostgreSQL — `turns.target jsonb null` (the action's target snapshot); migration `AddTurnTarget` + `database/migrations/098-turn-target.sql`. (098-action-target)
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend); Python 3 standard library (the table repository's skills) + existing only (ASP.NET Core 8, EF Core 9 + Npgsql, SignalR, `ModelContextProtocol.AspNetCore` 2.x; React 18, Bootstrap 5.3, i18next, Radix Dialog). **No new dependency.** (099-repeated-action)
 - PostgreSQL — `campaign_characters`/`map_npcs` + `repeated_action`, `repeated_action_user_id`; `turns.repeated` (1 Declared, 2 TurnStart); migration `AddRepeatedAction` + `database/migrations/099-repeated-action.sql`. (099-repeated-action)
+- TypeScript 5 / React 18 (frontend only) + existing only (React 18, Bootstrap 5.3, i18next, sonner, Radix Dialog; Canvas 2D and Pointer Events). **No new dependency.** (100-map-image-editor)
+- none — edits and versions live in the generator tab; nothing stored until the map is saved. (100-map-image-editor)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -1055,6 +1095,9 @@ dotnet publish Roll6.Console -c Release -r win-x64 --self-contained false -o ../
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 100-map-image-editor: an image editor in the map generator — brush (colour, eyedropper, size, opacity), clone brush,
+  crop and 90° turns/flips on the version's real pixels, with undo/redo; "Aplicar" creates a new version ("editada
+  de vN"), the original stays. Frontend only (`lib/imageEdit`, `MapImageEditor`); no API, schema or MCP change
 - 099-repeated-action: "Ação repetida…" in the piece menu's "Ação" group — a standing order recorded as the actor's
   action at every turn start (and at once when it had not acted), removed by "Remover ação repetida", by declaring
   another action or by whoever processes the turn (`clearRepeatedAction`, the skills judge when its goal is met);

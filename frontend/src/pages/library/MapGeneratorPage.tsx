@@ -10,10 +10,13 @@ import { SaveGeneratedMapModal } from '../../components/mapGenerator/SaveGenerat
 import { PrintMarkupModal } from '../../components/animations/editor/PrintMarkupModal';
 import type { MarkupResult } from '../../components/animations/editor/PrintMarkupModal';
 import { ImageLightbox } from '../../components/chat/ImageLightbox';
+import { MapImageEditor } from '../../components/mapGenerator/MapImageEditor';
+import { BrushIcon } from '../../components/ui/icons';
+import { toast } from 'sonner';
 import { idParam, libraryPath, mapEditPath } from '../../lib/libraryRoutes';
 import { downscaleImage } from '../../lib/downscaleImage';
 import { isBusy, selectedVersion } from '../../lib/mapGeneratorState';
-import type { GeneratorAttachment } from '../../lib/mapGeneratorState';
+import type { GeneratorAttachment, GeneratorVersion } from '../../lib/mapGeneratorState';
 import type { Mark } from '../../lib/markup';
 
 /** Marked versions go to the Codex at most this large. */
@@ -36,8 +39,11 @@ export const MapGeneratorPage = () => {
 
 const GeneratorBody = () => {
   const { t } = useTranslation();
-  const { state, loading, error, connected, baseModel, dirty, select, attach, replaceAttachment, markSaved } = useMapGenerator();
-  const guard = useLeaveGuard(dirty);
+  const { state, loading, error, connected, baseModel, dirty, select, attach, replaceAttachment, markSaved, applyEdit } = useMapGenerator();
+  /** The version open in the image editor (100), and whether it has edits not applied. */
+  const [editing, setEditing] = useState<GeneratorVersion | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const guard = useLeaveGuard(dirty || editorDirty);
   const [markup, setMarkup] = useState<{ original: string; version: number; existing: GeneratorAttachment | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [zoom, setZoom] = useState<string | null>(null);
@@ -77,6 +83,10 @@ const GeneratorBody = () => {
             onClick={() => current && setMarkup({ original: current.url, version: current.version, existing: null })}>
             {t('mapGenerator.mark')}
           </button>
+          <button type="button" className="btn btn-outline-secondary btn-sm" disabled={!current || busy} onClick={() => current && setEditing(current)}
+            title={busy ? t('mapGenerator.editor.busy') : t('mapGenerator.edit')}>
+            <BrushIcon size={14} /> {t('mapGenerator.edit')}
+          </button>
           <button type="button" className="btn btn-primary btn-sm" disabled={!current || current.version === 0 || busy} onClick={() => setSaving(true)}>
             {t('mapGenerator.save.button')}
           </button>
@@ -108,6 +118,7 @@ const GeneratorBody = () => {
                   onClick={() => select(version.version)} title={t('mapGenerator.versionLabel', { version: version.version })}>
                   <img src={version.url} alt="" />
                   <span>{version.version === 0 ? t('mapGenerator.original') : `v${version.version}`}</span>
+                  {version.editedFrom != null && <small className="stm-generator-edited">{t('mapGenerator.editedFrom', { version: version.editedFrom })}</small>}
                   {state.savedVersion === version.version && version.version > 0 && <span className="badge text-bg-success">{t('mapGenerator.savedBadge')}</span>}
                 </button>
               ))}
@@ -122,6 +133,14 @@ const GeneratorBody = () => {
       <SaveGeneratedMapModal version={saving ? current : null} baseModel={baseModel} onClose={() => setSaving(false)}
         onSaved={(version) => markSaved(version)} />
       <ImageLightbox image={zoom ? { url: zoom, caption: null } : null} onClose={() => setZoom(null)} />
+      <MapImageEditor version={editing} onDirtyChange={setEditorDirty}
+        onClose={() => { setEditing(null); setEditorDirty(false); }}
+        onApply={(image, from) => {
+          applyEdit(image, from);
+          setEditing(null);
+          setEditorDirty(false);
+          toast.success(t('mapGenerator.editor.applied', { version: Math.max(...state.versions.map((v) => v.version)) + 1 }));
+        }} />
       {guard}
     </section>
   );
