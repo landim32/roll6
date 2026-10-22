@@ -55,6 +55,8 @@ public class MapGeneratorPromptTests
         prompt.Should().Contain("ERRADO (nunca faça)");
         prompt.Should().Contain("CHECAGEM FINAL ANTES DE SALVAR");
         prompt.Should().Contain("salve a imagem final como mapas-gerados/abc/versao-1.png");
+        // A live run tried to pass the PNG as base64 inside a shell command: the prompt says to copy the file.
+        prompt.Should().Contain(MapGeneratorPrompt.SAVE_HOW).And.Contain("NUNCA escreva a imagem em base64");
         prompt.Should().Contain("nenhuma — é um mapa novo");
         prompt.Should().EndWith("<pedido_do_usuario>\ntaverna com lareira\n</pedido_do_usuario>");
     }

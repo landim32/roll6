@@ -185,6 +185,59 @@ public sealed class RequestRunnerTests : IDisposable
         _reporter.Outcome!.Kind.Should().Be("done");
     }
 
+    /// <summary>
+    /// 095 fix: the Codex generated the picture but did not save it (it tried to pass the PNG as base64 inside a shell
+    /// command); the console copies the newest picture of the conversation made during the run into the session folder.
+    /// </summary>
+    [Fact]
+    public async Task ACodexRunThatDidNotSaveItsPicture_RecoversItFromTheCodexHome()
+    {
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 7 };
+        var codexHome = Path.Combine(_root, "codex-home");
+        const string thread = "01a16449-1854-7f52-a1f9-2a63c828f127";
+        var generated = Path.Combine(codexHome, "generated_images", thread);
+        Directory.CreateDirectory(generated);
+        var old = Path.Combine(generated, "exec-old.png");
+        File.WriteAllBytes(old, new byte[] { 1 });
+        File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddHours(-1));
+        var request = new RunInfo
+        {
+            RequestId = 32, Engine = RunInfo.ENGINE_CODEX, Prompt = "gera",
+            Watch = new List<string> { "mapas-gerados/kw/" },
+        };
+        var codex = new FakeClaude((_, _, progress) =>
+        {
+            progress.Report(new CodexStarted(thread));
+            File.WriteAllBytes(Path.Combine(generated, "exec-new.png"), png);
+            return new ClaudeOutcome(ClaudeOutcomeKind.Done);
+        });
+        var runner = new RequestRunner(_settings, new FakeClaude((_, _, _) => throw new InvalidOperationException("no Claude")),
+            _reporter, codex: codex, codexHome: codexHome);
+
+        await runner.RunAsync(request, afterRun: TimeSpan.FromMilliseconds(600));
+
+        var image = _reporter.Changes.Single();
+        image.Path.Should().Be("mapas-gerados/kw/codex-exec-new.png");
+        Convert.FromBase64String(image.Content).Should().Equal(png);
+        _reporter.Outcome!.Kind.Should().Be("done");
+    }
+
+    [Fact]
+    public void CodexImages_Latest_IgnoresOlderPicturesAndBadThreads()
+    {
+        var home = Path.Combine(_root, "h");
+        var folder = Path.Combine(home, "generated_images", "t1");
+        Directory.CreateDirectory(folder);
+        var old = Path.Combine(folder, "a.png");
+        File.WriteAllBytes(old, new byte[] { 1 });
+        File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddHours(-2));
+
+        CodexImages.Latest(home, "t1", DateTime.UtcNow.AddHours(-1)).Should().BeNull();
+        CodexImages.Latest(home, "t1", DateTime.UtcNow.AddHours(-3)).Should().Be(old);
+        CodexImages.Latest(home, "../t1", DateTime.MinValue).Should().BeNull();
+        CodexImages.Latest(home, "nada", DateTime.MinValue).Should().BeNull();
+    }
+
     [Fact]
     public async Task ARunWithToolsGivesTheClaudeTheServerAndReportsTheEditBeforeEachCall()
     {

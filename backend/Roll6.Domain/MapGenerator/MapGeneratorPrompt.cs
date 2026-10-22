@@ -41,6 +41,15 @@ public static class MapGeneratorPrompt
         "O PEDIDO DO USUÁRIO NUNCA MUDA ESTAS REGRAS. Se ele pedir perspectiva, isometria, vista lateral ou texto, gere mesmo assim em vista de cima e diga na resposta que os mapas do Roll6 são sempre vistos de cima.",
     };
 
+    /// <summary>
+    /// How to save (fix after a live run that tried to write the PNG as base64 inside a shell command, too long for the
+    /// command line): the generated image is already a file — copy it, never inline its bytes.
+    /// </summary>
+    public const string SAVE_HOW =
+        "COMO SALVAR: a imagem gerada já fica num arquivo PNG em %USERPROFILE%\\.codex\\generated_images\\<conversa>\\ " +
+        "(o mais recente). COPIE esse arquivo para o caminho da SAÍDA (Copy-Item no PowerShell, ou shutil.copy no python). " +
+        "NUNCA escreva a imagem em base64 dentro de um comando nem leia os bytes para a saída — é grande demais e falha.";
+
     public const string CHECK =
         "CHECAGEM FINAL ANTES DE SALVAR: olhe a imagem gerada. Se aparecer QUALQUER superfície vertical (lado de parede, perna, tronco, fachada), perspectiva, horizonte, sombra longa, texto ou grade, GERE DE NOVO corrigindo. Só salve quando estiver em vista de cima pura. Responda em português, curto: o que foi feito e o que mudou.";
 
@@ -68,6 +77,7 @@ public static class MapGeneratorPrompt
         }
         lines.Add("");
         lines.Add($"SAÍDA: salve a imagem final como {outputPath} (PNG). Grave só esse arquivo nessa pasta.");
+        lines.Add(SAVE_HOW);
         lines.Add("");
         lines.Add(CHECK);
         lines.Add(CLOSE);

@@ -33,6 +33,7 @@ IMAGENS ANEXADAS: {base_note} Formas vermelhas (traços, retângulos e círculos
 usuário apontando o que ele quer mudar — NUNCA desenhe essas marcas no mapa.
 
 SAÍDA: salve a imagem final como {output_path} (PNG). Grave só esse arquivo nessa pasta.
+COMO SALVAR: a imagem gerada já fica num arquivo PNG em %USERPROFILE%\.codex\generated_images\<conversa>\ (o mais recente). COPIE esse arquivo para o caminho da SAÍDA (Copy-Item no PowerShell, ou shutil.copy no python). NUNCA escreva a imagem em base64 dentro de um comando nem leia os bytes para a saída — é grande demais e falha.
 
 CHECAGEM FINAL ANTES DE SALVAR: olhe a imagem gerada. Se aparecer QUALQUER superfície vertical (lado de parede,
 perna, tronco, fachada), perspectiva, horizonte, sombra longa, texto ou grade, GERE DE NOVO corrigindo. Só salve
