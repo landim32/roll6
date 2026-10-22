@@ -17,6 +17,10 @@ export interface GeneratorVersion {
   base64: string;
   mediaType: string;
   requestId: number | null;
+  /** The number the server gave a Codex image (100): kept to drop a repeated report after a local renumbering. */
+  serverVersion?: number | null;
+  /** The version this one was edited from in the image editor (100); null/absent for Codex and base versions. */
+  editedFrom?: number | null;
 }
 
 export interface GeneratorAttachment {
@@ -101,24 +105,55 @@ export const baseImage = (state: GeneratorState, mediaType: string, base64: stri
 
 export const agentStatus = (state: GeneratorState, agent: AgentStatus): GeneratorState => ({ ...state, agent });
 
-/** A new image: it joins the versions and goes on the stage. */
+const nextNumber = (state: GeneratorState): number => state.versions.reduce((max, v) => Math.max(max, v.version), 0) + 1;
+
+/**
+ * A new image: it joins the versions and goes on the stage. The server numbers the Codex's images by its own counter;
+ * a number already used here (by an edited version, 100) becomes the next free one instead of losing the image.
+ */
 export const imageArrived = (state: GeneratorState, image: GeneratorImage): GeneratorState => {
-  if (image.sessionId !== state.sessionId || state.versions.some((v) => v.version === image.version)) return state;
+  if (image.sessionId !== state.sessionId) return state;
+  if (state.versions.some((v) => (v.serverVersion ?? v.version) === image.version && v.requestId === image.requestId && v.editedFrom == null))
+    return state;
+  const number = state.versions.some((v) => v.version === image.version) ? nextNumber(state) : image.version;
   const version: GeneratorVersion = {
-    version: image.version, url: dataUrl(image.mediaType, image.data), base64: image.data, mediaType: image.mediaType, requestId: image.requestId,
+    version: number, url: dataUrl(image.mediaType, image.data), base64: image.data, mediaType: image.mediaType, requestId: image.requestId,
+    serverVersion: image.version,
   };
-  return { ...state, versions: [...state.versions, version].sort((a, b) => a.version - b.version), selected: image.version };
+  return { ...state, versions: [...state.versions, version].sort((a, b) => a.version - b.version), selected: number };
+};
+
+/** An image made in the editor (100): the next version, from <c>from</c>, selected; the version it came from is untouched. */
+export const edited = (state: GeneratorState, image: { url: string; base64: string; mediaType: string; from: number }): GeneratorState => {
+  const number = nextNumber(state);
+  const version: GeneratorVersion = {
+    version: number, url: image.url, base64: image.base64, mediaType: image.mediaType, requestId: null, editedFrom: image.from,
+  };
+  return { ...state, versions: [...state.versions, version], selected: number };
 };
 
 export const select = (state: GeneratorState, version: number): GeneratorState =>
   state.versions.some((v) => v.version === version) ? { ...state, selected: version } : state;
 
-export const sent = (state: GeneratorState, requestId: number, text: string, thumbnails: string[]): GeneratorState => ({
-  ...state,
-  messages: [...state.messages, { key: `sent-${requestId}`, role: 'user', text, thumbnails, lines: [], running: false }],
-  request: { id: requestId, state: 'queued', position: null },
-  attachments: [],
-});
+/** Keys of the messages a request produces (its running line, its answer and its notice). */
+const ofRequest = (key: string, requestId: number): boolean =>
+  key === RUNNING_KEY(requestId) || key === `done-${requestId}` || key === `notice-${requestId}`;
+
+/**
+ * The request was accepted. The hub may already have sent its start, progress or even its end before the call that
+ * sends it returns (they travel on the same connection), so the user's message goes **before** anything of that
+ * request — never after the Codex's answer — and a request already running or finished keeps its state.
+ */
+export const sent = (state: GeneratorState, requestId: number, text: string, thumbnails: string[]): GeneratorState => {
+  const message: GeneratorMessage = { key: `sent-${requestId}`, role: 'user', text, thumbnails, lines: [], running: false };
+  const at = state.messages.findIndex((m) => ofRequest(m.key, requestId));
+  const messages = at < 0 ? [...state.messages, message] : [...state.messages.slice(0, at), message, ...state.messages.slice(at)];
+  const answered = state.messages.some((m) => m.key === `done-${requestId}` || m.key === `notice-${requestId}`);
+  const request = state.request?.id === requestId ? state.request
+    : answered ? state.request
+      : { id: requestId, state: 'queued' as const, position: null };
+  return { ...state, messages, request, attachments: [] };
+};
 
 export const queued = (state: GeneratorState, requestId: number, position: number | null): GeneratorState => ({
   ...state, request: { id: requestId, state: 'queued', position },

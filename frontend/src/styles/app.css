@@ -3151,6 +3151,31 @@ button.stm-library-card-open:focus-visible { outline: 2px solid var(--stm-accent
   .stm-library-grid.is-compact .stm-library-card:not(:has(.stm-library-card-actions)) .stm-library-card-open { padding-bottom: 0.375rem; }
 }
 
+/* 100: the generator's image editor — full screen, the canvas at real pixels shown with zoom and pan. */
+.stm-image-editor-modal { width: 100vw; max-width: 100vw; height: 100dvh; margin: 0; border-radius: 0; }
+.stm-image-editor-body { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; flex: 1 1 auto; padding: 0.5rem; }
+.stm-image-editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.stm-image-editor-options { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.stm-image-editor-range { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; margin: 0; }
+.stm-image-editor-range .form-range { width: 110px; }
+.stm-image-editor-value { min-width: 2.6rem; text-align: right; color: var(--bs-secondary-color); }
+.stm-image-editor-color input { width: 34px; height: 30px; padding: 0; border: 1px solid var(--stm-border-strong); border-radius: var(--stm-radius-sm); background: transparent; }
+.stm-image-editor-area {
+  position: relative; flex: 1 1 auto; min-height: 240px; overflow: hidden; touch-action: none; cursor: crosshair;
+  border-radius: var(--stm-radius-sm);
+  background: repeating-conic-gradient(#2a3242 0% 25%, #222938 0% 50%) 0 0 / 20px 20px;
+}
+.stm-image-editor-area.is-pan { cursor: grab; }
+.stm-image-editor-canvas, .stm-image-editor-overlay { position: absolute; image-rendering: pixelated; }
+.stm-image-editor-overlay { pointer-events: none; overflow: visible; }
+.stm-image-editor-cursor { fill: none; stroke: #fff; mix-blend-mode: difference; }
+.stm-image-editor-source { fill: none; stroke: var(--stm-accent); }
+.stm-image-editor-crop rect { fill: none; stroke: #fff; }
+.stm-image-editor-crop .stm-image-editor-handle { fill: var(--stm-accent); stroke: #071322; }
+.stm-image-editor-crop text { fill: #fff; paint-order: stroke; stroke: #000; stroke-width: 3px; }
+.stm-image-editor-shade { fill: rgba(0, 0, 0, 0.55); }
+.stm-generator-edited { display: block; font-size: 0.65rem; color: var(--bs-secondary-color); }
+
 /* 095: the map generator — the image and its versions on the left, the conversation with the Codex on the right. */
 .stm-generator { display: flex; flex-direction: column; min-height: 0; }
 .stm-generator-body { display: flex; flex-direction: column; gap: 0.75rem; }

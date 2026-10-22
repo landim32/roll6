@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   INITIAL_STATE, MAX_ATTACHMENTS, attach, baseImage, finished, imageArrived, isBusy, isDirty, opened, progress, saved, select, selectedVersion,
-  sent, started,
+  sent, started, edited,
 } from './mapGeneratorState';
 import type { GeneratorState } from './mapGeneratorState';
 import { HEX_SIZE, gridPixelSize } from './hexGrid';
@@ -12,6 +12,20 @@ const open = (): GeneratorState => opened(INITIAL_STATE, { sessionId: 's1', agen
 const image = (version: number, requestId = 7) => ({ sessionId: 's1', requestId, version, mediaType: 'image/png', data: `AAA${version}` });
 
 describe('mapGeneratorState (095)', () => {
+  it('keeps the question before the answer when the hub starts the request before the send returns', () => {
+    let state = started(open(), 8);
+    state = progress(state, 8, { kind: 'text', text: 'Vou gerar o mapa…' });
+    state = sent(state, 8, 'corredor de pedra', []);
+    expect(state.messages.map((m) => m.role)).toEqual(['user', 'codex']);
+    expect(state.request).toEqual({ id: 8, state: 'running', position: null });
+
+    // Even an answer that already finished stays after the question, and the request stays done.
+    let done = finished(started(open(), 9), 9, { kind: 'done', message: null, permissionDenials: [] } as never, 'Pronto.', null);
+    done = sent(done, 9, 'taverna', []);
+    expect(done.messages.map((m) => [m.role, m.text])).toEqual([['user', 'taverna'], ['codex', 'Pronto.']]);
+    expect(isBusy(done)).toBe(false);
+  });
+
   it('walks a request: sent, started, progress, image, finished', () => {
     let state = sent(open(), 7, 'taverna', []);
     expect(isBusy(state)).toBe(true);
@@ -58,6 +72,20 @@ describe('mapGeneratorState (095)', () => {
     let state = open();
     for (let i = 0; i < MAX_ATTACHMENTS + 1; i++) state = attach(state, { id: i, version: 1, original: 'o', marked: 'm', marks: [], caption: 'c' });
     expect(state.attachments).toHaveLength(MAX_ATTACHMENTS);
+  });
+  it('adds an edited version after the others and renumbers a Codex image that would collide (100)', () => {
+    let state = imageArrived(open(), image(1));
+    state = edited(state, { url: 'data:image/png;base64,EEE', base64: 'EEE', mediaType: 'image/png', from: 1 });
+    expect(state.versions.map((v) => [v.version, v.editedFrom ?? null])).toEqual([[1, null], [2, 1]]);
+    expect(state.selected).toBe(2);
+    expect(state.versions[0].base64).toBe('AAA1');
+
+    // The server's next image is its own version 2: it becomes 3 here, and a repeated report is ignored.
+    state = imageArrived(state, image(2, 8));
+    state = imageArrived(state, image(2, 8));
+    expect(state.versions.map((v) => v.version)).toEqual([1, 2, 3]);
+    expect(state.versions[2].base64).toBe('AAA2');
+    expect(state.selected).toBe(3);
   });
 });
 
