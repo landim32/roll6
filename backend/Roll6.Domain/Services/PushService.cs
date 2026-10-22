@@ -209,7 +209,7 @@ public class PushService : IPushService
     {
         var campaign = await GetMasteredAsync(userId, campaignId);
         var approved = (await _campaignCharacterRepository.ListByCampaignAsync(campaignId, approvedOnly: true))
-            .Select(p => p.CharacterId).Distinct().ToList();
+            .Where(p => p.OwesAction()).Select(p => p.CharacterId).Distinct().ToList();
         var acted = (await _turnRepository.ListByCampaignTurnAsync(campaignId, campaign.CurrentTurn))
             .Where(e => e.TurnType == TurnType.Action && e.CharacterId.HasValue && approved.Contains(e.CharacterId.Value))
             .Select(e => e.CharacterId!.Value)

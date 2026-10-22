@@ -399,6 +399,21 @@ public partial class TurnServiceTests
     }
 
     [Fact]
+    public async Task Finish_OutOfCombatCharacter_IsNotWaitedFor()
+    {
+        _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(new List<CampaignCharacter>
+        {
+            new() { CampaignCharacterId = 100, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved },
+            new() { CampaignCharacterId = 101, CampaignId = CAMPAIGN, CharacterId = BRAM, Status = CampaignCharacterStatus.Approved,
+                    Posture = Posture.OutOfCombat }
+        });
+        _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3))
+            .ReturnsAsync(new List<Turn> { Turn.Action(CAMPAIGN, MAP, ARIA, null, null, 3, 1, "Ataca") });
+
+        (await _service.FinishAsync(MASTER, CAMPAIGN, new TurnFinishInfo())).Finished.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Finish_MovedButDidNotAct_IsPending()
     {
         SetupApproved(ARIA);
