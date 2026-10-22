@@ -429,8 +429,12 @@ React SPA in `frontend/` (design docs: `specs/006-frontend-map-editor/`). Dark t
     the open map when `MapTokenContext.canPlace` (`afterAddAction`; `placeOnMap` without a hex = free hex nearest the
     middle, 052): toast `toast.npcAddedPlaced`, warning `npcs.addedNotPlaced` when there is no room (it stays in the
     campaign), info `npcs.addedNoMap` without a placeable map. No API, database or MCP change.
-  - **Editing**: `components/npcs/CampaignNpcFields` ("Nesta campanha": Categoria + Personagem-mestre for allies) in
-    `NpcFormModal`, saved with `NpcContext.updateCampaignNpc` (`campaignNpcService.update`).
+  - **Editing**: `components/npcs/CampaignNpcFields` ("Nesta campanha": Categoria + Personagem-mestre for allies), saved
+    with `NpcContext.updateCampaignNpc` (`campaignNpcService.update`): on each card of the campaign page's NPCs section
+    and — since the NPC card's pencil opens the library NPC page (098 fix) — on that page too, as "Nesta campanha —
+    {campanha}" whenever the NPC is in the current campaign and the user is its master. MCP `update_campaign_npc`
+    (title "Set campaign NPC category and commander", with Portuguese keywords so a tool search finds it); the table's
+    `criar-npc`/`roll6` skills call it, through `roll6.py chamar` when the session has no `mcp__roll6__*` tools.
   - **Colors**: ally pieces are teal (`ALLY_BASE_COLOR` `#20c997`, `baseColorOf`, `.is-ally`, `mapSnapshot`
     `ALLY_DISC`).
   - **Commander**: `MapCanvas.isOwnPiece` lets the commander (`piece.commanderUserId`) move, act, reset, set the

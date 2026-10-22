@@ -25,7 +25,7 @@ public static class CampaignNpcTools
         [Description("Id of the master's library NPC (npcId from list_my_npcs).")] long npcId) =>
         api.SendAsync(HttpMethod.Post, "/api/campaignnpc", new CampaignNpcInsertInfo { CampaignId = campaignId, NpcId = npcId });
 
-    [McpServerTool(Name = "update_campaign_npc", Title = "Classify campaign NPC", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [McpServerTool(Name = "update_campaign_npc", Title = "Set campaign NPC category and commander", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaignnpc/{id}")]
     [Description("""
         What it does: sets the category of an NPC in a campaign — 1 Inimigo (enemy), 2 Neutro (neutral), 3 Aliado (ally)
@@ -34,7 +34,8 @@ public static class CampaignNpcTools
         and life/energy/status/posture through update_map_npc). Enemies and neutrals stay in the NPC panel; allies show on
         the party's side (under their master character when they have one) and their pieces get the ally color. Any
         category other than ally clears the master; the master is also cleared when that character is denied, removed
-        from the campaign or deleted. Same values = nothing changes.
+        from the campaign or deleted. Same values = nothing changes. (Em português: categoria do NPC na campanha —
+        inimigo, neutro, aliado — e o personagem-mestre / comandante de um NPC aliado.)
         Who can use it: only the master of the campaign, in any campaign status.
         Returns: the campaign NPC (same fields as list_campaign_npcs, with category, masterCampaignCharacterId and
         masterCharacterId).
