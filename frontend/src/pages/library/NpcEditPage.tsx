@@ -9,20 +9,27 @@ import type { NpcTokenChoice } from '../../components/npcs/NpcFormFields';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
 import { NotFoundCard } from '../../components/library/NotFoundCard';
 import { useAuth } from '../../hooks/useAuth';
+import { useCampaign } from '../../hooks/useCampaign';
+import { useCharacter } from '../../hooks/useCharacter';
+import { CampaignNpcFields } from '../../components/npcs/CampaignNpcFields';
+import { NPC_CATEGORY } from '../../types/npc';
+import type { NpcCategory } from '../../types/npc';
 import { useLeaveGuard } from '../../hooks/useLeaveGuard';
 import { useNpc } from '../../hooks/useNpc';
 import { imageService } from '../../Services/imageService';
 import { ApiError } from '../../Services/apiHelpers';
 import { cropToFile } from '../../lib/cropImage';
-import { idParam, libraryPath, npcPath } from '../../lib/libraryRoutes';
+import { campaignEditPath, idParam, libraryPath, npcPath } from '../../lib/libraryRoutes';
+import { Link } from 'react-router-dom';
 import { emptyNpcForm, toNpcForm, toNpcInsert, validateNpcForm } from '../../lib/npcForm';
 import type { NpcForm } from '../../lib/npcForm';
 import type { NpcInfo } from '../../types/npc';
 
 /**
  * An NPC of the library in full screen (087; was the library part of the NPC window): picture, token, sheet, vitals
- * and initial posture. `/library/npcs/new` creates, `/library/npcs/:id` edits one of the user's own NPCs. What the
- * NPC is in a campaign (category, master character, removal) lives on the campaign page.
+ * and initial posture. `/library/npcs/new` creates, `/library/npcs/:id` edits one of the user's own NPCs. When the NPC
+ * is in the current campaign and the user is its master, "Nesta campanha" (category and an ally's master character,
+ * 071) is edited here too — the NPC card's pencil opens this page; removal stays on the campaign page.
  */
 export const NpcEditPage = () => {
   const { t } = useTranslation();
@@ -31,7 +38,10 @@ export const NpcEditPage = () => {
   const creating = id === 'new';
   const npcId = idParam(id);
   const { session } = useAuth();
-  const { getNpc, createNpc, updateNpc } = useNpc();
+  const { getNpc, createNpc, updateNpc, campaignNpcs, updateCampaignNpc } = useNpc();
+  const { currentCampaign, isMaster } = useCampaign();
+  const { party } = useCharacter();
+  const [classifying, setClassifying] = useState(false);
   const [saved, setSaved] = useState<NpcInfo | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'notFound' | 'notYours'>(creating ? 'ready' : 'loading');
   const [form, setForm] = useState<NpcForm>(emptyNpcForm);
@@ -111,6 +121,23 @@ export const NpcEditPage = () => {
     }
   };
 
+  // 071 via the NPC card (098 fix): what this NPC is in the current campaign, saved on change.
+  const inCampaign = saved && isMaster ? campaignNpcs.find((c) => c.npcId === saved.npcId) ?? null : null;
+  const classify = async (category: NpcCategory, master: number | null) => {
+    if (!inCampaign) return;
+    setClassifying(true);
+    try {
+      await updateCampaignNpc(inCampaign.campaignNpcId, {
+        category, masterCampaignCharacterId: category === NPC_CATEGORY.ally ? master : null,
+      });
+      toast.success(t('toast.npcUpdated', { name: inCampaign.name }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    } finally {
+      setClassifying(false);
+    }
+  };
+
   return (
     <section className="stm-library-form">
       <LibraryPageHeader
@@ -136,6 +163,24 @@ export const NpcEditPage = () => {
           editing={saved !== null}
         />
       </form>
+      {inCampaign && currentCampaign && (
+        <div className="card mt-3">
+          <div className="card-body">
+            <h2 className="h6 mb-1">{t('npcs.campaignSectionOf', { campaign: currentCampaign.name })}</h2>
+            <p className="small text-body-secondary mb-0">{t('npcs.campaignSectionHint')}</p>
+            <fieldset disabled={classifying}>
+              <CampaignNpcFields
+                idPrefix={`npc-page-campaign-${inCampaign.campaignNpcId}`}
+                category={inCampaign.category}
+                master={inCampaign.masterCampaignCharacterId}
+                party={party}
+                onChange={(category, master) => { void classify(category, master); }}
+              />
+            </fieldset>
+            <Link to={campaignEditPath(currentCampaign.slug, 'npcs')} className="small d-inline-block mt-2">{t('npcs.campaignNpcsLink')}</Link>
+          </div>
+        </div>
+      )}
       {guard}
     </section>
   );
