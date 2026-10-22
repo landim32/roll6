@@ -37,12 +37,14 @@ public sealed class RequestRunner
     private readonly Action<string> _log;
     private readonly IToolHostFactory _toolHosts;
     private readonly IClaudeProcess _codex;
+    /// <summary>Where the Codex keeps its generated pictures (095 fix; a test points it elsewhere).</summary>
+    private readonly string _codexHome;
     private readonly object _lock = new();
     private long? _running;
     private CancellationTokenSource? _cancellation;
 
     public RequestRunner(ConsoleSettings settings, IClaudeProcess claude, IRequestReporter reporter, Action<string>? log = null,
-        IToolHostFactory? toolHosts = null, IClaudeProcess? codex = null)
+        IToolHostFactory? toolHosts = null, IClaudeProcess? codex = null, string? codexHome = null)
     {
         _settings = settings;
         _claude = claude;
@@ -50,6 +52,7 @@ public sealed class RequestRunner
         _log = log ?? (_ => { });
         _toolHosts = toolHosts ?? LocalToolServer.Factory;
         _codex = codex ?? new CodexRunner(settings);
+        _codexHome = codexHome ?? CodexImages.Home();
     }
 
     /// <summary>095: where the request's pictures are written for the Codex (<c>-i</c>), inside the working directory.</summary>
@@ -165,8 +168,14 @@ public sealed class RequestRunner
 
         using var watcher = new FileWatcher(root, run.Watch);
         var reports = new List<Task>();
+        // 095 fix: whether the run saved an image itself, and the Codex conversation (to recover one it did not save).
+        var imageReported = false;
+        var codexThread = run.Resume;
+        var startedAt = DateTime.UtcNow;
         watcher.FileSettled += (path, content) =>
         {
+            if (FileWriter.IsBinary(path))
+                imageReported = true;
             Log(run, $"Arquivo alterado: {path}");
             lock (reports)
                 reports.Add(_reporter.FileChangedAsync(run.RequestId, new FileChangedInfo
@@ -200,6 +209,7 @@ public sealed class RequestRunner
                     Log(run, $"sessão {started.SessionId} ({(started.UsesAccount ? "conta" : "chave")})");
                     break;
                 case CodexStarted codexStarted:
+                    codexThread = codexStarted.ThreadId;
                     Log(run, $"conversa do Codex {codexStarted.ThreadId}");
                     break;
                 case ClaudeToolUse tool:
@@ -241,6 +251,8 @@ public sealed class RequestRunner
             images.AddRange(run.Files.Where(f => f.IsBase64).Select(f => FileWriter.Resolve(root, f.Path)!));
             var codexArguments = CodexRunner.Arguments(_settings, run.Resume, images);
             var codexOutcome = await _codex.RunAsync(codexArguments, PromptOf(run), progress, cancellation);
+            if (codexOutcome.Kind != ClaudeOutcomeKind.Stopped && !imageReported)
+                RecoverCodexImage(run, root, codexThread, startedAt);
             return await AfterRunAsync(codexOutcome, reports, cancellation, afterRun);
         }
 
@@ -251,6 +263,36 @@ public sealed class RequestRunner
         var arguments = ClaudeRunner.Arguments(_settings, run.SessionId, run.Started, SystemPromptOf(run), run.ReadOnly, tools);
         var outcome = await _claude.RunAsync(arguments, PromptMessage.Build(PromptOf(run), run.Images), progress, cancellation);
         return await AfterRunAsync(outcome, reports, cancellation, afterRun);
+    }
+
+    /// <summary>
+    /// 095 fix: the Codex ended without saving the picture it generated (e.g. it tried to pass the PNG as base64 inside a
+    /// shell command, too long for the command line). The newest picture of its conversation made during this run is
+    /// copied into the first watched folder, so the watcher reports it like a saved version.
+    /// </summary>
+    private void RecoverCodexImage(RunInfo run, string root, string? threadId, DateTime sinceUtc)
+    {
+        if (threadId == null || run.Watch.Count == 0)
+            return;
+        var latest = CodexImages.Latest(_codexHome, threadId, sinceUtc);
+        var folder = FileWriter.Resolve(root, run.Watch[0].TrimEnd('/', '\\'));
+        if (latest == null || folder == null)
+            return;
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var target = Path.Combine(folder, "codex-" + Path.GetFileName(latest));
+            File.Copy(latest, target, overwrite: true);
+            Log(run, $"O Codex não salvou a imagem; usando a que ele gerou: {Path.GetFileName(latest)}");
+        }
+        catch (IOException ex)
+        {
+            Log(run, $"Não foi possível copiar a imagem gerada pelo Codex: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log(run, $"Não foi possível copiar a imagem gerada pelo Codex: {ex.Message}");
+        }
     }
 
     /// <summary>The last write may settle after the result line: the watcher keeps going a while, then every report is awaited.</summary>

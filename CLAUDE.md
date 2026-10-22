@@ -867,7 +867,11 @@ runner the generic console `backend/Roll6.Console`. Design docs: `specs/086-web-
     folder, output `versao-{n}.png`; a 5-minute timer stops the run (`GENERATOR_TIMED_OUT`). Progress → client
     `generatorProgress` (the thread id kept, not forwarded); a valid image under the folder (not `entrada/`) →
     `generatorImage { version, mediaType, data }`; else a notice; `generatorQueued`/`generatorStarted`/
-    `generatorFinished`; agent status also to generator tabs. Hub receive limit 16 MB. Nothing is stored; no REST or
+    `generatorFinished`; agent status also to generator tabs. **Saving fix**: the prompt's `SAVE_HOW` line tells the
+    Codex to copy the generated file from `~/.codex/generated_images/<thread>/` (never inline base64 in a shell
+    command — a live run did and the command line was too long), and when a Codex run ends without any watched image
+    the console copies the newest picture of that conversation made during the run into the first watched folder as
+    `codex-exec-….png` (`Codex/CodexImages.Latest`, `CODEX_HOME` or `~/.codex`), which the watcher reports as a version. Hub receive limit 16 MB. Nothing is stored; no REST or
     MCP change.
   - **Page**: `pages/library/MapGeneratorPage` (`LIBRARY_SUBSECTIONS.maps` + `generator`, `mapGeneratorPath`) over
     `Contexts/MapGeneratorContext` (+ `hooks/useMapGenerator`, `Services/mapGeneratorService` on the animation editor's

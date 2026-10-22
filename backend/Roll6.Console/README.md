@@ -80,6 +80,10 @@ A página **Biblioteca › Mapas › Gerador** usa o **Codex** da sua máquina (
    `mapas-gerados/<sessão>/entrada/`, passa-as com `-i` e acompanha `mapas-gerados/<sessão>/`.
 4. Imagens (`.png`, `.jpg`, `.jpeg`, `.webp`) acompanhadas são enviadas ao servidor como bytes em base64, até 10 MB
    (maiores viram um aviso); o servidor valida e manda para a aba do gerador.
+5. Se o Codex terminar sem salvar a imagem (por exemplo, tentou gravar o PNG em base64 dentro de um comando, longo
+   demais para a linha de comando), o console pega a imagem mais nova que ele gerou nessa conversa
+   (`~/.codex/generated_images/<conversa>/`, ou `CODEX_HOME`) e a copia para a pasta da sessão como
+   `codex-exec-….png`, que vira uma versão normal. A linha "O Codex não salvou a imagem; usando a que ele gerou" aparece no log.
 
 As pastas `mapas-gerados/` podem ser apagadas quando quiser: nada nelas é usado depois que a aba fecha.
 
