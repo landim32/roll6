@@ -39,6 +39,7 @@ public partial class TurnService : ITurnService
     private readonly IRealtimeNotifier _notifier;
     private readonly IAskDispatcher _askDispatcher;
     private readonly IGmDispatcher _gm;
+    private readonly ITurnProcessingRegistry _processing;
     private readonly INotificationQueue _queue;
     private readonly IChatReactionRepository<ChatReaction> _chatReactionRepository;
     private readonly IChatPollRepository<ChatPollOption, ChatPollVote> _chatPollRepository;
@@ -70,8 +71,10 @@ public partial class TurnService : ITurnService
         INotificationQueue queue,
         IRealtimeNotifier notifier,
         IAskDispatcher askDispatcher,
-        IGmDispatcher gmDispatcher)
+        IGmDispatcher gmDispatcher,
+        ITurnProcessingRegistry? processing = null)
     {
+        _processing = processing ?? new TurnProcessingRegistry();
         _whisperRepository = whisperRepository;
         _chatPollRepository = chatPollRepository;
         _queue = queue;
@@ -324,6 +327,7 @@ public partial class TurnService : ITurnService
                 await _repository.InsertAsync(action);
             await _campaignRepository.UpdateAsync(campaign);
         });
+        _processing.Clear(campaignId); // 101: the processed turn is over
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
             data: new { finishedTurn = finished, turnNo = campaign.CurrentTurn }));
         await NotifyTurnFinishedAsync(campaign, userId, finished);

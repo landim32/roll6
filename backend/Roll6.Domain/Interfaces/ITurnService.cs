@@ -27,6 +27,9 @@ public interface ITurnService
     Task<TurnRepeatResultInfo> SetRepeatedAsync(long userId, TurnRepeatInfo info);
     Task<TurnResetResultInfo> ResetAsync(long userId, TurnPieceInfo info);
     Task<TurnFinishResultInfo> FinishAsync(long userId, long campaignId, TurnFinishInfo info);
+
+    /// <summary>101: the master's "processing turn N" notice — start (Active campaign) or stop (with a reason).</summary>
+    Task<TurnProcessingResultInfo> SetProcessingAsync(long userId, long campaignId, TurnProcessingInfo info);
     Task<TurnInfo> CreateAsync(long userId, TurnInsertInfo info);
     Task DeleteAsync(long userId, long turnId);
 

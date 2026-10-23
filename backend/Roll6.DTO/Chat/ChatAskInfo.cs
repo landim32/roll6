@@ -30,6 +30,14 @@ public class AskStatusInfo
     /// <summary>096: the turn a GM run is queued or running for in this campaign, else null.</summary>
     [JsonPropertyName("gmRunningTurn")]
     public int? GmRunningTurn { get; set; }
+
+    /// <summary>101: the turn the master said he is processing (only the current turn, before it expires), else null.</summary>
+    [JsonPropertyName("processingTurn")]
+    public int? ProcessingTurn { get; set; }
+
+    /// <summary>101: UTC instant that notice expires.</summary>
+    [JsonPropertyName("processingUntil")]
+    public DateTime? ProcessingUntil { get; set; }
 }
 
 /// <summary>The master's correction of an answer (093): the new text, 1–4000 characters.</summary>

@@ -68,6 +68,7 @@ public partial class TurnService
                     await _repository.InsertAsync(action);
                 await _campaignRepository.UpdateAsync(campaign);
             });
+            _processing.Clear(campaignId); // 101
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,
                 data: new { finishedTurn = info.TurnNo - 1, turnNo = info.TurnNo }));
             await NotifyTurnFinishedAsync(campaign, userId, info.TurnNo - 1);
@@ -88,6 +89,7 @@ public partial class TurnService
             await _repository.DeleteFinishedFromAsync(campaignId, info.TurnNo);
             await _campaignRepository.UpdateAsync(campaign);
         });
+        _processing.Clear(campaignId); // 101: a turn reopened is not being processed
         await PublishTurnChangedAsync(campaignId, userId);
         return result;
     }

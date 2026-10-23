@@ -25,6 +25,8 @@ export const TABLE_EVENT = {
   askChanged: 'ask.changed',
   /** A GM run of the campaign started or ended (096); data = { running, turnNo }. */
   gmChanged: 'gm.changed',
+  /** The master started or stopped processing the turn (101); data = { turnNo, processing }. */
+  turnProcessing: 'turn.processing',
   resync: 'resync',
 } as const;
 

@@ -459,6 +459,7 @@ public partial class TurnService
             await _campaignRepository.UpdateAsync(campaign);
         });
 
+        _processing.Clear(campaignId); // 101: the processed turn is over
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.PARTY_CHANGED, campaignId, userId));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKENS_CHANGED, campaignId, userId));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_FINISHED, campaignId, userId,

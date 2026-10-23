@@ -305,7 +305,8 @@ public static class ChatTools
         connected — and which of your questions is still waiting for its answer (one at a time).
         Who can use it: the campaign master or a player with an approved character.
         Returns: { available, waitingTurnId (null when none), gmRunningTurn (096: the turn a GM run is queued or running
-        for, null when none) }.
+        for, null when none), processingTurn / processingUntil (101: the turn the master announced he is processing
+        with set_turn_processing and when that notice expires, null when none) }.
         Common errors: 403 not in the campaign, 404 campaign not found.
         Related tools: ask_question, list_chat_messages.
         """)]

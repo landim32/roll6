@@ -381,7 +381,10 @@ public static class Roll6Guide
           change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the
           fields before/after. `get_turn_summary` returns the whole turn as readable markdown (actions + positions).
         - Running a turn as an assistant: `get_turn_data` (characters, NPC occurrences and actions in one call) → decide →
-          `process_turn` (all changes + narration in one atomic call; it also finishes the turn). Older story:
+          `process_turn` (all changes + narration in one atomic call; it also finishes the turn). Outside the GM mode,
+          announce it first with `set_turn_processing` (`processing: true`, 101): the chat shows "O mestre começou a
+          processar o turno N." and every footer "Processando o turno N…"; closing the turn ends it, and stopping without
+          closing is `processing: false` with a short `reason`. It blocks nothing and expires after 30 minutes. Older story:
           `get_turn_history` (one item per narration, newest first, a few pages at a time). `get_turn_narration` returns only the
           narration of one turn, or of the latest finished turn that has one (204 / `{ ok: true }` when there is none).
         - `finish_turn` (master) moves to the next turn; without `force` it only lists the approved characters that

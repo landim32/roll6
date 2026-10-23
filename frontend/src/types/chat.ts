@@ -39,6 +39,10 @@ export interface AskStatusInfo {
   waitingTurnId: number | null;
   /** 096: the turn a GM run is queued or running for in this campaign, else null. */
   gmRunningTurn: number | null;
+  /** 101: the turn the master announced he is processing (current turn only, until it expires), else null. */
+  processingTurn?: number | null;
+  /** 101: when that notice expires (UTC without zone, as the API writes dates). */
+  processingUntil?: string | null;
 }
 
 export type ChatKind = (typeof CHAT_KIND)[keyof typeof CHAT_KIND];

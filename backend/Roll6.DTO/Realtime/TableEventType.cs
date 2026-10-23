@@ -44,4 +44,7 @@ public static class TableEventType
 
     /// <summary>A GM run of the campaign started or ended (096). Data = { running, turnNo }.</summary>
     public const string GM_CHANGED = "gm.changed";
+
+    /// <summary>The master started or stopped processing the turn (101). Data = { turnNo, processing }.</summary>
+    public const string TURN_PROCESSING = "turn.processing";
 }
