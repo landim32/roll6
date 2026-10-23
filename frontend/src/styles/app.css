@@ -2770,6 +2770,12 @@ button.stm-chat-quote { cursor: pointer; }
 
 .stm-bubble {
   max-width: 100%;
+  transition: opacity 0.15s ease;
+}
+
+/* With the mouse over it the balloon lets the map show through. */
+.stm-bubble.is-see-through {
+  opacity: 0.3;
 }
 
 
