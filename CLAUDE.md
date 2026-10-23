@@ -305,6 +305,25 @@ Solution lives in `backend/` (`Roll6.sln`): `DTO` → `Infra.Interfaces` → `Do
     (`ClaudeToolUse.Input`, `LogLines.Compact` ≤ 400/1500), `← result head` (`ClaudeToolResult`, ≤ 600, from the
     `user` messages' `tool_result`), `Claude: text` (`ClaudeText`, the whole assistant text), refused tools, the
     outcome; `LogLines.Redact` hides `r6_…` keys; the new events are never relayed (`ToInfo` → null).
+- Turn processing notice (101): the master (or his Claude, through the table's `processar-turno` skill) announces he is
+  processing the turn in progress, outside the GM mode.
+  - **Endpoint**: `PUT /api/campaign/{id}/turn/processing` (`TurnProcessingInfo { processing, reason? }`, master only;
+    start needs `EnsurePlayable`, stop works in any status; reason ≤ 200 → 400 `reason`) →
+    `TurnProcessingResultInfo { processingTurn, processingUntil, ignored }` (`TurnService.ProcessingNotice.cs`).
+  - **State in memory**: the singleton `Domain/Turns/TurnProcessingRegistry` (`ITurnProcessingRegistry`, last optional
+    `TurnService` constructor parameter) keeps `{ turnNo, userId, startedAt }` per campaign; an entry counts only while it
+    is the campaign's current turn and younger than `TIMEOUT` (30 min), so any path that moves the turn ends it
+    (finish/process/set-current also `Clear` it). A restart forgets it.
+  - **Chat**: start writes the GM-style blue line (`TurnType.GmNotice`, kind `gm`) "O mestre começou a processar o turno
+    N." once per turn (a repeated start writes nothing; a start while the GM mode runs that turn → `ignored: "gm"`); stop
+    writes "O mestre interrompeu o processamento do turno N[: motivo]." (`TurnProcessingTexts`). Event `turn.processing`
+    `{ turnNo, processing }`. Nothing is blocked (Q1 = A), no push (Q2 = A).
+  - **Read**: `AskStatusInfo.processingTurn`/`processingUntil`; `ChatContext` reloads the status on `turn.processing` and
+    `turn.finished`; `lib/gmMode.processingBadge`/`processingExpiresIn` → "Processando o turno N…" in `GridSizeFooter`
+    (hidden while the GM run badge shows, for another turn or after the expiry).
+  - **MCP**: `set_turn_processing`, `processingTurn` on `get_ask_status`, guide "Turns" (127 operations / 128 tools).
+    Skill (files only): `processar_turno.py processando [--campanha N]` after `PRONTO`, `parei --motivo "…"` when
+    stopping without `process_turn`.
 - Web Push notifications (feature 043, issue #39): a fixed catalog — **N1** chat message (text/photo/audio/roll/narration) to every participant but the author who doesn't have that campaign's chat on screen; **N2** each character's action, with its text, to the **master only**; **N3** "Falta apenas você e Bruno" to the players still missing when the characters that acted reach ⌈approved/2⌉ (`Domain/Notifications/Majority`, once per turn via `campaigns.majority_notified_turn` + `ICampaignRepository.TrySetMajorityNotifiedAsync`); **N4** "Turno N terminado. Pode agir novamente" to the players (finish, `process_turn`, set-current forward); **N5/N6** "Você está com -3/13 PV" / "5/11 de Fadiga" to the owner when someone else changes them (participation update, `process_turn`); **N7** "Rodrigo está cutucando você" from `POST /api/campaign/{id}/poke` (master or approved; players whose characters have no Action, minus the caller; cooldown per person and campaign — 1 min, **30 min since 075** (`TurnService.POKE_COOLDOWN`) → 409 "Você só pode cutucar a cada 30 minutos. Tente de novo em N min." (`PokeCooldownMessage`, minutes left rounded up); writes a `TurnType.Poke` = 11 chat line "Rodrigo cutucou Ana e Bruno", kind `poke`, not deletable, not a turn record). Texts in the pure `NoticeTexts`/`TableNotices` (first names, ≤ 120 chars, markdown stripped). The services only `INotificationQueue.Enqueue(TableNotice)` after the write (`TurnService.Notices.cs`, wrapped so a notice never fails the write); `NotificationQueue` (Channel) → `NotificationWorker` (BackgroundService) → `NoticeDispatcher` (Application/Notifications): recipients = master + owners of approved characters, minus actor and muted (`campaign_notification_prefs`); presence from the hub (`TableHub.SetPresence(visible, chatVisible)`, kept per connection in `TableConnections : IPresence`): N1/N2 are skipped for whoever has the chat visible, N3–N7 become a `notice` hub message (toast) when the campaign is on screen, else a Web Push to every `push_subscriptions` row of the user (`WebPushSender`, NuGet `Lib.Net.Http.WebPush`, VAPID + aes128gcm; 404/410 delete the row; payload `{ title, body, icon, tag, url: /campaign/{slug}?chat=1, kind, renotify }`, tag `campaign:{id}:chat` so messages replace each other). VAPID keys in `Push:PublicKey`/`PrivateKey`/`Subject` (`Push__*`; prod secrets `ROLL6_VAPID_PUBLIC_KEY`/`ROLL6_VAPID_PRIVATE_KEY`); empty = off (`GET /api/push/key` → null). REST: `GET /api/push/key`, `POST`/`DELETE /api/push/subscription` (`Session` policy, upsert by endpoint), `GET /api/push/campaigns`, `PUT /api/campaign/{id}/notifications` (`{ muted }`). MCP `poke_players`, `list_notification_settings`, `set_campaign_notifications` (93 operations / 94 tools; key/subscription excluded); guide section "Notifications". Migration `AddWebPush` + `database/migrations/043-web-push.sql`.
 - Push review (074) — what changed in 043:
   - **Catalog**: N2 goes to the master for every action whose author is not him — characters and ally NPCs acted by
@@ -1088,6 +1107,8 @@ The project reached **1.0.0** on 2026-10-22 by the user's request: the productio
 - PostgreSQL — `campaign_characters`/`map_npcs` + `repeated_action`, `repeated_action_user_id`; `turns.repeated` (1 Declared, 2 TurnStart); migration `AddRepeatedAction` + `database/migrations/099-repeated-action.sql`. (099-repeated-action)
 - TypeScript 5 / React 18 (frontend only) + existing only (React 18, Bootstrap 5.3, i18next, sonner, Radix Dialog; Canvas 2D and Pointer Events). **No new dependency.** (100-map-image-editor)
 - none — edits and versions live in the generator tab; nothing stored until the map is saved. (100-map-image-editor)
+- C# 12 / .NET 8 (DTO, Domain, API, MCP); TypeScript 5 / React 18; Python 3 stdlib + Markdown + existing only — ASP.NET Core 8, SignalR, `ModelContextProtocol.AspNetCore` 2.x; React 18, (101-turn-processing-notice)
+- none — the processing state lives in memory (singleton); the chat lines are ordinary `turns` rows of the (101-turn-processing-notice)
 
 - C# 12 / .NET 8 (backend); TypeScript 5 / React 18 (frontend) + ASP.NET Core 8, EF Core 9 + Npgsql, SignalR (017), `ModelContextProtocol.AspNetCore` 2.x · React 18, i18next (existing). **No new dependency.** (050-pinned-open-polls)
 - PostgreSQL. Adds `turns.chat_at timestamp without time zone not null`, backfilled from `created_at` in the migration, and the index `ix_turns_campaign_chat (campaign_id, chat_at, turn_id)`. Migration `AddTurnChatAt` + `database/migrations/050-turn-chat-at.sql`. (050-pinned-open-polls)
@@ -1099,6 +1120,10 @@ The project reached **1.0.0** on 2026-10-22 by the user's request: the productio
 - browser only — `localStorage` `roll6:3d-quality` = `"standard" | "high" | "ultra"`; nada no servidor (053-3d-quality-setting)
 
 ## Recent Changes
+- 101-turn-processing-notice: the master (or his Claude's `processar-turno` skill) announces he is processing the turn —
+  a blue GM-style chat line "O mestre começou a processar o turno N." and "Processando o turno N…" in every footer, ended
+  by the turn closing, by "parei" (with the reason in the chat) or after 30 minutes; nothing blocked, no push. State in
+  memory, `PUT /api/campaign/{id}/turn/processing`, MCP `set_turn_processing` (127 operations / 128 tools)
 - 100-map-image-editor: an image editor in the map generator — brush (colour, eyedropper, size, opacity), clone brush,
   crop and 90° turns/flips on the version's real pixels, with undo/redo; "Aplicar" creates a new version ("editada
   de vN"), the original stays. Frontend only (`lib/imageEdit`, `MapImageEditor`); no API, schema or MCP change

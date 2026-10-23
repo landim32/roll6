@@ -380,6 +380,31 @@ public static class CampaignTools
         [Description("true = finish even if some characters haven't acted; false (default) = only report who is missing.")] bool force = false) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/finish", new TurnFinishInfo { Force = force });
 
+    [McpServerTool(Name = "set_turn_processing", Title = "Announce turn processing", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/campaign/{id}/turn/processing")]
+    [Description("""
+        What it does: tells the table that the master is processing the turn in progress (101) — "aviso de turno em
+        processamento". processing = true (call it right after confirming every character acted, before resolving the
+        turn) writes the blue chat line "O mestre começou a processar o turno N." (kind gm) and shows "Processando o
+        turno N…" in everyone's footer; calling it again for the same turn writes nothing. processing = false, with an
+        optional reason, is for stopping WITHOUT closing the turn (a doubt for the master, an error): the badge goes
+        and the chat says "O mestre interrompeu o processamento do turno N: motivo.". Closing the turn (process_turn,
+        finish_turn, set_current_turn) ends the notice by itself — no call needed — and it expires after 30 minutes.
+        It blocks nothing (players may still act) and sends no push. Ignored (ignored = "gm") while the GM mode is
+        already processing that turn.
+        Who can use it: only the master; starting needs an Active campaign, stopping works in any status.
+        Returns: { processingTurn (null when none), processingUntil (UTC expiry), ignored }.
+        Common errors: 400 reason longer than 200 characters, 403 not the master, 404 campaign not found, 409 campaign
+        not active (start).
+        Related tools: get_turn_data, process_turn, finish_turn, get_ask_status.
+        """)]
+    public static Task<CallToolResult> SetTurnProcessing(
+        Roll6ApiClient api,
+        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
+        [Description("true = I started processing the turn in progress; false = I stopped without closing it.")] bool processing,
+        [Description("Only when stopping: why, in a few words (≤ 200 characters), shown in the chat line.")] string? reason = null) =>
+        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/turn/processing", new TurnProcessingInfo { Processing = processing, Reason = reason });
+
     [McpServerTool(Name = "set_current_turn", Title = "Set current turn", ReadOnly = false, Idempotent = true, Destructive = true, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/turn/current")]
     [Description($$"""

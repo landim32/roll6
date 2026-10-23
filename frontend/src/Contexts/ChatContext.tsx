@@ -307,8 +307,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       setExtraPolls((current) => current.filter((p) => p.key !== itemKey));
     } else if (event.type === TABLE_EVENT.turnChanged || event.type === TABLE_EVENT.turnFinished) {
       void refreshRecent();
-    } else if (event.type === TABLE_EVENT.askChanged || event.type === TABLE_EVENT.gmChanged) {
-      // 093/096: the master's console came or went, or a GM run started or ended — the status says it all.
+      // 101: a finished turn ends the "processing" notice.
+      if (event.type === TABLE_EVENT.turnFinished) void refreshAsk();
+    } else if (event.type === TABLE_EVENT.askChanged || event.type === TABLE_EVENT.gmChanged
+      || event.type === TABLE_EVENT.turnProcessing) {
+      // 093/096/101: the master's console came or went, a GM run started or ended, or the master announced he is
+      // processing the turn — the status says it all.
       if (event.campaignId === campaignRef.current) void refreshAsk();
     } else if (event.type === TABLE_EVENT.resync) {
       void refreshRecent();

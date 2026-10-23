@@ -1170,6 +1170,8 @@
     "gmBadge": "Modo GM",
     "gmNoConsole": "GM sem console",
     "gmRunning": "GM processando o turno {{no}}…",
+    "processing": "Processando o turno {{no}}…",
+    "processingTitle": "O mestre está processando este turno; as ações ainda podem mudar até a narração sair",
     "gmTitle": "Modo GM: o Claude do mestre fecha o turno quando todos os personagens agirem",
     "update": "Alteração",
     "narration": "Narração",

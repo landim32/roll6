@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useTurn } from '../../hooks/useTurn';
@@ -6,7 +7,7 @@ import { useRealtime } from '../../hooks/useRealtime';
 import { useCampaign } from '../../hooks/useCampaign';
 import { statusNoticeKey } from '../../lib/campaignStatus';
 import { isFreeMode } from '../../lib/freeMode';
-import { GM_BADGE, gmBadge } from '../../lib/gmMode';
+import { GM_BADGE, gmBadge, processingBadge, processingExpiresIn } from '../../lib/gmMode';
 import { useChat } from '../../hooks/useChat';
 import { REALTIME_STATUS } from '../../types/realtime';
 
@@ -30,6 +31,15 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
   // 096: the GM mode, as the chat's status reports it (the master's console, a run in progress).
   const { askStatus } = useChat();
   const gm = gmBadge(currentCampaign, askStatus, isMaster);
+  // 101: the master announced he is processing the turn; re-render when the notice expires.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const wait = processingExpiresIn(askStatus, Date.now());
+    if (wait === null) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), wait + 50);
+    return () => window.clearTimeout(timer);
+  }, [askStatus]);
+  const processing = gm === GM_BADGE.running ? null : processingBadge(askStatus, turnNo, Math.max(now, Date.now()));
 
   return (
     <footer className="stm-footer">
@@ -43,6 +53,9 @@ export const GridSizeFooter = ({ onEditGrid }: GridSizeFooterProps) => {
           {gm === GM_BADGE.running ? t('turn.gmRunning', { no: askStatus.gmRunningTurn })
             : gm === GM_BADGE.noConsole ? t('turn.gmNoConsole') : t('turn.gmBadge')}
         </span>
+      )}
+      {processing !== null && (
+        <span className="badge text-bg-primary" title={t('turn.processingTitle')}>{t('turn.processing', { no: processing })}</span>
       )}
       {statusNotice && <span className="badge text-bg-secondary" title={t('campaignStatus.blockedPlay')}>{t(statusNotice)}</span>}
       {offline && (

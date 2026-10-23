@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { gmBadge } from './gmMode';
+import { gmBadge, processingBadge, processingExpiresIn } from './gmMode';
+
+describe('processingBadge (101)', () => {
+  const now = Date.parse('2026-10-22T20:00:00Z');
+  const status = { processingTurn: 7, processingUntil: '2026-10-22T20:30:00' };
+
+  it('shows the announced turn while it is the turn in progress and not expired', () => {
+    expect(processingBadge(status, 7, now)).toBe(7);
+    expect(processingBadge({ processingTurn: 7, processingUntil: null }, 7, now)).toBe(7);
+  });
+
+  it('hides it for another turn, after the expiry and without a notice', () => {
+    expect(processingBadge(status, 8, now)).toBeNull();
+    expect(processingBadge(status, 7, Date.parse('2026-10-22T20:30:00Z'))).toBeNull();
+    expect(processingBadge({ processingTurn: null }, 7, now)).toBeNull();
+    expect(processingBadge(null, 7, now)).toBeNull();
+  });
+
+  it('tells when to look again', () => {
+    expect(processingExpiresIn(status, now)).toBe(30 * 60 * 1000);
+    expect(processingExpiresIn({ processingTurn: null, processingUntil: '2026-10-22T20:30:00' }, now)).toBeNull();
+  });
+});
 
 describe('gmBadge (096)', () => {
   const idle = { available: true, gmRunningTurn: null };

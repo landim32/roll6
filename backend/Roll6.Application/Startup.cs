@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using Roll6.Application.Auth;
 using Roll6.Application.Realtime;
 using Roll6.Domain.Interfaces;
+using Roll6.Domain.Turns;
 using Roll6.Domain.Models;
 using Roll6.Domain.Services;
 using Roll6.DTO.Settings;
@@ -118,6 +119,8 @@ public static class Startup
         services.AddSingleton<AgentDispatcher>();
         services.AddSingleton<IAskDispatcher>(sp => sp.GetRequiredService<AgentDispatcher>());
         services.AddSingleton<IGmDispatcher>(sp => sp.GetRequiredService<AgentDispatcher>());
+        // 101: the master's "processing turn N" notices, in memory like the GM run state.
+        services.AddSingleton<ITurnProcessingRegistry, TurnProcessingRegistry>();
         services.AddHostedService<Roll6.Application.Asks.AskTimeoutWorker>();
         services.AddSingleton<IAnimationNotifier, AnimationNotifier>();
         services.AddSingleton<SignalRRealtimeNotifier>();

@@ -585,6 +585,24 @@ public class CampaignController : ApiControllerBase
     }
 
     /// <summary>
+    /// The master's "processing turn N" notice (101): start (Active campaign) writes a blue chat line and shows the
+    /// footer badge; stop (with an optional reason) removes it. Closing the turn ends it by itself.
+    /// </summary>
+    [HttpPut("{id:long}/turn/processing")]
+    [ProducesResponseType(typeof(TurnProcessingResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetTurnProcessing(long id, [FromBody] TurnProcessingInfo info)
+    {
+        try
+        {
+            return Ok(await _turnService.SetProcessingAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>
     /// Sets the turn in progress (master, 030): forward works like finishing; back refuses (409) while later turns
     /// have entries unless discardLaterEntries.
     /// </summary>
