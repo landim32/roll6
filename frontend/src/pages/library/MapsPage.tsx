@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
-import { MagicIcon, MapIcon, PencilIcon } from '../../components/ui/icons';
+import { MagicIcon, MapIcon, PencilIcon, PlusSquareIcon } from '../../components/ui/icons';
 import { MakeCurrentMapButton } from '../../components/campaign/MakeCurrentMapButton';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
 import { CardGrid } from '../../components/library/CardGrid';
@@ -18,6 +18,7 @@ import { mapEditPath, mapGeneratorPath } from '../../lib/libraryRoutes';
 import type { MapSubsection } from '../../lib/libraryRoutes';
 import { visibleCampaignMaps } from '../../lib/viewerMap';
 import { canMakeCurrent } from '../../lib/currentMap';
+import { canEditMap } from '../../lib/campaignStatus';
 import type { PagedList } from '../../types/common';
 import { MAP_STATUS_DELETED } from '../../types/map';
 import type { MapInfo } from '../../types/map';
@@ -50,6 +51,9 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [pending, setPending] = useState<(() => Promise<void>) | null>(null);
+  const [adding, setAdding] = useState<number | null>(null);
+  // The master adds any map of the list to the current campaign (not at a paused or finished table).
+  const canAddToCampaign = !!currentCampaign && isMaster && canEditMap(currentCampaign.status, true);
 
   const loadCampaignMaps = useCallback(async (campaignId: number, currentMapId: number | null, page: number): Promise<PagedList<MapInfo>> => {
     if (isMaster) return mapService.listByCampaign(campaignId, page, PAGE_SIZE);
@@ -118,6 +122,31 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
       </button>
     </>
   );
+
+  const addToCampaign = async (model: MapModelInfo) => {
+    if (!currentCampaign) return;
+    setAdding(model.mapModelId);
+    try {
+      const map = await mapService.create({ campaignId: currentCampaign.campaignId, mapModelId: model.mapModelId });
+      toast.success(t('library.maps.addedToCampaign', { name: map.name, campaign: currentCampaign.name }), {
+        action: { label: t('library.maps.openAdded'), onClick: () => openCampaignMap(map) },
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    } finally {
+      setAdding(null);
+    }
+  };
+
+  const addButton = (model: MapModelInfo) => {
+    const label = t('library.maps.addToCampaign', { campaign: currentCampaign?.name ?? '' });
+    return (
+      <button type="button" className="btn btn-sm btn-outline-primary" title={label} aria-label={label}
+        disabled={adding === model.mapModelId} onClick={() => { void addToCampaign(model); }}>
+        <PlusSquareIcon size={14} />
+      </button>
+    );
+  };
 
   const figure = (imageUrl: string | null, name: string) => (imageUrl ? <img src={imageUrl} alt={name} loading="lazy" /> : undefined);
   const gridText = (cols: number, rows: number) => t('mapModal.grid', { cols, rows });
@@ -190,7 +219,12 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
               fallback={<MapIcon />}
               onOpen={() => openModel(m.mapModelId)}
               meta={m.description ? `${gridText(m.gridWidth, m.gridHeight)} · ${m.description}` : gridText(m.gridWidth, m.gridHeight)}
-              actions={m.userId === userId ? editButton(m.mapModelId, null) : undefined}
+              actions={canAddToCampaign || m.userId === userId ? (
+                <>
+                  {canAddToCampaign && addButton(m)}
+                  {m.userId === userId && editButton(m.mapModelId, null)}
+                </>
+              ) : undefined}
             />
           )}
         />

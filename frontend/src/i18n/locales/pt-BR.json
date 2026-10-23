@@ -200,6 +200,9 @@
       "notYours": "Este NPC não é seu."
     },
     "maps": {
+      "addToCampaign": "Incluir na campanha {{campaign}}",
+      "addedToCampaign": "Mapa {{name}} incluído na campanha {{campaign}}.",
+      "openAdded": "Abrir",
       "discardTitle": "Descartar o mapa não salvo?",
       "discardMessage": "O mapa aberto na mesa tem alterações não salvas. Abrir outro mapa descarta essas alterações."
     }
