@@ -10,11 +10,12 @@ import { MentionList } from './MentionList';
 import { WhisperChips } from './WhisperChips';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useCharacter } from '../../hooks/useCharacter';
-import { addRecipient, mentionAt, mentionOptions, removeMention, removeRecipient, whisperPayload } from '../../lib/whisper';
+import { addRecipient, mentionAt, mentionOptions, removeMention, removeRecipient, replyRecipients, sameRecipients, whisperPayload } from '../../lib/whisper';
 import type { MentionMatch, WhisperRecipient } from '../../lib/whisper';
 import { pickClipboardImage } from '../../lib/clipboardImage';
 import { replyExcerpt } from '../../lib/chatItems';
 import { BarChartLineIcon, Dice5Icon, EyeIcon, EyeSlashIcon, HandIndexIcon, ImageIcon, ReplyIcon, LightningIcon, PaperclipIcon, QuestionCircleIcon, RobotIcon, SendIcon } from '../ui/icons';
+import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
@@ -55,6 +56,7 @@ export const ChatComposer = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const { party } = useCharacter();
+  const { session } = useAuth();
   const { currentCampaign, isMaster, setPendingNotice, setGmMode } = useCampaign();
   // 047: who the next entry is whispered to; empty = public. Cleared after every send (clarification B).
   const [recipients, setRecipients] = useState<WhisperRecipient[]>([]);
@@ -97,6 +99,29 @@ export const ChatComposer = () => {
     setRecipients([]);
     setMention(null);
   }, [speakerKey, campaignId]);
+
+  // 102: replying to a whisper starts whispering to whoever sent it (Q1 = B: the chips stay editable); cancelling the
+  // reply drops them again while they are still the automatic ones.
+  const autoRecipients = useRef<WhisperRecipient[] | null>(null);
+  const userId = session?.user.userId ?? null;
+  useEffect(() => {
+    if (replyTo?.whisper) {
+      const auto = replyRecipients(replyTo, {
+        userId,
+        speakerCharacterId: participation?.characterId ?? null,
+        isMaster,
+        approvedIds: new Set(party.map((p) => p.characterId)),
+        masterLabel: t('chat.whisper.master'),
+      });
+      autoRecipients.current = auto;
+      setRecipients(auto);
+    } else if (!replyTo && autoRecipients.current) {
+      const auto = autoRecipients.current;
+      autoRecipients.current = null;
+      setRecipients((current) => (sameRecipients(current, auto) ? [] : current));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the quoted entry changes
+  }, [replyTo?.key]);
 
   const options = useMemo(() => (mention === null ? [] : mentionOptions({
     party: party.map((p) => ({ characterId: p.characterId, name: p.characterName, imageUrl: p.characterImageUrl })),

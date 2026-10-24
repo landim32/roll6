@@ -274,23 +274,27 @@ export const VOICE_KINDS: ReadonlySet<ChatKind> = new Set<ChatKind>([CHAT_KIND.t
 export const isMasterVoice = (item: Pick<ChatItemInfo, 'kind' | 'characterId' | 'deleted'>): boolean =>
   VOICE_KINDS.has(item.kind) && item.characterId === null && !item.deleted;
 
-/** What "Falar como…" offers (079): back to the master, or to the selected character. */
+/** What "Falar como…" offers (079): back to the master, or to one of his characters. */
 export type VoiceSwitch = { to: 'master' } | { to: 'character'; characterId: number; name: string };
 
 export interface VoiceViewer {
   userId: number | null;
   isMaster: boolean;
-  /** The master's character selected in "Personagem atual", or null ("Mestre (GM)" or none). */
-  selected: { characterId: number; name: string } | null;
+  /** The master's own approved characters in the campaign (102: all of them, not only "Personagem atual"). */
+  characters: readonly { characterId: number; name: string }[];
 }
 
 /**
- * The voice switch of the hold menu (079): only the campaign master, on a message, photo, recording or roll he wrote
- * himself — a character's goes back to the master; the master's goes to the selected character (Q3), if any.
+ * The voice switches of the hold menu (079, 102): only the campaign master, on a message, photo, recording or roll he
+ * wrote himself — a character's goes back to the master; the master's goes to any of his approved characters, except
+ * one the entry is whispered to (the server refuses it).
  */
-export const voiceSwitch = (item: ChatItemInfo, viewer: VoiceViewer): VoiceSwitch | null => {
-  if (!viewer.isMaster || viewer.userId === null || item.userId !== viewer.userId) return null;
-  if (!VOICE_KINDS.has(item.kind) || item.deleted || item.whisperHidden) return null;
-  if (item.characterId !== null) return { to: 'master' };
-  return viewer.selected ? { to: 'character', characterId: viewer.selected.characterId, name: viewer.selected.name } : null;
+export const voiceSwitches = (item: ChatItemInfo, viewer: VoiceViewer): VoiceSwitch[] => {
+  if (!viewer.isMaster || viewer.userId === null || item.userId !== viewer.userId) return [];
+  if (!VOICE_KINDS.has(item.kind) || item.deleted || item.whisperHidden) return [];
+  if (item.characterId !== null) return [{ to: 'master' }];
+  const whispered = new Set((item.whisper?.recipients ?? []).map((r) => r.characterId));
+  return viewer.characters
+    .filter((c) => !whispered.has(c.characterId))
+    .map((c) => ({ to: 'character' as const, characterId: c.characterId, name: c.name }));
 };

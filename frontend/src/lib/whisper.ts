@@ -86,6 +86,52 @@ export const addRecipient = (chosen: readonly WhisperRecipient[], recipient: Whi
 export const removeRecipient = (chosen: readonly WhisperRecipient[], recipient: WhisperRecipient): WhisperRecipient[] =>
   chosen.filter((c) => !sameRecipient(c, recipient));
 
+/** Who answers a whisper (102). */
+export interface ReplyViewer {
+  userId: number | null;
+  /** The character the reply is spoken by, or null (the master's own voice). */
+  speakerCharacterId: number | null;
+  /** The campaign master never whispers to "Mestre". */
+  isMaster: boolean;
+  /** Approved characters of the campaign. */
+  approvedIds: ReadonlySet<number>;
+  masterLabel: string;
+}
+
+interface WhisperedItem {
+  userId: number;
+  characterId: number | null;
+  displayName: string;
+  displayImageUrl: string | null;
+  whisper?: { master: boolean; recipients: { characterId: number | null; name: string; imageUrl: string | null }[] } | null;
+}
+
+/**
+ * 102: the recipients a reply to a whisper starts with (Q1 = B: only pre-filled, the user may change them) — the one
+ * who sent it (its character, or "Mestre" when the master spoke or the character is gone); replying to one's own whisper
+ * keeps its recipients. A public item gives none.
+ */
+export const replyRecipients = (item: WhisperedItem, viewer: ReplyViewer): WhisperRecipient[] => {
+  if (!item.whisper) return [];
+  const master: WhisperRecipient = { characterId: null, name: viewer.masterLabel, imageUrl: null };
+  if (viewer.userId !== null && item.userId === viewer.userId) {
+    const characters = item.whisper.recipients
+      .filter((r) => r.characterId !== null && r.characterId !== viewer.speakerCharacterId)
+      .map((r) => ({ characterId: r.characterId, name: r.name, imageUrl: r.imageUrl }));
+    return item.whisper.master && !viewer.isMaster ? [master, ...characters] : characters;
+  }
+  if (item.characterId !== null && viewer.approvedIds.has(item.characterId)) {
+    return item.characterId === viewer.speakerCharacterId
+      ? []
+      : [{ characterId: item.characterId, name: item.displayName, imageUrl: item.displayImageUrl }];
+  }
+  return viewer.isMaster ? [] : [master];
+};
+
+/** Same recipients, in any order. */
+export const sameRecipients = (a: readonly WhisperRecipient[], b: readonly WhisperRecipient[]): boolean =>
+  a.length === b.length && a.every((x) => b.some((y) => sameRecipient(x, y)));
+
 /** The fields a send carries: none when public. */
 export const whisperPayload = (chosen: readonly WhisperRecipient[]): WhisperPayload => {
   if (chosen.length === 0) return {};
