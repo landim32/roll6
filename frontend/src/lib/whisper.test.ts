@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addRecipient, matchesQuery, mentionAt, mentionOptions, removeMention, removeRecipient, whisperPayload,
+  addRecipient, matchesQuery, mentionAt, mentionOptions, removeMention, removeRecipient, replyRecipients, sameRecipients, whisperPayload,
 } from './whisper';
 import type { MentionContext, WhisperRecipient } from './whisper';
 
@@ -45,5 +45,42 @@ describe('recipients', () => {
     expect(whisperPayload(chosen)).toEqual({ whisperCharacterIds: [81], whisperMaster: true });
     expect(whisperPayload(removeRecipient(chosen, master))).toEqual({ whisperCharacterIds: [81], whisperMaster: false });
     expect(whisperPayload([])).toEqual({});
+  });
+});
+
+describe('replyRecipients (102)', () => {
+  const approvedIds = new Set([80, 81, 82]);
+  const viewer = { userId: 3, speakerCharacterId: 81, isMaster: false, approvedIds, masterLabel: 'Mestre' };
+  const whispered = (over: Record<string, unknown> = {}) => ({
+    userId: 2, characterId: 80, displayName: 'Aria', displayImageUrl: 'a.png',
+    whisper: { master: false, recipients: [{ characterId: 81, name: 'Bram de Ândria', imageUrl: 'b.png' }] }, ...over,
+  });
+
+  it('answers only whoever sent the whisper', () => {
+    expect(replyRecipients(whispered(), viewer)).toEqual([{ characterId: 80, name: 'Aria', imageUrl: 'a.png' }]);
+    // The master spoke (no character): back to "Mestre".
+    expect(replyRecipients(whispered({ userId: 1, characterId: null, displayName: 'Mestre (GM) — Rô' }), viewer)).toEqual([master]);
+  });
+
+  it('lets the master answer a player privately, never to himself', () => {
+    const gm = { ...viewer, userId: 1, speakerCharacterId: null, isMaster: true };
+    expect(replyRecipients(whispered(), gm)).toEqual([{ characterId: 80, name: 'Aria', imageUrl: 'a.png' }]);
+    expect(replyRecipients(whispered({ characterId: 99 }), gm)).toEqual([]);
+  });
+
+  it('keeps the recipients of one\'s own whisper', () => {
+    const own = whispered({ userId: 3, characterId: 81, whisper: { master: true, recipients: [
+      { characterId: 80, name: 'Aria', imageUrl: null }, { characterId: 82, name: 'Cael', imageUrl: null }] } });
+    expect(replyRecipients(own, viewer).map((r) => r.characterId)).toEqual([null, 80, 82]);
+  });
+
+  it('falls back to the master when the character left, and gives nothing for public items', () => {
+    expect(replyRecipients(whispered({ characterId: 99 }), viewer)).toEqual([master]);
+    expect(replyRecipients(whispered({ whisper: null }), viewer)).toEqual([]);
+  });
+
+  it('compares lists in any order', () => {
+    expect(sameRecipients([aria, bram], [bram, aria])).toBe(true);
+    expect(sameRecipients([aria], [aria, bram])).toBe(false);
   });
 });

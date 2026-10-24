@@ -2999,6 +2999,10 @@ button.stm-chat-quote { cursor: pointer; }
 .stm-chat-message.is-master .stm-chat-roll-total small { color: rgba(26, 19, 0, 0.7); }
 .stm-chat-message.is-master.is-whisper .stm-chat-bubble { border: 2px dashed #7a5a00; }
 .stm-chat-message.is-master .stm-whisper-footer { color: #3d2a00; }
+/* 102: the quote of a reply inside the golden card reads in dark ink, like the rest of the card. */
+.stm-chat-message.is-master .stm-chat-quote { background: rgba(26, 19, 0, 0.1); color: #1a1300; }
+.stm-chat-message.is-master .stm-chat-quote-name { color: #3d2a00 !important; }
+.stm-chat-message.is-master .stm-chat-quote-text { color: rgba(26, 19, 0, 0.78); }
 
 /* 086: the animation editor page — nothing of the table, only the logo bar, the stage and the conversation. */
 .stm-editor-page { display: flex; flex-direction: column; flex: 1 1 auto; height: 100%; min-height: 0; background: var(--stm-bg); }

@@ -22,9 +22,9 @@ export interface ChatItemActionsProps {
   onDelete: () => void;
   /** The master closes the poll (077); only offered when `item.canClosePoll`. */
   onClosePoll: () => void;
-  /** 079: the voice the master may switch his own message to ("Falar como …"), or null. */
-  voice?: VoiceSwitch | null;
-  onVoice?: () => void;
+  /** 079/102: the voices the master may switch his own message to ("Falar como …"). */
+  voices?: readonly VoiceSwitch[];
+  onVoice?: (voice: VoiceSwitch) => void;
   /** 093: the master corrects an answer of his Claude ("Corrigir resposta"); offered only when set. */
   onEditAnswer?: () => void;
   /** Puts the text on the clipboard (only offered when the entry has text). */
@@ -39,7 +39,7 @@ const BAR_HEIGHT = 56;
  * Ação/Mensagem (077: or, on a poll, Encerrar enquete for the master) and Apagar — only those this viewer may use on this entry. It floats above the bubble (below when there is no room) and
  * closes on a tap outside, a scroll or Esc.
  */
-export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onClosePoll, voice = null, onVoice, onEditAnswer, onCopy, onClose }: ChatItemActionsProps) => {
+export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConvert, onDelete, onClosePoll, voices = [], onVoice, onEditAnswer, onCopy, onClose }: ChatItemActionsProps) => {
   const { t } = useTranslation();
   // 049: items loaded before the campaign stopped playing still carry their old flag.
   const { currentCampaign } = useCampaign();
@@ -122,14 +122,15 @@ export const ChatItemActions = ({ item, anchor, userId, onReact, onReply, onConv
           <ChatLeftTextIcon size={24} />
         </button>
       )}
-      {voice && onVoice && (() => {
+      {onVoice && voices.map((voice) => {
         const label = voice.to === 'master' ? t('chat.speakAsMaster') : t('chat.speakAs', { name: voice.name });
         return (
-          <button type="button" className="stm-chat-action" onClick={act(onVoice)} title={label} aria-label={label}>
+          <button key={voice.to === 'master' ? 'master' : voice.characterId} type="button" className="stm-chat-action"
+            onClick={act(() => onVoice(voice))} title={label} aria-label={label}>
             {voice.to === 'master' ? <PersonBadgeIcon size={24} /> : <PersonFillIcon size={24} />}
           </button>
         );
-      })()}
+      })}
       {onEditAnswer && (
         <button type="button" className="stm-chat-action" onClick={act(onEditAnswer)} title={t('chat.ask.edit')} aria-label={t('chat.ask.edit')}>
           <PencilIcon size={24} />

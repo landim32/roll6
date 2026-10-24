@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isPollOpen } from './chatPoll';
 import {
-  authorLabel, chatLabel, compareCursors, isMasterVoice, voiceSwitch, pinOpenPolls, nextReaction, permissionsFor, canEditAnswer, replyExcerpt, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
+  authorLabel, chatLabel, compareCursors, isMasterVoice, voiceSwitches, pinOpenPolls, nextReaction, permissionsFor, canEditAnswer, replyExcerpt, reactionSummary, continuesPrevious, nameColor, NAME_COLORS, rollTotal, countUnread, formatChanges, formatMovement, markDeleted, mergeItems, reconcileRange, shortName, copyableText,
 } from './chatItems';
 import type { ChatItemInfo } from '../types/chat';
 import { CHAT_KIND } from '../types/chat';
@@ -279,22 +279,31 @@ describe("079: the master's voice", () => {
     expect(isMasterVoice(item(6, { kind: 'text', characterId: null, deleted: true }))).toBe(false);
   });
 
-  const master = { userId: 1, isMaster: true, selected: { characterId: 85, name: 'Goran' } };
+  const master = { userId: 1, isMaster: true, characters: [{ characterId: 85, name: 'Goran' }] };
 
   it('offers the master the other voice on his own message', () => {
-    expect(voiceSwitch(item(1, { kind: 'text', userId: 1, characterId: 85 }), master)).toEqual({ to: 'master' });
-    expect(voiceSwitch(item(2, { kind: 'roll', userId: 1, characterId: null }), master))
-      .toEqual({ to: 'character', characterId: 85, name: 'Goran' });
-    // With "Mestre (GM)" selected there is no character to switch to.
-    expect(voiceSwitch(item(3, { kind: 'text', userId: 1, characterId: null }), { ...master, selected: null })).toBeNull();
+    expect(voiceSwitches(item(1, { kind: 'text', userId: 1, characterId: 85 }), master)).toEqual([{ to: 'master' }]);
+    expect(voiceSwitches(item(2, { kind: 'roll', userId: 1, characterId: null }), master))
+      .toEqual([{ to: 'character', characterId: 85, name: 'Goran' }]);
+    // Without an approved character there is nothing to switch to.
+    expect(voiceSwitches(item(3, { kind: 'text', userId: 1, characterId: null }), { ...master, characters: [] })).toEqual([]);
+  });
+
+  it('102: one switch per own approved character, whatever "Personagem atual" says, minus a whisper recipient', () => {
+    const two = { ...master, characters: [{ characterId: 85, name: 'Goran' }, { characterId: 86, name: 'Sae' }] };
+    expect(voiceSwitches(item(1, { kind: 'text', userId: 1, characterId: null }), two).map((v) => v.to === 'character' && v.characterId))
+      .toEqual([85, 86]);
+    const whisper = { master: false, recipients: [{ characterId: 86, name: 'Sae', imageUrl: null }] };
+    expect(voiceSwitches(item(2, { kind: 'text', userId: 1, characterId: null, whisper }), two))
+      .toEqual([{ to: 'character', characterId: 85, name: 'Goran' }]);
   });
 
   it("never for players, others' messages, polls, deleted or masked entries", () => {
-    expect(voiceSwitch(item(1, { kind: 'text', userId: 2, characterId: 80 }), { userId: 2, isMaster: false, selected: null })).toBeNull();
-    expect(voiceSwitch(item(2, { kind: 'text', userId: 2, characterId: 80 }), master)).toBeNull();
-    expect(voiceSwitch(item(3, { kind: 'poll', userId: 1, characterId: null }), master)).toBeNull();
-    expect(voiceSwitch(item(4, { kind: 'text', userId: 1, characterId: null, deleted: true }), master)).toBeNull();
-    expect(voiceSwitch(item(5, { kind: 'text', userId: 1, characterId: 85, whisperHidden: true }), master)).toBeNull();
+    expect(voiceSwitches(item(1, { kind: 'text', userId: 2, characterId: 80 }), { userId: 2, isMaster: false, characters: [] })).toEqual([]);
+    expect(voiceSwitches(item(2, { kind: 'text', userId: 2, characterId: 80 }), master)).toEqual([]);
+    expect(voiceSwitches(item(3, { kind: 'poll', userId: 1, characterId: null }), master)).toEqual([]);
+    expect(voiceSwitches(item(4, { kind: 'text', userId: 1, characterId: null, deleted: true }), master)).toEqual([]);
+    expect(voiceSwitches(item(5, { kind: 'text', userId: 1, characterId: 85, whisperHidden: true }), master)).toEqual([]);
   });
 });
 

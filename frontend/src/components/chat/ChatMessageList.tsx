@@ -7,8 +7,10 @@ import { ImageLightbox } from './ImageLightbox';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
-import { canEditAnswer, compareCursors, continuesPrevious, voiceSwitch } from '../../lib/chatItems';
+import { canEditAnswer, compareCursors, continuesPrevious, voiceSwitches } from '../../lib/chatItems';
 import { useCampaign } from '../../hooks/useCampaign';
+import { useCharacter } from '../../hooks/useCharacter';
+import { CAMPAIGN_CHARACTER_STATUS } from '../../types/campaignCharacter';
 import { filterChatItems } from '../../lib/chatFilters';
 import { copyToClipboard } from '../../lib/clipboard';
 import type { ChatItemInfo } from '../../types/chat';
@@ -23,9 +25,10 @@ export const ChatMessageList = () => {
   const { session } = useAuth();
   const {
     items: allItems, pinnedPolls, hasMore, loading, pending, firstUnreadCursor, loadOlder, retry, discard, remove, filters, startReply,
-    react, convert, closePoll, setSpeaker, speaker, editAnswer,
+    react, convert, closePoll, setSpeaker, editAnswer,
   } = useChat();
-  const { isMaster } = useCampaign();
+  const { isMaster, currentCampaign } = useCampaign();
+  const { myParticipations } = useCharacter();
   // Moves and character changes show only when the user turned them on in the paperclip.
   const items = useMemo(() => filterChatItems(allItems, filters), [allItems, filters]);
   /** "Novas mensagens" goes before the first unread item still shown (the first unread may be a hidden one). */
@@ -194,16 +197,16 @@ export const ChatMessageList = () => {
       <AnswerEditModal item={editing} onClose={() => setEditing(null)} onSave={editAnswer} />
       {actions && (() => {
         const shown = allItems.find((i) => i.key === actions.item.key) ?? pinnedPolls.find((i) => i.key === actions.item.key) ?? actions.item;
-        // 079: the master who also plays may switch the voice of his own message — to the character selected now.
-        const selected = speaker?.characterId != null && speaker.participation
-          ? { characterId: speaker.characterId, name: speaker.participation.characterName }
-          : null;
-        const voice = voiceSwitch(shown, { userId, isMaster, selected });
+        // 079/102: the master who also plays may switch the voice of his own message — to any approved character of his.
+        const characters = myParticipations
+          .filter((p) => p.status === CAMPAIGN_CHARACTER_STATUS.approved && p.campaignId === currentCampaign?.campaignId)
+          .map((p) => ({ characterId: p.characterId, name: p.characterName }));
+        const voices = voiceSwitches(shown, { userId, isMaster, characters });
         return (
           <ChatItemActions
             item={shown}
-            voice={voice}
-            onVoice={() => run(() => setSpeaker(shown, voice?.to === 'character' ? voice.characterId : null))}
+            voices={voices}
+            onVoice={(voice) => run(() => setSpeaker(shown, voice.to === 'character' ? voice.characterId : null))}
             anchor={actions.anchor}
             userId={userId}
             onClose={() => setActions(null)}
