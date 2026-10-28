@@ -19,7 +19,7 @@ import {
 import type { MapDraft } from '../lib/draft';
 import { sameRatio } from '../lib/maskImage';
 import { clampFov, FOV_DEFAULT } from '../lib/storyCamera';
-import { readViewMode, writeViewMode } from '../lib/viewMode';
+import { isThreeD, readViewMode, writeViewMode } from '../lib/viewMode';
 import type { ViewMode } from '../lib/viewMode';
 import { readViewQuality, writeViewQuality } from '../lib/viewQuality';
 import type { ViewQuality } from '../lib/viewQuality';
@@ -305,7 +305,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeState(mode);
     if (draft.mapModelId !== null) writeViewMode(draft.mapModelId, mode);
-    if (mode === '3d') setResizeMode(false);
+    if (isThreeD(mode)) setResizeMode(false);
   }, [draft.mapModelId]);
 
   // Each map reopens in the view last used for it on this device.

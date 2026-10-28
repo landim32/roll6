@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCampaign } from '../../hooks/useCampaign';
-import { useChat } from '../../hooks/useChat';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useStoryCamera } from '../../hooks/useStoryCamera';
-import { useTurn } from '../../hooks/useTurn';
+import { useStoryBubbles } from '../../hooks/useStoryBubbles';
 import { useWalkEvents } from '../../hooks/useRealtime';
 import { useWalkSync } from '../../hooks/useWalkSync';
 import type { FollowedPiece, WalkOptions } from '../../hooks/useStoryCamera';
-import { nextBalloonExpiry, storyBalloons } from '../../lib/chatBubbles';
 import { isFreeMode } from '../../lib/freeMode';
 import { addSample, remotePose } from '../../lib/remoteWalk';
 import type { RemotePose, RemoteTrack } from '../../lib/remoteWalk';
@@ -30,11 +28,10 @@ import { SPRITE_VIEWS } from '../../lib/spriteView';
 import { cameraEdge, pieceGround } from '../../lib/storyCamera';
 import type { CameraPose, CameraWorld } from '../../lib/storyCamera';
 import { buildTerrain, groundUnder } from '../../lib/terrain';
-import { pieceKey } from '../../lib/turnStatus';
 import { QUALITY_PROFILES } from '../../lib/viewQuality';
 import { FollowCharacterIcon } from '../ui/icons';
 import { BubbleLayer } from './BubbleLayer';
-import type { BubbleLayerHandle, StoryBubble } from './BubbleLayer';
+import type { BubbleLayerHandle } from './BubbleLayer';
 import { initialPixels, toPixels } from './imagePixels';
 import type { PixelBuffer } from './imagePixels';
 import type { ModelSpec } from './modelSet';
@@ -81,10 +78,6 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
   const { currentCampaign } = useCampaign();
   const freeMode = isFreeMode(currentCampaign);
   const { registerStoryZoom } = useMapEditor();
-  const { entries } = useTurn();
-  const { items: chatItems } = useChat();
-  /** The clock of the chat balloons (068): moved forward when one of them expires. */
-  const [balloonNow, setBalloonNow] = useState(() => Date.now());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<SceneRenderer | null>(null);
   /** The pieces whose 3D model is drawn (055): their figure only measures the balloon and the shadow. */
@@ -142,30 +135,8 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     })() : null
   ), [ownPiece]);
 
-  // The balloons (036, 068, 073), in any mode, for the standing pieces of this map, keyed like the 2D map (`pieceKey`):
-  // the action of the turn in progress always shows; what an actor says in the chat (a message, a caption, a roll)
-  // takes its place for 60 seconds from when it was sent, while newer than the action. Objects say nothing.
-  const bubbles = useMemo((): StoryBubble[] => {
-    const texts = storyBalloons(chatItems, entries, balloonNow);
-    if (texts.size === 0) return [];
-    return pieces.reduce<StoryBubble[]>((list, piece) => {
-      if (!isShownIn3d(piece)) return list;
-      const key = pieceKey(piece);
-      const text = key ? texts.get(key) : undefined;
-      return text ? [...list, { id: piece.mapTokenId, name: piece.name, text }] : list;
-    }, []);
-  }, [chatItems, balloonNow, entries, pieces]);
-
-  // The clock of the balloons (068): read again when the chat changes and when the next speech to expire is due.
-  useEffect(() => {
-    setBalloonNow(Date.now());
-  }, [chatItems]);
-  useEffect(() => {
-    const next = nextBalloonExpiry(chatItems, balloonNow);
-    if (next === null) return;
-    const timer = window.setTimeout(() => setBalloonNow(Date.now()), Math.max(0, next - Date.now()) + 20);
-    return () => window.clearTimeout(timer);
-  }, [chatItems, balloonNow]);
+  // The balloons (036, 068, 073) of the standing pieces of this map (`useStoryBubbles`).
+  const bubbles = useStoryBubbles(pieces, isShownIn3d);
 
   // A new saying has to show at once, and the renderer only draws when something moved.
   useEffect(() => {

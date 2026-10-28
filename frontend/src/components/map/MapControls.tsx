@@ -1,3 +1,4 @@
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { mapRegionCenter } from '../../lib/mapRegion';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -7,15 +8,25 @@ import { canEditMap } from '../../lib/campaignStatus';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapShare } from '../../hooks/useMapShare';
 import { FOV_MAX, FOV_MIN, FOV_STEP } from '../../lib/storyCamera';
-import { ImageIcon, MapIcon, MinusIcon, PlusIcon, ResizeIcon, ShareIcon, View3dIcon } from '../ui/icons';
+import { isThreeD } from '../../lib/viewMode';
+import type { ViewMode } from '../../lib/viewMode';
+import { CheckIcon, ImageIcon, IsoViewIcon, MapIcon, MinusIcon, PlusIcon, ResizeIcon, ShareIcon, View3dIcon } from '../ui/icons';
+
+/** The views of the map (103): the 2D map, the isometric lit view and the 3D view. */
+const VIEWS: readonly { mode: ViewMode; label: string; Icon: typeof MapIcon }[] = [
+  { mode: '2d', label: 'story.view2dItem', Icon: MapIcon },
+  { mode: 'iso', label: 'story.viewIso', Icon: IsoViewIcon },
+  { mode: '3d', label: 'story.view3dItem', Icon: View3dIcon },
+];
 
 interface MapControlsProps {
   onOpenImage: () => void;
 }
 
 /**
- * Buttons at the bottom-right corner: zoom in/out, dice, share, the 2D/3D switch (034, every map has the 3D view),
- * scene image and image resize mode. In 3D the zoom buttons change the field of view and the image buttons are hidden.
+ * Buttons at the bottom-right corner: zoom in/out, dice, share, the view chooser (034: every map has the 3D view; 103:
+ * and the isometric one), scene image and image resize mode. In the 3D views the zoom buttons drive the view (field of
+ * view, or the distance its handler registered) and the image buttons are hidden.
  */
 export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   const { t } = useTranslation();
@@ -28,7 +39,8 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
     && !canEditMap(currentCampaign?.status, isMaster);
   const canEdit = canEditModel && !frozen;
 
-  const in3d = viewMode === '3d';
+  const in3d = isThreeD(viewMode);
+  const CurrentIcon = VIEWS.find((view) => view.mode === viewMode)?.Icon ?? MapIcon;
 
   const center = mapRegionCenter;
 
@@ -56,12 +68,29 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
           {sharing ? <span className="spinner-border spinner-border-sm" role="status" /> : <ShareIcon size={20} />}
         </button>
       )}
-      {/* Every map can be seen in 3D (034): the only button this feature adds. */}
-      <button type="button" className={`btn ${in3d ? 'btn-info' : 'btn-secondary'}`}
-        title={t(in3d ? 'story.view2d' : 'story.view3d')} aria-label={t(in3d ? 'story.view2d' : 'story.view3d')}
-        aria-pressed={in3d} onClick={() => setViewMode(in3d ? '2d' : '3d')}>
-        {in3d ? <MapIcon size={20} /> : <View3dIcon size={20} />}
-      </button>
+      {/* Every map can be seen in 3D (034) and, since 103, in the isometric lit view: one chooser for the three. */}
+      <DropdownMenu.Root modal={false}>
+        <DropdownMenu.Trigger asChild>
+          <button type="button" className={`btn ${in3d ? 'btn-info' : 'btn-secondary'}`}
+            title={t('story.viewChoose')} aria-label={t('story.viewChoose')}>
+            <CurrentIcon size={20} />
+          </button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content className="dropdown-menu show stm-popper-menu" side="left" align="end" sideOffset={6}>
+            <DropdownMenu.RadioGroup value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
+              {VIEWS.map(({ mode, label, Icon }) => (
+                <DropdownMenu.RadioItem key={mode} value={mode}
+                  className={`dropdown-item d-flex align-items-center gap-2${mode === viewMode ? ' active' : ''}`}>
+                  <Icon size={16} />
+                  <span className="flex-grow-1">{t(label)}</span>
+                  <DropdownMenu.ItemIndicator><CheckIcon size={14} /></DropdownMenu.ItemIndicator>
+                </DropdownMenu.RadioItem>
+              ))}
+            </DropdownMenu.RadioGroup>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
       {/* Editing the image is not done on phones, nor in 3D. */}
       {!in3d && (
         <>
