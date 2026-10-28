@@ -1,5 +1,5 @@
 import { AnimationMixer, LoopOnce } from 'three';
-import type { AnimationAction, Mesh, Object3D, Scene } from 'three';
+import type { AnimationAction, Material, Mesh, Object3D, Scene } from 'three';
 import type { Point } from '../../lib/hexGrid';
 import { fitLyingModel, fitModel } from '../../lib/modelFit';
 import { loadAnimations } from '../../lib/animationCache';
@@ -44,6 +44,8 @@ export interface ModelSet {
   /** Moves one model (a character someone walks) without reloading it. */
   setPose: (id: number, center: Point, yaw: number, ground: number) => void;
   setWalking: (id: number, walking: boolean) => void;
+  /** Height of a loaded model as placed in the scene (world units), standing; null while it loads (103: balloons). */
+  sceneHeight: (id: number) => number | null;
   /** Ultra (081): the models cast shadows on the terrain. */
   setShadows: (on: boolean) => void;
   /** Advances the animations; true while any model has one to play. */
@@ -60,17 +62,39 @@ interface Drawn {
   walk: AnimationAction | null;
   /** The death (058): played once, clamped on its last frame. */
   down: AnimationAction | null;
+  /** The scale it was placed with (its file's units → world units). */
+  placedScale: number;
   walking: boolean;
   /** The weapons this model carries (082/083). */
   hands: WeaponSocketsSync;
 }
 
 const FADE_SECONDS = 0.25;
+/** Marks a material copied for this model set (103). */
+const OWN_MATERIAL = 'roll6OwnMaterial';
+
+/**
+ * Options of another view drawing the models (103, the isometric view). Without them the models behave exactly as in the
+ * 3D view.
+ */
+export interface ModelSetOptions {
+  /** The models stand still on the first frame of their idle animation (their rest pose without one); nothing plays. */
+  still?: boolean;
+  /**
+   * Called with a clone of every material of each model and of the weapons it carries: the loaded files share their
+   * materials with the 3D view, so a view that changes them gets its own copies.
+   */
+  patchMaterial?: (material: Material) => void;
+  /** Called once for every mesh of each model and of its weapons (103: the shadow pass's depth material). */
+  patchMesh?: (mesh: Mesh) => void;
+}
 
 export const createModelSet = (
   scene: Scene,
   events: { onReady: (id: number) => void; onFailed: (id: number) => void; onChange: () => void },
+  options: ModelSetOptions = {},
 ): ModelSet => {
+  const { still = false, patchMaterial, patchMesh } = options;
   const drawn = new Map<number, Drawn>();
   /** Library animations (059) read for this view: id → clip, null when it could not be read. */
   const library = new Map<number, Roll6Clip | null>();
@@ -83,6 +107,31 @@ export const createModelSet = (
     });
   };
 
+  /**
+   * Gives every mesh of `object` its own patched materials (`options.patchMaterial`). Runs again whenever weapons are hung
+   * on the model, so materials already copied (marked in `userData`) are kept.
+   */
+  const ownMaterials = (object: Object3D) => {
+    if (!patchMaterial && !patchMesh) return;
+    object.traverse((node) => {
+      const mesh = node as Mesh;
+      if (!mesh.isMesh) return;
+      if (patchMesh && !mesh.userData[OWN_MATERIAL]) {
+        mesh.userData[OWN_MATERIAL] = true;
+        patchMesh(mesh);
+      }
+      if (!patchMaterial) return;
+      const copy = (material: Material) => {
+        if (material.userData[OWN_MATERIAL]) return material;
+        const clone = material.clone();
+        clone.userData[OWN_MATERIAL] = true;
+        patchMaterial(clone);
+        return clone;
+      };
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(copy) : copy(mesh.material);
+    });
+  };
+
   const place = (entry: Drawn) => {
     if (!entry.object || !entry.asset) return;
     const { bounds } = entry.asset;
@@ -91,6 +140,7 @@ export const createModelSet = (
     const lying = entry.spec.lying && !entry.down ? fitLyingModel(bounds, width, center, yaw, scale) : null;
     const fit = lying ?? fitModel(bounds, width, center, yaw, scale);
     entry.object.scale.setScalar(fit.scale);
+    entry.placedScale = fit.scale;
     entry.object.position.set(fit.position.x, fit.position.y + ground, fit.position.z);
     entry.object.rotation.set(lying?.tilt ?? 0, fit.rotationY, 0, 'YXZ');
     events.onChange();
@@ -104,6 +154,7 @@ export const createModelSet = (
   };
 
   const newHands = () => createWeaponSockets((model) => {
+    ownMaterials(model);
     castShadows(model);
     events.onChange();
   });
@@ -141,6 +192,13 @@ export const createModelSet = (
       forgetSockets(entry.object);
       measureSockets(entry.object);
       entry.hands.refresh(entry.object, heightOf(entry.asset));
+    }
+    if (still) {
+      // Still (103): the first frame of the idle, held — `update` never moves these mixers.
+      entry.idle?.reset().play();
+      entry.mixer.update(0);
+      events.onChange();
+      return;
     }
     if (entry.spec.lying) {
       if (entry.down) {
@@ -180,6 +238,7 @@ export const createModelSet = (
       entry.asset = asset;
       entry.object = object;
       entry.mixer = new AnimationMixer(object);
+      ownMaterials(object);
       castShadows(object);
       animate(entry);
       requestLibrary(entry);
@@ -206,7 +265,7 @@ export const createModelSet = (
         if (!entry || entry.spec.url !== spec.url) {
           if (entry) remove(entry);
           const fresh: Drawn = {
-            spec, asset: null, object: null, mixer: null, idle: null, walk: null, down: null, walking: entry?.walking ?? false,
+            spec, asset: null, object: null, mixer: null, idle: null, walk: null, down: null, placedScale: 1, walking: entry?.walking ?? false,
             hands: newHands(),
           };
           drawn.set(spec.id, fresh);
@@ -236,6 +295,7 @@ export const createModelSet = (
       const entry = drawn.get(id);
       if (!entry || entry.walking === walking) return;
       entry.walking = walking;
+      if (still) return;
       // A piece lying down never walks (the walker refuses it): its death stays as it is.
       if (entry.spec.lying) return;
       const to = walking ? entry.walk : entry.idle;
@@ -249,11 +309,16 @@ export const createModelSet = (
         from.fadeOut(FADE_SECONDS);
       }
     },
+    sceneHeight: (id) => {
+      const entry = drawn.get(id);
+      return entry?.object && entry.asset ? heightOf(entry.asset) * entry.placedScale : null;
+    },
     setShadows: (on) => {
       shadows = on;
       for (const entry of drawn.values()) if (entry.object) castShadows(entry.object);
     },
     update: (delta) => {
+      if (still) return false;
       let animating = false;
       for (const entry of drawn.values()) {
         if (entry.mixer && (entry.idle || entry.walk || entry.down)) {

@@ -44,6 +44,8 @@ import type { TokenInfo } from '../types/token';
 
 /** 3D view of story maps (033): its own chunk, so three.js is downloaded only when someone opens it. */
 const StoryView = lazy(() => import('../components/story/StoryView'));
+// The isometric lit view (103): its own lazy chunk, like the 3D view.
+const IsoView = lazy(() => import('../components/iso/IsoView'));
 
 /**
  * Main screen: the map with the grid and/or the campaign chat (041: map, map over chat, or chat only — the map isn't
@@ -164,6 +166,13 @@ export const MainPage = () => {
           {viewMode === '3d' ? (
             <Suspense fallback={<div className="stm-story"><div className="stm-story-loading text-secondary small">{t('story.loading')}</div></div>}>
               <StoryView onUnsupported={() => {
+                toast.error(t('story.noWebgl'));
+                setViewMode('2d');
+              }} />
+            </Suspense>
+          ) : viewMode === 'iso' ? (
+            <Suspense fallback={<div className="stm-iso"><div className="stm-iso-loading text-secondary small">{t('iso.loading')}</div></div>}>
+              <IsoView onUnsupported={() => {
                 toast.error(t('story.noWebgl'));
                 setViewMode('2d');
               }} />

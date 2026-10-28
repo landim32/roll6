@@ -333,6 +333,75 @@ body,
   cursor: grabbing;
 }
 
+/* The isometric lit view (103): a black stage (everything past the light is dark) and the focus chooser. */
+.stm-iso {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.stm-iso-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+  outline: none;
+}
+
+.stm-iso-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.stm-iso-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Bottom middle, where the 3D view's "Voltar ao personagem" sits: clear of both side panels and of the map controls.
+   The focus chooser and, beside it, the radius of the light. */
+.stm-iso-bar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--stm-footer-height) + 1rem);
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  gap: 0.5rem;
+  max-width: calc(100% - 8rem);
+}
+
+.stm-iso-bar .dropdown-toggle {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* A Radix dropdown drawn with Bootstrap's .dropdown-menu: Bootstrap makes it absolute, so Radix measured a zero-size
+   menu and placed it from the trigger's edge (on the wrong side for side="left"/"top"). Static, it is measured whole. */
+.stm-popper-menu {
+  position: static;
+}
+
+.stm-popper-menu .dropdown-item {
+  cursor: pointer;
+}
+
+/* The check column of a radio list in a dropdown. */
+.stm-menu-check {
+  display: inline-flex;
+  width: 16px;
+}
+
 /* The model card (060): the stage, and on the "Animação" tab its timeline and "Gerar imagem", in one frame. */
 .stm-model-card {
   /* A flex item of .stm-model-layout: without a width it shrinks to its content and the stage (width: 100%) collapses. */

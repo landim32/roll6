@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearViewModes, readViewMode, VIEW_MODE_STORAGE_KEY, writeViewMode } from './viewMode';
+import { clearViewModes, isThreeD, readViewMode, VIEW_MODE_STORAGE_KEY, writeViewMode } from './viewMode';
 
 const memoryStorage = () => {
   const data = new Map<string, string>();
@@ -25,6 +25,17 @@ describe('viewMode', () => {
     expect(readViewMode(7)).toBe('3d');
     expect(readViewMode(8)).toBe('2d');
     expect(readViewMode(9)).toBe('2d');
+  });
+
+  it('remembers the isometric view (103) next to the old values', () => {
+    writeViewMode(7, 'iso');
+    writeViewMode(8, '3d');
+
+    expect(readViewMode(7)).toBe('iso');
+    expect(readViewMode(8)).toBe('3d');
+    expect(isThreeD('iso')).toBe(true);
+    expect(isThreeD('3d')).toBe(true);
+    expect(isThreeD('2d')).toBe(false);
   });
 
   it('reads invalid JSON or values as 2D', () => {

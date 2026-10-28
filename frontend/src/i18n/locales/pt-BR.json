@@ -1038,7 +1038,21 @@
     "noWebgl": "Este dispositivo não consegue exibir a vista 3D.",
     "loading": "Carregando cena 3D…",
     "bubbleLabel": "{{name}} diz: {{text}}",
-    "joystick": "Andar"
+    "joystick": "Andar",
+    "viewChoose": "Escolher vista",
+    "view2dItem": "Mapa 2D",
+    "viewIso": "Isométrica",
+    "view3dItem": "3D"
+  },
+  "iso": {
+    "focus": "Foco: {{name}}",
+    "focusMine": "Voltar ao meu personagem",
+    "noFocus": "Sem personagem no mapa",
+    "focusTitle": "Escolher quem a câmera acompanha",
+    "radius": "Raio: {{count}}",
+    "radiusItem": "{{count}} hexágonos",
+    "radiusTitle": "Tamanho da área iluminada",
+    "loading": "Carregando a vista isométrica…"
   },
   "viewQuality": {
     "title": "Qualidade do 3D",
