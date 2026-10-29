@@ -51,7 +51,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
       # MCP tools call the API with the caller's own API key; no database/storage secrets here.
-      Roll6Api__BaseUrl: http://api:8080
+      # By container name, never the service name: other apps on emagine-network also have a service called "api",
+      # so "api" may resolve to their containers (which refuse our keys with 401).
+      Roll6Api__BaseUrl: http://roll6-api:8080
     depends_on:
       - api
     networks:

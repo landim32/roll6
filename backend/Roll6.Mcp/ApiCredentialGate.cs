@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Caching.Memory;
@@ -20,7 +21,7 @@ public class ApiCredentialGate
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext context, IHttpClientFactory clients, IMemoryCache cache)
+    public async Task InvokeAsync(HttpContext context, IHttpClientFactory clients, IMemoryCache cache, ILogger<ApiCredentialGate> logger)
     {
         var credential = context.Request.Headers.TryGetValue(Roll6ApiClient.API_KEY_HEADER, out var key) && !string.IsNullOrWhiteSpace(key)
             ? (Header: Roll6ApiClient.API_KEY_HEADER, Value: key.ToString())
@@ -28,7 +29,20 @@ public class ApiCredentialGate
                 ? (Header: "Authorization", Value: authorization.ToString())
                 : (Header: string.Empty, Value: string.Empty);
 
-        if (credential.Value.Length == 0 || !await IsValidAsync(credential, clients, cache))
+        var check = credential.Value.Length == 0 ? CredentialCheck.Refused : await CheckAsync(credential, clients, cache, logger);
+        if (check == CredentialCheck.Unavailable)
+        {
+            // The API could not answer: not the caller's fault, so never report the key as invalid.
+            context.Response.StatusCode = StatusCodes.Status502BadGateway;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                status = 502,
+                title = "Bad Gateway",
+                detail = "The Roll6 API could not be reached to check the API key. Try again shortly."
+            }, options: (System.Text.Json.JsonSerializerOptions?)null, contentType: "application/problem+json");
+            return;
+        }
+        if (check == CredentialCheck.Refused)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsJsonAsync(new
@@ -42,25 +56,38 @@ public class ApiCredentialGate
         await _next(context);
     }
 
-    private static async Task<bool> IsValidAsync((string Header, string Value) credential, IHttpClientFactory clients, IMemoryCache cache)
+    private enum CredentialCheck { Valid, Refused, Unavailable }
+
+    /// <summary>Only a 401/403 from the API means a bad credential; anything else is the API being unavailable.</summary>
+    private static async Task<CredentialCheck> CheckAsync((string Header, string Value) credential, IHttpClientFactory clients,
+        IMemoryCache cache, ILogger<ApiCredentialGate> logger)
     {
         var cacheKey = "cred:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(credential.Header + "|" + credential.Value)));
         if (cache.TryGetValue(cacheKey, out _))
-            return true;
+            return CredentialCheck.Valid;
 
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "/api/user/me");
             request.Headers.TryAddWithoutValidation(credential.Header, credential.Value);
             using var response = await clients.CreateClient(nameof(Roll6ApiClient)).SendAsync(request);
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                logger.LogInformation("Credential refused by the API ({Status}).", (int)response.StatusCode);
+                return CredentialCheck.Refused;
+            }
             if (!response.IsSuccessStatusCode)
-                return false;
+            {
+                logger.LogWarning("Credential check failed: the API answered {Status}.", (int)response.StatusCode);
+                return CredentialCheck.Unavailable;
+            }
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            return false;
+            logger.LogWarning(ex, "Credential check failed: the API could not be reached.");
+            return CredentialCheck.Unavailable;
         }
         cache.Set(cacheKey, true, CACHE);
-        return true;
+        return CredentialCheck.Valid;
     }
 }
