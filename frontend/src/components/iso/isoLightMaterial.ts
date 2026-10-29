@@ -9,6 +9,8 @@ import { LIGHT_FEATHER_PX, lightRadiusPx } from '../../lib/isoLight';
  * are cut at the radius (the part outside is discarded, so it never covers the lit floor) — in their shadow pass too, so
  * a piece in the dark casts no shadow into the light; the shadows on the floor fade with the light. All patched materials
  * share one set of uniforms: moving the light or changing its radius is changing a uniform, nothing is rebuilt.
+ * A piece may also get its own `gray` uniform (104): 1 draws it in black and white (out of combat), 0 in color — the same
+ * program either way, so a change of posture recompiles nothing.
  */
 export interface LightUniforms {
   lightCenter: { value: Vector2 };
@@ -18,6 +20,14 @@ export interface LightUniforms {
 }
 
 export type LightKind = 'floor' | 'piece' | 'shadow';
+
+/** A piece's black-and-white switch (104): 0 = color, 1 = gray. */
+export interface GrayUniform {
+  value: number;
+}
+
+/** The switch of every material without its own: always in color. */
+const NO_GRAY: GrayUniform = { value: 0 };
 
 export const createLightUniforms = (): LightUniforms => ({
   lightCenter: { value: new Vector2(0, 0) },
@@ -35,6 +45,7 @@ uniform vec2 lightCenter;
 uniform float lightRadius;
 uniform float lightFeather;
 uniform float fogTime;
+uniform float isoGray;
 
 float isoHash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -64,6 +75,7 @@ gl_FragColor.rgb = gl_FragColor.rgb * isoLit + isoFogColor * (1.0 - isoLit);
 
 const PIECE_END = `${LIT}
 if (isoDist > lightRadius) discard;
+gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114))), isoGray);
 gl_FragColor.rgb *= isoLit;
 #include <dithering_fragment>`;
 
@@ -77,10 +89,15 @@ const DEPTH_END = `${LIT}
 if (isoDist > lightRadius) discard;
 }`;
 
-/** Patches `material` (a built-in three.js material) with the light; `uniforms` are shared by every patched material. */
-export const applyLight = (material: Material, uniforms: LightUniforms, kind: LightKind): void => {
+/**
+ * Patches `material` (a built-in three.js material) with the light; `uniforms` are shared by every patched material, and
+ * `options.gray` (pieces only) is the piece's own black-and-white switch.
+ */
+export const applyLight = (
+  material: Material, uniforms: LightUniforms, kind: LightKind, options: { gray?: GrayUniform } = {},
+): void => {
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, uniforms, { isoGray: options.gray ?? NO_GRAY });
     shader.vertexShader = VERTEX_HEADER + shader.vertexShader.replace('#include <project_vertex>', VERTEX_WORLD);
     shader.fragmentShader = FRAGMENT_HEADER + (kind === 'shadow'
       ? shader.fragmentShader.replace('#include <premultiplied_alpha_fragment>', SHADOW_END)
@@ -96,7 +113,7 @@ export const applyLight = (material: Material, uniforms: LightUniforms, kind: Li
  */
 export const applyLightToDepth = (material: Material, uniforms: LightUniforms): void => {
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, uniforms, { isoGray: NO_GRAY });
     shader.vertexShader = VERTEX_HEADER + shader.vertexShader.replace('#include <project_vertex>', VERTEX_WORLD);
     const body = shader.fragmentShader.trimEnd();
     shader.fragmentShader = FRAGMENT_HEADER + body.slice(0, body.lastIndexOf('}')) + DEPTH_END;
