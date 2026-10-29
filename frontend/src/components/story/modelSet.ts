@@ -84,9 +84,14 @@ export interface ModelSetOptions {
    * Called with a clone of every material of each model and of the weapons it carries: the loaded files share their
    * materials with the 3D view, so a view that changes them gets its own copies.
    */
-  patchMaterial?: (material: Material) => void;
+  patchMaterial?: (material: Material, id: number) => void;
   /** Called once for every mesh of each model and of its weapons (103: the shadow pass's depth material). */
   patchMesh?: (mesh: Mesh) => void;
+  /**
+   * The parent of the model of piece `id` (104: the isometric miniature, which tips over with its base); missing or null
+   * = the scene. The model is placed in that parent's frame (`center`, `yaw` and `ground` of its spec).
+   */
+  mount?: (id: number) => Object3D | null;
 }
 
 export const createModelSet = (
@@ -94,7 +99,7 @@ export const createModelSet = (
   events: { onReady: (id: number) => void; onFailed: (id: number) => void; onChange: () => void },
   options: ModelSetOptions = {},
 ): ModelSet => {
-  const { still = false, patchMaterial, patchMesh } = options;
+  const { still = false, patchMaterial, patchMesh, mount } = options;
   const drawn = new Map<number, Drawn>();
   /** Library animations (059) read for this view: id → clip, null when it could not be read. */
   const library = new Map<number, Roll6Clip | null>();
@@ -111,7 +116,7 @@ export const createModelSet = (
    * Gives every mesh of `object` its own patched materials (`options.patchMaterial`). Runs again whenever weapons are hung
    * on the model, so materials already copied (marked in `userData`) are kept.
    */
-  const ownMaterials = (object: Object3D) => {
+  const ownMaterials = (object: Object3D, id: number) => {
     if (!patchMaterial && !patchMesh) return;
     object.traverse((node) => {
       const mesh = node as Mesh;
@@ -125,7 +130,7 @@ export const createModelSet = (
         if (material.userData[OWN_MATERIAL]) return material;
         const clone = material.clone();
         clone.userData[OWN_MATERIAL] = true;
-        patchMaterial(clone);
+        patchMaterial(clone, id);
         return clone;
       };
       mesh.material = Array.isArray(mesh.material) ? mesh.material.map(copy) : copy(mesh.material);
@@ -153,8 +158,8 @@ export const createModelSet = (
     if (entry.object && entry.asset) entry.hands.sync(entry.object, heightOf(entry.asset), entry.spec.weapons);
   };
 
-  const newHands = () => createWeaponSockets((model) => {
-    ownMaterials(model);
+  const newHands = (id: number) => createWeaponSockets((model) => {
+    ownMaterials(model, id);
     castShadows(model);
     events.onChange();
   });
@@ -162,7 +167,7 @@ export const createModelSet = (
   const remove = (entry: Drawn) => {
     entry.hands.reset();
     entry.mixer?.stopAllAction();
-    if (entry.object) scene.remove(entry.object);
+    entry.object?.parent?.remove(entry.object);
   };
 
   /**
@@ -238,11 +243,11 @@ export const createModelSet = (
       entry.asset = asset;
       entry.object = object;
       entry.mixer = new AnimationMixer(object);
-      ownMaterials(object);
+      ownMaterials(object, entry.spec.id);
       castShadows(object);
       animate(entry);
       requestLibrary(entry);
-      scene.add(object);
+      (mount?.(entry.spec.id) ?? scene).add(object);
       place(entry);
       holdWeapons(entry);
       events.onReady(entry.spec.id);
@@ -266,7 +271,7 @@ export const createModelSet = (
           if (entry) remove(entry);
           const fresh: Drawn = {
             spec, asset: null, object: null, mixer: null, idle: null, walk: null, down: null, placedScale: 1, walking: entry?.walking ?? false,
-            hands: newHands(),
+            hands: newHands(spec.id),
           };
           drawn.set(spec.id, fresh);
           load(fresh);

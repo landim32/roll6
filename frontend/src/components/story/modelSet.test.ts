@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AnimationClip, BoxGeometry, Mesh, MeshStandardMaterial, Scene, VectorKeyframeTrack } from 'three';
+import { AnimationClip, BoxGeometry, Group, Mesh, MeshStandardMaterial, Scene, VectorKeyframeTrack } from 'three';
 import type { Material } from 'three';
 
 const { material, idle } = vi.hoisted(() => ({
@@ -91,6 +91,39 @@ describe('modelSet options (103)', () => {
     expect(patched).toHaveLength(1);
     expect(body.material).toBe(patched[0]);
     expect(body.material).not.toBe(material.current);
+    set.dispose();
+  });
+});
+
+describe('modelSet options (104)', () => {
+  it('mounts each model under the parent given for its piece and leaves it when removed', async () => {
+    prepare();
+    const scene = new Scene();
+    const holder = new Group();
+    scene.add(holder);
+    const set = createModelSet(scene, { onReady: () => undefined, onFailed: () => undefined, onChange: () => undefined },
+      { still: true, mount: (id) => (id === 1 ? holder : null) });
+    set.setModels([spec, { ...spec, id: 2 }]);
+    await flush();
+
+    expect(holder.children).toHaveLength(1);
+    expect(holder.getObjectByName('body')).toBeDefined();
+    expect(scene.children.filter((child) => child !== holder)).toHaveLength(1);
+    set.setModels([{ ...spec, id: 2 }]);
+    expect(holder.children).toHaveLength(0);
+    set.dispose();
+  });
+
+  it('tells patchMaterial which piece the material belongs to', async () => {
+    prepare();
+    const scene = new Scene();
+    const ids: number[] = [];
+    const set = createModelSet(scene, { onReady: () => undefined, onFailed: () => undefined, onChange: () => undefined },
+      { still: true, patchMaterial: (_m, id) => { ids.push(id); } });
+    set.setModels([{ ...spec, id: 7 }]);
+    await flush();
+
+    expect(ids).toEqual([7]);
     set.dispose();
   });
 });
