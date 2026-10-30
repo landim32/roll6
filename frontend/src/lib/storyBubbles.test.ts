@@ -55,6 +55,21 @@ describe('bubblePlacement', () => {
     expect(high?.y).toBeCloseTo(ceiling);
   });
 
+  it('with no ceiling (the isometric view, 105) stays just over a head near the top of the view', () => {
+    const high = bubblePlacement(sprite({ top: 10 }), FRAME, CANVAS, SIZE, { ceiling: 0 });   // the head at 100 px
+
+    expect(high?.below).toBe(false);
+    expect(high!.y).toBeCloseTo(82);                // 18 px of tail over the head, not pushed down to the ceiling (144)
+    expect(high?.visible).toBe(true);
+  });
+
+  it('with no ceiling hangs under the head only when the box does not fit above it', () => {
+    const top = bubblePlacement(sprite({ top: 3 }), FRAME, CANVAS, SIZE, { ceiling: 0 });     // the head at 30 px
+
+    expect(top?.below).toBe(true);
+    expect(top!.y).toBeGreaterThan(30);
+  });
+
   it('keeps the balloon inside the canvas at the left and at the right', () => {
     const left = place({ screenX: -20 });
     const right = place({ screenX: 90 });

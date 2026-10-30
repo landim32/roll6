@@ -172,10 +172,19 @@ export const MainPage = () => {
             </Suspense>
           ) : viewMode === 'iso' ? (
             <Suspense fallback={<div className="stm-iso"><div className="stm-iso-loading text-secondary small">{t('iso.loading')}</div></div>}>
-              <IsoView onUnsupported={() => {
-                toast.error(t('story.noWebgl'));
-                setViewMode('2d');
-              }} />
+              <IsoView
+                onUnsupported={() => {
+                  toast.error(t('story.noWebgl'));
+                  setViewMode('2d');
+                }}
+                onPickToken={setTokenPick}
+                onDeleteToken={setToDelete}
+                onEditNpc={setEditingInstance}
+                onAct={setActing}
+                onRepeated={setRepeating}
+                onResetTurn={setToReset}
+                picking={tokenPick !== null || toDelete !== null || acting !== null || repeating !== null}
+              />
             </Suspense>
           ) : (
             <MapCanvas

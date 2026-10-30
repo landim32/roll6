@@ -14,7 +14,7 @@ import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
 /** Share of the circle as large as the piece's shape that the base covers (the colored hexes still show around it). */
 export const BASE_SHARE = 0.85;
 /** Thickness of the base (map px; a hex is 40 from middle to corner). */
-export const BASE_HEIGHT = 14;
+export const BASE_HEIGHT = 10;
 
 export interface MiniatureState {
   /** Down or out of combat: the miniature lies tipped over. */

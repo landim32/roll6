@@ -1,66 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent,
 } from 'react';
-import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
-import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useMapEditor } from '../../hooks/useMapEditor';
+import { useMapInteraction } from '../../hooks/useMapInteraction';
+import type { MapInteractionProps } from '../../hooks/useMapInteraction';
 import { toMapPoint, useMapPointer } from '../../hooks/useMapPointer';
 import { useMapToken } from '../../hooks/useMapToken';
-import { useNpc } from '../../hooks/useNpc';
-import { useTokenMovement } from '../../hooks/useTokenMovement';
 import { useTurn } from '../../hooks/useTurn';
-import { hexCenter, isInsideGrid, lookToward } from '../../lib/hexGrid';
-import { pickTarget } from '../../lib/actionTarget';
-import { repeatedActionOf } from '../../lib/repeatedAction';
-import type { RepeatedTarget } from '../modals/RepeatedActionModal';
-import { canConfirm, canPickDestination, currentStatus, MOVEMENT_KIND, previewHexes, previewOf } from '../../lib/movement';
-import { hasEntries, hasMoved, lastActions, movementTrails } from '../../lib/turnStatus';
-import { commandsNpc } from '../../lib/npcCategory';
-import type { ActTarget } from '../../lib/turnStatus';
-import { MAP_TOKEN_TYPE } from '../../types/mapToken';
-import type { MapTokenInfo } from '../../types/mapToken';
-import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt } from '../../lib/mapTokens';
-import { pieceHexes } from '../../lib/occupancy';
-import { isPlayable } from '../../lib/campaignStatus';
+import { hexCenter } from '../../lib/hexGrid';
+import { lastActions, movementTrails } from '../../lib/turnStatus';
 import { isFreeMode, showTrails } from '../../lib/freeMode';
-import type { Offset } from '../../lib/hexGrid';
-import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 import { HexGridLayer } from './HexGridLayer';
 import { HexHighlight } from './HexHighlight';
-import { HexMenu } from './HexMenu';
 import { ImageLayer } from './ImageLayer';
-import { MovementCounter } from './MovementCounter';
+import { MapHexMenu } from './MapHexMenu';
 import { MovementLayer } from './MovementLayer';
 import { ResizeHandles } from './ResizeHandles';
 import { SpeechBubbleLayer } from './SpeechBubbleLayer';
 import { TokenLayer } from './TokenLayer';
 import { TurnTrailLayer } from './TurnTrailLayer';
 
-/** What the tokens modal is opened for, from the map. */
-export type TokenPickRequest =
-  | { kind: 'add'; x: number; y: number }
-  | { kind: 'change'; mapTokenId: number; name: string }
-  | { kind: 'character'; participation: CampaignCharacterInfo; x: number; y: number };
-
-interface MapCanvasProps {
-  onPickToken: (request: TokenPickRequest) => void;
-  /** Asks to remove a piece (the page confirms first); `mapNpcId` set = an NPC instance leaving the map (051). */
-  onDeleteToken: (target: { mapTokenId: number; name: string; mapNpcId: number | null }) => void;
-  /** "Editar NPC" on an NPC piece (051): the page opens the instance form. */
-  onEditNpc: (piece: MapTokenInfo) => void;
-  /** "Agir" on a piece (the page opens the action modal, 016). */
-  onAct: (target: ActTarget) => void;
-  /** "Ação repetida…" on a piece (099): the page opens the repeated-action window. */
-  onRepeated: (target: RepeatedTarget) => void;
-  /** "Resetar turno" on a piece (the page confirms first, 016). */
-  onResetTurn: (target: { mapTokenId: number; name: string }) => void;
-  /** A modal opened from the hex menu (tokens or delete confirmation) is still open: the hex stays selected. */
-  picking?: boolean;
-}
+export type { TokenPickRequest } from '../../hooks/useMapInteraction';
 
 /** Moves under this distance (px) between press and release count as a click, not a pan. */
 const CLICK_TOLERANCE = 4;
@@ -68,81 +31,28 @@ const CLICK_TOLERANCE = 4;
 /** Zoom used to show the user's character when a map opens. */
 const FOCUS_ZOOM = 1.5;
 
-const sameHex = (a: Offset | null, b: Offset | null) => a?.x === b?.x && a?.y === b?.y;
-
 /**
  * Full-screen SVG: image + hex grid + pieces inside one transformed group; drag the background to pan.
  * The hex under the mouse is highlighted; the master clicks a hex for its menu and drops party cards
- * on hexes (011).
+ * on hexes (011). The menu, "Agir sobre…", "Mover" and the drops live in `useMapInteraction` (shared with the
+ * isometric view, 105): this component only turns the pointer into hexes and map points.
  */
-export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRepeated, onResetTurn, picking = false }: MapCanvasProps) => {
-  const { t } = useTranslation();
+export const MapCanvas = (props: MapInteractionProps) => {
   const { draft, hexSize, view, panBy, zoomIn, zoomOut, centerOn, resizeMode, canEdit, setImageLayout } = useMapEditor();
-  const { mapTokens, canPlace, canPlaceOwn, placeCharacter, moveToken, setPosture } = useMapToken();
+  const { mapTokens } = useMapToken();
   const { party, currentSelection } = useCharacter();
-  const { session } = useAuth();
-  const movement = useTokenMovement();
   const { currentCampaign } = useCampaign();
   const freeMode = isFreeMode(currentCampaign);
-  const { placeOnMap } = useNpc();
-  const { turnNo, entries: turnEntries, refresh: refreshTurn } = useTurn();
+  const { entries: turnEntries } = useTurn();
+  const interaction = useMapInteraction(props);
+  const { movement, overlay, targeting, hover, closeMenu } = interaction;
   const hexAt = useMapPointer();
   const last = useRef<{ x: number; y: number } | null>(null);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
   const [panning, setPanning] = useState(false);
-  const [hoverHex, setHoverHex] = useState<Offset | null>(null);
-  const [menu, setMenu] = useState<{ hex: Offset; left: number; top: number } | null>(null);
 
-  const hover = (hex: Offset | null) => setHoverHex((prev) => (sameHex(prev, hex) ? prev : hex));
-  /** Hex whose menu action is in progress (tokens modal open). */
-  const [pickedHex, setPickedHex] = useState<Offset | null>(null);
-  const closeMenu = useCallback(() => setMenu(null), []);
-  /** The clicked hex stays selected (gray) while its menu or the modal it opened is up. */
-  const selectedHex = menu?.hex ?? pickedHex;
-
-  // The modal closed (token chosen or cancelled): release the selection.
-  useEffect(() => {
-    if (!picking) setPickedHex(null);
-  }, [picking]);
-
-  // Another map (or campaign) closes the menu.
-  useEffect(() => closeMenu(), [draft.mapId, closeMenu]);
-
-  /**
-   * "Agir sobre…" (098): the piece whose action waits for the hex it is about. While set, the next click on a hex
-   * inside the grid picks the target and opens the action window; Esc, the right button, a click outside the grid,
-   * another map or the piece leaving the map cancel it.
-   */
-  const [targeting, setTargeting] = useState<ActTarget | null>(null);
-  useEffect(() => setTargeting(null), [draft.mapId]);
-  useEffect(() => {
-    if (targeting && !mapTokens.some((token) => token.mapTokenId === targeting.mapTokenId)) setTargeting(null);
-  }, [mapTokens, targeting]);
-  useEffect(() => {
-    if (!targeting) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setTargeting(null);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [targeting]);
-
-  const startTargeting = (actor: ActTarget) => {
-    setTargeting(actor);
-    toast.info(t('turn.targetHint'));
-  };
-
-  /** The click that picks the target: a hex inside the grid opens the window; anything else cancels. */
-  const pickTargetHex = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!targeting) return;
-    const hex = hexAt(event);
-    const actor = mapTokens.find((token) => token.mapTokenId === targeting.mapTokenId);
-    setTargeting(null);
-    if (!hex || !actor || !isInsideGrid(hex, draft.gridWidth, draft.gridHeight)) return;
-    const onThisMap = mapTokens.filter((token) => token.mapId === actor.mapId);
-    setPickedHex(hex);
-    onAct({ ...targeting, target: pickTarget(hex, actor, onThisMap) });
-  };
+  const mapPointOf = (event: { clientX: number; clientY: number; currentTarget: Element }) =>
+    toMapPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), view);
 
   // Opening a map shows the user's chosen character centered and zoomed in, once its pieces are loaded.
   const centeredFor = useRef<number | null>(null);
@@ -169,96 +79,9 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRepe
     setPanning(true);
   };
 
-  /**
-   * Who may move a piece (015): the master any piece of the open campaign map; a player only the pieces of
-   * his own characters.
-   */
-  const isOwnCharacter = (token: MapTokenInfo): boolean =>
-    token.tokenType === MAP_TOKEN_TYPE.character
-    && party.some((p) => p.campaignCharacterId === token.campaignCharacterId && p.characterOwnerId === session?.user.userId);
-
-  /** A player's own piece: his character, or an ally NPC he commands through its master character (071). */
-  const isOwnPiece = (token: MapTokenInfo): boolean => isOwnCharacter(token) || commandsNpc(token, session?.user.userId, false);
-
-  /** Characters and NPCs move once per turn (016); objects move freely; in free mode (054) everyone does. */
-  const canMove = (token: MapTokenInfo): boolean => {
-    if (draft.mapId === null || !canPlaceOwn) return false;
-    if (!canPlace && !isOwnPiece(token)) return false;
-    return token.tokenType === MAP_TOKEN_TYPE.object || freeMode || !hasMoved(turnEntries, token);
-  };
-
-  /** "Agir"/"Resetar turno" (016): the master on characters and NPCs, a player on his own characters. */
-  const canTakeTurn = (token: MapTokenInfo): boolean => {
-    if (draft.mapId === null || turnNo === null || token.tokenType === MAP_TOKEN_TYPE.object) return false;
-    // 049: acting and resetting only while the campaign plays (not even the master while preparing).
-    if (!isPlayable(currentCampaign?.status)) return false;
-    return canPlace || isOwnPiece(token);
-  };
-
-  /** Posture (031): the master on characters and NPCs, a player on his own characters and commanded allies (071). */
-  const canSetPosture = (token: MapTokenInfo): boolean =>
-    draft.mapId !== null && canPlaceOwn && token.tokenType !== MAP_TOKEN_TYPE.object && (canPlace || isOwnPiece(token));
-
-  /** Movement mode: the path follows the hovered hex; in the facing phase the piece turns to the mouse. */
-  const moveWithPointer = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const { state } = movement;
-    if (state.phase === 'path') {
-      movement.hover(hexAt(event));
-    } else if (state.phase === 'facing') {
-      const point = toMapPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), view);
-      movement.face(lookToward(hexCenter(state.destination.x, state.destination.y, hexSize), point, state.look));
-    }
-  };
-
-  /**
-   * Movement mode clicks: pick the destination, then confirm the facing. A touch screen has no hover, so a tap
-   * on another hex (or toward another side) first shows that path/facing; tapping it again confirms. With a
-   * mouse the hover already did that, so one click still confirms.
-   */
-  const clickWhileMoving = async (event: ReactPointerEvent<SVGSVGElement>) => {
-    const { state } = movement;
-    if (state.phase === 'path') {
-      const hex = hexAt(event);
-      if (!sameHex(state.target, hex)) {
-        movement.hover(hex);
-        return;
-      }
-      if (state.cost === null) {
-        if (state.target)
-          toast.warning(t(state.piece.kind === MOVEMENT_KIND.unlimited ? 'movement.blocked' : 'movement.unreachable'));
-        return;
-      }
-      if (!canPickDestination(state, canPlace)) {
-        toast.warning(t('movement.overLimit'));
-        return;
-      }
-      movement.pick();
-      return;
-    }
-    if (state.phase !== 'facing') return;
-    const point = toMapPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), view);
-    const look = lookToward(hexCenter(state.destination.x, state.destination.y, hexSize), point, state.look);
-    if (look !== state.look) {
-      movement.face(look);
-      return;
-    }
-    if (!canConfirm(state, canPlace)) {
-      toast.warning(t('movement.overLimit'));
-      return;
-    }
-    try {
-      const piece = await movement.confirm();
-      if (piece) toast.success(t('toast.tokenMoved', { name: piece.name }));
-      void refreshTurn();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-    }
-  };
-
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (!last.current) {
-      hover(movement.active ? null : hexAt(event));
-      if (movement.active) moveWithPointer(event);
+      interaction.pointerAt(hexAt(event), mapPointOf(event));
       return;
     }
     const dx = event.clientX - last.current.x;
@@ -285,22 +108,8 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRepe
       && Math.abs(event.clientX - start.x) < CLICK_TOLERANCE
       && Math.abs(event.clientY - start.y) < CLICK_TOLERANCE;
     if (!clicked || resizeMode) return;
-    if (targeting) {
-      pickTargetHex(event);
-      return;
-    }
-    if (movement.active) {
-      void clickWhileMoving(event);
-      return;
-    }
-    const hex = hexAt(event);
-    if (!hex) return;
-    // Players only get a menu (Mover / Agir / Resetar turno) on the pieces of their own characters.
-    const piece = tokenAt(mapTokens, hex.x, hex.y);
-    if (!canPlace && !(piece && (canMove(piece) || canTakeTurn(piece) || canSetPosture(piece)))) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    setMenu({ hex, left: event.clientX - rect.left, top: event.clientY - rect.top });
-    hover(hex);
+    interaction.clickAt(hexAt(event), mapPointOf(event), { left: event.clientX - rect.left, top: event.clientY - rect.top });
   };
 
   const onWheel = (event: ReactWheelEvent<SVGSVGElement>) => {
@@ -311,106 +120,24 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRepe
 
   // ---------- party cards dropped on the map ----------
 
-  /** Party cards move/place a character; NPC cards add a new piece (014). */
-  const isNpcDrag = (event: ReactDragEvent<SVGSVGElement>) => event.dataTransfer.types.includes(NPC_DRAG_TYPE);
-  const acceptsDrag = (event: ReactDragEvent<SVGSVGElement>) => {
-    const isParticipation = event.dataTransfer.types.includes(PARTICIPATION_DRAG_TYPE);
-    if (canPlace) return isParticipation || isNpcDrag(event);
-    // Players only drag the cards of their own characters (the only draggable ones for them).
-    return canPlaceOwn && isParticipation;
-  };
-
   const onDragOver = (event: ReactDragEvent<SVGSVGElement>) => {
-    if (!acceptsDrag(event)) return;
+    const types = [...event.dataTransfer.types];
+    if (!interaction.acceptsDrag(types)) return;
     event.preventDefault();
-    event.dataTransfer.dropEffect = isNpcDrag(event) ? 'copy' : 'move';
+    event.dataTransfer.dropEffect = interaction.dropEffectOf(types);
     hover(hexAt(event));
   };
 
-  const dropNpc = async (npcId: number, hex: Offset | null) => {
-    const action = npcDropAction({ hex, tokens: mapTokens });
-    if (action.kind === 'occupied') {
-      toast.warning(t('mapTokens.hexOccupied'));
-      return;
-    }
-    if (action.kind !== 'place' || !hex) return;
-    try {
-      const placed = await placeOnMap(npcId, hex.x, hex.y);
-      toast.success(t('toast.npcPlaced', { name: placed.name }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-    }
-  };
-
   const onDrop = async (event: ReactDragEvent<SVGSVGElement>) => {
-    if (!acceptsDrag(event)) return;
+    if (!interaction.acceptsDrag([...event.dataTransfer.types])) return;
     event.preventDefault();
-    const hex = hexAt(event);
-    hover(null);
-    if (isNpcDrag(event)) {
-      await dropNpc(Number(event.dataTransfer.getData(NPC_DRAG_TYPE)), hex);
-      return;
-    }
-    const id = Number(event.dataTransfer.getData(PARTICIPATION_DRAG_TYPE));
-    const participation = party.find((p) => p.campaignCharacterId === id);
-    if (!participation || !hex) return;
-    if (!canPlace && participation.characterOwnerId !== session?.user.userId) return;
-
-    const action = characterDropAction({ hex, tokens: mapTokens, participation, columns: draft.gridWidth, rows: draft.gridHeight });
-    try {
-      switch (action.kind) {
-        case 'occupied':
-          toast.warning(t('mapTokens.hexOccupied'));
-          break;
-        case 'blocked':
-          toast.warning(t('mapTokens.doesNotFit'));
-          break;
-        case 'move':
-          // Players move a piece already on the map with "Mover" (turn and move limits).
-          if (!canPlace) {
-            toast.info(t('mapTokens.useMove', { name: participation.characterName }));
-            break;
-          }
-          await moveToken(action.mapTokenId, hex.x, hex.y);
-          void refreshTurn();
-          break;
-        case 'place':
-          await placeCharacter(participation, hex.x, hex.y);
-          toast.success(t('toast.mapTokenAdded', { name: participation.characterName }));
-          break;
-        case 'chooseToken':
-          onPickToken({ kind: 'character', participation, x: hex.x, y: hex.y });
-          break;
-        default:
-          break;
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-    }
+    await interaction.drop(event.dataTransfer, hexAt(event));
   };
 
   const hasImage = !!draft.imageUrl && !!draft.imageWidth && !!draft.imageHeight;
   // 054: in free mode nothing is recorded for moves and even the earlier trails leave the map.
   const trails = showTrails(freeMode) ? movementTrails(turnEntries, draft.mapId) : [];
   const bubbles = lastActions(turnEntries);
-  const menuToken = menu ? tokenAt(mapTokens, menu.hex.x, menu.hex.y) : undefined;
-  /** A hex, or the whole shape of the piece on it (031). */
-  const shapeAt = (hex: Offset | null): { hexes: Offset[]; pieceId: number | null } | null => {
-    if (!hex) return null;
-    const piece = tokenAt(mapTokens, hex.x, hex.y);
-    return piece ? { hexes: pieceHexes(piece), pieceId: piece.mapTokenId } : { hexes: [hex], pieceId: null };
-  };
-  const selectedShape = shapeAt(selectedHex);
-  const hoverShape = movement.active ? (hoverHex ? { hexes: [hoverHex], pieceId: null } : null) : shapeAt(hoverHex);
-  const sameShape = !!selectedShape && !!hoverShape && (sameHex(hoverHex, selectedHex)
-    || (hoverShape.pieceId !== null && hoverShape.pieceId === selectedShape.pieceId));
-  const moveState = movement.state;
-  const moveStatus = currentStatus(moveState);
-  const movePreview = moveState.phase === 'idle' ? null : { mapTokenId: moveState.piece.mapTokenId, ...previewOf(moveState)! };
-  // An unlimited piece (054) outlines the target even where it does not fit (red), since there is no path to show.
-  const moveDestination = moveState.phase === 'facing'
-    || (moveState.phase === 'path' && (moveState.cost !== null || moveState.piece.kind === MOVEMENT_KIND.unlimited))
-    ? previewHexes(moveState) : [];
 
   return (
     <>
@@ -422,14 +149,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRepe
         onPointerCancel={stopPan}
         onPointerLeave={() => hover(null)}
         onContextMenu={(event) => {
-          if (targeting) {
-            event.preventDefault();
-            setTargeting(null);
-            return;
-          }
-          if (!movement.active) return;
-          event.preventDefault();
-          movement.cancel();
+          if (interaction.cancelSecondary()) event.preventDefault();
         }}
         onWheel={onWheel}
         onDragOver={onDragOver}
@@ -439,13 +159,13 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRepe
         <g transform={`translate(${view.panX} ${view.panY}) scale(${view.zoom})`}>
           <ImageLayer url={draft.imageUrl} left={draft.imageLeft} top={draft.imageTop} width={draft.imageWidth} height={draft.imageHeight} />
           <HexGridLayer columns={draft.gridWidth} rows={draft.gridHeight} hexSize={hexSize} />
-          <HexHighlight hexes={selectedShape?.hexes ?? null} hexSize={hexSize} variant="selected" />
-          <HexHighlight hexes={sameShape ? null : hoverShape?.hexes ?? null} hexSize={hexSize} />
-          {moveState.phase !== 'idle' && moveStatus && (
-            <MovementLayer trail={moveState.trail} destination={moveDestination} status={moveStatus} hexSize={hexSize} />
+          <HexHighlight hexes={interaction.selectedHexes} hexSize={hexSize} variant="selected" />
+          <HexHighlight hexes={interaction.hoverHexes} hexSize={hexSize} />
+          {overlay && (
+            <MovementLayer trail={overlay.trail} destination={overlay.destination} status={overlay.status} hexSize={hexSize} />
           )}
           <TurnTrailLayer trails={trails} hexSize={hexSize} columns={draft.gridWidth} rows={draft.gridHeight} />
-          <TokenLayer tokens={mapTokens} hexSize={hexSize} preview={movePreview} />
+          <TokenLayer tokens={mapTokens} hexSize={hexSize} preview={overlay?.preview ?? null} />
           {!movement.active && <SpeechBubbleLayer tokens={mapTokens} bubbles={bubbles} hexSize={hexSize} />}
           {resizeMode && canEdit && hasImage && (
             <ResizeHandles
@@ -456,57 +176,7 @@ export const MapCanvas = ({ onPickToken, onDeleteToken, onEditNpc, onAct, onRepe
           )}
         </g>
       </svg>
-      {moveState.phase !== 'idle' && moveState.piece.kind === MOVEMENT_KIND.limited && moveStatus && (
-        <MovementCounter spent={moveState.cost} total={moveState.piece.total ?? 0} status={moveStatus} />
-      )}
-      {menu && (
-        <HexMenu
-          left={menu.left}
-          top={menu.top}
-          token={menuToken ? { name: menuToken.name, imageUrl: menuToken.upImageUrl } : null}
-          canManage={canPlace}
-          onEditNpc={menuToken && menuToken.mapNpcId !== null && (canPlace || isOwnPiece(menuToken)) ? () => onEditNpc(menuToken) : undefined}
-          deleteLabel={menuToken && menuToken.mapNpcId !== null ? t('hexMenu.removeNpc') : undefined}
-          onMove={menuToken && canMove(menuToken) ? () => movement.start(menuToken) : undefined}
-          onAct={menuToken && canTakeTurn(menuToken)
-            ? () => onAct({
-              mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
-            }) : undefined}
-          onActOn={menuToken && canTakeTurn(menuToken)
-            ? () => startTargeting({
-              mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
-            }) : undefined}
-          onRepeated={menuToken && canTakeTurn(menuToken)
-            ? () => onRepeated({
-              mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
-              current: repeatedActionOf(menuToken),
-            }) : undefined}
-          repeatedActive={repeatedActionOf(menuToken) !== null}
-          onResetTurn={menuToken && canTakeTurn(menuToken) && hasEntries(turnEntries, menuToken)
-            ? () => onResetTurn({ mapTokenId: menuToken.mapTokenId, name: menuToken.name }) : undefined}
-          posture={menuToken?.posture ?? null}
-          onPosture={menuToken && canSetPosture(menuToken)
-            ? (posture) => setPosture(menuToken.mapTokenId, posture).catch((err: unknown) => {
-              toast.error(err instanceof Error ? err.message : t('common.unknownError'));
-            })
-            : undefined}
-          onClose={closeMenu}
-          onAdd={() => {
-            setPickedHex(menu.hex);
-            onPickToken({ kind: 'add', x: menu.hex.x, y: menu.hex.y });
-          }}
-          onChange={() => {
-            if (!menuToken) return;
-            setPickedHex(menu.hex);
-            onPickToken({ kind: 'change', mapTokenId: menuToken.mapTokenId, name: menuToken.name });
-          }}
-          onDelete={() => {
-            if (!menuToken) return;
-            setPickedHex(menu.hex);
-            onDeleteToken({ mapTokenId: menuToken.mapTokenId, name: menuToken.name, mapNpcId: menuToken.mapNpcId });
-          }}
-        />
-      )}
+      <MapHexMenu interaction={interaction} />
     </>
   );
 };

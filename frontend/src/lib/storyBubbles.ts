@@ -65,13 +65,15 @@ const clamp = (value: number, min: number, max: number): number => Math.min(max,
 /**
  * The balloon of one drawn figure: its anchor in canvas pixels, its scale by distance, pushed back inside the canvas so
  * it never leaves the screen, and under the head when it does not fit above it. Null when the head is hidden behind a
- * block (FR-018) — the balloon goes away with the figure.
+ * block (FR-018) — the balloon goes away with the figure. `ceiling` is the share of the canvas height its bottom edge
+ * never goes above (the first-person view's `BALLOON_CEILING`); the isometric view (105) passes 0: always over the head.
  */
 export const bubblePlacement = (
   sprite: FrameSprite,
   frame: { frameWidth: number; frameHeight: number },
   canvas: { width: number; height: number },
   size: { width: number; height: number },
+  { ceiling = BALLOON_CEILING }: { ceiling?: number } = {},
 ): BubblePlacement | null => {
   if (!sprite.headVisible) return null;
   const scale = clamp(REFERENCE_DEPTH / sprite.depth, MIN_SCALE, MAX_SCALE);
@@ -82,7 +84,7 @@ export const bubblePlacement = (
   const x = clamp(headX, SCREEN_MARGIN + width / 2, Math.max(SCREEN_MARGIN, canvas.width - SCREEN_MARGIN - width / 2));
   // Over the head, but never higher than the ceiling line: a figure so close that its head is off the top of the screen
   // gets its balloon a little above the middle of the view, over the figure, instead of out of sight.
-  const anchor = Math.max(headY - TAIL_GAP, canvas.height * BALLOON_CEILING);
+  const anchor = Math.max(headY - TAIL_GAP, canvas.height * ceiling);
   const above = anchor - height >= SCREEN_MARGIN;
   const y = above ? anchor : headY + TAIL_GAP + height;
   return {

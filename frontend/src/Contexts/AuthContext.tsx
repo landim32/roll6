@@ -7,7 +7,6 @@ import {
 import { clearAnimationCache } from '../lib/animationCache';
 import { runBeforeLogout } from '../lib/beforeLogout';
 import { clearLayoutMode } from '../lib/layoutMode';
-import { clearLightRadius } from '../lib/isoLight';
 import { clearViewModes } from '../lib/viewMode';
 import { clearViewQuality } from '../lib/viewQuality';
 import type { UserInfo, UserInsertInfo, UserLoginInfo, UserPasswordInfo, UserTokenInfo } from '../types/auth';
@@ -69,7 +68,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(TURN_STORAGE_KEY);
     localStorage.removeItem(MAP_STORAGE_KEY);
     clearViewModes();
-    clearLightRadius();
     clearViewQuality();
     clearLayoutMode();
     clearAnimationCache();

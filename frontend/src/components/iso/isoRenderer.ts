@@ -3,11 +3,12 @@ import {
   MeshBasicMaterial, OrthographicCamera, PCFSoftShadowMap, PlaneGeometry, Plane, Raycaster, Scene, ShadowMaterial,
   SRGBColorSpace, Texture, Vector2, Vector3, WebGLRenderer,
 } from 'three';
-import { hexCenter, hexCorners, HEX_SIZE, pixelToHex } from '../../lib/hexGrid';
+import { hexCenter, hexCorners, HEX_SIZE, isInsideGrid, pixelToHex } from '../../lib/hexGrid';
+import type { MovementStatus } from '../../lib/movement';
 import type { Offset, Point } from '../../lib/hexGrid';
-import { hexStep, isLit, LIGHT_RADIUS_MAX, lightRadiusPx } from '../../lib/isoLight';
+import { hexStep, isLit, lightRadiusPx } from '../../lib/isoLight';
 import {
-  CAMERA_DISTANCE, defaultIsoPose, easeTarget, FOCUS_EASE_SECONDS, frustumFor, isoCameraPosition, SPAN_DEFAULT,
+  CAMERA_DISTANCE, defaultIsoPose, frustumFor, isoCameraPosition, SPAN_DEFAULT,
 } from '../../lib/isoCamera';
 import type { IsoPose } from '../../lib/isoCamera';
 import { loadImage } from '../../lib/mapSnapshot';
@@ -16,14 +17,14 @@ import { REFERENCE_DEPTH } from '../../lib/storyBubbles';
 import type { QualityProfile } from '../../lib/viewQuality';
 import { applyLight, createLightUniforms } from './isoLightMaterial';
 import { createPieceLayer } from './isoPieces';
-import { stripGeometry } from './isoStrips';
+import { hexFillGeometry, hexShape, stripGeometry } from './isoStrips';
 import { dashSegments } from '../../lib/isoTrail';
 import type { IsoPiece } from './isoPieces';
 
 /**
  * The scene of the isometric view (103): a flat floor with the map image where the 2D map shows it and the hex grid on
- * top, the pieces standing on it, an orthographic camera looking down at the focused character and the light circle
- * around it — everything else dark. Nothing here reads the 3D mask, the wall texture or the background: the floor is
+ * top, the pieces standing on it, an orthographic camera looking down at a point the user slides over the map (105) and
+ * the light circle around that point — everything else dark — plus the hex highlights and the "Mover" path. Nothing here reads the 3D mask, the wall texture or the background: the floor is
  * flat. World units are map pixels (x = map x, z = map y, y up), like the 3D view (081). Draws only when something
  * changed, plus a slow clock for the fog while the page is visible.
  */
@@ -35,25 +36,40 @@ export interface IsoMap {
   rows: number;
 }
 
+/** What the map's interaction draws on the floor (105): the 2D map's `HexHighlight` and `MovementLayer`. */
+export interface IsoOverlays {
+  /** Light blue: the hex (or shape) under the pointer. */
+  hover: Offset[] | null;
+  /** Gray: the clicked hex (or shape) while its menu or window is up. */
+  selected: Offset[] | null;
+  /** The move in progress: the hex centers it goes through, the shape at the destination and their color. */
+  move: { trail: Point[]; destination: Offset[]; status: MovementStatus } | null;
+}
+
 export interface IsoRenderer {
   setMap: (map: IsoMap) => void;
   setPieces: (pieces: readonly IsoPiece[]) => void;
-  /** Moves the light and the camera's target; `animate` glides there. Nothing else is rebuilt. */
-  setFocus: (center: Point, animate: boolean) => void;
+  /** Puts the camera's target (and the light, its middle) on `target` at once (a slide, the first placement). */
+  setTarget: (target: Point) => void;
+  getTarget: () => Point;
   /**
    * The moves of the turn in progress (the 2D map's dashed trails): each one the hex centers it went through, from where
    * the piece was to where it stopped (map px).
    */
   setTrails: (trails: readonly Point[][]) => void;
-  /** Radius of the light circle, in hexes (3–6). */
-  setRadius: (hexes: number) => void;
-  /** The user's turn, tilt and zoom (the target stays the focus). */
+  /** The user's turn, tilt and zoom (the target is set apart). */
   setPose: (pose: Omit<IsoPose, 'target'>) => void;
   setQuality: (profile: QualityProfile) => void;
   /** Draws again (a new saying for the balloons). */
   refresh: () => void;
-  /** The hex of the floor under a point of the canvas (client px), or null off the floor. */
+  /** The point of the floor under a point of the canvas (client px, map px), or null when the ray misses it. */
+  floorAt: (clientX: number, clientY: number) => Point | null;
+  /** The hex of the grid under a point of the canvas (client px), or null outside the grid. */
   hexAt: (clientX: number, clientY: number) => Offset | null;
+  /** The lit piece drawn under a point of the canvas (client px): its map token id, or null (105). */
+  pieceAt: (clientX: number, clientY: number) => number | null;
+  /** The hex highlights and the "Mover" path (105), drawn over the grid and never darkened by the light. */
+  setOverlays: (overlays: IsoOverlays) => void;
   resize: (width: number, height: number) => void;
   dispose: () => void;
 }
@@ -71,11 +87,11 @@ const FLOOR_REACH = 40000;
 const GRID_LIFT = 0.5;
 /**
  * The models' shadows: the light comes from above, a little to the south-east so a shadow shows beside its model. Its
- * shadow camera covers the largest circle around the focus (pieces outside cast nothing anyway).
+ * shadow camera covers the light circle around the target (pieces outside cast nothing anyway).
  */
 const SUN_DIRECTION = new Vector3(0.28, 1, 0.22).normalize();
 const SUN_DISTANCE = 3000;
-const SHADOW_REACH = lightRadiusPx(LIGHT_RADIUS_MAX) + 2 * hexStep();
+const SHADOW_REACH = lightRadiusPx() + 2 * hexStep();
 /** Shadow map size on the levels whose profile casts none (Padrão, Alta): this view always shows them. */
 const SHADOW_MAP_DEFAULT = 1024;
 const SHADOW_OPACITY = 0.5;
@@ -88,6 +104,29 @@ const TRAIL_LIFT = 0.75;
 const TRAIL_START_RADIUS = 0.15 * HEX_SIZE;
 /** The fog moves even when nothing else does: redrawn this often (ms). */
 const FOG_FRAME_MS = 1000 / 30;
+/**
+ * The hex highlights and the "Mover" path (105), the 2D map's colors (`.stm-hex-highlight`, `.stm-hex-selected`,
+ * `.stm-move-*`) over the discs and trails, never darkened: a hex in the dark can still be pointed at.
+ */
+const OVERLAY_FILL_LIFT = 0.9;
+const OVERLAY_EDGE_LIFT = 1;
+const OVERLAY_EDGE_WIDTH = 2.5;
+const MOVE_TRAIL_WIDTH = 6;
+const MOVE_TRAIL_LIFT = 1.1;
+const HOVER_LOOK = { fill: 0x0dcaf0, fillOpacity: 0.25, edge: 0x0dcaf0, edgeOpacity: 0.6 };
+const SELECTED_LOOK = { fill: 0xadb5bd, fillOpacity: 0.4, edge: 0xdee2e6, edgeOpacity: 0.85 };
+const OVER_COLOR = 0xdc3545;
+const FREE_COLOR = 0xadb5bd;
+
+/** The one green of the site (`--stm-accent`, 038), read from the page: the brand color lives only in `theme.css`. */
+const accentColor = (): Color => {
+  const value = getComputedStyle(document.documentElement).getPropertyValue('--stm-accent').trim();
+  try {
+    return new Color(value || 0xadb5bd);
+  } catch {
+    return new Color(0xadb5bd);
+  }
+};
 
 /** Every edge of the grid once (a shared edge between two hexes is drawn by one of them). */
 const gridEdges = (columns: number, rows: number): Float32Array => {
@@ -158,7 +197,6 @@ export const createIsoRenderer = (
 
   let size = { width: 1, height: 1 };
   let pose: IsoPose = defaultIsoPose({ x: 0, y: 0 });
-  let glide: { from: Point; to: Point; start: number } | null = null;
   let disposed = false;
   let frame = 0;
   let dirty = true;
@@ -211,6 +249,29 @@ export const createIsoRenderer = (
     }
   };
 
+  // ---- The hex highlights and the "Mover" path (105) ----
+  const overlays = new Group();
+  scene.add(overlays);
+  let overlayKey = '';
+  const clearOverlays = () => {
+    for (const child of [...overlays.children]) {
+      overlays.remove(child);
+      const mesh = child as Mesh<BufferGeometry, MeshBasicMaterial>;
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+  };
+  const flatMaterial = (color: Color | number, opacity: number) =>
+    new MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: DoubleSide });
+  const addShape = (offsets: Offset[], look: { fill: Color | number; fillOpacity: number; edge: Color | number; edgeOpacity: number }) => {
+    if (offsets.length === 0) return;
+    const { hexes, outline } = hexShape(offsets);
+    overlays.add(new Mesh(hexFillGeometry(hexes, OVERLAY_FILL_LIFT), flatMaterial(look.fill, look.fillOpacity)));
+    overlays.add(new Mesh(stripGeometry(outline, OVERLAY_EDGE_WIDTH, OVERLAY_EDGE_LIFT), flatMaterial(look.edge, look.edgeOpacity)));
+  };
+  const statusColor = (status: MovementStatus): Color | number =>
+    (status === 'ok' ? accentColor() : status === 'over' ? OVER_COLOR : FREE_COLOR);
+
   const eyeOnFloor = (): Point => {
     const eye = isoCameraPosition(pose);
     return { x: eye.x, y: eye.z };
@@ -249,13 +310,6 @@ export const createIsoRenderer = (
   const draw = (now: number) => {
     frame = 0;
     if (disposed) return;
-    if (glide) {
-      const t = (now - glide.start) / (FOCUS_EASE_SECONDS * 1000);
-      pose = { ...pose, target: easeTarget(glide.from, glide.to, t) };
-      if (t >= 1) glide = null;
-      applyCamera();
-      dirty = true;
-    }
     const visible = document.visibilityState !== 'hidden';
     if (visible && now - lastFog >= FOG_FRAME_MS) {
       uniforms.fogTime.value = now / 1000;
@@ -268,7 +322,7 @@ export const createIsoRenderer = (
       onFrame(frameResult());
     }
     // The fog keeps the clock going while the page is visible; a hidden page stops until something changes.
-    if (glide || visible) frame = requestAnimationFrame(draw);
+    if (visible) frame = requestAnimationFrame(draw);
   };
 
   const projected = new Vector3();
@@ -304,6 +358,19 @@ export const createIsoRenderer = (
 
   const raycaster = new Raycaster();
   const floorPlane = new Plane(new Vector3(0, 1, 0), 0);
+  let gridColumns = 0;
+  let gridRows = 0;
+  /** Points the raycaster from the camera through a point of the canvas (client px). */
+  const aim = (clientX: number, clientY: number) => {
+    const rect = canvas.getBoundingClientRect();
+    const ndc = new Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+  };
+  const floorAt = (clientX: number, clientY: number): Point | null => {
+    aim(clientX, clientY);
+    const hit = raycaster.ray.intersectPlane(floorPlane, new Vector3());
+    return hit ? { x: hit.x, y: hit.z } : null;
+  };
 
   return {
     setMap: (map) => {
@@ -338,6 +405,8 @@ export const createIsoRenderer = (
       } else {
         image.visible = !!map.area && !!imageTexture;
       }
+      gridColumns = map.columns;
+      gridRows = map.rows;
       const nextGrid = `${map.columns}x${map.rows}`;
       if (nextGrid !== gridSize) {
         gridSize = nextGrid;
@@ -353,13 +422,24 @@ export const createIsoRenderer = (
       pieces.faceCamera(eyeOnFloor());
       requestRender();
     },
-    setFocus: (center, animate) => {
-      if (animate) {
-        glide = { from: pose.target, to: center, start: performance.now() };
-      } else {
-        glide = null;
-        pose = { ...pose, target: center };
-        applyCamera();
+    setTarget: (target) => {
+      pose = { ...pose, target };
+      applyCamera();
+      requestRender();
+    },
+    getTarget: () => pose.target,
+    setOverlays: ({ hover, selected, move }) => {
+      const key = JSON.stringify([hover, selected, move]);
+      if (key === overlayKey) return;
+      overlayKey = key;
+      clearOverlays();
+      if (selected) addShape(selected, SELECTED_LOOK);
+      if (hover) addShape(hover, HOVER_LOOK);
+      if (move) {
+        const color = statusColor(move.status);
+        addShape(move.destination, { fill: color, fillOpacity: 0.3, edge: color, edgeOpacity: 0.9 });
+        const segments = move.trail.slice(1).map((point, i): [Point, Point] => [move.trail[i], point]);
+        if (segments.length > 0) overlays.add(new Mesh(stripGeometry(segments, MOVE_TRAIL_WIDTH, MOVE_TRAIL_LIFT), flatMaterial(color, 0.85)));
       }
       requestRender();
     },
@@ -373,10 +453,6 @@ export const createIsoRenderer = (
         start.position.set(path[0].x, TRAIL_LIFT, path[0].y);
         trails.add(start);
       }
-      requestRender();
-    },
-    setRadius: (hexes) => {
-      uniforms.lightRadius.value = lightRadiusPx(hexes);
       requestRender();
     },
     setPose: (next) => {
@@ -398,12 +474,17 @@ export const createIsoRenderer = (
       pieces.setQuality(profile, renderer.capabilities.getMaxAnisotropy());
       requestRender();
     },
+    floorAt,
     hexAt: (clientX, clientY) => {
-      const rect = canvas.getBoundingClientRect();
-      const ndc = new Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
-      raycaster.setFromCamera(ndc, camera);
-      const hit = raycaster.ray.intersectPlane(floorPlane, new Vector3());
-      return hit ? pixelToHex({ x: hit.x, y: hit.z }, HEX_SIZE) : null;
+      const point = floorAt(clientX, clientY);
+      if (!point) return null;
+      const hex = pixelToHex(point, HEX_SIZE);
+      return isInsideGrid(hex, gridColumns, gridRows) ? hex : null;
+    },
+    pieceAt: (clientX, clientY) => {
+      aim(clientX, clientY);
+      const radius = uniforms.lightRadius.value;
+      return pieces.pickAt(raycaster, (center) => isLit(Math.hypot(center.x - pose.target.x, center.y - pose.target.y), radius));
     },
     resize: (width, height) => {
       size = { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)) };
@@ -425,6 +506,7 @@ export const createIsoRenderer = (
       grid.geometry.dispose();
       gridMaterial.dispose();
       clearTrails();
+      clearOverlays();
       trailStart.dispose();
       trailMaterial.dispose();
       shadowFloor.geometry.dispose();
