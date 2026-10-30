@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { AnimationClip, BoxGeometry, Group, Mesh, MeshStandardMaterial, Scene, VectorKeyframeTrack } from 'three';
 import type { Material } from 'three';
 
-const { material, idle } = vi.hoisted(() => ({
+const { material, idle, measured } = vi.hoisted(() => ({
   material: { current: null as MeshStandardMaterial | null },
   idle: { current: null as AnimationClip | null },
+  /** Where the body stood each time the sockets were measured. */
+  measured: [] as number[],
 }));
 
 vi.mock('./loadModel', async () => {
@@ -27,7 +29,10 @@ vi.mock('./loadModel', async () => {
     instantiate: () => makeScene(),
   };
 });
-vi.mock('./socketAnchors', () => ({ forgetSockets: () => undefined, measureSockets: () => undefined }));
+vi.mock('./socketAnchors', () => ({
+  forgetSockets: () => undefined,
+  measureSockets: (model: Group) => { measured.push(model.getObjectByName('body')!.position.x); },
+}));
 vi.mock('./weaponSockets', () => ({
   createWeaponSockets: () => ({ sync: () => undefined, refresh: () => undefined, reset: () => undefined }),
   sameSocketWeapons: () => true,
@@ -49,6 +54,22 @@ const prepare = () => {
   // The idle walks the body 10 units along x in one second.
   idle.current = new AnimationClip('idle', 1, [new VectorKeyframeTrack('body.position', [0, 1], [0, 0, 0, 10, 0, 0])]);
 };
+
+describe('modelSet weapon sockets (085)', () => {
+  it('measures the sockets on the first frame of the idle, not on the rest pose', async () => {
+    prepare();
+    // The idle's first frame stands the body 5 units along x; the rest pose is at 0.
+    idle.current = new AnimationClip('idle', 1, [new VectorKeyframeTrack('body.position', [0, 1], [5, 0, 0, 10, 0, 0])]);
+    measured.length = 0;
+    for (const options of [{}, { still: true }]) {
+      const set = createModelSet(new Scene(), { onReady: () => undefined, onFailed: () => undefined, onChange: () => undefined }, options);
+      set.setModels([spec]);
+      await flush();
+      set.dispose();
+    }
+    expect(measured).toEqual([5, 5]);
+  });
+});
 
 describe('modelSet options (103)', () => {
   it('without options the idle plays', async () => {

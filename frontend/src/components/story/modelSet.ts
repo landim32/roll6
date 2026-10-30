@@ -186,16 +186,17 @@ export const createModelSet = (
       entry.down.clampWhenFinished = true;
     }
     // The weapon sockets are measured on the first frame of the idle animation (085), the pose the user sees, and the
-    // carried weapons hung again; a model without an idle is measured on its rest pose (the mixer stopped above).
+    // carried weapons hung again; a model without an idle is measured on its rest pose (the mixer stopped above). The
+    // measure comes before stopping the idle: stopping the last action puts the bones back in their original pose.
     if (entry.object) {
       if (entry.idle) {
         entry.idle.reset().play();
         entry.mixer.update(0);
-        entry.mixer.stopAllAction();
       }
       entry.object.updateMatrixWorld(true);
       forgetSockets(entry.object);
       measureSockets(entry.object);
+      entry.mixer.stopAllAction();
       entry.hands.refresh(entry.object, heightOf(entry.asset));
     }
     if (still) {
