@@ -90,6 +90,8 @@ export interface MapTokenInfo {
   posture: Posture | null;
   /** Hexes the piece takes now: the token's standing or down size, depending on the posture (1, 2, 3, 7 or 10). */
   space: number;
+  /** Hexes of the token standing (104): the base of a knocked-over miniature keeps this size. Absent on older APIs. */
+  upSpace?: number;
   createdAt: string;
   updatedAt: string;
 }

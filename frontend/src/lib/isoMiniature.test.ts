@@ -40,21 +40,38 @@ describe('isoMiniature', () => {
     }
   });
 
-  it('tips over backwards, about the back edge of the base, for every facing', () => {
+  it('lies knocked over backwards on the base edge and the head, over the middle of the shape, for every facing', () => {
     const base = miniatureBase(1);
     const center = { x: 100, y: 200 };
+    const figure = 60;
     for (let look = 0; look < 6; look += 1) {
       const yaw = (look * Math.PI) / 3;
-      const front = { x: Math.sin(yaw), z: -Math.cos(yaw) };
-      const { pivot, axis, angle } = tipPose(center, yaw, base);
-      expect(pivot.x).toBeCloseTo(center.x - front.x * base.radius);
-      expect(pivot.y).toBeCloseTo(center.y - front.z * base.radius);
-      expect(axis.x * front.x + axis.z * front.z).toBeCloseTo(0);
+      const front: [number, number, number] = [Math.sin(yaw), 0, -Math.cos(yaw)];
+      const side: [number, number, number] = [Math.cos(yaw), 0, Math.sin(yaw)];
+      const { origin, axis, angle, top } = tipPose(center, yaw, base, figure);
+      expect(axis.x * front[0] + axis.z * front[2]).toBeCloseTo(0);
       expect(Math.hypot(axis.x, axis.z)).toBeCloseTo(1);
-      const top = rotate([0, 1, 0], [axis.x, 0, axis.z], angle);
-      expect(top[0]).toBeCloseTo(-front.x);
-      expect(top[1]).toBeCloseTo(0);
-      expect(top[2]).toBeCloseTo(-front.z);
+      const k: [number, number, number] = [axis.x, 0, axis.z];
+      const world = (local: [number, number, number]) => {
+        const [x, y, z] = rotate(local, k, angle);
+        return [x + origin.x, y + origin.y, z + origin.z];
+      };
+      const at = (u: number, up: number, across = 0) =>
+        world([-front[0] * u + side[0] * across, up, -front[2] * u + side[2] * across]);
+      // The base's top edge toward the fall and the head touch the floor; nothing goes under it.
+      const rim = at(base.radius, base.height);
+      const head = at(0, base.height + figure);
+      expect(rim[1]).toBeCloseTo(0);
+      expect(head[1]).toBeCloseTo(0);
+      const outline = [at(-base.radius, 0), at(base.radius, 0), at(-base.radius, base.height), rim, head,
+        at(0, 0, base.radius), at(0, base.height, -base.radius)];
+      for (const point of outline) expect(point[1]).toBeGreaterThanOrEqual(-1e-9);
+      expect(top).toBeCloseTo(Math.max(...outline.map((p) => p[1])));
+      // The head lies behind (the miniature fell backwards) and the whole lies centered on the shape.
+      const back = (p: number[]) => (p[0] - center.x) * -front[0] + (p[2] - center.y) * -front[2];
+      expect(back(head)).toBeGreaterThan(0);
+      const along = outline.map(back);
+      expect(Math.min(...along) + Math.max(...along)).toBeCloseTo(0);
     }
   });
 
