@@ -1,12 +1,10 @@
 name: Deploy Production
 
+# On demand only (Actions › Deploy Production › Run workflow); pushes to main no longer deploy.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
-# One deploy at a time; a newer push waits for the running one instead of racing it.
+# One deploy at a time; a newer run waits for the running one instead of racing it.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
