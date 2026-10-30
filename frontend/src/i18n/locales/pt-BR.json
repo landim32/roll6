@@ -1042,16 +1042,9 @@
     "viewChoose": "Escolher vista",
     "view2dItem": "Mapa 2D",
     "viewIso": "Isométrica",
-    "view3dItem": "3D"
+    "view3dItem": "3D (legado)"
   },
-  "iso": {
-    "focus": "Foco: {{name}}",
-    "focusMine": "Voltar ao meu personagem",
-    "noFocus": "Sem personagem no mapa",
-    "focusTitle": "Escolher quem a câmera acompanha",
-    "radius": "Raio: {{count}}",
-    "radiusItem": "{{count}} hexágonos",
-    "radiusTitle": "Tamanho da área iluminada",
+  "iso": {
     "loading": "Carregando a vista isométrica…"
   },
   "viewQuality": {

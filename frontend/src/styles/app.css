@@ -333,7 +333,7 @@ body,
   cursor: grabbing;
 }
 
-/* The isometric lit view (103): a black stage (everything past the light is dark) and the focus chooser. */
+/* The isometric lit view (103): a black stage (everything past the light is dark). */
 .stm-iso {
   position: absolute;
   inset: 0;
@@ -355,6 +355,11 @@ body,
   cursor: grabbing;
 }
 
+/* "Agir sobre…" (098, 105): picking the hex the action is about, like the 2D map. */
+.stm-iso-canvas.is-targeting {
+  cursor: crosshair;
+}
+
 .stm-iso-loading {
   position: absolute;
   inset: 0;
@@ -362,28 +367,6 @@ body,
   align-items: center;
   justify-content: center;
   pointer-events: none;
-}
-
-/* Bottom middle, where the 3D view's "Voltar ao personagem" sits: clear of both side panels and of the map controls.
-   The focus chooser and, beside it, the radius of the light. */
-.stm-iso-bar {
-  position: absolute;
-  left: 50%;
-  bottom: calc(var(--stm-footer-height) + 1rem);
-  transform: translateX(-50%);
-  z-index: 9;
-  display: flex;
-  gap: 0.5rem;
-  max-width: calc(100% - 8rem);
-}
-
-.stm-iso-bar .dropdown-toggle {
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 /* A Radix dropdown drawn with Bootstrap's .dropdown-menu: Bootstrap makes it absolute, so Radix measured a zero-size
@@ -2844,6 +2827,15 @@ button.stm-chat-quote { cursor: pointer; }
 
 /* With the mouse over it the balloon lets the map show through. */
 .stm-bubble.is-see-through {
+  opacity: 0.3;
+}
+
+/* The 3D views' balloons (105) do the same; their box's own opacity is written per frame, so the balloon fades. */
+.stm-story-bubble .stm-comic-balloon {
+  transition: opacity 0.15s ease;
+}
+
+.stm-story-bubble.is-see-through .stm-comic-balloon {
   opacity: 0.3;
 }
 

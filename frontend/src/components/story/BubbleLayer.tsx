@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { bubblePlacement, orderByProximity } from '../../lib/storyBubbles';
 import type { FrameResult } from '../../lib/storyBubbles';
@@ -22,18 +22,36 @@ const BALLOON = { width: 220, height: 84 };
  * The speech balloons of the turn over the 3D figures (036): an HTML layer above the canvas, because the frame is drawn
  * small and blown up without smoothing, which would blur the text. Each frame the layer is told where every figure
  * landed and writes the place, the size and the order straight into the DOM — no React render sixty times a second.
- * A figure that is not drawn, or whose head is behind a wall, loses its balloon with it (FR-018).
+ * A figure that is not drawn, or whose head is behind a wall, loses its balloon with it (FR-018). Like the 2D map's
+ * balloons, one turns see-through while the pointer is over it (`.is-see-through`); the layer never catches the pointer,
+ * so the hover is found from its position and every click reaches the view under it (105).
  */
-export const BubbleLayer = forwardRef<BubbleLayerHandle, { bubbles: StoryBubble[] }>(({ bubbles }, ref) => {
+export const BubbleLayer = forwardRef<BubbleLayerHandle, { bubbles: StoryBubble[]; ceiling?: number }>(({ bubbles, ceiling }, ref) => {
   const { t } = useTranslation();
   const nodes = useRef(new Map<number, HTMLDivElement>());
+  const ceilingRef = useRef(ceiling);
+  ceilingRef.current = ceiling;
+
+  useEffect(() => {
+    if (bubbles.length === 0) return undefined;
+    const onMove = (event: PointerEvent) => {
+      for (const node of nodes.current.values()) {
+        const box = node.getBoundingClientRect();
+        const over = event.clientX >= box.left && event.clientX <= box.right
+          && event.clientY >= box.top && event.clientY <= box.bottom;
+        node.classList.toggle('is-see-through', over);
+      }
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => window.removeEventListener('pointermove', onMove);
+  }, [bubbles]);
 
   useImperativeHandle(ref, () => ({
     update: (result, canvas) => {
       const frame = { frameWidth: result.frameWidth, frameHeight: result.frameHeight };
       const placed = orderByProximity(
         result.sprites.flatMap((sprite) => {
-          const at = bubblePlacement(sprite, frame, canvas, BALLOON);
+          const at = bubblePlacement(sprite, frame, canvas, BALLOON, { ceiling: ceilingRef.current });
           return at ? [at] : [];
         }),
       );

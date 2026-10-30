@@ -2,9 +2,9 @@ import {
   CanvasTexture, Color, CylinderGeometry, DoubleSide, Group, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshBasicMaterial,
   MeshDepthMaterial, NearestFilter, PlaneGeometry, Quaternion, RGBADepthPacking, SRGBColorSpace, Texture, TorusGeometry, Vector3,
 } from 'three';
-import type { Object3D, Scene } from 'three';
+import type { Object3D, Raycaster, Scene } from 'three';
 import { figureView, facingAngle } from '../../lib/billboard';
-import { footprint, hexCenter, hexCorners, HEX_SIZE } from '../../lib/hexGrid';
+import { footprint, HEX_SIZE } from '../../lib/hexGrid';
 import type { Point } from '../../lib/hexGrid';
 import { BASE_HEIGHT, miniatureBase, miniatureState, tipPose } from '../../lib/isoMiniature';
 import type { MiniatureBase } from '../../lib/isoMiniature';
@@ -21,7 +21,7 @@ import { createModelSet } from '../story/modelSet';
 import type { ModelSpec } from '../story/modelSet';
 import { applyLight, applyLightToDepth } from './isoLightMaterial';
 import type { GrayUniform, LightUniforms } from './isoLightMaterial';
-import { hexFillGeometry, stripGeometry } from './isoStrips';
+import { hexFillGeometry, hexShape, stripGeometry } from './isoStrips';
 
 /**
  * The pieces of the isometric view (103): what the token has, in this order — its 3D model standing still on the first
@@ -34,7 +34,7 @@ import { hexFillGeometry, stripGeometry } from './isoStrips';
  * the 3D view gives its figures.
  *
  * Tabletop miniatures (104, `lib/isoMiniature`): a model or a figure stands on a round base in dull, darker tones of the
- * piece's color with thin black edges, all of
+ * piece's color with thin edges in the color itself, all of
  * it in a group that lies knocked over backwards on the table (on the base's edge and the head) when the piece is down
  * or out of combat — a turn of one node, nothing reloaded; out of combat it is also black and white (a uniform of the
  * piece, the base keeps its color). A figure stands turned to the camera; tipped it lies face up. A floor picture has
@@ -120,7 +120,7 @@ interface Miniature {
   holder: Group;
   /** The base: side, top and bottom (the cylinder's groups), in darker tones of the piece's color. */
   body: Mesh<CylinderGeometry, MeshBasicMaterial[]>;
-  /** The thin black rings on the base's top and bottom edges, built for `rimRadius`. */
+  /** The thin rings in the piece's color on the base's top and bottom edges, built for `rimRadius`. */
   rims: Mesh<TorusGeometry, MeshBasicMaterial>[];
   rimRadius: number;
   color: string;
@@ -141,6 +141,11 @@ export interface PieceLayer {
   anchors: () => PieceAnchor[];
   /** Turns the figures to the camera (its position on the floor) and shows the side it sees. */
   faceCamera: (eye: Point) => void;
+  /**
+   * The piece drawn under a ray from the camera (105): the nearest miniature (base, figure, model) or floor picture it
+   * crosses whose middle `isShown` accepts (the lit ones), or null.
+   */
+  pickAt: (raycaster: Raycaster, isShown: (center: Point) => boolean) => number | null;
   setQuality: (profile: QualityProfile, maxAnisotropy: number) => void;
   dispose: () => void;
 }
@@ -180,32 +185,11 @@ const edgeColorOf = (color: string): Color => new Color(color).lerp(WHITE, 0.45)
 /** The base in dull, darker tones of the piece's color: the side darker than the top, so its edges read. */
 const BASE_SIDE_DARKEN = 0.55;
 const BASE_TOP_DARKEN = 0.35;
-/** Thickness of the black rings on the base's edges (map px). */
+/** Thickness of the rings on the base's edges (map px). */
 const RIM_TUBE = 0.45;
 
-/** The piece's hexes (centers and corners) and the outer edges of its shape (an edge shared by two of its hexes is inside). */
-const discShape = (piece: IsoPiece) => {
-  const hexes = footprint(piece.hex.x, piece.hex.y, piece.look, piece.space).map(({ x, y }) => {
-    const center = hexCenter(x, y, HEX_SIZE);
-    return { center, corners: hexCorners(center, HEX_SIZE) };
-  });
-  const key = (a: Point, b: Point) => {
-    const p = `${Math.round(a.x * 10)},${Math.round(a.y * 10)}`;
-    const q = `${Math.round(b.x * 10)},${Math.round(b.y * 10)}`;
-    return p < q ? `${p}|${q}` : `${q}|${p}`;
-  };
-  const edges = new Map<string, { segment: [Point, Point]; count: number }>();
-  for (const { corners } of hexes) {
-    corners.forEach((a, i) => {
-      const b = corners[(i + 1) % 6];
-      const k = key(a, b);
-      const found = edges.get(k);
-      if (found) found.count += 1;
-      else edges.set(k, { segment: [a, b], count: 1 });
-    });
-  }
-  return { hexes, outline: [...edges.values()].filter((e) => e.count === 1).map((e) => e.segment) };
-};
+/** The piece's hexes (centers and corners) and the outer edges of its shape. */
+const discShape = (piece: IsoPiece) => hexShape(footprint(piece.hex.x, piece.hex.y, piece.look, piece.space));
 
 /** The soft spot under a figure: radius as a share of its width, strength at the middle (the 3D view's numbers). */
 const SPOT_RADIUS_SHARE = 0.42;
@@ -314,7 +298,7 @@ export const createPieceLayer = (
     applyLight(cap, uniforms, 'piece');
     for (const rim of mini.rims) {
       rim.material.dispose();
-      rim.material = new MeshBasicMaterial({ color: BLACK });
+      rim.material = new MeshBasicMaterial({ color: new Color(color) });
       applyLight(rim.material, uniforms, 'piece');
     }
     mini.color = color;
@@ -345,6 +329,8 @@ export const createPieceLayer = (
       const rims = [0, 1].map(() => new Mesh(new TorusGeometry(1, RIM_TUBE, 6, 64), new MeshBasicMaterial()));
       for (const rim of rims) holder.add(rim);
       tip.add(holder);
+      // What a click on the miniature (base, figure, model) belongs to (105).
+      tip.userData.pieceId = id;
       scene.add(tip);
       mini = { tip, holder, body, rims, rimRadius: 0, color: '', top: 0 };
       minis.set(id, mini);
@@ -526,6 +512,7 @@ export const createPieceLayer = (
     // The colored hexes show at once; the picture follows when it is read.
     placeDisc(entry);
     const mesh = new Mesh(figureGeometry, newMesh(piece.id));
+    mesh.userData.pieceId = piece.id;
     mesh.visible = false;
     entry.mesh = mesh;
     scene.add(mesh);
@@ -610,6 +597,23 @@ export const createPieceLayer = (
     faceCamera: (point) => {
       eye = point;
       for (const entry of drawn.values()) place(entry);
+    },
+    pickAt: (raycaster, isShown) => {
+      const targets: Object3D[] = [...minis.values()].map((mini) => mini.tip);
+      for (const entry of drawn.values()) if (entry.mesh && entry.mesh.parent === scene) targets.push(entry.mesh);
+      for (const hit of raycaster.intersectObjects(targets, true)) {
+        // A ray also crosses what is hidden (a figure under its loaded model, an empty base): only what shows counts.
+        let shows = true;
+        let id: number | undefined;
+        for (let node: Object3D | null = hit.object; node; node = node.parent) {
+          if (!node.visible) shows = false;
+          if (id === undefined && typeof node.userData.pieceId === 'number') id = node.userData.pieceId as number;
+        }
+        if (!shows || id === undefined) continue;
+        const entry = drawn.get(id);
+        if (entry && isShown(entry.piece.sprite.center)) return id;
+      }
+      return null;
     },
     setQuality: (next, maxAnisotropy) => {
       profile = next;

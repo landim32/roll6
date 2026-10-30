@@ -12,7 +12,7 @@ import { isThreeD } from '../../lib/viewMode';
 import type { ViewMode } from '../../lib/viewMode';
 import { CheckIcon, ImageIcon, IsoViewIcon, MapIcon, MinusIcon, PlusIcon, ResizeIcon, ShareIcon, View3dIcon } from '../ui/icons';
 
-/** The views of the map (103): the 2D map, the isometric lit view and the 3D view. */
+/** The views of the map (103): the 2D map, the isometric lit view and the first-person 3D view, now legacy (105). */
 const VIEWS: readonly { mode: ViewMode; label: string; Icon: typeof MapIcon }[] = [
   { mode: '2d', label: 'story.view2dItem', Icon: MapIcon },
   { mode: 'iso', label: 'story.viewIso', Icon: IsoViewIcon },

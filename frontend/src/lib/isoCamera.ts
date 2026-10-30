@@ -1,10 +1,12 @@
+import { hexCenter, HEX_SIZE } from './hexGrid';
 import type { Point } from './hexGrid';
 import { hexStep } from './isoLight';
 
 /**
- * The camera of the isometric view (103): orthographic, looking down at the focused character from a fixed distance.
- * The user turns it around (yaw), tilts it between two limits (pitch) and zooms (span = how many hexes fit in the height
- * of the screen). There is no pan: the target is always the focus. Pure.
+ * The camera of the isometric view (103/105): orthographic, looking down at a point of the floor (the target) from a
+ * fixed distance. The user slides the target over the map (105: it never follows a piece; it only starts on the
+ * viewer's character), turns around it (yaw), tilts it between two limits (pitch) and zooms
+ * (span = how many hexes fit in the height of the screen). The target is also the middle of the light circle. Pure.
  */
 export interface IsoPose {
   /** Point of the floor the camera looks at (map px). */
@@ -29,8 +31,6 @@ export const SPAN_DEFAULT = 14;
 export const ORBIT_DEG_PER_PX = 0.35;
 /** Zoom factor per step of the wheel or of the +/− buttons. */
 export const ZOOM_STEP = 1.15;
-/** How long the camera and the light glide to a new focus (seconds). */
-export const FOCUS_EASE_SECONDS = 0.6;
 /** Distance of the camera from the target (map px): only sets the depth range, the projection is orthographic. */
 export const CAMERA_DISTANCE = 6000;
 
@@ -77,9 +77,40 @@ export const frustumFor = (pose: IsoPose, aspect: number): { halfWidth: number; 
   return { halfWidth: halfHeight * Math.max(0.01, aspect), halfHeight };
 };
 
-/** Ease-out from `from` to `to`: t in [0, 1]. */
-export const easeTarget = (from: Point, to: Point, t: number): Point => {
-  const k = Math.min(1, Math.max(0, t));
-  const e = 1 - (1 - k) ** 3;
-  return { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e };
+/** The rectangle the target may go over: from the first to the last hex center of the grid (map px). */
+export interface MapBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export const mapBounds = (columns: number, rows: number): MapBounds => {
+  const lastColumn = Math.max(0, columns - 1);
+  const lastRow = Math.max(0, rows - 1);
+  const first = hexCenter(0, 0, HEX_SIZE);
+  // An odd column sits half a hex lower: the lowest center is in an odd column, when there is one.
+  const lowest = hexCenter(lastColumn >= 1 ? 1 : 0, lastRow, HEX_SIZE);
+  return { minX: first.x, minY: first.y, maxX: hexCenter(lastColumn, 0, HEX_SIZE).x, maxY: lowest.y };
 };
+
+export const clampTarget = (target: Point, bounds: MapBounds): Point => ({
+  x: Math.min(bounds.maxX, Math.max(bounds.minX, target.x)),
+  y: Math.min(bounds.maxY, Math.max(bounds.minY, target.y)),
+});
+
+/**
+ * A slide with the floor held under the pointer: `grabbed` is the point of the floor under it when the drag began and
+ * `now` the point under it at this moment (both read with the current pose); the target moves by their difference, so
+ * the grabbed point comes back under the pointer. Kept inside the map.
+ */
+export const panTo = (pose: IsoPose, grabbed: Point, now: Point, bounds: MapBounds): IsoPose => ({
+  ...pose,
+  target: clampTarget({ x: pose.target.x + grabbed.x - now.x, y: pose.target.y + grabbed.y - now.y }, bounds),
+});
+
+/** Two fingers turning (radians, clockwise on the screen = positive): the camera turns around the target. */
+export const twistBy = (pose: IsoPose, radians: number): IsoPose => clampIso({ ...pose, yaw: pose.yaw - radians });
+
+/** Two fingers moving up or down together (screen px): the camera tilts, like a right drag. */
+export const tiltBy = (pose: IsoPose, dy: number): IsoPose => orbitBy(pose, 0, dy);
