@@ -143,6 +143,10 @@ public class MapTokenInfo
     [JsonPropertyName("space")]
     public int Space { get; set; } = 1;
 
+    /// <summary>Hexes of the token standing (104): the isometric view sizes a knocked-over miniature's base by it.</summary>
+    [JsonPropertyName("upSpace")]
+    public int UpSpace { get; set; } = 1;
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

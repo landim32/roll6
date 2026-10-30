@@ -1,6 +1,6 @@
 import {
   CanvasTexture, Color, CylinderGeometry, DoubleSide, Group, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshBasicMaterial,
-  MeshDepthMaterial, NearestFilter, PlaneGeometry, Quaternion, RGBADepthPacking, RingGeometry, SRGBColorSpace, Texture, Vector3,
+  MeshDepthMaterial, NearestFilter, PlaneGeometry, Quaternion, RGBADepthPacking, SRGBColorSpace, Texture, TorusGeometry, Vector3,
 } from 'three';
 import type { Object3D, Scene } from 'three';
 import { figureView, facingAngle } from '../../lib/billboard';
@@ -33,8 +33,9 @@ import { hexFillGeometry, stripGeometry } from './isoStrips';
  * shadows on the floor (the scene's light from above); a 2,5D figure, a flat picture, gets the soft spot under it that
  * the 3D view gives its figures.
  *
- * Tabletop miniatures (104, `lib/isoMiniature`): a model or a figure stands on a thin round base (dark, its rim in the
- * piece's color), all of it in a group that tips over backwards about the back edge of the base when the piece is down
+ * Tabletop miniatures (104, `lib/isoMiniature`): a model or a figure stands on a round base in dull, darker tones of the
+ * piece's color with thin black edges, all of
+ * it in a group that lies knocked over backwards on the table (on the base's edge and the head) when the piece is down
  * or out of combat — a turn of one node, nothing reloaded; out of combat it is also black and white (a uniform of the
  * piece, the base keeps its color). A figure stands turned to the camera; tipped it lies face up. A floor picture has
  * no base and shows the token's "Caído" image when tipped.
@@ -75,7 +76,8 @@ export const toIsoPiece = (token: MapTokenInfo): IsoPiece => {
     imageUrl: token.upImageUrl,
     downImageUrl: token.downImageUrl,
     ...miniatureState(token),
-    base: kind === 'flat' ? null : miniatureBase(token.space),
+    // The base keeps the standing size: a knocked-over miniature is the same miniature.
+    base: kind === 'flat' ? null : miniatureBase(token.upSpace ?? token.space),
     box: geometry.box,
     look: token.look,
     hex: { x: token.x, y: token.y },
@@ -109,16 +111,21 @@ interface Drawn {
 }
 
 /**
- * The miniature of a piece with a base (104): `tip` stands on the back edge of the base and turns to tip it over;
- * `holder` (the middle of the base) carries the base, the figure and the model. Kept by piece id apart from `Drawn`, so a
+ * The miniature of a piece with a base (104): `tip` stands on the middle of the base and turns to knock it over;
+ * `holder` carries the base, the figure and the model. Kept by piece id apart from `Drawn`, so a
  * model mounted in it stays when the piece's pictures are read again.
  */
 interface Miniature {
   tip: Group;
   holder: Group;
-  body: Mesh<CylinderGeometry, MeshBasicMaterial>;
-  rim: Mesh<RingGeometry, MeshBasicMaterial>;
+  /** The base: side, top and bottom (the cylinder's groups), in darker tones of the piece's color. */
+  body: Mesh<CylinderGeometry, MeshBasicMaterial[]>;
+  /** The thin black rings on the base's top and bottom edges, built for `rimRadius`. */
+  rims: Mesh<TorusGeometry, MeshBasicMaterial>[];
+  rimRadius: number;
   color: string;
+  /** Height of its highest point as placed (the balloon's of a knocked-over miniature). */
+  top: number;
 }
 
 /** Where a piece's balloon hangs: the middle of its shape on the floor and the height of its head (world units). */
@@ -166,14 +173,15 @@ const DISC_FILL_LIFT = 0.6;
 const DISC_EDGE_LIFT = 0.7;
 const WHITE = new Color(0xffffff);
 const BLACK = new Color(0x000000);
-/** The base's body is the piece's color this close to black; its rim, the color itself, lies just over its top. */
-const BASE_DARKEN = 0.8;
-const RIM_INNER = 0.82;
-const RIM_LIFT = 0.3;
 const NO_TIP = new Quaternion();
 
 /** The outline color of a piece: its own color lightened, like the 2D map's strokes. */
 const edgeColorOf = (color: string): Color => new Color(color).lerp(WHITE, 0.45);
+/** The base in dull, darker tones of the piece's color: the side darker than the top, so its edges read. */
+const BASE_SIDE_DARKEN = 0.55;
+const BASE_TOP_DARKEN = 0.35;
+/** Thickness of the black rings on the base's edges (map px). */
+const RIM_TUBE = 0.45;
 
 /** The piece's hexes (centers and corners) and the outer edges of its shape (an edge shared by two of its hexes is inside). */
 const discShape = (piece: IsoPiece) => {
@@ -237,9 +245,8 @@ export const createPieceLayer = (
   const pictures = new Map<string, Promise<Picture | null>>();
   const figureGeometry = new PlaneGeometry(1, 1).translate(0, 0.5, 0);
   const flatGeometry = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-  // One unit base for every miniature, scaled by its radius and thickness; the rim lies flat just over its top.
+  // One unit base for every miniature, scaled by its radius and thickness.
   const baseGeometry = new CylinderGeometry(1, 1, 1, 32).translate(0, 0.5, 0);
-  const rimGeometry = new RingGeometry(RIM_INNER, 1, 48).rotateX(-Math.PI / 2);
   const tipAxis = new Vector3();
   const spotMap = spotTexture();
   const spotMaterial = new MeshBasicMaterial({ map: spotMap, transparent: true, depthWrite: false });
@@ -297,15 +304,33 @@ export const createPieceLayer = (
     return material;
   };
 
-  /** The base's two materials in the piece's color (lit, never gray: the base keeps telling whose piece it is). */
+  /** The base in the piece's color (lit, never gray: the base keeps telling whose piece it is). */
   const paintBase = (mini: Miniature, color: string) => {
-    mini.body.material.dispose();
-    mini.rim.material.dispose();
-    mini.body.material = new MeshBasicMaterial({ color: new Color(color).lerp(BLACK, BASE_DARKEN) });
-    mini.rim.material = new MeshBasicMaterial({ color: new Color(color), side: DoubleSide });
-    applyLight(mini.body.material, uniforms, 'piece');
-    applyLight(mini.rim.material, uniforms, 'piece');
+    for (const material of mini.body.material) material.dispose();
+    const side = new MeshBasicMaterial({ color: new Color(color).lerp(BLACK, BASE_SIDE_DARKEN) });
+    const cap = new MeshBasicMaterial({ color: new Color(color).lerp(BLACK, BASE_TOP_DARKEN) });
+    mini.body.material = [side, cap, cap];
+    applyLight(side, uniforms, 'piece');
+    applyLight(cap, uniforms, 'piece');
+    for (const rim of mini.rims) {
+      rim.material.dispose();
+      rim.material = new MeshBasicMaterial({ color: BLACK });
+      applyLight(rim.material, uniforms, 'piece');
+    }
     mini.color = color;
+  };
+
+  /** The rings follow the base's radius (a torus can't be scaled without thickening its tube). */
+  const shapeRims = (mini: Miniature, radius: number, height: number) => {
+    if (mini.rimRadius !== radius) {
+      for (const rim of mini.rims) {
+        rim.geometry.dispose();
+        rim.geometry = new TorusGeometry(radius, RIM_TUBE, 6, 64).rotateX(-Math.PI / 2);
+      }
+      mini.rimRadius = radius;
+    }
+    mini.rims[0].position.y = 0;
+    mini.rims[1].position.y = height;
   };
 
   const miniatureOf = (id: number): Miniature => {
@@ -313,16 +338,15 @@ export const createPieceLayer = (
     if (!mini) {
       const tip = new Group();
       const holder = new Group();
-      const body = new Mesh(baseGeometry, new MeshBasicMaterial());
-      const rim = new Mesh(rimGeometry, new MeshBasicMaterial());
-      for (const mesh of [body, rim]) {
-        mesh.castShadow = true;
-        mesh.customDepthMaterial = depthMaterial;
-        holder.add(mesh);
-      }
+      const body = new Mesh(baseGeometry, [new MeshBasicMaterial()]);
+      body.castShadow = true;
+      body.customDepthMaterial = depthMaterial;
+      holder.add(body);
+      const rims = [0, 1].map(() => new Mesh(new TorusGeometry(1, RIM_TUBE, 6, 64), new MeshBasicMaterial()));
+      for (const rim of rims) holder.add(rim);
       tip.add(holder);
       scene.add(tip);
-      mini = { tip, holder, body, rim, color: '' };
+      mini = { tip, holder, body, rims, rimRadius: 0, color: '', top: 0 };
       minis.set(id, mini);
     }
     return mini;
@@ -332,13 +356,19 @@ export const createPieceLayer = (
     const mini = minis.get(id);
     if (!mini) return;
     scene.remove(mini.tip);
-    mini.body.material.dispose();
-    mini.rim.material.dispose();
+    for (const material of mini.body.material) material.dispose();
+    for (const rim of mini.rims) {
+      rim.geometry.dispose();
+      rim.material.dispose();
+    }
     minis.delete(id);
   };
 
-  /** Stands the piece's miniature on its base, or tips it over backwards (104). */
-  const placeMiniature = (entry: Drawn, showsBase: boolean): Miniature | null => {
+  /**
+   * Stands the piece's miniature on its base, or lays it knocked over backwards over its shape (104); `figure` = how tall
+   * the model or the figure stands over the base. Returns the height of its highest point.
+   */
+  const placeMiniature = (entry: Drawn, showsBase: boolean, figure: number): { mini: Miniature; top: number } | null => {
     const { piece } = entry;
     if (!piece.base) {
       dropMiniature(piece.id);
@@ -347,17 +377,21 @@ export const createPieceLayer = (
     const mini = miniatureOf(piece.id);
     if (mini.color !== piece.sprite.baseColor) paintBase(mini, piece.sprite.baseColor);
     const { radius, height } = piece.base;
-    const { pivot, axis, angle } = tipPose(piece.sprite.center, piece.sprite.yaw, piece.base);
-    mini.tip.position.set(pivot.x, 0, pivot.y);
-    if (piece.tipped) mini.tip.quaternion.setFromAxisAngle(tipAxis.set(axis.x, 0, axis.z), angle);
-    else mini.tip.quaternion.copy(NO_TIP);
-    mini.holder.position.set(piece.sprite.center.x - pivot.x, 0, piece.sprite.center.y - pivot.y);
     mini.body.scale.set(radius, height, radius);
-    mini.rim.scale.set(radius, 1, radius);
-    mini.rim.position.y = height + RIM_LIFT;
+    shapeRims(mini, radius, height);
     mini.body.visible = showsBase;
-    mini.rim.visible = showsBase;
-    return mini;
+    for (const rim of mini.rims) rim.visible = showsBase;
+    if (!piece.tipped) {
+      mini.tip.position.set(piece.sprite.center.x, 0, piece.sprite.center.y);
+      mini.tip.quaternion.copy(NO_TIP);
+      mini.top = height + figure;
+      return { mini, top: mini.top };
+    }
+    const { origin, axis, angle, top } = tipPose(piece.sprite.center, piece.sprite.yaw, piece.base, figure);
+    mini.tip.position.set(origin.x, origin.y, origin.z);
+    mini.tip.quaternion.setFromAxisAngle(tipAxis.set(axis.x, 0, axis.z), angle);
+    mini.top = top;
+    return { mini, top };
   };
 
   /** Puts `mesh` under `parent` (the miniature's holder or the scene) when it is somewhere else. */
@@ -404,8 +438,18 @@ export const createPieceLayer = (
     grayOf(piece.id).value = piece.gray ? 1 : 0;
     const asModel = piece.kind === 'model' && entry.modelReady;
     const asFigure = !asModel && (piece.kind === 'figure' || (piece.kind === 'model' && !!piece.sprite.views.front));
+    // Tipped, the figure shows its front and lies face up with the miniature; standing, it turns to the camera.
+    const shown = asFigure && entry.fallback
+      ? (piece.tipped
+        ? { image: entry.images.front ?? entry.fallback, mirrored: false }
+        : figureView(piece.sprite.yaw, piece.sprite.center, eye, entry.images, entry.fallback))
+      : null;
+    const width = piece.sprite.width;
+    const height = shown?.image ? (width * shown.image.height) / Math.max(1, shown.image.width) : 0;
+    // How tall it stands over the base: the miniature lies on the base's edge and on that head.
+    const figure = asModel ? models.sceneHeight(piece.id) ?? width : height;
     // The base shows under a model or a figure; a model still loading without a figure shows its floor picture alone.
-    const mini = placeMiniature(entry, asModel || (asFigure && !!entry.fallback));
+    const mini = placeMiniature(entry, asModel || (asFigure && !!entry.fallback), figure)?.mini ?? null;
     if (!mesh) return;
     if (spot) spot.visible = false;
     // Until its images are read the piece shows nothing; under a loaded model the figure is hidden.
@@ -414,17 +458,11 @@ export const createPieceLayer = (
       return;
     }
     mesh.visible = !asModel;
-    if (asFigure && mini) {
-      // Tipped, the figure shows its front and lies face up with the miniature; standing, it turns to the camera.
-      const shown = piece.tipped
-        ? { image: entry.images.front ?? entry.fallback, mirrored: false }
-        : figureView(piece.sprite.yaw, piece.sprite.center, eye, entry.images, entry.fallback);
+    if (asFigure && mini && shown) {
       if (!shown.image) {
         mesh.visible = false;
         return;
       }
-      const width = piece.sprite.width;
-      const height = (width * shown.image.height) / Math.max(1, shown.image.width);
       if (mesh.material.map !== shown.image.texture) {
         mesh.material.map = shown.image.texture;
         mesh.material.needsUpdate = true;
@@ -432,7 +470,7 @@ export const createPieceLayer = (
       reparent(mesh, mini.holder);
       mesh.geometry = figureGeometry;
       mesh.scale.set(shown.mirrored ? -width : width, height, 1);
-      mesh.position.set(0, BASE_HEIGHT, 0);
+      mesh.position.set(0, piece.base?.height ?? BASE_HEIGHT, 0);
       mesh.rotation.set(0, piece.tipped ? rotationForYaw(piece.sprite.yaw) : facingAngle(piece.sprite.center, eye), 0);
       if (spot && mesh.visible && !piece.tipped) {
         const radius = width * SPOT_RADIUS_SHARE;
@@ -558,9 +596,10 @@ export const createPieceLayer = (
     anchors: () => [...drawn.values()].flatMap((entry): PieceAnchor[] => {
       const { piece, mesh } = entry;
       if (!mesh || !entry.fallback) return [];
-      // A tipped miniature's highest point is its base, standing on its edge (104).
-      if (piece.base && piece.tipped && minis.get(piece.id)?.body.visible) {
-        return [{ id: piece.id, center: piece.sprite.center, height: 2 * piece.base.radius }];
+      // A knocked-over miniature's highest point is its base, leaning on its edge (104).
+      const mini = minis.get(piece.id);
+      if (piece.base && piece.tipped && mini?.body.visible) {
+        return [{ id: piece.id, center: piece.sprite.center, height: mini.top }];
       }
       const modelHeight = piece.kind === 'model' && entry.modelReady ? models.sceneHeight(piece.id) : null;
       const figure = mesh.geometry === figureGeometry && mesh.parent !== scene ? Math.abs(mesh.scale.y) : null;
@@ -590,7 +629,6 @@ export const createPieceLayer = (
       for (const id of [...minis.keys()]) dropMiniature(id);
       grays.clear();
       baseGeometry.dispose();
-      rimGeometry.dispose();
       figureGeometry.dispose();
       flatGeometry.dispose();
       spotMap.dispose();

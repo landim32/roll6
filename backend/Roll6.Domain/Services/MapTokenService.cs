@@ -417,6 +417,7 @@ public partial class MapTokenService : IMapTokenService
                 WalkY = mapToken.WalkY,
                 WalkYaw = mapToken.WalkYaw,
                 Space = MapOccupancyLoader.PieceSpace(token, null),
+                UpSpace = MapOccupancyLoader.PieceSpace(token, null),
                 CreatedAt = mapToken.CreatedAt,
                 UpdatedAt = mapToken.UpdatedAt
             };
