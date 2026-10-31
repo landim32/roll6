@@ -45,6 +45,8 @@ describe('toTokenInsert', () => {
     expect(toTokenInsert(form(), 'a.png', null, undefined, { ...model, modelScale: 150 }).modelScale).toBe(150);
     expect(toTokenInsert(form(), 'a.png', null, undefined, model).modelScale).toBe(100);
     expect(toTokenInsert(form(), 'a.png', null, undefined, { ...model, modelFile: null, modelScale: 150 }).modelScale).toBe(100);
+    expect(toTokenInsert(form(), 'a.png', null, undefined, { ...model, modelFront: 90 }).modelFront).toBe(90);
+    expect(toTokenInsert(form(), 'a.png', null, undefined, { ...model, modelFile: null, modelFront: 90 }).modelFront).toBe(0);
   });
 
   it('sends the weapons of the sockets with their grips (083), none without a model', () => {
@@ -69,7 +71,7 @@ describe('toTokenInsert', () => {
     expect(toTokenInsert(form({ name: ' Goblin ', description: '  ', upSpace: '1', downSpace: '' }), 'a.png', null)).toEqual({
       name: 'Goblin', description: null, upSpace: 1, downSpace: null, upImage: 'a.png', downImage: null,
       frontImage: null, rightImage: null, leftImage: null, backImage: null, modelFile: null, modelIdleClip: null, modelWalkClip: null, modelDownClip: null,
-      modelScale: 100, weapons: [],
+      modelScale: 100, modelFront: 0, weapons: [],
     });
     expect(toTokenInsert(form({ downSpace: '2' }), null, 'b.png').downSpace).toBe(2);
   });

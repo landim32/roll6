@@ -71,7 +71,7 @@ public class TokenLibraryService : ITokenLibraryService
         var token = new Token { UserId = userId };
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
-        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale);
+        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale, info.ModelFront);
         var weapons = TokenWeaponSet.Parse(info.Weapons, token.ModelFile != null);
         await CheckLibraryAnimationsAsync(token);
         await CheckWeaponsAsync(weapons);
@@ -95,7 +95,7 @@ public class TokenLibraryService : ITokenLibraryService
         var token = await GetOwnedAsync(userId, tokenId);
         token.Update(info.Name, info.Description, info.UpSpace, info.DownSpace, info.UpImage, info.DownImage);
         token.UpdateSprites(info.FrontImage, info.RightImage, info.LeftImage, info.BackImage);
-        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale);
+        token.UpdateModel(info.ModelFile, info.ModelIdleClip, info.ModelWalkClip, info.ModelDownClip, info.ModelScale, info.ModelFront);
         var weapons = TokenWeaponSet.Parse(info.Weapons, token.ModelFile != null);
         await CheckLibraryAnimationsAsync(token);
         await CheckWeaponsAsync(weapons);
@@ -231,6 +231,7 @@ public class TokenLibraryService : ITokenLibraryService
         ModelWalkClip = token.ModelWalkClip,
         ModelDownClip = token.ModelDownClip,
         ModelScale = token.ModelScale,
+        ModelFront = token.ModelFront,
         Weapons = TokenWeapons.Read(rows, weapons, _imageStorage.GetUrl),
         CreatedAt = token.CreatedAt,
         UpdatedAt = token.UpdatedAt

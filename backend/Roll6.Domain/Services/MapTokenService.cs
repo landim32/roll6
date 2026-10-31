@@ -399,6 +399,7 @@ public partial class MapTokenService : IMapTokenService
                 ModelWalkClip = token?.ModelWalkClip,
                 ModelDownClip = token?.ModelDownClip,
                 ModelScale = token?.ModelScale ?? Validation.Guard.MODEL_SCALE_DEFAULT,
+                ModelFront = token?.ModelFront ?? 0,
                 Weapons = TokenWeapons.Read(rowsByToken[mapToken.TokenId], weapons, _imageStorage.GetUrl),
                 CampaignCharacterId = mapToken.CampaignCharacterId,
                 Name = mapToken.Name,

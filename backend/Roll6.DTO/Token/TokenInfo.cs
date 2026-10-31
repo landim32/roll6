@@ -85,6 +85,10 @@ public class TokenInfo
     [JsonPropertyName("modelScale")]
     public int ModelScale { get; set; } = 100;
 
+    /// <summary>Which side of the file is the model's front (106): 0 (+Z), 90 (+X), 180 (−Z) or 270 (−X); 0 without a model.</summary>
+    [JsonPropertyName("modelFront")]
+    public int ModelFront { get; set; }
+
     /// <summary>The weapons in the model's sockets (083), ordered by socket; empty = none.</summary>
     [JsonPropertyName("weapons")]
     public List<Weapon.TokenWeaponInfo> Weapons { get; set; } = new();

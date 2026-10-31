@@ -68,6 +68,13 @@ public class TokenInsertInfo
     public int? ModelScale { get; set; }
 
     /// <summary>
+    /// Which side of the file is the model's front (106), for models without a skeleton: 0 (+Z, glTF's forward), 90 (+X),
+    /// 180 (−Z) or 270 (−X). Omitted = 0. Ignored without modelFile.
+    /// </summary>
+    [JsonPropertyName("modelFront")]
+    public int? ModelFront { get; set; }
+
+    /// <summary>
     /// The weapons in the model's sockets (083): { socket (1 right hand, 2 left hand, 3 back, 4 right holster, 5 left
     /// holster), weaponId, grip? } each. Omitted or empty = none (the PUT replaces the whole set); ignored without
     /// modelFile. The same weapon may be in several sockets; the same socket only once.

@@ -2633,5 +2633,20 @@ BEGIN
     VALUES ('20261021184235_AddRepeatedAction', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261031011119_AddTokenModelFront') THEN
+    ALTER TABLE tokens ADD model_front integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20261031011119_AddTokenModelFront') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261031011119_AddTokenModelFront', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

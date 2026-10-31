@@ -57,6 +57,10 @@ public class MapTokenInfo
     [JsonPropertyName("modelScale")]
     public int ModelScale { get; set; } = 100;
 
+    /// <summary>Which side of the token's model file is its front (106): 0 (+Z), 90 (+X), 180 (−Z) or 270 (−X).</summary>
+    [JsonPropertyName("modelFront")]
+    public int ModelFront { get; set; }
+
     /// <summary>The weapons in the sockets of the piece's token (083), ordered by socket; empty = none.</summary>
     [JsonPropertyName("weapons")]
     public List<Weapon.TokenWeaponInfo> Weapons { get; set; } = new();

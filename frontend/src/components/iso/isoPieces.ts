@@ -37,7 +37,7 @@ import { hexFillGeometry, hexShape, stripGeometry } from './isoStrips';
  * piece's color with thin edges in the color itself, all of
  * it in a group that lies knocked over backwards on the table (on the base's edge and the head) when the piece is down
  * or out of combat — a turn of one node, nothing reloaded; out of combat it is also black and white (a uniform of the
- * piece, the base keeps its color). A figure stands turned to the camera; tipped it lies face up. A floor picture has
+ * piece, shared by the base and its rings). A figure stands turned to the camera; tipped it lies face up. A floor picture has
  * no base and shows the token's "Caído" image when tipped.
  */
 export interface IsoPiece {
@@ -288,18 +288,19 @@ export const createPieceLayer = (
     return material;
   };
 
-  /** The base in the piece's color (lit, never gray: the base keeps telling whose piece it is). */
-  const paintBase = (mini: Miniature, color: string) => {
+  /** The base in the piece's color (lit, gray with the piece when it is out of combat). */
+  const paintBase = (mini: Miniature, id: number, color: string) => {
+    const gray = grayOf(id);
     for (const material of mini.body.material) material.dispose();
     const side = new MeshBasicMaterial({ color: new Color(color).lerp(BLACK, BASE_SIDE_DARKEN) });
     const cap = new MeshBasicMaterial({ color: new Color(color).lerp(BLACK, BASE_TOP_DARKEN) });
     mini.body.material = [side, cap, cap];
-    applyLight(side, uniforms, 'piece');
-    applyLight(cap, uniforms, 'piece');
+    applyLight(side, uniforms, 'piece', { gray });
+    applyLight(cap, uniforms, 'piece', { gray });
     for (const rim of mini.rims) {
       rim.material.dispose();
       rim.material = new MeshBasicMaterial({ color: new Color(color) });
-      applyLight(rim.material, uniforms, 'piece');
+      applyLight(rim.material, uniforms, 'piece', { gray });
     }
     mini.color = color;
   };
@@ -361,7 +362,7 @@ export const createPieceLayer = (
       return null;
     }
     const mini = miniatureOf(piece.id);
-    if (mini.color !== piece.sprite.baseColor) paintBase(mini, piece.sprite.baseColor);
+    if (mini.color !== piece.sprite.baseColor) paintBase(mini, piece.id, piece.sprite.baseColor);
     const { radius, height } = piece.base;
     mini.body.scale.set(radius, height, radius);
     shapeRims(mini, radius, height);
@@ -545,7 +546,7 @@ export const createPieceLayer = (
     ? [{
       // In the frame of its miniature's holder: the middle of the base, standing on its top.
       id: piece.id, url: piece.sprite.modelUrl, width: piece.sprite.width, center: { x: 0, y: 0 }, yaw: piece.sprite.yaw,
-      ground: piece.base?.height ?? BASE_HEIGHT, clips: piece.sprite.modelClips, lying: false, scale: piece.sprite.modelScale, weapons: piece.sprite.modelWeapons,
+      ground: piece.base?.height ?? BASE_HEIGHT, clips: piece.sprite.modelClips, lying: false, scale: piece.sprite.modelScale, front: piece.sprite.modelFront, weapons: piece.sprite.modelWeapons,
     }]
     : []));
 

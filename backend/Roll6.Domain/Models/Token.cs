@@ -42,6 +42,12 @@ public class Token
     /// model.
     /// </summary>
     public int ModelScale { get; set; } = Guard.MODEL_SCALE_DEFAULT;
+    /// <summary>
+    /// Which side of the file is the model's front (106), for files without a skeleton that do not face glTF's +Z: the
+    /// direction in the file's floor plane, in degrees clockwise seen from above — 0 = +Z, 90 = +X, 180 = −Z, 270 = −X.
+    /// 0 without a model.
+    /// </summary>
+    public int ModelFront { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -72,15 +78,17 @@ public class Token
     /// <summary>
     /// The token's 3D model (055) and the animations chosen for it (056; the death since 058); null removes it (the PUT
     /// of a token replaces every field). Without a model the choices are dropped and the size goes back to 100: they only
-    /// mean something for a file. The size (063) is null = 100.
+    /// mean something for a file. The size (063) is null = 100, the front (106) null = 0.
     /// </summary>
-    public void UpdateModel(string? modelFile, string? idleClip = null, string? walkClip = null, string? downClip = null, int? scale = null)
+    public void UpdateModel(
+        string? modelFile, string? idleClip = null, string? walkClip = null, string? downClip = null, int? scale = null, int? front = null)
     {
         ModelFile = Guard.ModelFileName(modelFile, "modelFile");
         ModelIdleClip = ModelFile == null ? null : Guard.ModelClip(idleClip, "modelIdleClip");
         ModelWalkClip = ModelFile == null ? null : Guard.ModelClip(walkClip, "modelWalkClip");
         ModelDownClip = ModelFile == null ? null : Guard.ModelClip(downClip, "modelDownClip");
         ModelScale = ModelFile == null ? Guard.MODEL_SCALE_DEFAULT : Guard.ModelScale(scale, "modelScale");
+        ModelFront = ModelFile == null ? 0 : Guard.ModelFront(front, "modelFront");
         UpdatedAt = DateTime.UtcNow;
     }
 

@@ -38,6 +38,8 @@ export interface TokenInfo {
   modelDownClip?: string | null;
   /** Size of the model in the 3D view (063): percent of its automatic height, 25–400; missing = 100. */
   modelScale?: number;
+  /** Which side of a model without a skeleton is its front (106): 0 (+Z), 90 (+X), 180 (−Z) or 270 (−X); missing = 0. */
+  modelFront?: number;
   /** Weapons in the model's sockets (083): the weapon's name, file, grip point and pose, and the socket's grip; missing = none. */
   weapons?: TokenWeapon[] | null;
   createdAt: string;
@@ -64,6 +66,8 @@ export interface TokenInsertInfo {
   modelDownClip: string | null;
   /** Size of the model (063), 25–400 in steps of 5; the PUT resets it to 100 when omitted. */
   modelScale: number;
+  /** Front of a model without a skeleton (106): 0, 90, 180 or 270; the PUT resets it to 0 when omitted. */
+  modelFront: number;
   /** Weapons in the model's sockets (083): `{ socket, weaponId, grip }` each; the PUT empties a socket it doesn't get. */
   weapons: TokenWeaponWrite[];
 }

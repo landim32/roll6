@@ -146,4 +146,31 @@ public class GuardTests
 
         act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelScale");
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(90)]
+    [InlineData(180)]
+    [InlineData(270)]
+    public void ModelFront_AcceptsQuarterTurns(int front)
+    {
+        Guard.ModelFront(front, "modelFront").Should().Be(front);
+    }
+
+    [Fact]
+    public void ModelFront_NullIsPlusZ()
+    {
+        Guard.ModelFront(null, "modelFront").Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(45)]
+    [InlineData(-90)]
+    [InlineData(360)]
+    public void ModelFront_RefusesOtherAngles(int front)
+    {
+        var act = () => Guard.ModelFront(front, "modelFront");
+
+        act.Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("modelFront");
+    }
 }

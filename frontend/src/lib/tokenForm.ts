@@ -15,6 +15,8 @@ export interface ResolvedModel {
   modelDownClip: string | null;
   /** Size of the model in the 3D view (063), percent; missing = 100. */
   modelScale?: number;
+  /** Which side of a model without a skeleton is its front (106), degrees; missing = 0 (+Z). */
+  modelFront?: number;
   /** The weapons in the model's sockets (083) with their grips; missing = none. */
   weapons?: TokenWeaponWrite[];
 }
@@ -93,5 +95,6 @@ export const toTokenInsert = (
   modelWalkClip: model?.modelFile ? model.modelWalkClip : null,
   modelDownClip: model?.modelFile ? model.modelDownClip : null,
   modelScale: model?.modelFile ? model.modelScale ?? MODEL_SCALE.standard : MODEL_SCALE.standard,
+  modelFront: model?.modelFile ? model.modelFront ?? 0 : 0,
   weapons: model?.modelFile ? model.weapons ?? [] : [],
 });

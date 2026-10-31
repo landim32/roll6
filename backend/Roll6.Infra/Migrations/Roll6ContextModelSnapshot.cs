@@ -1399,6 +1399,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("model_file");
 
+                    b.Property<int>("ModelFront")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("model_front");
+
                     b.Property<string>("ModelIdleClip")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)")
