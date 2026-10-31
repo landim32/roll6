@@ -49,7 +49,7 @@ export interface MapTokenInfo {
   modelDownClip?: string | null;
   /** Size of the token's model in the 3D view (063): percent of its automatic height; missing = 100. */
   modelScale?: number;
-  /** Which side of the token's model file is its front (106): 0 (+Z), 90, 180 or 270; missing = 0. */
+  /** Which side of the token's model file is its front (106): degrees 0–359, 0 = +Z; missing = 0. */
   modelFront?: number;
   /** Weapons in the token model's sockets (083), ordered by socket; missing = none. */
   weapons?: TokenWeapon[] | null;

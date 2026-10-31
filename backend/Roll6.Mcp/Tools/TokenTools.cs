@@ -27,7 +27,7 @@ public static class TokenTools
         modelDownClip choose the animation of each state (omit = automatic; "none"; "clip:{name}" for a clip
         of the file; "animation:{id}" for a library animation of the state's type — see create_animation). A piece that is down or out of combat lies in the 3D view at the last frame of modelDownClip (the
         death), or laid on its back when there is none. modelScale (25–400, steps of 5, default 100) makes the model
-        bigger or smaller in the 3D view, in percent of its automatic height. modelFront (0, 90, 180 or 270, default 0)
+        bigger or smaller in the 3D view, in percent of its automatic height. modelFront (whole degrees 0–359, default 0)
         tells which side of a model without a skeleton is its front, when the file does not face +Z.
         weapons (optional, only with modelFile) puts library weapons (list_weapons / create_weapon) in the model's sockets —
         hands, back, holsters — aligned by each weapon's grip point and standard pose, with a size and an optional fine

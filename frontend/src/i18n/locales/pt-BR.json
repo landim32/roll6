@@ -695,10 +695,9 @@
       "scaleReset": "Voltar a 100%",
       "front": {
         "title": "Frente do objeto",
-        "noSkeleton": "Este modelo não tem esqueleto: é um objeto que fica parado e não carrega armas. Se ele aparecer de lado ou de costas nas vistas 3D e isométrica, gire-o até a frente dele ficar virada para você, do lado da seta verde.",
+        "noSkeleton": "Este modelo não tem esqueleto: é um objeto que fica parado e não carrega armas. Se ele aparecer de lado ou de costas nas vistas 3D e isométrica, gire-o (grau a grau na barra, ou de 90° em 90°) até a frente dele ficar virada para você, do lado da seta verde.",
         "turnLeft": "Girar 90° para a esquerda",
         "turnRight": "Girar 90° para a direita",
-        "angle": "Giro: {{angle}}°",
         "reset": "Voltar à frente do arquivo"
       },
       "refresh": "Atualizar",

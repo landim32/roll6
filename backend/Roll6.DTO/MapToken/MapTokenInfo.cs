@@ -57,7 +57,7 @@ public class MapTokenInfo
     [JsonPropertyName("modelScale")]
     public int ModelScale { get; set; } = 100;
 
-    /// <summary>Which side of the token's model file is its front (106): 0 (+Z), 90 (+X), 180 (−Z) or 270 (−X).</summary>
+    /// <summary>Which side of the token's model file is its front (106): degrees 0–359 clockwise from above, 0 = +Z, 90 = +X.</summary>
     [JsonPropertyName("modelFront")]
     public int ModelFront { get; set; }
 

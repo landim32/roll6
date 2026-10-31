@@ -17,13 +17,13 @@ import { animationService } from '../../Services/animationService';
 import type { AnimationInfo } from '../../types/animation';
 import { checkModelFile } from '../../lib/modelFile';
 import { MODEL_SCALE, clampModelScale, formatModelScale, modelScaleFactor } from '../../lib/modelScale';
-import { hasSkeleton, toModelFront } from '../../lib/modelFront';
+import { frontFromRotation, frontRotation, hasSkeleton } from '../../lib/modelFront';
 import {
   ANIMATION_STATES, STATE_ANIMATION_TYPE, animationChoice, clipChoiceFromValue, clipChoiceOptions, isMixamoSkeleton, parseClipChoice,
 } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ClipOption } from '../../lib/modelAnimations';
 import { ModelTimeline } from './ModelTimeline';
-import { ArrowClockwiseIcon, ArrowCounterclockwiseIcon, CameraIcon, ChevronDownIcon, ChevronUpIcon } from '../ui/icons';
+import { ArrowClockwiseIcon, CameraIcon, ChevronDownIcon, ChevronUpIcon, RotateRightIcon, UndoIcon } from '../ui/icons';
 import { ZoomButtons } from '../ui/ZoomButtons';
 import type { ModelPreviewHandle, ModelPreviewInfo } from './ModelPreview';
 
@@ -110,6 +110,8 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   // The form learns whether the model has a skeleton (106): it decides the front and the "Armas" tab.
   useEffect(() => {
     setSkinned(skinned);
+    // Without a skeleton nothing walks or falls (106): the preview stays on "Parado".
+    if (skinned === false) setShown('idle');
   }, [skinned, setSkinned]);
 
   // The weapon selects (082) read the library once, when the "Armas" tab first shows.
@@ -302,6 +304,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 id={`${id}-state`}
                 className="form-select form-select-sm"
                 value={shown}
+                disabled={skinned === false}
                 onChange={(e) => setShown(e.target.value as AnimationState)}
               >
                 {ANIMATION_STATES.map((animation) => (
@@ -427,20 +430,25 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
         <div className="stm-model-front mt-3">
           <div className="form-label small mb-1">{t('tokens.model.front.title')}</div>
           <div className="alert alert-info small mb-2">{t('tokens.model.front.noSkeleton')}</div>
+          {/* Like the token images' rotation: 90° buttons and a slider in whole degrees (−180…180). */}
           <div className="d-flex align-items-center gap-2">
-            <button type="button" className="btn btn-outline-secondary btn-sm" title={t('tokens.model.front.turnLeft')}
-              aria-label={t('tokens.model.front.turnLeft')} onClick={() => setFront(toModelFront((front + 90) % 360))}>
-              <ArrowCounterclockwiseIcon size={14} />
+            <label className="form-label mb-0 small" htmlFor={`${id}-front`}>{t('image.rotation')}</label>
+            <button type="button" className="btn btn-sm btn-outline-secondary" title={t('tokens.model.front.turnLeft')}
+              aria-label={t('tokens.model.front.turnLeft')} onClick={() => setFront(frontFromRotation(front - 90))}>
+              <UndoIcon size={14} />
             </button>
-            <output className="fw-semibold small" aria-live="polite">{t('tokens.model.front.angle', { angle: front })}</output>
-            <button type="button" className="btn btn-outline-secondary btn-sm" title={t('tokens.model.front.turnRight')}
-              aria-label={t('tokens.model.front.turnRight')} onClick={() => setFront(toModelFront((front + 270) % 360))}>
-              <ArrowClockwiseIcon size={14} />
+            <input id={`${id}-front`} type="range" className="form-range flex-grow-1" min={-180} max={180} step={1}
+              value={frontRotation(front)} aria-valuetext={`${frontRotation(front)}°`}
+              onChange={(e) => setFront(frontFromRotation(Number(e.target.value)))} />
+            <button type="button" className="btn btn-sm btn-outline-secondary" title={t('tokens.model.front.turnRight')}
+              aria-label={t('tokens.model.front.turnRight')} onClick={() => setFront(frontFromRotation(front + 90))}>
+              <RotateRightIcon size={14} />
             </button>
-            {front !== 0 && (
-              <button type="button" className="btn btn-link btn-sm p-0" onClick={() => setFront(0)}>{t('tokens.model.front.reset')}</button>
-            )}
+            <small className="text-body-secondary text-nowrap" style={{ minWidth: '3.5em' }}>{frontRotation(front)}°</small>
           </div>
+          {front !== 0 && (
+            <button type="button" className="btn btn-link btn-sm p-0" onClick={() => setFront(0)}>{t('tokens.model.front.reset')}</button>
+          )}
         </div>
       )}
       {animating && previewUrl && options && skinned !== false && (
