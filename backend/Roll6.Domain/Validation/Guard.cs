@@ -149,14 +149,14 @@ public static class Guard
     }
 
     /// <summary>
-    /// The front of a token's 3D model (106): which side of the file looks ahead, in degrees — 0 (+Z, glTF's forward),
-    /// 90 (+X), 180 (−Z) or 270 (−X). Null = 0.
+    /// The front of a token's 3D model (106): which way of the file looks ahead, in whole degrees clockwise seen from
+    /// above, 0–359 — 0 (+Z, glTF's forward), 90 (+X), 180 (−Z), 270 (−X). Null = 0.
     /// </summary>
     public static int ModelFront(int? value, string field)
     {
         var front = value ?? 0;
-        if (front is not (0 or 90 or 180 or 270))
-            throw new DomainValidationException(field, "A frente do modelo deve ser 0, 90, 180 ou 270 graus.");
+        if (front < 0 || front > 359)
+            throw new DomainValidationException(field, "A frente do modelo deve ser de 0 a 359 graus.");
         return front;
     }
 

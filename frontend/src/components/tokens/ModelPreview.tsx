@@ -70,8 +70,8 @@ interface ModelPreviewProps {
    */
   scale?: number;
   /**
-   * Which side of the file is the model's front (106): the model is turned so that side faces the viewer when the
-   * turntable is at rest; a change turns it at once and brings the turntable back to rest. Default 0 (+Z).
+   * Which way of the file is the model's front (106), degrees: the model is turned so that way faces the viewer when
+   * the turntable is at rest; a change turns it at once and brings the turntable back to rest. Default 0 (+Z).
    */
   front?: ModelFront;
   /** Shows an arrow on the disc pointing where the front is (106: choosing the front of a model without a skeleton). */
@@ -254,11 +254,12 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const switchRef = useRef(switchState);
   switchRef.current = switchState;
 
-  /** Turns the model so its front (106) faces +Z; a turn of 90° or 270° swaps the width and the depth it lies on. */
+  /** Turns the model so its front (106) faces +Z; lying, it rests on the depth of its turned box. */
   function applyFront(value: ModelFront) {
-    facerRef.current?.rotation.set(0, frontTurn(value), 0);
+    const angle = frontTurn(value);
+    facerRef.current?.rotation.set(0, angle, 0);
     const { width, depth } = footprintRef.current;
-    sizeRef.current = { ...sizeRef.current, depth: value === 90 || value === 270 ? width : depth };
+    sizeRef.current = { ...sizeRef.current, depth: Math.abs(width * Math.sin(angle)) + Math.abs(depth * Math.cos(angle)) };
   }
 
   /**

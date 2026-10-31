@@ -200,7 +200,7 @@ public static class Roll6Guide
           figure's silhouette for the piece's hexes), 25–400 in steps of 5, 100 by default. Feet stay on the floor and
           the balloon over the head; only the 3D view changes (hexes, movement and 2D images do not).
         - The token's `modelFront` (106) is for models **without a skeleton** (props, statues, vehicles) whose file does
-          not face glTF's forward (+Z): 0 (+Z, default), 90 (+X), 180 (−Z) or 270 (−X). The 3D and isometric views turn
+          not face glTF's forward (+Z): whole degrees 0–359 clockwise from above (0 = +Z, default; 90 = +X; 180 = −Z; 270 = −X). The 3D and isometric views turn
           the model so that side looks where the piece looks. Models without a skeleton carry no weapons.
         - In **free mode** a player walks his own character in the 3D view, in third person (camera locked behind it,
           zoom = distance). That walk is **local to his screen**: it never moves the piece, records nothing and no tool

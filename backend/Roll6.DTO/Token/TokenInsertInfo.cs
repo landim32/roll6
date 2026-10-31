@@ -69,7 +69,7 @@ public class TokenInsertInfo
 
     /// <summary>
     /// Which side of the file is the model's front (106), for models without a skeleton: 0 (+Z, glTF's forward), 90 (+X),
-    /// 180 (−Z) or 270 (−X). Omitted = 0. Ignored without modelFile.
+    /// 180 (−Z), 270 (−X) or any whole degree between 0 and 359. Omitted = 0. Ignored without modelFile.
     /// </summary>
     [JsonPropertyName("modelFront")]
     public int? ModelFront { get; set; }

@@ -85,7 +85,7 @@ public class TokenInfo
     [JsonPropertyName("modelScale")]
     public int ModelScale { get; set; } = 100;
 
-    /// <summary>Which side of the file is the model's front (106): 0 (+Z), 90 (+X), 180 (−Z) or 270 (−X); 0 without a model.</summary>
+    /// <summary>Which side of the file is the model's front (106): degrees 0–359 clockwise from above, 0 = +Z, 90 = +X; 0 without a model.</summary>
     [JsonPropertyName("modelFront")]
     public int ModelFront { get; set; }
 

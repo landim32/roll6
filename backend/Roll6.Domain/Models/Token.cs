@@ -44,7 +44,7 @@ public class Token
     public int ModelScale { get; set; } = Guard.MODEL_SCALE_DEFAULT;
     /// <summary>
     /// Which side of the file is the model's front (106), for files without a skeleton that do not face glTF's +Z: the
-    /// direction in the file's floor plane, in degrees clockwise seen from above — 0 = +Z, 90 = +X, 180 = −Z, 270 = −X.
+    /// direction in the file's floor plane, in whole degrees (0–359) clockwise seen from above — 0 = +Z, 90 = +X, 180 = −Z, 270 = −X.
     /// 0 without a model.
     /// </summary>
     public int ModelFront { get; set; }

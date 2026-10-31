@@ -152,7 +152,9 @@ public class GuardTests
     [InlineData(90)]
     [InlineData(180)]
     [InlineData(270)]
-    public void ModelFront_AcceptsQuarterTurns(int front)
+    [InlineData(17)]
+    [InlineData(359)]
+    public void ModelFront_AcceptsWholeDegrees(int front)
     {
         Guard.ModelFront(front, "modelFront").Should().Be(front);
     }
@@ -164,7 +166,7 @@ public class GuardTests
     }
 
     [Theory]
-    [InlineData(45)]
+    [InlineData(-1)]
     [InlineData(-90)]
     [InlineData(360)]
     public void ModelFront_RefusesOtherAngles(int front)
