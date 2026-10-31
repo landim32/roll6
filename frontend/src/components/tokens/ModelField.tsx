@@ -17,12 +17,13 @@ import { animationService } from '../../Services/animationService';
 import type { AnimationInfo } from '../../types/animation';
 import { checkModelFile } from '../../lib/modelFile';
 import { MODEL_SCALE, clampModelScale, formatModelScale, modelScaleFactor } from '../../lib/modelScale';
+import { hasSkeleton, toModelFront } from '../../lib/modelFront';
 import {
   ANIMATION_STATES, STATE_ANIMATION_TYPE, animationChoice, clipChoiceFromValue, clipChoiceOptions, isMixamoSkeleton, parseClipChoice,
 } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ClipOption } from '../../lib/modelAnimations';
 import { ModelTimeline } from './ModelTimeline';
-import { ArrowClockwiseIcon, CameraIcon, ChevronDownIcon, ChevronUpIcon } from '../ui/icons';
+import { ArrowClockwiseIcon, ArrowCounterclockwiseIcon, CameraIcon, ChevronDownIcon, ChevronUpIcon } from '../ui/icons';
 import { ZoomButtons } from '../ui/ZoomButtons';
 import type { ModelPreviewHandle, ModelPreviewInfo } from './ModelPreview';
 
@@ -73,7 +74,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   /** The preview shows a still pose (paused, or a state without animation) — 057. */
   const [still, setStill] = useState(false);
   const previewRef = useRef<ModelPreviewHandle>(null);
-  const { previewUrl, clips, setClip, setInvalid, scale, setScale } = state;
+  const { previewUrl, clips, setClip, setInvalid, scale, setScale, front, setFront, setSkinned } = state;
   const { byType, listForType, refreshType } = useAnimation();
   const [refreshing, setRefreshing] = useState(false);
   const { session } = useAuth();
@@ -81,6 +82,8 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
   /** Names of chosen library animations that are not in the loaded lists (another user's, beyond the first page). */
   const [chosenNames, setChosenNames] = useState<Record<number, string>>({});
   const mixamo = info !== null && isMixamoSkeleton(info.boneNames);
+  /** The model has a skeleton (106): null while it loads. Without one the "Animação" tab picks its front instead. */
+  const skinned = info === null ? null : hasSkeleton(info.boneNames);
   /** "Armas" (083): the socket being edited, which sockets the model offers, and the library's weapons. */
   const [socket, setSocket] = useState<Socket>(SOCKET.rightHand);
   const [sockets, setSockets] = useState<SocketAvailabilities | null>(null);
@@ -103,6 +106,11 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
     setZoom(1);
     setLoading(previewUrl !== null);
   }, [previewUrl]);
+
+  // The form learns whether the model has a skeleton (106): it decides the front and the "Armas" tab.
+  useEffect(() => {
+    setSkinned(skinned);
+  }, [skinned, setSkinned]);
 
   // The weapon selects (082) read the library once, when the "Armas" tab first shows.
   useEffect(() => {
@@ -336,6 +344,8 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 animated={live}
                 clips={clips}
                 scale={modelScaleFactor(scale)}
+                front={skinned === false ? front : 0}
+                showFront={animating && skinned === false}
                 weapons={heldWeapons}
                 onSockets={setSockets}
                 zoom={zoom}
@@ -413,7 +423,27 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
           </div>
         </div>
       )}
-      {animating && previewUrl && options && (
+      {animating && previewUrl && skinned === false && (
+        <div className="stm-model-front mt-3">
+          <div className="form-label small mb-1">{t('tokens.model.front.title')}</div>
+          <div className="alert alert-info small mb-2">{t('tokens.model.front.noSkeleton')}</div>
+          <div className="d-flex align-items-center gap-2">
+            <button type="button" className="btn btn-outline-secondary btn-sm" title={t('tokens.model.front.turnLeft')}
+              aria-label={t('tokens.model.front.turnLeft')} onClick={() => setFront(toModelFront((front + 90) % 360))}>
+              <ArrowCounterclockwiseIcon size={14} />
+            </button>
+            <output className="fw-semibold small" aria-live="polite">{t('tokens.model.front.angle', { angle: front })}</output>
+            <button type="button" className="btn btn-outline-secondary btn-sm" title={t('tokens.model.front.turnRight')}
+              aria-label={t('tokens.model.front.turnRight')} onClick={() => setFront(toModelFront((front + 270) % 360))}>
+              <ArrowClockwiseIcon size={14} />
+            </button>
+            {front !== 0 && (
+              <button type="button" className="btn btn-link btn-sm p-0" onClick={() => setFront(0)}>{t('tokens.model.front.reset')}</button>
+            )}
+          </div>
+        </div>
+      )}
+      {animating && previewUrl && options && skinned !== false && (
         <div className="stm-model-choice mt-3">
           <label htmlFor={`${id}-clip`} className="form-label small mb-1">
             {t('tokens.model.animationOf', { state: t(`tokens.model.state.${shown}`) })}
@@ -532,7 +562,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
           <div className="form-text">{t('tokens.weapons.help')}</div>
         </div>
       )}
-      {animating && isStatic && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.static')}</div>}
+      {animating && isStatic && skinned !== false && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.static')}</div>}
       {animating && deforms && <div className="alert alert-warning small mt-2 mb-0">{t('tokens.model.deforms')}</div>}
       </div>
       </div>

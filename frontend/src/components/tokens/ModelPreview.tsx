@@ -1,8 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
-  AnimationMixer, CircleGeometry, Clock, DirectionalLight, Group, HemisphereLight, LoopOnce, Mesh, MeshBasicMaterial, PerspectiveCamera,
-  Quaternion, Scene, Vector3, WebGLRenderer,
+  AnimationMixer, BufferGeometry, CircleGeometry, Clock, DirectionalLight, DoubleSide, Float32BufferAttribute, Group, HemisphereLight, LoopOnce, Mesh,
+  MeshBasicMaterial, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer,
 } from 'three';
 import type { AnimationAction, Object3D } from 'three';
 import { loadAnimations } from '../../lib/animationCache';
@@ -10,6 +10,8 @@ import { clipChoiceIds } from '../../lib/modelAnimations';
 import type { AnimationSource, AnimationState, ModelClipChoices } from '../../lib/modelAnimations';
 import type { Roll6Clip } from '../../lib/roll6Clips';
 import { LYING_TILT } from '../../lib/modelFit';
+import { frontTurn } from '../../lib/modelFront';
+import type { ModelFront } from '../../lib/modelFront';
 import { previewFraming } from '../../lib/modelScale';
 import { pinchZoom, wheelZoom } from '../../lib/previewZoom';
 import { instantiate, loadModel } from '../story/loadModel';
@@ -67,6 +69,13 @@ interface ModelPreviewProps {
    * the model grows or shrinks on it and the camera moves back for a bigger one to fit. Default 1.
    */
   scale?: number;
+  /**
+   * Which side of the file is the model's front (106): the model is turned so that side faces the viewer when the
+   * turntable is at rest; a change turns it at once and brings the turntable back to rest. Default 0 (+Z).
+   */
+  front?: ModelFront;
+  /** Shows an arrow on the disc pointing where the front is (106: choosing the front of a model without a skeleton). */
+  showFront?: boolean;
   /** The weapons in the model's sockets (083) with the token's grips; a grip, pose or grip point change re-places them at once. */
   weapons?: SocketWeapons;
   /** After the model opens: which sockets the model offers (Mixamo bones), and which are approximate. */
@@ -92,7 +101,7 @@ const CAMERA_TARGET_Y = 0.95;
  * the form (056), so the user sees each choice at once. Without a death the down state shows the model laid on its back,
  * as the 3D view does. Its own small three.js scene, loaded lazily with the tab, released when it closes.
  */
-export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1, weapons, onSockets, zoom = 1, onZoom }, ref) => {
+export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1, front = 0, showFront = false, weapons, onSockets, zoom = 1, onZoom }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** The action the preview shows now (057): the timeline's subject; null when that state has no animation. */
   const current = useRef<AnimationAction | null>(null);
@@ -101,8 +110,16 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const actions = useRef<Record<AnimationState, AnimationAction | null>>({ idle: null, walk: null, down: null });
   /** Between the turntable and the model (058): laid on its back for a down state without a death. */
   const holderRef = useRef<Group | null>(null);
+  /** Between the holder and the model (106): the turn that puts the file's front toward the viewer. */
+  const facerRef = useRef<Group | null>(null);
+  const frontRef = useRef(front);
+  const showFrontRef = useRef(showFront);
+  /** The arrow on the disc that points to the front (106). */
+  const arrowRef = useRef<Mesh | null>(null);
   /** Depth and height of the model in the preview, to lay it down centered on the disc. */
   const sizeRef = useRef({ depth: 0, height: PREVIEW_HEIGHT });
+  /** Width and depth of the file in the preview's units: the depth after the front's turn is one of them (106). */
+  const footprintRef = useRef({ width: 0, depth: 0 });
   const mixerRef = useRef<AnimationMixer | null>(null);
   const assetRef = useRef<ModelAsset | null>(null);
   const shownRef = useRef(shown);
@@ -237,6 +254,13 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const switchRef = useRef(switchState);
   switchRef.current = switchState;
 
+  /** Turns the model so its front (106) faces +Z; a turn of 90° or 270° swaps the width and the depth it lies on. */
+  function applyFront(value: ModelFront) {
+    facerRef.current?.rotation.set(0, frontTurn(value), 0);
+    const { width, depth } = footprintRef.current;
+    sizeRef.current = { ...sizeRef.current, depth: value === 90 || value === 270 ? width : depth };
+  }
+
   /**
    * The model's size (063) on the fixed disc, and the camera pulled back so a bigger one still fits — then brought
    * closer to its target (the waist, where the hands are) by the zoom (085).
@@ -338,6 +362,14 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     scene.add(ground);
     const turntable = new Group();
     scene.add(turntable);
+    // The front's arrow (106): a flat triangle at the disc's edge on +Z, turning with the model.
+    const arrowGeometry = new BufferGeometry();
+    arrowGeometry.setAttribute('position', new Float32BufferAttribute([-0.18, 0, 0.82, 0.18, 0, 0.82, 0, 0, 1.08], 3));
+    const arrow = new Mesh(arrowGeometry, new MeshBasicMaterial({ color: 0x1fd67a, side: DoubleSide }));
+    arrow.position.y = 0.005;
+    arrow.visible = showFrontRef.current;
+    turntable.add(arrow);
+    arrowRef.current = arrow;
     stage.current = turntable;
     const sizer = new Group();
     turntable.add(sizer);
@@ -378,10 +410,15 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       model.scale.setScalar(scale);
       model.position.set(-((minX + maxX) / 2) * scale, -minY * scale, -((minZ + maxZ) / 2) * scale);
       const holder = new Group();
-      holder.add(model);
+      const facer = new Group();
+      facer.add(model);
+      holder.add(facer);
       sizer.add(holder);
       holderRef.current = holder;
+      facerRef.current = facer;
+      footprintRef.current = { width: (maxX - minX) * scale, depth: (maxZ - minZ) * scale };
       sizeRef.current = { depth: (maxZ - minZ) * scale, height: PREVIEW_HEIGHT };
+      applyFront(frontRef.current);
       modelRef.current = model;
       assetRef.current = asset;
       mixerRef.current = new AnimationMixer(model);
@@ -421,6 +458,10 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       current.current = null;
       modelRef.current = null;
       holderRef.current = null;
+      facerRef.current = null;
+      arrowRef.current = null;
+      arrowGeometry.dispose();
+      (arrow.material as MeshBasicMaterial).dispose();
       restRef.current = [];
       stage.current = null;
       sizerRef.current = null;
@@ -437,6 +478,20 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
     zoomRef.current = zoom;
     applySize(scaleRef.current);
   }, [zoom]);
+
+  // Another front (106): the model turns at once and the turntable comes back to rest, so the front faces the viewer.
+  useEffect(() => {
+    if (frontRef.current === front) return;
+    frontRef.current = front;
+    applyFront(front);
+    layDown(holderRef.current?.rotation.x === LYING_TILT);
+    if (stage.current) stage.current.rotation.y = 0;
+  }, [front]);
+
+  useEffect(() => {
+    showFrontRef.current = showFront;
+    if (arrowRef.current) arrowRef.current.visible = showFront;
+  }, [showFront]);
 
   // Another size (063): the loaded model grows or shrinks on the disc at once, without loading again.
   useEffect(() => {

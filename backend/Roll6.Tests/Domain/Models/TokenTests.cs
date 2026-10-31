@@ -148,6 +148,26 @@ public class TokenTests
     }
 
     [Fact]
+    public void UpdateModel_KeepsTheFrontOfAModel()
+    {
+        var token = new Token();
+
+        token.UpdateModel("0123456789abcdef0123456789abcdef.glb", front: 90);
+
+        token.ModelFront.Should().Be(90);
+    }
+
+    [Fact]
+    public void UpdateModel_WithoutAModel_TheFrontIsPlusZ()
+    {
+        var token = new Token { ModelFile = "0123456789abcdef0123456789abcdef.glb", ModelFront = 180 };
+
+        token.UpdateModel(null, front: 270);
+
+        token.ModelFront.Should().Be(0);
+    }
+
+    [Fact]
     public void UpdateModel_WithoutAModel_TheSizeIsTheDefault()
     {
         var token = new Token { ModelFile = "0123456789abcdef0123456789abcdef.glb", ModelScale = 200 };

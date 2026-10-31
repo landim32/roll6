@@ -1,7 +1,9 @@
-import { AnimationMixer, LoopOnce } from 'three';
+import { AnimationMixer, Euler, LoopOnce, Quaternion, Vector3 } from 'three';
 import type { AnimationAction, Material, Mesh, Object3D, Scene } from 'three';
 import type { Point } from '../../lib/hexGrid';
 import { fitLyingModel, fitModel } from '../../lib/modelFit';
+import { frontTurn, turnedBounds } from '../../lib/modelFront';
+import type { ModelFront } from '../../lib/modelFront';
 import { loadAnimations } from '../../lib/animationCache';
 import { clipChoiceIds, sameClipChoices } from '../../lib/modelAnimations';
 import type { ModelClipChoices } from '../../lib/modelAnimations';
@@ -35,6 +37,8 @@ export interface ModelSpec {
   lying: boolean;
   /** Size of the token's model (063) as a factor of its automatic height; missing = 1. */
   scale?: number;
+  /** Which side of the file is the model's front (106); missing = +Z. */
+  front?: ModelFront;
   /** The weapons in the model's sockets (083) with the token's grips; missing = none. */
   weapons?: SocketWeapons;
 }
@@ -70,6 +74,7 @@ interface Drawn {
 }
 
 const FADE_SECONDS = 0.25;
+const UP = new Vector3(0, 1, 0);
 /** Marks a material copied for this model set (103). */
 const OWN_MATERIAL = 'roll6OwnMaterial';
 
@@ -139,15 +144,17 @@ export const createModelSet = (
 
   const place = (entry: Drawn) => {
     if (!entry.object || !entry.asset) return;
-    const { bounds } = entry.asset;
-    const { width, center, yaw, ground, scale = 1 } = entry.spec;
+    const { width, center, yaw, ground, scale = 1, front = 0 } = entry.spec;
+    // The front (106) turns the file in its own frame first: the fit sees the turned box, and its turns come after.
+    const bounds = turnedBounds(entry.asset.bounds, front);
     // Lying without a death animation (058): the whole model laid on its back. With one, it stands where it falls.
     const lying = entry.spec.lying && !entry.down ? fitLyingModel(bounds, width, center, yaw, scale) : null;
     const fit = lying ?? fitModel(bounds, width, center, yaw, scale);
     entry.object.scale.setScalar(fit.scale);
     entry.placedScale = fit.scale;
     entry.object.position.set(fit.position.x, fit.position.y + ground, fit.position.z);
-    entry.object.rotation.set(lying?.tilt ?? 0, fit.rotationY, 0, 'YXZ');
+    entry.object.quaternion.setFromEuler(new Euler(lying?.tilt ?? 0, fit.rotationY, 0, 'YXZ'));
+    if (front !== 0) entry.object.quaternion.multiply(new Quaternion().setFromAxisAngle(UP, frontTurn(front)));
     events.onChange();
   };
 

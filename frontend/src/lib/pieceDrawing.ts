@@ -2,6 +2,8 @@ import { footprintLocal, hexCenter, hexCorners, pixelToHex } from './hexGrid';
 import type { Point } from './hexGrid';
 import { tokenSpriteUrls } from './spriteView';
 import { modelScaleFactor } from './modelScale';
+import { toModelFront } from './modelFront';
+import type { ModelFront } from './modelFront';
 import { socketWeaponsOf } from './weaponGrip';
 import type { SocketWeapons } from '../types/weapon';
 import { isAllyPiece } from './npcCategory';
@@ -141,6 +143,8 @@ export interface SpriteSpec {
   modelClips: ModelClipChoices;
   /** Size of that model (063) as a factor of its automatic height; 1 = as before. */
   modelScale: number;
+  /** Which side of that model's file is its front (106). */
+  modelFront: ModelFront;
   /** The weapons in that model's sockets (083), with the token's grips. */
   modelWeapons: SocketWeapons;
 }
@@ -192,6 +196,7 @@ export const spriteSpec = (token: MapTokenInfo, size: number): SpriteSpec => {
     modelUrl: token.modelFileUrl ?? null,
     modelClips: { idle: token.modelIdleClip ?? null, walk: token.modelWalkClip ?? null, down: token.modelDownClip ?? null },
     modelScale: modelScaleFactor(token.modelScale),
+    modelFront: toModelFront(token.modelFront),
     modelWeapons: socketWeaponsOf(token),
   };
 };

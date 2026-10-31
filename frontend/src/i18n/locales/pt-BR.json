@@ -604,6 +604,7 @@
     "weapons": {
       "help": "A arma é alinhada pela pega e pela pose padrão dela, definidas na biblioteca, na pose \"parado\" do modelo: normalmente só o tamanho precisa de ajuste. O tamanho e o ajuste fino são deste token: mudar aqui não muda outros tokens que usam a mesma arma. Aproxime a prévia com a roda do mouse, a pinça ou os botões para ver a mão de perto.",
       "needsModel": "Escolha um modelo 3D na aba \"3D\" para colocar armas nos encaixes dele.",
+      "noSkeleton": "Este modelo não tem esqueleto, por isso não carrega armas.",
       "socketLabel": "Encaixe",
       "socket": {
         "rightHand": "Mão D.",
@@ -643,7 +644,7 @@
       }
     },
     "model": {
-      "help": "Um modelo 3D (.glb, até 20 MB) aparece na vista 3D no lugar das imagens 2,5D, em pé e animado. A frente do modelo deve olhar para a frente do arquivo.",
+      "help": "Um modelo 3D (.glb, até 20 MB) aparece na vista 3D no lugar das imagens 2,5D, em pé e animado. A frente do modelo deve olhar para a frente do arquivo; num objeto sem esqueleto, a frente pode ser escolhida na aba Animação.",
       "pick": "Escolher arquivo .glb",
       "change": "Trocar modelo",
       "remove": "Remover modelo",
@@ -692,6 +693,14 @@
       "scale": "Tamanho",
       "scaleHint": "Altura do modelo na vista 3D, em relação à figura da peça (o disco é a base). 100% = automático.",
       "scaleReset": "Voltar a 100%",
+      "front": {
+        "title": "Frente do objeto",
+        "noSkeleton": "Este modelo não tem esqueleto: é um objeto que fica parado e não carrega armas. Se ele aparecer de lado ou de costas nas vistas 3D e isométrica, gire-o até a frente dele ficar virada para você, do lado da seta verde.",
+        "turnLeft": "Girar 90° para a esquerda",
+        "turnRight": "Girar 90° para a direita",
+        "angle": "Giro: {{angle}}°",
+        "reset": "Voltar à frente do arquivo"
+      },
       "refresh": "Atualizar",
       "refreshTitle": "Atualizar a lista de animações da biblioteca",
       "refreshFailed": "Não foi possível atualizar a lista de animações.",
@@ -1044,7 +1053,13 @@
     "viewIso": "Isométrica",
     "view3dItem": "3D (legado)"
   },
-  "iso": {
+  "iso": {
+
+
+
+
+
+
     "loading": "Carregando a vista isométrica…"
   },
   "viewQuality": {

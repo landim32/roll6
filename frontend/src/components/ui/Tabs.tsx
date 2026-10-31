@@ -1,6 +1,9 @@
 interface TabItem {
   key: string;
   label: string;
+  /** Shown but not selectable; `title` tells why. */
+  disabled?: boolean;
+  title?: string;
 }
 
 interface TabsProps {
@@ -18,7 +21,10 @@ export const Tabs = ({ tabs, active, onChange }: TabsProps) => (
           type="button"
           role="tab"
           aria-selected={active === tab.key}
-          className={`nav-link${active === tab.key ? ' active' : ''}`}
+          className={`nav-link${active === tab.key ? ' active' : ''}${tab.disabled ? ' disabled' : ''}`}
+          disabled={tab.disabled}
+          aria-disabled={tab.disabled || undefined}
+          title={tab.title}
           onClick={() => onChange(tab.key)}
         >
           {tab.label}

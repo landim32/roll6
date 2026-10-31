@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { modelService } from '../Services/modelService';
 import { AUTO_CLIPS, parseClipChoice } from '../lib/modelAnimations';
 import { MODEL_SCALE } from '../lib/modelScale';
+import { toModelFront } from '../lib/modelFront';
+import type { ModelFront } from '../lib/modelFront';
 import type { AnimationState, ModelClipChoice, ModelClipChoices } from '../lib/modelAnimations';
 import type { ResolvedModel } from '../lib/tokenForm';
 import { DEFAULT_GRIP, clampGrip } from '../lib/weaponGrip';
@@ -24,6 +26,13 @@ export interface ModelFileState {
   clips: ModelClipChoices;
   /** Size of the model in the 3D view (063), percent: kept when the file is swapped, 100 when it is removed. */
   scale: number;
+  /** Which side of the file is the model's front (106): only for a model without a skeleton; 0 when another file is picked. */
+  front: ModelFront;
+  /**
+   * Whether the model shown has a skeleton (106), as the preview found it: null while it loads. Without one the
+   * "Animação" tab picks the front and the "Armas" tab is off; with one the front is saved as 0.
+   */
+  skinned: boolean | null;
   /** The weapon in each socket (083) with its grip: kept when the file is swapped, emptied when the model is removed. */
   weapons: TokenWeapons;
   pick: (file: File) => void;
@@ -32,6 +41,8 @@ export interface ModelFileState {
   setInvalid: (invalid: boolean) => void;
   setClip: (state: AnimationState, choice: ModelClipChoice) => void;
   setScale: (scale: number) => void;
+  setFront: (front: ModelFront) => void;
+  setSkinned: (skinned: boolean | null) => void;
   /** Puts a library weapon in a socket (default grip when the socket was empty or carried another weapon), or empties it. */
   setWeapon: (socket: Socket, weapon: PickedWeapon | null) => void;
   setGrip: (socket: Socket, grip: WeaponGrip) => void;
@@ -71,6 +82,8 @@ const savedClips = (token: TokenInfo | null): ModelClipChoices =>
 
 const savedScale = (token: TokenInfo | null): number => (token?.modelFile ? token.modelScale ?? MODEL_SCALE.standard : MODEL_SCALE.standard);
 
+const savedFront = (token: TokenInfo | null): ModelFront => (token?.modelFile ? toModelFront(token.modelFront) : 0);
+
 /**
  * State of the token's 3D model in the form, for "Incluir token" and "Editar token". `active` is the modal's open flag:
  * the state starts again when it opens or the token changes. The saved model starts kept, because the token PUT replaces
@@ -83,6 +96,8 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
   const [clips, setClips] = useState<ModelClipChoices>(() => savedClips(token));
   const [scale, setScale] = useState(() => savedScale(token));
+  const [front, setFront] = useState<ModelFront>(() => savedFront(token));
+  const [skinned, setSkinned] = useState<boolean | null>(null);
   const [weapons, setWeapons] = useState<TokenWeapons>(() => savedWeapons(token));
 
   useEffect(() => {
@@ -92,6 +107,7 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
     setInvalid(false);
     setClips(savedClips(token));
     setScale(savedScale(token));
+    setFront(savedFront(token));
     setWeapons(savedWeapons(token));
   }, [active, token]);
 
@@ -110,6 +126,8 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
     setPicked(file);
     setInvalid(false);
     setClips(AUTO_CLIPS);
+    setFront(0);
+    setSkinned(null);
   }, []);
 
   const remove = useCallback(() => {
@@ -118,6 +136,8 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
     setInvalid(false);
     setClips(AUTO_CLIPS);
     setScale(MODEL_SCALE.standard);
+    setFront(0);
+    setSkinned(null);
     setWeapons(NO_WEAPONS);
   }, []);
 
@@ -150,14 +170,16 @@ export const useModelFile = (token: TokenInfo | null, active: boolean): ModelFil
       if (weapon) written.push({ socket, weaponId: weapon.weaponId, grip: weapon.grip });
     }
     return {
-      modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down, modelScale: scale, weapons: written,
+      modelFile, modelIdleClip: clips.idle, modelWalkClip: clips.walk, modelDownClip: clips.down, modelScale: scale,
+      // A rigged model faces +Z (its weapons and animations count on it); only one without a skeleton keeps a front.
+      modelFront: skinned === true ? 0 : front, weapons: written,
     };
-  }, [picked, keepsSaved, token, clips, scale, weapons]);
+  }, [picked, keepsSaved, token, clips, scale, front, skinned, weapons]);
 
   const previewUrl = pickedUrl ?? (keepsSaved ? token?.modelFileUrl ?? null : null);
   return {
-    picked, previewUrl, keepsSaved, invalid, clips, scale, weapons, pick, remove, setInvalid, setClip, setScale, setWeapon, setGrip,
-    resolve,
+    picked, previewUrl, keepsSaved, invalid, clips, scale, front, skinned, weapons, pick, remove, setInvalid, setClip, setScale, setFront,
+    setSkinned, setWeapon, setGrip, resolve,
   };
 };
 

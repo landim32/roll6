@@ -478,7 +478,7 @@ export const StoryView = ({ onUnsupported }: StoryViewProps) => {
     return spec.modelUrl
       ? [{
         id: piece.mapTokenId, url: spec.modelUrl, width: spec.width, center: spec.center, yaw: spec.yaw,
-        ground: pieceGround(terrain, spec.center), clips: spec.modelClips, lying: isLying(piece), scale: spec.modelScale,
+        ground: pieceGround(terrain, spec.center), clips: spec.modelClips, lying: isLying(piece), scale: spec.modelScale, front: spec.modelFront,
         weapons: spec.modelWeapons,
       }]
       : [];

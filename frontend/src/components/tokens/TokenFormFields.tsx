@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModelField } from './ModelField';
 import { SpriteImageField } from './SpriteImageField';
@@ -52,6 +52,11 @@ export const TokenFormFields = ({
 }: TokenFormFieldsProps) => {
   const { t } = useTranslation();
   const [tab, setTab] = useState('token');
+  // A model without a skeleton carries no weapons (106): its "Armas" tab is off.
+  const noWeapons = model.skinned === false;
+  useEffect(() => {
+    if (noWeapons) setTab((current) => (current === 'weapons' ? 'animation' : current));
+  }, [noWeapons]);
   const id = (name: string) => `${idPrefix}-${name}`;
   const upSize = tokenImageSize(Number(form.upSpace));
   const downSize = tokenImageSize(downImageSpace(form.downSpace));
@@ -70,7 +75,10 @@ export const TokenFormFields = ({
           { key: 'sprites', label: t('tokens.tabSprites') },
           { key: 'model', label: t('tokens.tab3d') },
           { key: 'animation', label: t('tokens.tabAnimation') },
-          { key: 'weapons', label: t('tokens.tabWeapons') },
+          {
+            key: 'weapons', label: t('tokens.tabWeapons'), disabled: noWeapons,
+            title: noWeapons ? t('tokens.weapons.noSkeleton') : undefined,
+          },
         ]}
         active={tab}
         onChange={setTab}
