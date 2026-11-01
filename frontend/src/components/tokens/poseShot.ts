@@ -12,6 +12,8 @@ interface PoseShotInput {
   turntable: Object3D;
   /** Size of the picture, the token image it fills (`tokenImageSize`). */
   size: { width: number; height: number };
+  /** Helpers of the preview inside the turntable (106: the front's arrow) left out of the picture. */
+  hide?: Object3D[];
 }
 
 const toBlob = (canvas: HTMLCanvasElement): Promise<Blob> => new Promise((resolve, reject) => {
@@ -23,11 +25,12 @@ const toBlob = (canvas: HTMLCanvasElement): Promise<Blob> => new Promise((resolv
  * background, framed by `lib/poseShot` for the token image's size. Drawn by a renderer of its own, the size of the
  * picture, so the preview never resizes or flickers; the turntable is borrowed for the shot and given back as it was.
  */
-export const capturePose = async ({ model, turntable, size }: PoseShotInput): Promise<Blob> => {
+export const capturePose = async ({ model, turntable, size, hide = [] }: PoseShotInput): Promise<Blob> => {
   const width = Math.max(1, Math.round(size.width));
   const height = Math.max(1, Math.round(size.height));
   const parent = turntable.parent;
   const turned = turntable.rotation.y;
+  const shown = hide.map((node) => node.visible);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -40,6 +43,7 @@ export const capturePose = async ({ model, turntable, size }: PoseShotInput): Pr
   const giveBack = () => {
     if (givenBack) return;
     givenBack = true;
+    hide.forEach((node, index) => { node.visible = shown[index]; });
     if (turntable.parent === scene) scene.remove(turntable);
     if (parent && turntable.parent !== parent) parent.add(turntable);
     turntable.rotation.y = turned;
@@ -47,6 +51,7 @@ export const capturePose = async ({ model, turntable, size }: PoseShotInput): Pr
   };
   try {
     turntable.rotation.y = 0;
+    for (const node of hide) node.visible = false;
     turntable.updateMatrixWorld(true);
     // The pose's real extent: three.js applies the bones to every vertex with `precise`.
     const box = new Box3().setFromObject(model, true);

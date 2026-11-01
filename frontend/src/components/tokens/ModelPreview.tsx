@@ -76,6 +76,8 @@ interface ModelPreviewProps {
   front?: ModelFront;
   /** Shows an arrow on the disc pointing where the front is (106: choosing the front of a model without a skeleton). */
   showFront?: boolean;
+  /** False (106, choosing the front): the stage does not turn by itself; a drag still turns it and the zoom works. Default true. */
+  spin?: boolean;
   /** The weapons in the model's sockets (083) with the token's grips; a grip, pose or grip point change re-places them at once. */
   weapons?: SocketWeapons;
   /** After the model opens: which sockets the model offers (Mixamo bones), and which are approximate. */
@@ -101,7 +103,7 @@ const CAMERA_TARGET_Y = 0.95;
  * the form (056), so the user sees each choice at once. Without a death the down state shows the model laid on its back,
  * as the 3D view does. Its own small three.js scene, loaded lazily with the tab, released when it closes.
  */
-export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1, front = 0, showFront = false, weapons, onSockets, zoom = 1, onZoom }, ref) => {
+export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({ url, shown, animated = true, onLoaded, onClips, onError, label, clips, scale = 1, front = 0, showFront = false, spin = true, weapons, onSockets, zoom = 1, onZoom }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** The action the preview shows now (057): the timeline's subject; null when that state has no animation. */
   const current = useRef<AnimationAction | null>(null);
@@ -114,6 +116,8 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
   const facerRef = useRef<Group | null>(null);
   const frontRef = useRef(front);
   const showFrontRef = useRef(showFront);
+  const spinRef = useRef(spin);
+  spinRef.current = spin;
   /** The arrow on the disc that points to the front (106). */
   const arrowRef = useRef<Mesh | null>(null);
   /** Depth and height of the model in the preview, to lay it down centered on the disc. */
@@ -336,7 +340,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       const turntable = stage.current;
       if (!model || !turntable) throw new Error('model not loaded');
       const { capturePose } = await import('./poseShot');
-      return capturePose({ model, turntable, size });
+      return capturePose({ model, turntable, size, hide: arrowRef.current ? [arrowRef.current] : [] });
     },
   }), []);
 
@@ -440,7 +444,7 @@ export const ModelPreview = forwardRef<ModelPreviewHandle, ModelPreviewProps>(({
       frame = requestAnimationFrame(loop);
       const delta = clock.getDelta();
       // Paused, the stage stops turning too, so the pose can be looked at; a drag still turns it.
-      if (drag.current === null && !pausedRef.current) turntable.rotation.y += TURN_SPEED * delta;
+      if (spinRef.current && drag.current === null && !pausedRef.current) turntable.rotation.y += TURN_SPEED * delta;
       mixerRef.current?.update(delta);
       renderer.render(scene, camera);
     };
