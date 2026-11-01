@@ -349,6 +349,7 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 scale={modelScaleFactor(scale)}
                 front={skinned === false ? front : 0}
                 showFront={animating && skinned === false}
+                spin={!(animating && skinned === false)}
                 weapons={heldWeapons}
                 onSockets={setSockets}
                 zoom={zoom}
@@ -390,9 +391,12 @@ export const ModelField = ({ id, state, name, generate, section }: ModelFieldPro
                 <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('up'); }}>
                   {t('tokens.model.generate.up')}
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('down'); }}>
-                  {t('tokens.model.generate.down')}
-                </DropdownMenu.Item>
+                {/* Without a skeleton nothing falls (106): only the standing image. */}
+                {skinned !== false && (
+                  <DropdownMenu.Item className="dropdown-item" onSelect={() => { void shoot('down'); }}>
+                    {t('tokens.model.generate.down')}
+                  </DropdownMenu.Item>
+                )}
               </DropdownMenu.Content>
             </DropdownMenu.Root>
           </div>
