@@ -5,6 +5,7 @@ import { useCharacter } from '../../hooks/useCharacter';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapInteraction } from '../../hooks/useMapInteraction';
+import { useMapPaint } from '../../hooks/useMapPaint';
 import type { MapInteractionProps } from '../../hooks/useMapInteraction';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useStoryBubbles } from '../../hooks/useStoryBubbles';
@@ -126,6 +127,12 @@ const IsoView = ({ onUnsupported, ...props }: IsoViewProps) => {
       rows: gridHeight,
     });
   }, [ready, imageUrl, imageLeft, imageTop, imageWidth, imageHeight, gridWidth, gridHeight]);
+
+  // ---------- The campaign map's paint (107), on the floor like in 2D ----------
+  const { paint } = useMapPaint();
+  useEffect(() => {
+    if (ready) rendererRef.current?.setPaint(paint);
+  }, [ready, paint]);
 
   // ---------- The pieces (live: moves, turns, tokens, new and removed pieces) ----------
   useEffect(() => {

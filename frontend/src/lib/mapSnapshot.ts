@@ -302,16 +302,18 @@ const paintColors = (): Map<string, string> => {
 
 /**
  * The paint of the campaign map (107), as `PaintLayer` draws it: hex marks (inside the grid) with the Mark's text,
- * then the drawings by id. Widths are map pixels, like on screen.
+ * then the drawings by id. Widths are map pixels, like on screen. Shared with the isometric floor (`isoRenderer`).
  */
-const drawPaint = (ctx: CanvasRenderingContext2D, paint: MapPaintInfo, draft: SnapshotDraft, hexSize: number) => {
+export const drawMapPaint = (
+  ctx: CanvasRenderingContext2D, paint: MapPaintInfo, columns: number, rows: number, hexSize: number,
+) => {
   const colors = paintColors();
   const color = (name: string) => colors.get(name) ?? 'gray';
   const text = markTextLayout(hexSize);
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  paint.marks.filter((mark) => isInsideGrid(mark, draft.gridWidth, draft.gridHeight)).forEach((mark) => {
+  paint.marks.filter((mark) => isInsideGrid(mark, columns, rows)).forEach((mark) => {
     const center = hexCenter(mark.x, mark.y, hexSize);
     const lines = mark.kind === HEX_MARK.mark ? markTextLines(mark.text) : [];
     ctx.save();
@@ -385,7 +387,7 @@ export const renderMapSnapshot = async (input: {
   ctx.lineWidth = GRID_LINE / scale;
   ctx.stroke(new Path2D(gridPath(draft.gridWidth, draft.gridHeight, hexSize)));
 
-  if (paint) drawPaint(ctx, paint, draft, hexSize);
+  if (paint) drawMapPaint(ctx, paint, draft.gridWidth, draft.gridHeight, hexSize);
 
   const pictures = await Promise.all(tokens.map((token) => {
     const { url } = pieceImage(token);

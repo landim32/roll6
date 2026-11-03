@@ -3,7 +3,7 @@
  * made by a drag or a stroke, their shared SVG/canvas geometry and the eraser's hit test. Hex math only through
  * `lib/hexGrid` (Red Blob Games: axial lerp + cube rounding), never rounding q/r on their own.
  */
-import { axialToOffset, distance, hexRound, isInsideGrid, offsetToAxial } from './hexGrid';
+import { axialToOffset, distance, gridPixelSize, hexRound, isInsideGrid, offsetToAxial } from './hexGrid';
 import type { Offset } from './hexGrid';
 import {
   DRAWING_KIND, HEX_MARK, MAX_MARK_TEXT, MAX_MARKS_PER_REQUEST, MAX_PAINT_WIDTH, MAX_STROKE_POINTS, MIN_PAINT_WIDTH,
@@ -318,4 +318,38 @@ export const markTextLines = (text: string | null, perLine = 14, lines = 2): str
   const last = out[lines - 1];
   out[lines - 1] = `${last.length >= perLine ? last.slice(0, perLine - 1) : last}…`;
   return out;
+};
+
+/** A rectangle of the map (px). */
+export interface PaintArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The part of the map the paint covers (px) — the grid (where marks live) grown to hold every drawing with its stroke,
+ * the circle's radius and the arrow's head — or null when nothing is painted. The isometric floor draws the paint on a
+ * picture of this size.
+ */
+export const paintArea = (paint: MapPaintInfo | null, columns: number, rows: number, hexSize: number): PaintArea | null => {
+  if (!paint || (paint.marks.length === 0 && paint.drawings.length === 0)) return null;
+  const grid = gridPixelSize(columns, rows, hexSize);
+  let minX = 0;
+  let minY = 0;
+  let maxX = grid.width;
+  let maxY = grid.height;
+  paint.drawings.forEach((drawing) => {
+    if (drawing.points.length === 0) return;
+    const reach = drawing.width * 3 + (drawing.kind === DRAWING_KIND.circle ? circleRadius(drawing.points) : 0);
+    const points = drawing.kind === DRAWING_KIND.circle ? [drawing.points[0]] : drawing.points;
+    points.forEach(([x, y]) => {
+      minX = Math.min(minX, x - reach);
+      minY = Math.min(minY, y - reach);
+      maxX = Math.max(maxX, x + reach);
+      maxY = Math.max(maxY, y + reach);
+    });
+  });
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 };
