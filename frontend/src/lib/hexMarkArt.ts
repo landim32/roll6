@@ -65,9 +65,10 @@ const stone = (s: number): ArtShape[] => [
   { d: rock(s * 0.02, -s * 0.28, s * 0.3), fill: '--stm-mark-stone', stroke: '--stm-mark-stone-line', width: 2 },
 ];
 
+/** The whole hex is the hole (like the wall): a dark hexagon with an earthen rim and a darker, deeper middle. */
 const hole = (s: number): ArtShape[] => [
-  { d: ellipse(0, 0, s * 0.62, s * 0.48), fill: '--stm-mark-hole', stroke: '--stm-mark-hole-rim', width: 4 },
-  { d: ellipse(0, s * 0.06, s * 0.42, s * 0.3), fill: '--stm-mark-hole', opacity: 0.9 },
+  { d: hexagon(s * 0.92), fill: '--stm-mark-hole', stroke: '--stm-mark-hole-rim', width: 4, opacity: 0.95 },
+  { d: hexagon(s * 0.62), fill: '--stm-mark-hole', stroke: '--stm-mark-hole-rim', width: 1.5, opacity: 0.9 },
 ];
 
 const water = (s: number): ArtShape[] => {

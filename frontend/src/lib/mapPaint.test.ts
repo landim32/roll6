@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyPaintChange, arrowHead, circleRadius, dragHexes, drawingFromDrag, drawingFromStroke, drawingPath, emptyPaint,
-  fillWrites, hexLine, hitDrawing, markAt, markBatches, markText, markTextLines, simplifyStroke,
+  fillWrites, hexLine, hitDrawing, markAt, markBatches, markText, markTextLines, paintArea,
+  simplifyStroke,
 } from './mapPaint';
-import { distance } from './hexGrid';
+import { distance, gridPixelSize } from './hexGrid';
 import { DRAWING_KIND, HEX_MARK } from '../types/mapPaint';
 import type { MapDrawingInfo, MapPaintInfo, PaintPoint } from '../types/mapPaint';
 
@@ -197,5 +198,31 @@ describe('markTextLines', () => {
     const lines = markTextLines('Baú do tesouro do rei antigo', 8);
     expect(lines).toHaveLength(2);
     expect(lines[1].endsWith('…')).toBe(true);
+  });
+});
+
+describe('paintArea', () => {
+  it('is null without paint and the grid with marks only', () => {
+    expect(paintArea(null, 10, 8, 40)).toBeNull();
+    expect(paintArea(emptyPaint(1), 10, 8, 40)).toBeNull();
+    const grid = gridPixelSize(10, 8, 40);
+    const marked: MapPaintInfo = { ...emptyPaint(1), marks: [{ x: 1, y: 1, kind: HEX_MARK.hole, text: null }] };
+    expect(paintArea(marked, 10, 8, 40)).toEqual({ x: 0, y: 0, width: grid.width, height: grid.height });
+  });
+
+  it('grows to hold drawings past the grid, with the stroke and the circle radius', () => {
+    const grid = gridPixelSize(4, 4, 40);
+    const paint: MapPaintInfo = {
+      ...emptyPaint(1),
+      drawings: [
+        drawing(1, DRAWING_KIND.line, [[-50, 10], [20, 20]], 2),
+        drawing(2, DRAWING_KIND.circle, [[100, 400], [100, 500]], 2),
+      ],
+    };
+    const area = paintArea(paint, 4, 4, 40)!;
+    expect(area.x).toBe(-56);
+    expect(area.y).toBe(0);
+    expect(area.x + area.width).toBe(grid.width);
+    expect(area.y + area.height).toBe(506);
   });
 });

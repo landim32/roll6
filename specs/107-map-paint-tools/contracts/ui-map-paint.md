@@ -7,7 +7,7 @@
 | Cannot edit (player, frozen campaign) | zoom ±, share, view — no "Editar mapa" |
 | Can edit, edit mode off | zoom ±, share, view, **Editar mapa** (`PencilSquareIcon`, `map.editMode`) |
 | Edit mode on, 2D | … Editar mapa (`btn-warning`, `aria-pressed`), Imagem, Ajustar imagem, **Pintar** (`BrushIcon`, `map.paint`) |
-| Edit mode on, iso/3D | … Editar mapa only (image tools stay 2D-only as before; no Pintar) |
+| Edit mode on, iso/3D | … Editar mapa only (image tools stay 2D-only as before; no Pintar). The isometric floor still **shows** the paint |
 | Map is a loose model (no campaign map) | Pintar disabled, `title` = `paint.campaignOnly` |
 
 Phones: "Editar mapa" hidden like the image tools today (`d-none d-md-inline-flex`).

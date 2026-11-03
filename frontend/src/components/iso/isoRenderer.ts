@@ -1,7 +1,7 @@
 import {
   BufferAttribute, BufferGeometry, CircleGeometry, Color, DoubleSide, Group, DirectionalLight, HemisphereLight, LineBasicMaterial, LineSegments, Mesh,
   MeshBasicMaterial, OrthographicCamera, PCFSoftShadowMap, PlaneGeometry, Plane, Raycaster, Scene, ShadowMaterial,
-  SRGBColorSpace, Texture, Vector2, Vector3, WebGLRenderer,
+  CanvasTexture, SRGBColorSpace, Texture, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { hexCenter, hexCorners, HEX_SIZE, isInsideGrid, pixelToHex } from '../../lib/hexGrid';
 import type { MovementStatus } from '../../lib/movement';
@@ -11,7 +11,9 @@ import {
   CAMERA_DISTANCE, defaultIsoPose, frustumFor, isoCameraPosition, SPAN_DEFAULT,
 } from '../../lib/isoCamera';
 import type { IsoPose } from '../../lib/isoCamera';
-import { loadImage } from '../../lib/mapSnapshot';
+import { drawMapPaint, loadImage } from '../../lib/mapSnapshot';
+import { paintArea } from '../../lib/mapPaint';
+import type { MapPaintInfo } from '../../types/mapPaint';
 import type { FrameResult, FrameSprite } from '../../lib/storyBubbles';
 import { REFERENCE_DEPTH } from '../../lib/storyBubbles';
 import type { QualityProfile } from '../../lib/viewQuality';
@@ -49,6 +51,8 @@ export interface IsoOverlays {
 export interface IsoRenderer {
   setMap: (map: IsoMap) => void;
   setPieces: (pieces: readonly IsoPiece[]) => void;
+  /** The campaign map's paint (107), drawn on the floor like the 2D map draws it; null = nothing painted. */
+  setPaint: (paint: MapPaintInfo | null) => void;
   /** Puts the camera's target (and the light, its middle) on `target` at once (a slide, the first placement). */
   setTarget: (target: Point) => void;
   getTarget: () => Point;
@@ -85,6 +89,10 @@ const NEUTRAL_FLOOR = new Color(0.16, 0.17, 0.2);
 /** How far the neutral floor reaches past the map (px): it is dark there anyway. */
 const FLOOR_REACH = 40000;
 const GRID_LIFT = 0.5;
+/** The paint (107) lies on the image, under the shadows and the grid. */
+const PAINT_LIFT = 0.2;
+/** Longest side of the paint's picture (px); a bigger map is drawn smaller and stretched. */
+const PAINT_MAX_SIDE = 4096;
 /**
  * The models' shadows: the light comes from above, a little to the south-east so a shadow shows beside its model. Its
  * shadow camera covers the light circle around the target (pieces outside cast nothing anyway).
@@ -216,6 +224,17 @@ export const createIsoRenderer = (
   scene.add(image);
   let imageUrl: string | null = null;
   let imageTexture: Texture | null = null;
+
+  // The paint (107): one picture of the painted area (canvas, like the shared JPEG) on a plane over the image.
+  const paintMaterial = new MeshBasicMaterial({ transparent: true, depthWrite: false });
+  applyLight(paintMaterial, uniforms, 'floor');
+  const paintPlane = new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), paintMaterial);
+  paintPlane.visible = false;
+  paintPlane.renderOrder = -1;
+  scene.add(paintPlane);
+  let paintTexture: CanvasTexture | null = null;
+  let paintState: MapPaintInfo | null = null;
+  let paintKey = '';
 
   const gridMaterial = new LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28, depthWrite: false });
   applyLight(gridMaterial, uniforms, 'floor');
@@ -372,6 +391,39 @@ export const createIsoRenderer = (
     return hit ? { x: hit.x, y: hit.z } : null;
   };
 
+  const drawPaint = () => {
+    const area = paintArea(paintState, gridColumns, gridRows, HEX_SIZE);
+    const key = area && paintState ? `${gridColumns}x${gridRows}:${JSON.stringify(paintState)}` : '';
+    if (key === paintKey) return;
+    paintKey = key;
+    if (!area || !paintState) {
+      paintPlane.visible = false;
+      return;
+    }
+    const limit = Math.min(PAINT_MAX_SIDE, renderer.capabilities.maxTextureSize);
+    const scale = Math.min(1, limit / Math.max(area.width, area.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.ceil(area.width * scale));
+    canvas.height = Math.max(1, Math.ceil(area.height * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      paintPlane.visible = false;
+      return;
+    }
+    ctx.scale(scale, scale);
+    ctx.translate(-area.x, -area.y);
+    drawMapPaint(ctx, paintState, gridColumns, gridRows, HEX_SIZE);
+    paintTexture?.dispose();
+    paintTexture = new CanvasTexture(canvas);
+    paintTexture.colorSpace = SRGBColorSpace;
+    paintTexture.anisotropy = Math.min(profile.anisotropy, renderer.capabilities.getMaxAnisotropy());
+    paintMaterial.map = paintTexture;
+    paintMaterial.needsUpdate = true;
+    paintPlane.scale.set(area.width, 1, area.height);
+    paintPlane.position.set(area.x + area.width / 2, PAINT_LIFT, area.y + area.height / 2);
+    paintPlane.visible = true;
+  };
+
   return {
     setMap: (map) => {
       // The image: only the texture changes with a new picture; the plane follows the area.
@@ -415,6 +467,12 @@ export const createIsoRenderer = (
         geometry.setAttribute('position', new BufferAttribute(gridEdges(map.columns, map.rows), 3));
         grid.geometry = geometry;
       }
+      drawPaint();
+      requestRender();
+    },
+    setPaint: (paint) => {
+      paintState = paint;
+      drawPaint();
       requestRender();
     },
     setPieces: (next) => {
@@ -503,6 +561,9 @@ export const createIsoRenderer = (
       image.geometry.dispose();
       imageMaterial.dispose();
       imageTexture?.dispose();
+      paintPlane.geometry.dispose();
+      paintMaterial.dispose();
+      paintTexture?.dispose();
       grid.geometry.dispose();
       gridMaterial.dispose();
       clearTrails();
