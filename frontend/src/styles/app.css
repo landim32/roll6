@@ -3301,3 +3301,111 @@ button.stm-library-card-open:focus-visible { outline: 2px solid var(--stm-accent
 
 /* 096: the GM mode's lines in the chat — the poke line in the info color. */
 .stm-chat-gm { color: var(--bs-info); }
+
+/* ---------- Map paint (107) ---------- */
+.stm-map.is-painting {
+  cursor: crosshair;
+}
+
+.stm-map .stm-paint,
+.stm-map .stm-paint-preview {
+  pointer-events: none;
+}
+
+.stm-map .stm-hex-mark-text {
+  fill: var(--stm-text);
+  stroke: var(--stm-bg);
+  stroke-width: 3px;
+  paint-order: stroke;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.stm-map .stm-paint-preview-hex {
+  fill: var(--stm-paint-preview);
+  stroke: var(--stm-mark-fire-core);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.stm-map .stm-paint-preview-hex.is-erasing {
+  fill: rgba(var(--bs-danger-rgb), 0.3);
+  stroke: var(--bs-danger);
+}
+
+/* "Pintar" and its tools, opened to the left of the button. */
+.stm-paint-anchor {
+  position: relative;
+}
+
+.stm-paint-toolbar {
+  position: absolute;
+  right: calc(100% + 0.5rem);
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 6rem));
+  padding: 0.5rem;
+  background: var(--stm-surface);
+  border: 1px solid var(--stm-border);
+  border-radius: var(--stm-radius-sm);
+  box-shadow: var(--stm-shadow);
+}
+
+.stm-paint-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.stm-controls .stm-paint-toolbar .btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  box-shadow: none;
+}
+
+.stm-paint-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stm-paint-options .form-select,
+.stm-paint-options .form-control {
+  width: 100%;
+}
+
+.stm-paint-color input[type="color"] {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--stm-border-strong);
+  border-radius: var(--stm-radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.stm-paint-range {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--stm-text-muted);
+}
+
+.stm-paint-range .form-range {
+  flex: 1;
+  min-width: 120px;
+}
+
+.stm-paint-value {
+  min-width: 2.6rem;
+  text-align: right;
+  color: var(--stm-text);
+}

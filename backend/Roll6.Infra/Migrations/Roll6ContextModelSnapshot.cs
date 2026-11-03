@@ -857,6 +857,121 @@ namespace Roll6.Infra.Migrations
                     b.ToTable("maps", (string)null);
                 });
 
+            modelBuilder.Entity("Roll6.Domain.Models.MapDrawing", b =>
+                {
+                    b.Property<long>("MapDrawingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_drawing_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("MapDrawingId"));
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("MapId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_id");
+
+                    b.Property<float>("Opacity")
+                        .HasColumnType("real")
+                        .HasColumnName("opacity");
+
+                    b.Property<string>("Points")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("points");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("MapDrawingId")
+                        .HasName("map_drawings_pkey");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("MapId", "MapDrawingId")
+                        .HasDatabaseName("ix_map_drawings_map");
+
+                    b.ToTable("map_drawings", (string)null);
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.MapHexMark", b =>
+                {
+                    b.Property<long>("MapHexMarkId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_hex_mark_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("MapHexMarkId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("MapId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("map_id");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("X")
+                        .HasColumnType("integer")
+                        .HasColumnName("x");
+
+                    b.Property<int>("Y")
+                        .HasColumnType("integer")
+                        .HasColumnName("y");
+
+                    b.HasKey("MapHexMarkId")
+                        .HasName("map_hex_marks_pkey");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("MapId", "X", "Y")
+                        .IsUnique()
+                        .HasDatabaseName("ix_map_hex_marks_map_hex");
+
+                    b.ToTable("map_hex_marks", (string)null);
+                });
+
             modelBuilder.Entity("Roll6.Domain.Models.MapModel", b =>
                 {
                     b.Property<long>("MapModelId")
@@ -2116,6 +2231,36 @@ namespace Roll6.Infra.Migrations
                         .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("fk_user_map");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.MapDrawing", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Map", null)
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .IsRequired()
+                        .HasConstraintName("fk_map_drawing");
+
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_map_drawing");
+                });
+
+            modelBuilder.Entity("Roll6.Domain.Models.MapHexMark", b =>
+                {
+                    b.HasOne("Roll6.Domain.Models.Map", null)
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .IsRequired()
+                        .HasConstraintName("fk_map_hex_mark");
+
+                    b.HasOne("Roll6.Domain.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .IsRequired()
+                        .HasConstraintName("fk_user_map_hex_mark");
                 });
 
             modelBuilder.Entity("Roll6.Domain.Models.MapModel", b =>

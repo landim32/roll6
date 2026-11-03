@@ -1,4 +1,8 @@
-import { gridPath, gridPixelSize, hexCenter } from './hexGrid';
+import { gridPath, gridPixelSize, hexCenter, isInsideGrid } from './hexGrid';
+import { markArt, markTextLayout, MARK_COLOR_VARS } from './hexMarkArt';
+import { drawingPath, markTextLines } from './mapPaint';
+import { HEX_MARK } from '../types/mapPaint';
+import type { MapPaintInfo } from '../types/mapPaint';
 import { isOutOfCombat, pieceGeometry, pieceImage } from './pieceDrawing';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import type { Posture } from '../types/mapToken';
@@ -286,13 +290,77 @@ const drawToken = (
   ctx.restore();
 };
 
-/** JPEG of the open map: dark background, scene image, hex outlines and pieces. */
+/** Colors of the theme the paint uses (107), read from the page: a canvas can't use CSS variables. */
+const paintColors = (): Map<string, string> => {
+  const colors = new Map<string, string>();
+  const style = typeof document !== 'undefined' ? getComputedStyle(document.documentElement) : null;
+  [...MARK_COLOR_VARS, '--stm-text', '--stm-bg'].forEach((name) => {
+    colors.set(name, style?.getPropertyValue(name).trim() || 'gray');
+  });
+  return colors;
+};
+
+/**
+ * The paint of the campaign map (107), as `PaintLayer` draws it: hex marks (inside the grid) with the Mark's text,
+ * then the drawings by id. Widths are map pixels, like on screen.
+ */
+const drawPaint = (ctx: CanvasRenderingContext2D, paint: MapPaintInfo, draft: SnapshotDraft, hexSize: number) => {
+  const colors = paintColors();
+  const color = (name: string) => colors.get(name) ?? 'gray';
+  const text = markTextLayout(hexSize);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  paint.marks.filter((mark) => isInsideGrid(mark, draft.gridWidth, draft.gridHeight)).forEach((mark) => {
+    const center = hexCenter(mark.x, mark.y, hexSize);
+    const lines = mark.kind === HEX_MARK.mark ? markTextLines(mark.text) : [];
+    ctx.save();
+    ctx.translate(center.x, center.y);
+    markArt(mark.kind, hexSize, lines.length > 0).forEach((shape) => {
+      const path = new Path2D(shape.d);
+      ctx.globalAlpha = shape.opacity ?? 1;
+      if (shape.fill) {
+        ctx.fillStyle = color(shape.fill);
+        ctx.fill(path);
+      }
+      if (shape.stroke && shape.width) {
+        ctx.strokeStyle = color(shape.stroke);
+        ctx.lineWidth = shape.width;
+        ctx.stroke(path);
+      }
+    });
+    ctx.globalAlpha = 1;
+    ctx.font = `700 ${text.fontSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    lines.forEach((line, i) => {
+      const y = text.firstLine + i * text.lineHeight;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = color('--stm-bg');
+      ctx.strokeText(line, 0, y);
+      ctx.fillStyle = color('--stm-text');
+      ctx.fillText(line, 0, y);
+    });
+    ctx.restore();
+  });
+  paint.drawings.forEach((drawing) => {
+    ctx.globalAlpha = drawing.opacity;
+    ctx.strokeStyle = drawing.color;
+    ctx.lineWidth = drawing.width;
+    ctx.stroke(new Path2D(drawingPath(drawing)));
+  });
+  ctx.restore();
+};
+
+/** JPEG of the open map: dark background, scene image, hex outlines, the paint (107) and pieces. */
 export const renderMapSnapshot = async (input: {
   draft: SnapshotDraft;
   tokens: SnapshotToken[];
   hexSize: number;
+  /** Marks and drawings of the campaign map (107), between the grid and the pieces. */
+  paint?: MapPaintInfo | null;
 }): Promise<Blob> => {
-  const { draft, tokens, hexSize } = input;
+  const { draft, tokens, hexSize, paint } = input;
   const grid = gridPixelSize(draft.gridWidth, draft.gridHeight, hexSize);
   const bounds = snapshotBounds(draft, grid, hexSize);
   const scale = snapshotScale(bounds);
@@ -316,6 +384,8 @@ export const renderMapSnapshot = async (input: {
   ctx.strokeStyle = GRID_STROKE;
   ctx.lineWidth = GRID_LINE / scale;
   ctx.stroke(new Path2D(gridPath(draft.gridWidth, draft.gridHeight, hexSize)));
+
+  if (paint) drawPaint(ctx, paint, draft, hexSize);
 
   const pictures = await Promise.all(tokens.map((token) => {
     const { url } = pieceImage(token);

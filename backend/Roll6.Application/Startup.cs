@@ -68,6 +68,7 @@ public static class Startup
         services.AddScoped<ITurnWhisperRepository<TurnWhisperTarget>, TurnWhisperRepository>();
         services.AddScoped<IUserNotificationRepository<UserNotification>, UserNotificationRepository>();
         services.AddScoped<ICampaignNotificationPrefRepository<CampaignNotificationPref>, CampaignNotificationPrefRepository>();
+        services.AddScoped<IMapPaintRepository<MapHexMark, MapDrawing>, MapPaintRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // AppServices
@@ -85,6 +86,7 @@ public static class Startup
         services.AddScoped<IMapModelService, MapModelService>();
         services.AddScoped<ICampaignService, CampaignService>();
         services.AddScoped<IMapService, MapService>();
+        services.AddScoped<IMapPaintService, MapPaintService>();
         services.AddScoped<IPageMetaService, PageMetaService>();
         services.AddScoped<ITokenLibraryService, TokenLibraryService>();
         services.AddScoped<IAnimationService, AnimationService>();

@@ -27,6 +27,7 @@ import { MAP_STATUS_DELETED } from '../types/map';
 import type { MapInfo } from '../types/map';
 import type { CampaignInfo } from '../types/campaign';
 import { isMasterOf, viewerMapDecision } from '../lib/viewerMap';
+import { canEditMap } from '../lib/campaignStatus';
 
 /** Zoom limits and step (research R3). */
 export const MIN_ZOOM = 0.1;
@@ -82,6 +83,15 @@ interface MapEditorContextType {
   gridSize: { width: number; height: number };
   view: MapView;
   resizeMode: boolean;
+  /**
+   * "Editar mapa" (107): only while on do the image tools and "Pintar" show. Memory only; turned off when the open
+   * map can no longer be edited (another master's map, a paused/finished campaign).
+   */
+  editMode: boolean;
+  setEditMode: (on: boolean) => void;
+  /** "Pintar" (107): clicks and drags paint the campaign map. Only in 2D, on a campaign map, inside the edit mode. */
+  paintMode: boolean;
+  setPaintMode: (on: boolean) => void;
   loading: boolean;
   error: string | null;
   // View
@@ -190,6 +200,8 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const [saved, setSaved] = useState<MapDraft>(createEmptyDraft);
   const [view, setView] = useState<MapView>(INITIAL_VIEW);
   const [resizeMode, setResizeMode] = useState(false);
+  const [editMode, setEditModeState] = useState(false);
+  const [paintMode, setPaintModeState] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -203,6 +215,10 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const canEdit = draft.mapId === null || (isMaster && currentCampaign?.campaignId === draft.campaignId);
   const isCopy = draft.mapModelId !== null && draft.ownerUserId !== userId;
   const needsName = draft.mapModelId === null || isCopy;
+  // 049: the open campaign map stays as it is while the table is paused or finished (as MapControls shows it).
+  const frozen = draft.mapId !== null && draft.campaignId === currentCampaign?.campaignId
+    && !canEditMap(currentCampaign?.status, isMaster);
+  const canEditOpen = canEdit && !frozen;
 
   // Fixed: adjusting the image never changes the grid.
   const hexSize = HEX_SIZE;
@@ -268,7 +284,38 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     setDraft((prev) => ({ ...prev, gridWidth: columns, gridHeight: rows }));
   }, []);
 
-  const toggleResizeMode = useCallback(() => setResizeMode((prev) => !prev), []);
+  const toggleResizeMode = useCallback(() => {
+    setResizeMode((prev) => {
+      // Adjusting the image and painting both take the pointer: one at a time.
+      if (!prev) setPaintModeState(false);
+      return !prev;
+    });
+  }, []);
+
+  // ---------- edit and paint modes (107) ----------
+
+  const setEditMode = useCallback((on: boolean) => {
+    setEditModeState(on);
+    if (!on) {
+      setResizeMode(false);
+      setPaintModeState(false);
+    }
+  }, []);
+
+  const setPaintMode = useCallback((on: boolean) => {
+    setPaintModeState(on);
+    if (on) setResizeMode(false);
+  }, []);
+
+  // Losing the right to edit the open map ends the edit mode, and with it the image adjustment and the paint.
+  useEffect(() => {
+    if (!canEditOpen) setEditMode(false);
+  }, [canEditOpen, setEditMode]);
+
+  // Another map: the paint mode ends (the edit mode itself stays, like a tool bar left open).
+  useEffect(() => {
+    setPaintModeState(false);
+  }, [draft.mapId, draft.mapModelId]);
 
   // ---------- 3D view (034) ----------
 
@@ -307,6 +354,11 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     if (draft.mapModelId !== null) writeViewMode(draft.mapModelId, mode);
     if (isThreeD(mode)) setResizeMode(false);
   }, [draft.mapModelId]);
+
+  // The paint exists only in 2D: any other view ends it.
+  useEffect(() => {
+    if (viewMode !== '2d') setPaintModeState(false);
+  }, [viewMode]);
 
   // Each map reopens in the view last used for it on this device.
   useEffect(() => {
@@ -548,7 +600,8 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const value: MapEditorContextType = {
-    draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, loading, error,
+    draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, editMode, setEditMode,
+    paintMode, setPaintMode, loading, error,
     zoomAt, zoomIn, zoomOut, panBy, centerOn,
     setImage, setImageLayout, setGridSize, toggleResizeMode,
     setMaskImage, setBackgroundImage, setWallTextureImage, viewMode, setViewMode, fov, setFov, viewQuality, setViewQuality,

@@ -47,4 +47,7 @@ public static class TableEventType
 
     /// <summary>The master started or stopped processing the turn (101). Data = { turnNo, processing }.</summary>
     public const string TURN_PROCESSING = "turn.processing";
+
+    /// <summary>The paint of a map changed (107): hex marks and/or drawings. Data = MapPaintChangeInfo (the delta).</summary>
+    public const string MAP_PAINT_CHANGED = "mapPaint.changed";
 }

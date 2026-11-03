@@ -30,6 +30,7 @@ public class CampaignService : ICampaignService
     private readonly IMapTokenService _mapTokenService;
     private readonly IGmService _gmService;
     private readonly IGmDispatcher _gmDispatcher;
+    private readonly IMapPaintRepository<MapHexMark, MapDrawing> _mapPaintRepository;
 
     public CampaignService(
         ICampaignRepository<Campaign> repository,
@@ -49,8 +50,10 @@ public class CampaignService : ICampaignService
         IUserNotificationRepository<UserNotification> inboxRepository,
         IMapTokenService mapTokenService,
         IGmService gmService,
-        IGmDispatcher gmDispatcher)
+        IGmDispatcher gmDispatcher,
+        IMapPaintRepository<MapHexMark, MapDrawing> mapPaintRepository)
     {
+        _mapPaintRepository = mapPaintRepository;
         _gmService = gmService;
         _gmDispatcher = gmDispatcher;
         _mapTokenService = mapTokenService;
@@ -274,6 +277,7 @@ public class CampaignService : ICampaignService
             {
                 await _mapTokenRepository.DeleteByMapIdsAsync(deletedMapIds);
                 await _mapNpcRepository.DeleteByMapIdsAsync(deletedMapIds);
+                await _mapPaintRepository.DeleteByMapIdsAsync(deletedMapIds); // 107: the maps' paint
                 await _mapRepository.DeleteRangeAsync(deletedMapIds);
             }
             await _campaignNpcRepository.DeleteByCampaignAsync(campaignId);

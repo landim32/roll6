@@ -13,9 +13,12 @@ public class MapController : ApiControllerBase
     private readonly IMapService _mapService;
     private readonly IMapTokenService _mapTokenService;
     private readonly IMapNpcService _mapNpcService;
+    private readonly IMapPaintService _mapPaintService;
 
-    public MapController(IMapService mapService, IMapTokenService mapTokenService, IMapNpcService mapNpcService)
+    public MapController(IMapService mapService, IMapTokenService mapTokenService, IMapNpcService mapNpcService,
+        IMapPaintService mapPaintService)
     {
+        _mapPaintService = mapPaintService;
         _mapService = mapService;
         _mapTokenService = mapTokenService;
         _mapNpcService = mapNpcService;
@@ -115,6 +118,99 @@ public class MapController : ApiControllerBase
         try
         {
             return Ok(await _mapNpcService.ListByMapAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Paint of the map (107): hex marks inside the grid and drawings oldest first (master or approved).</summary>
+    [HttpGet("{id:long}/paint")]
+    [ProducesResponseType(typeof(MapPaintInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPaint(long id)
+    {
+        try
+        {
+            return Ok(await _mapPaintService.GetPaintAsync(CurrentUserId, id));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Paints or clears up to 200 hexes at once (107, master; kind null clears the hex).</summary>
+    [HttpPut("{id:long}/hex-marks")]
+    [ProducesResponseType(typeof(MapPaintChangeInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetHexMarks(long id, [FromBody] MapHexMarksInfo info)
+    {
+        try
+        {
+            return Ok(await _mapPaintService.SetHexMarksAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Adds a drawing to the map (107, master).</summary>
+    [HttpPost("{id:long}/drawing")]
+    [ProducesResponseType(typeof(MapDrawingInfo), StatusCodes.Status201Created)]
+    public async Task<IActionResult> AddDrawing(long id, [FromBody] MapDrawingInsertInfo info)
+    {
+        try
+        {
+            var drawing = await _mapPaintService.AddDrawingAsync(CurrentUserId, id, info);
+            return CreatedAtAction(nameof(GetPaint), new { id }, drawing);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Erases one drawing of the map (107, master).</summary>
+    [HttpDelete("{id:long}/drawing/{drawingId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteDrawing(long id, long drawingId)
+    {
+        try
+        {
+            await _mapPaintService.DeleteDrawingAsync(CurrentUserId, id, drawingId);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>Removes every hex mark and drawing of the map (107, master).</summary>
+    [HttpDelete("{id:long}/paint")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> ClearPaint(long id)
+    {
+        try
+        {
+            await _mapPaintService.ClearAsync(CurrentUserId, id);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    /// <summary>What is on one hex (107): its mark and every piece whose shape covers it (master or approved).</summary>
+    [HttpGet("{id:long}/hex")]
+    [ProducesResponseType(typeof(HexContentInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetHexContent(long id, [FromQuery] int? x, [FromQuery] int? y)
+    {
+        try
+        {
+            return Ok(await _mapPaintService.GetHexContentAsync(CurrentUserId, id, x ?? -1, y ?? -1));
         }
         catch (Exception ex)
         {

@@ -17,6 +17,7 @@ import { registerServiceWorker } from './lib/serviceWorker';
 import { CharacterProvider } from './Contexts/CharacterContext';
 import { MapEditorProvider } from './Contexts/MapEditorContext';
 import { MapTokenProvider } from './Contexts/MapTokenContext';
+import { MapPaintProvider } from './Contexts/MapPaintContext';
 import { NpcProvider } from './Contexts/NpcContext';
 import { RealtimeProvider } from './Contexts/RealtimeContext';
 import { TokenProvider } from './Contexts/TokenContext';
@@ -25,7 +26,7 @@ import { TurnProvider } from './Contexts/TurnContext';
 // Provider chain: Auth → Install (the installable app, 042) → Push (Web Push on this device, 043) → Campaign (needs the session) → Realtime (table events
 // of the current campaign; every provider below reacts to them) → Character (needs the campaign) → MapEditor →
 // Token (library) → Animation (the animation library, 059) → MapToken (pieces of the open map: needs the editor,
-// the campaign and the characters) →
+// the campaign and the characters) → MapPaint (marks and drawings of the open campaign map, 107) →
 // Npc (library and campaign NPCs; places pieces, so it needs MapToken) → Turn (turn of the current campaign;
 // resetting reloads the pieces) → Chat (the campaign's timeline: conversation + turn records, 041) → App.
 // A data router (087): `useBlocker` — the guard of the library pages with unsaved changes — needs it. One catch-all
@@ -45,13 +46,15 @@ const router = createBrowserRouter([
                       <AnimationProvider>
                         <WeaponProvider>
                           <MapTokenProvider>
-                            <NpcProvider>
-                              <TurnProvider>
-                                <ChatProvider>
-                                  <App />
-                                </ChatProvider>
-                              </TurnProvider>
-                            </NpcProvider>
+                            <MapPaintProvider>
+                              <NpcProvider>
+                                <TurnProvider>
+                                  <ChatProvider>
+                                    <App />
+                                  </ChatProvider>
+                                </TurnProvider>
+                              </NpcProvider>
+                            </MapPaintProvider>
                           </MapTokenProvider>
                         </WeaponProvider>
                       </AnimationProvider>

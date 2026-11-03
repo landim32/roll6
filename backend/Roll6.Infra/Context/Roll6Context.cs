@@ -20,6 +20,9 @@ public class Roll6Context : DbContext
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
+    /// <summary>The points of a map drawing (107): [[x, y], …].</summary>
+    private static readonly JsonSerializerOptions DRAWING_POINTS_JSON = new(JsonSerializerDefaults.Web);
+
     public Roll6Context(DbContextOptions<Roll6Context> options) : base(options)
     {
     }
@@ -52,6 +55,8 @@ public class Roll6Context : DbContext
     public DbSet<CampaignNotificationPref> CampaignNotificationPrefs { get; set; }
     public DbSet<CampaignPlan> CampaignPlans { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
+    public DbSet<MapHexMark> MapHexMarks { get; set; }
+    public DbSet<MapDrawing> MapDrawings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -702,6 +707,53 @@ public class Roll6Context : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_user_notification_pref");
             entity.HasOne<Campaign>().WithMany().HasForeignKey(e => e.CampaignId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_notification_pref");
+        });
+
+        modelBuilder.Entity<MapHexMark>(entity =>
+        {
+            // 107: a painted hex of a campaign map, one row per hex.
+            entity.ToTable("map_hex_marks");
+            entity.HasKey(e => e.MapHexMarkId).HasName("map_hex_marks_pkey");
+            entity.Property(e => e.MapHexMarkId).HasColumnName("map_hex_mark_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.MapId).HasColumnName("map_id");
+            entity.Property(e => e.X).HasColumnName("x");
+            entity.Property(e => e.Y).HasColumnName("y");
+            entity.Property(e => e.Kind).HasColumnName("kind").HasConversion<int>();
+            entity.Property(e => e.Text).HasColumnName("text").HasMaxLength(MapHexMark.MAX_TEXT);
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.HasIndex(e => new { e.MapId, e.X, e.Y }).IsUnique().HasDatabaseName("ix_map_hex_marks_map_hex");
+            entity.HasOne<Map>().WithMany().HasForeignKey(e => e.MapId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_hex_mark");
+            HasOwner(entity, "fk_user_map_hex_mark");
+        });
+
+        modelBuilder.Entity<MapDrawing>(entity =>
+        {
+            // 107: a drawing on a campaign map (map pixels), created and deleted, never changed.
+            entity.ToTable("map_drawings");
+            entity.HasKey(e => e.MapDrawingId).HasName("map_drawings_pkey");
+            entity.Property(e => e.MapDrawingId).HasColumnName("map_drawing_id").UseIdentityAlwaysColumn();
+            entity.Property(e => e.MapId).HasColumnName("map_id");
+            entity.Property(e => e.Kind).HasColumnName("kind").HasConversion<int>();
+            entity.Property(e => e.Points).HasColumnName("points").HasColumnType("jsonb").IsRequired()
+                .HasConversion(
+                    points => JsonSerializer.Serialize(points, DRAWING_POINTS_JSON),
+                    json => JsonSerializer.Deserialize<List<int[]>>(json, DRAWING_POINTS_JSON) ?? new List<int[]>(),
+                    new ValueComparer<List<int[]>>(
+                        (a, b) => JsonSerializer.Serialize(a, DRAWING_POINTS_JSON) == JsonSerializer.Serialize(b, DRAWING_POINTS_JSON),
+                        v => JsonSerializer.Serialize(v, DRAWING_POINTS_JSON).GetHashCode(),
+                        v => JsonSerializer.Deserialize<List<int[]>>(JsonSerializer.Serialize(v, DRAWING_POINTS_JSON), DRAWING_POINTS_JSON)!));
+            entity.Property(e => e.Color).HasColumnName("color").HasMaxLength(7).IsRequired();
+            entity.Property(e => e.Width).HasColumnName("width");
+            entity.Property(e => e.Opacity).HasColumnName("opacity").HasColumnType("real");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
+            entity.HasIndex(e => new { e.MapId, e.MapDrawingId }).HasDatabaseName("ix_map_drawings_map");
+            entity.HasOne<Map>().WithMany().HasForeignKey(e => e.MapId)
+                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_drawing");
+            HasOwner(entity, "fk_user_map_drawing");
         });
     }
 
