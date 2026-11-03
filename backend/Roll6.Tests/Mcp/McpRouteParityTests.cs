@@ -49,6 +49,8 @@ public class McpRouteParityTests
             if (type == typeof(bool)) return true;
             if (type == typeof(string)) return p.Name == "contentBase64" ? Convert.ToBase64String(new byte[] { 1, 2, 3 }) : p.Name == "fileName" ? "sample.png" : "sample";
             if (type == typeof(List<string>)) return new List<string> { "sample", "other" };
+            // 107: lists of objects (hex marks, drawing points) go as empty lists — the route is what is checked.
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>)) return Activator.CreateInstance(type);
             if (type == typeof(System.Text.Json.JsonElement)) return System.Text.Json.JsonDocument.Parse("{\"format\":\"roll6-animation\"}").RootElement;
             throw new InvalidOperationException($"No sample for {p.ParameterType} {p.Name}");
         }).ToArray();

@@ -10,7 +10,11 @@ import { useMapShare } from '../../hooks/useMapShare';
 import { FOV_MAX, FOV_MIN, FOV_STEP } from '../../lib/storyCamera';
 import { isThreeD } from '../../lib/viewMode';
 import type { ViewMode } from '../../lib/viewMode';
-import { CheckIcon, ImageIcon, IsoViewIcon, MapIcon, MinusIcon, PlusIcon, ResizeIcon, ShareIcon, View3dIcon } from '../ui/icons';
+import { useMapPaint } from '../../hooks/useMapPaint';
+import {
+  BrushIcon, CheckIcon, ImageIcon, IsoViewIcon, MapIcon, MinusIcon, PencilSquareIcon, PlusIcon, ResizeIcon, ShareIcon, View3dIcon,
+} from '../ui/icons';
+import { PaintToolbar } from './PaintToolbar';
 
 /** The views of the map (103): the 2D map, the isometric lit view and the first-person 3D view, now legacy (105). */
 const VIEWS: readonly { mode: ViewMode; label: string; Icon: typeof MapIcon }[] = [
@@ -25,13 +29,17 @@ interface MapControlsProps {
 
 /**
  * Buttons at the bottom-right corner: zoom in/out, dice, share, the view chooser (034: every map has the 3D view; 103:
- * and the isometric one), scene image and image resize mode. In the 3D views the zoom buttons drive the view (field of
+ * and the isometric one) and, behind "Editar mapa" (107), scene image, image resize mode and — in 2D — "Pintar". In the 3D views the zoom buttons drive the view (field of
  * view, or the distance its handler registered) and the image buttons are hidden.
  */
 export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   const { t } = useTranslation();
   const { currentCampaign, isMaster } = useCampaign();
-  const { view, zoomIn, zoomOut, resizeMode, toggleResizeMode, canEdit: canEditModel, draft, viewMode, setViewMode, fov, setFov, storyWalking, storyZoom } = useMapEditor();
+  const {
+    view, zoomIn, zoomOut, resizeMode, toggleResizeMode, canEdit: canEditModel, draft, viewMode, setViewMode, fov, setFov,
+    storyWalking, storyZoom, editMode, setEditMode, paintMode, setPaintMode,
+  } = useMapEditor();
+  const { canPaint } = useMapPaint();
   const { share, sharing } = useMapShare();
   const canShare = draft.mapId !== null && currentCampaign !== null;
   // 049: the open campaign map's picture stays as it is while the table is paused or finished.
@@ -91,14 +99,29 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
+      {/* 107: the editing tools live behind "Editar mapa" — never on phones, only for who may edit the open map. */}
+      {canEdit && (
+        <button type="button" className={`btn d-none d-md-inline-flex ${editMode ? 'btn-warning' : 'btn-secondary'}`}
+          title={t('map.editMode')} aria-label={t('map.editMode')} aria-pressed={editMode}
+          onClick={() => setEditMode(!editMode)}><PencilSquareIcon size={20} /></button>
+      )}
       {/* Editing the image is not done on phones, nor in 3D. */}
-      {!in3d && (
+      {canEdit && editMode && !in3d && (
         <>
           <button type="button" className="btn btn-secondary d-none d-md-inline-flex" title={t('map.image')} aria-label={t('map.image')}
-            disabled={!canEdit} onClick={onOpenImage}><ImageIcon size={20} /></button>
+            onClick={onOpenImage}><ImageIcon size={20} /></button>
           <button type="button" className={`btn d-none d-md-inline-flex ${resizeMode ? 'btn-warning' : 'btn-secondary'}`} title={t('map.resize')}
-            aria-label={t('map.resize')} aria-pressed={resizeMode} disabled={!canEdit} onClick={onToggleResize}><ResizeIcon size={20} /></button>
+            aria-label={t('map.resize')} aria-pressed={resizeMode} onClick={onToggleResize}><ResizeIcon size={20} /></button>
         </>
+      )}
+      {/* The paint (107) exists only in 2D and only on a campaign map; its tools open to the left of the button. */}
+      {canEdit && editMode && viewMode === '2d' && (
+        <div className="stm-paint-anchor d-none d-md-block" title={canPaint ? undefined : t('paint.campaignOnly')}>
+          <button type="button" className={`btn ${paintMode ? 'btn-warning' : 'btn-secondary'}`}
+            title={canPaint ? t('map.paint') : t('paint.campaignOnly')} aria-label={t('map.paint')} aria-pressed={paintMode}
+            disabled={!canPaint} onClick={() => setPaintMode(!paintMode)}><BrushIcon size={20} /></button>
+          {paintMode && canPaint && <PaintToolbar />}
+        </div>
       )}
     </div>
   );

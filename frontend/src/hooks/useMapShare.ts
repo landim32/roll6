@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useCampaign } from './useCampaign';
 import { useMapEditor } from './useMapEditor';
 import { useMapToken } from './useMapToken';
+import { useMapPaint } from './useMapPaint';
 import { turnService } from '../Services/turnService';
 import { renderMapSnapshot } from '../lib/mapSnapshot';
 import { buildShareText } from '../lib/whatsappText';
@@ -33,6 +34,7 @@ export const useMapShare = () => {
   const { currentCampaign } = useCampaign();
   const { draft, hexSize } = useMapEditor();
   const { mapTokens } = useMapToken();
+  const { paint } = useMapPaint();
   const [sharing, setSharing] = useState(false);
   const sharingRef = useRef(false);
 
@@ -64,7 +66,7 @@ export const useMapShare = () => {
     setSharing(true);
     try {
       const [blob, narration] = await Promise.all([
-        renderMapSnapshot({ draft, tokens: mapTokens, hexSize }),
+        renderMapSnapshot({ draft, tokens: mapTokens, hexSize, paint }),
         turnService.narration(currentCampaign.campaignId).catch(() => null),
       ]);
       const text = buildShareText({
@@ -106,7 +108,7 @@ export const useMapShare = () => {
       sharingRef.current = false;
       setSharing(false);
     }
-  }, [currentCampaign, draft, hexSize, mapTokens, send, t]);
+  }, [currentCampaign, draft, hexSize, mapTokens, paint, send, t]);
 
   return { share, sharing };
 };

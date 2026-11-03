@@ -153,6 +153,19 @@ public static class Roll6Guide
           each side. Placing, moving or turning needs the whole shape inside the grid and free; lying down never fails:
           the piece may overlap another one until it moves.
 
+        ## Map paint
+        - Each **campaign map** (not the map model: another campaign using the same model sees none of it) has paint:
+          **hex marks** — one per hex, kinds `1` Wall (Parede), `2` Stone (Pedra), `3` Hole (Buraco), `4` Water (Água),
+          `5` Fire (Fogo), `6` Entrance (Entrada), `7` Mark (Marcação: a red X with an optional text up to 100
+          characters) — and **drawings** (`1` Rectangle, `2` Circle, `3` Pencil, `4` Line, `5` Arrow; outlines in map
+          pixels with color `#rrggbb`, width 1–200 and opacity 0.05–1; at most 500 per map).
+        - Marks are **informative only**: they never block, slow or change movement, occupancy or turns. Use them to
+          tell the table what a hex holds (a wall, fire, a chest) and read them back while narrating.
+        - Only the master writes (`set_hex_marks` — up to 200 hexes at once, `kind: null` clears —, `add_map_drawing`,
+          `delete_map_drawing`, `clear_map_paint`), while the campaign is active or being prepared; the master and
+          approved participants read (`get_map_paint`, `get_hex_content` = the hex's mark + every piece covering it).
+          Players see paint changes live on the current map.
+
         ## 3D view
         - Every map can be seen in 3D in the web app (a button on the map): a real 3D scene built from the mask — blocks
           as tall as its tones, the map image on the floor and on the blocks' tops — with a camera behind the chosen

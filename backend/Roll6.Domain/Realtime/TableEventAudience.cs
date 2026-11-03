@@ -22,7 +22,9 @@ public static class TableEventAudience
     {
         TableEventType.MAP_TOKEN_UPSERTED,
         TableEventType.MAP_TOKEN_DELETED,
-        TableEventType.MAP_TOKENS_CHANGED
+        TableEventType.MAP_TOKENS_CHANGED,
+        // 107: the paint of a map follows its pieces (players see only the current map).
+        TableEventType.MAP_PAINT_CHANGED
     };
 
     /// <summary>True when the audience depends on the campaign's current map (a piece event of one map).</summary>

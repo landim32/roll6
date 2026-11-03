@@ -33,6 +33,7 @@ public class CampaignServiceTests
     private readonly Mock<IMapTokenService> _mapTokenService = new();
     private readonly Mock<IGmService> _gmService = new();
     private readonly Mock<IGmDispatcher> _gmDispatcher = new();
+    private readonly Mock<IMapPaintRepository<MapHexMark, MapDrawing>> _mapPaintRepository = new();
     private readonly CampaignService _service;
 
     public CampaignServiceTests()
@@ -53,7 +54,7 @@ public class CampaignServiceTests
             _campaignCharacterRepository.Object, _userRepository.Object, _campaignNpcRepository.Object, _mapNpcRepository.Object,
             _unitOfWork.Object, _turnRepository.Object, _notifier.Object, _campaignPlanRepository.Object,
             _chatReadRepository.Object, _imageStorage.Object, _notificationPrefs.Object, _inbox.Object, _mapTokenService.Object,
-            _gmService.Object, _gmDispatcher.Object);
+            _gmService.Object, _gmDispatcher.Object, _mapPaintRepository.Object);
         _mapTokenService.Setup(s => s.ListOverlapsAsync(It.IsAny<long>())).ReturnsAsync(new List<IReadOnlyList<string>>());
     }
 
@@ -79,6 +80,7 @@ public class CampaignServiceTests
 
         _mapTokenRepository.Verify(r => r.DeleteByMapIdsAsync(deletedMapIds));
         _mapNpcRepository.Verify(r => r.DeleteByMapIdsAsync(deletedMapIds));
+        _mapPaintRepository.Verify(r => r.DeleteByMapIdsAsync(deletedMapIds), "107: the paint of the deleted maps goes first");
         _mapRepository.Verify(r => r.DeleteRangeAsync(deletedMapIds));
         _campaignNpcRepository.Verify(r => r.DeleteByCampaignAsync(10));
         _campaignCharacterRepository.Verify(r => r.DeleteByCampaignAsync(10));

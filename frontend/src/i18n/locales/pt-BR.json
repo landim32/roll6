@@ -977,7 +977,36 @@
     "resize": "Ajustar imagem",
     "zoom": "Zoom {{value}}%",
     "unsaved": "Não salvo",
-    "share": "Compartilhar"
+    "share": "Compartilhar",
+    "editMode": "Editar mapa",
+    "paint": "Pintar"
+  },
+  "paint": {
+    "tools": "Ferramentas de pintura",
+    "fill": "Preencher",
+    "rect": "Quadrado",
+    "circle": "Circunferência",
+    "pencil": "Lápis",
+    "line": "Linha",
+    "arrow": "Seta",
+    "erase": "Apagar",
+    "clear": "Limpar pintura",
+    "clearConfirm": "Limpar toda a pintura deste mapa?",
+    "color": "Cor",
+    "width": "Espessura",
+    "opacity": "Opacidade",
+    "markText": "Texto da marcação (opcional)",
+    "campaignOnly": "A pintura vale só para mapas de campanha.",
+    "kind": {
+      "wall": "Parede",
+      "stone": "Pedra",
+      "hole": "Buraco",
+      "water": "Água",
+      "fire": "Fogo",
+      "entrance": "Entrada",
+      "mark": "Marcação",
+      "none": "Nenhum (apagar)"
+    }
   },
   "share": {
     "fallback": "Imagem do mapa baixada — envie no WhatsApp.",

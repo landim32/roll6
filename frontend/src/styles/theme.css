@@ -25,6 +25,22 @@
   --stm-radius: 0.75rem;
   --stm-radius-sm: 0.5rem;
   --stm-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  /* Map paint (107): the pictures of the hex marks (lib/hexMarkArt). The shared JPEG reads them with getComputedStyle. */
+  --stm-mark-wall: #8a8f98;
+  --stm-mark-wall-line: #3f444c;
+  --stm-mark-stone: #9b9184;
+  --stm-mark-stone-line: #4f483f;
+  --stm-mark-hole: #05070b;
+  --stm-mark-hole-rim: #6b4f2e;
+  --stm-mark-water: #2f86d6;
+  --stm-mark-water-line: #d0e8ff;
+  --stm-mark-fire: #f76707;
+  --stm-mark-fire-core: #ffd43b;
+  --stm-mark-door: #8b5a2b;
+  --stm-mark-door-line: #e0b878;
+  --stm-mark-x: #e03131;
+  /* The fill drag in progress and its eraser. */
+  --stm-paint-preview: rgba(255, 212, 59, 0.35);
 }
 
 [data-bs-theme="dark"] {

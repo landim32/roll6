@@ -27,6 +27,8 @@ export const TABLE_EVENT = {
   gmChanged: 'gm.changed',
   /** The master started or stopped processing the turn (101); data = { turnNo, processing }. */
   turnProcessing: 'turn.processing',
+  /** The paint of a campaign map changed (107); data = MapPaintChangeInfo, `mapId` set. */
+  mapPaintChanged: 'mapPaint.changed',
   resync: 'resync',
 } as const;
 

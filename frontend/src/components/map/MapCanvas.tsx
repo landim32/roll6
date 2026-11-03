@@ -6,6 +6,8 @@ import { useCampaign } from '../../hooks/useCampaign';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { useMapInteraction } from '../../hooks/useMapInteraction';
+import { useMapPaint } from '../../hooks/useMapPaint';
+import { useMapPaintTool } from '../../hooks/useMapPaintTool';
 import type { MapInteractionProps } from '../../hooks/useMapInteraction';
 import { toMapPoint, useMapPointer } from '../../hooks/useMapPointer';
 import { useMapToken } from '../../hooks/useMapToken';
@@ -18,6 +20,7 @@ import { HexHighlight } from './HexHighlight';
 import { ImageLayer } from './ImageLayer';
 import { MapHexMenu } from './MapHexMenu';
 import { MovementLayer } from './MovementLayer';
+import { PaintLayer, PaintPreviewLayer } from './PaintLayer';
 import { ResizeHandles } from './ResizeHandles';
 import { SpeechBubbleLayer } from './SpeechBubbleLayer';
 import { TokenLayer } from './TokenLayer';
@@ -46,6 +49,12 @@ export const MapCanvas = (props: MapInteractionProps) => {
   const { entries: turnEntries } = useTurn();
   const interaction = useMapInteraction(props);
   const { movement, overlay, targeting, hover, closeMenu } = interaction;
+  const { paint } = useMapPaint();
+  // 107: while painting, the pointer belongs to the paint tool — no hex menu, Mover or card drops.
+  const paintTool = useMapPaintTool();
+  const painting = paintTool.active;
+  /** A paint gesture holds the pointer (captured on press). */
+  const paintPressed = useRef(false);
   const hexAt = useMapPointer();
   const last = useRef<{ x: number; y: number } | null>(null);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
@@ -71,8 +80,24 @@ export const MapCanvas = (props: MapInteractionProps) => {
     centerOn(center.x, center.y, FOCUS_ZOOM);
   }, [draft.mapId, mapTokens, party, currentSelection, hexSize, centerOn]);
 
+  // Entering the paint mode closes the hex menu and ends "Agir sobre…" or a move in progress.
+  useEffect(() => {
+    if (!painting) return;
+    closeMenu();
+    hover(null);
+    interaction.cancelSecondary();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the paint mode turns on
+  }, [painting]);
+
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (event.button !== 0) return;
+    if (painting && event.button === 0) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      paintPressed.current = true;
+      paintTool.down(mapPointOf(event), { x: event.clientX, y: event.clientY });
+      return;
+    }
+    // While painting the middle button still pans the map.
+    if (event.button !== (painting ? 1 : 0)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     last.current = { x: event.clientX, y: event.clientY };
     pressedAt.current = { x: event.clientX, y: event.clientY };
@@ -80,6 +105,11 @@ export const MapCanvas = (props: MapInteractionProps) => {
   };
 
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (painting && !last.current) {
+      if (paintPressed.current) paintTool.move(mapPointOf(event), { x: event.clientX, y: event.clientY });
+      hover(hexAt(event));
+      return;
+    }
     if (!last.current) {
       interaction.pointerAt(hexAt(event), mapPointOf(event));
       return;
@@ -101,13 +131,19 @@ export const MapCanvas = (props: MapInteractionProps) => {
   };
 
   const onPointerUp = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (paintPressed.current) {
+      paintPressed.current = false;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      paintTool.up(mapPointOf(event), { x: event.clientX, y: event.clientY });
+      return;
+    }
     const start = pressedAt.current;
     pressedAt.current = null;
     stopPan(event);
     const clicked = start
       && Math.abs(event.clientX - start.x) < CLICK_TOLERANCE
       && Math.abs(event.clientY - start.y) < CLICK_TOLERANCE;
-    if (!clicked || resizeMode) return;
+    if (!clicked || resizeMode || painting) return;
     const rect = event.currentTarget.getBoundingClientRect();
     interaction.clickAt(hexAt(event), mapPointOf(event), { left: event.clientX - rect.left, top: event.clientY - rect.top });
   };
@@ -121,6 +157,7 @@ export const MapCanvas = (props: MapInteractionProps) => {
   // ---------- party cards dropped on the map ----------
 
   const onDragOver = (event: ReactDragEvent<SVGSVGElement>) => {
+    if (painting) return;
     const types = [...event.dataTransfer.types];
     if (!interaction.acceptsDrag(types)) return;
     event.preventDefault();
@@ -129,7 +166,7 @@ export const MapCanvas = (props: MapInteractionProps) => {
   };
 
   const onDrop = async (event: ReactDragEvent<SVGSVGElement>) => {
-    if (!interaction.acceptsDrag([...event.dataTransfer.types])) return;
+    if (painting || !interaction.acceptsDrag([...event.dataTransfer.types])) return;
     event.preventDefault();
     await interaction.drop(event.dataTransfer, hexAt(event));
   };
@@ -142,13 +179,26 @@ export const MapCanvas = (props: MapInteractionProps) => {
   return (
     <>
       <svg
-        className={`stm-map${panning ? ' stm-panning' : ''}${targeting ? ' is-targeting' : ''}`}
+        className={`stm-map${panning ? ' stm-panning' : ''}${targeting ? ' is-targeting' : ''}${painting ? ' is-painting' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={stopPan}
+        onPointerCancel={(event) => {
+          if (paintPressed.current) {
+            paintPressed.current = false;
+            paintTool.cancel();
+          }
+          stopPan(event);
+        }}
         onPointerLeave={() => hover(null)}
         onContextMenu={(event) => {
+          if (painting) {
+            // A right click discards the drawing in progress (FR-010) and never opens the browser menu.
+            event.preventDefault();
+            paintPressed.current = false;
+            paintTool.cancel();
+            return;
+          }
           if (interaction.cancelSecondary()) event.preventDefault();
         }}
         onWheel={onWheel}
@@ -159,6 +209,8 @@ export const MapCanvas = (props: MapInteractionProps) => {
         <g transform={`translate(${view.panX} ${view.panY}) scale(${view.zoom})`}>
           <ImageLayer url={draft.imageUrl} left={draft.imageLeft} top={draft.imageTop} width={draft.imageWidth} height={draft.imageHeight} />
           <HexGridLayer columns={draft.gridWidth} rows={draft.gridHeight} hexSize={hexSize} />
+          <PaintLayer paint={paint} hexSize={hexSize} columns={draft.gridWidth} rows={draft.gridHeight} />
+          <PaintPreviewLayer preview={paintTool.preview} hexSize={hexSize} />
           <HexHighlight hexes={interaction.selectedHexes} hexSize={hexSize} variant="selected" />
           <HexHighlight hexes={interaction.hoverHexes} hexSize={hexSize} />
           {overlay && (
