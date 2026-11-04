@@ -946,7 +946,8 @@
     "life": "Vida",
     "energy": "Energia",
     "vital": "{{label}} {{current}} de {{total}}",
-    "noMap": "Sem mapa"
+    "noMap": "Sem mapa",
+    "openMap": "Abrir o mapa {{name}}"
   },
   "profile": {
     "title": "Editar usuário",

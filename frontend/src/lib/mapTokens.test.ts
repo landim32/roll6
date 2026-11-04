@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { characterDropAction, npcDropAction, tokenAt, tokenOfParticipation, transferSource } from './mapTokens';
+import { characterDropAction, isOutsideOpenMap, npcDropAction, tokenAt, tokenOfParticipation, transferSource } from './mapTokens';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import type { MapTokenInfo } from '../types/mapToken';
@@ -85,5 +85,18 @@ describe('pieces of several hexes (031)', () => {
     expect(characterDropAction({ hex: { x: 7, y: 6 }, tokens: big, columns: 10, rows: 10, participation: member(9, 3) })).toEqual({ kind: 'blocked' });
     expect(characterDropAction({ hex: { x: 7, y: 9 }, tokens: big, columns: 10, rows: 10, participation: member(9, 3) })).toEqual({ kind: 'blocked' });
     expect(characterDropAction({ hex: { x: 3, y: 3 }, tokens: big, columns: 10, rows: 10, participation: member(9, 3) })).toEqual({ kind: 'move', mapTokenId: 20 });
+  });
+});
+
+describe('isOutsideOpenMap', () => {
+  it('is false only for a character on the open map', () => {
+    expect(isOutsideOpenMap(1, 1)).toBe(false);
+    expect(isOutsideOpenMap(2, 1)).toBe(true);
+  });
+
+  it('is true for a character on no map, with or without a map open', () => {
+    expect(isOutsideOpenMap(null, 1)).toBe(true);
+    expect(isOutsideOpenMap(null, null)).toBe(true);
+    expect(isOutsideOpenMap(2, null)).toBe(true);
   });
 });

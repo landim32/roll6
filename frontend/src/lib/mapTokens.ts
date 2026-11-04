@@ -65,6 +65,10 @@ export const transferSource = (
   return participation.mapName ?? '';
 };
 
+/** The party card names the map only of a character outside the open one, also when it is on no map at all. */
+export const isOutsideOpenMap = (mapId: number | null, openMapId: number | null): boolean =>
+  mapId === null || mapId !== openMapId;
+
 /** Data type of a campaign NPC card being dragged onto the map (value = npcId). */
 export const NPC_DRAG_TYPE = 'application/x-roll6-npc';
 

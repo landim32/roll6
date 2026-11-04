@@ -51,7 +51,7 @@ export const showsInTable = (campaign: Pick<CampaignTableInfo, 'status' | 'isMas
     : status === CAMPAIGN_STATUS.active;
 };
 
-const mapPath = (slug: string) => `/map/${encodeURIComponent(slug)}`;
+export const mapPath = (slug: string) => `/map/${encodeURIComponent(slug)}`;
 
 /**
  * The maps a player has in a campaign (108): the server sends only the ones with his characters, and the chosen character
