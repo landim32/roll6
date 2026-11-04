@@ -10,7 +10,7 @@ namespace Roll6.API.Controllers;
 
 /// <summary>
 /// Link previews (040) for crawlers that read only the first HTML (messaging apps, social networks, search engines):
-/// no login, by design — they expose only the map/campaign name, the master, the grid and the map picture. The nginx
+/// no login, by design — they expose only the map/campaign name, the master, the grid and the map/campaign picture. The nginx
 /// puts <c>head</c> into the SPA's index.html through SSI. Never an error page: a robot can't read ProblemDetails, so
 /// anything missing or failing is the generic preview or the brand picture. Not exposed through MCP.
 /// </summary>
@@ -56,11 +56,19 @@ public class MetaController : ApiControllerBase
     [HttpGet("image/map/{slug}.jpg")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status302Found)]
-    public async Task<IActionResult> MapImage(string slug)
+    public Task<IActionResult> MapImage(string slug) => PreviewImageAsync(() => _pageMeta.MapImageAsync(slug), slug);
+
+    /// <summary>The 1200×630 JPEG of a campaign for previews (108); the brand picture when there is none.</summary>
+    [HttpGet("image/campaign/{slug}.jpg")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    public Task<IActionResult> CampaignImage(string slug) => PreviewImageAsync(() => _pageMeta.CampaignImageAsync(slug), slug);
+
+    private async Task<IActionResult> PreviewImageAsync(Func<Task<string?>> findFile, string slug)
     {
         try
         {
-            var fileName = await _pageMeta.MapImageAsync(slug);
+            var fileName = await findFile();
             var bytes = fileName != null ? await _renderer.RenderMapAsync(fileName) : null;
             if (bytes != null)
             {
@@ -70,7 +78,7 @@ public class MetaController : ApiControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Preview image of map {Slug} failed", slug);
+            _logger.LogWarning(ex, "Preview image of {Slug} failed", slug);
         }
         return Redirect(PageMeta.GENERIC_IMAGE_PATH);
     }

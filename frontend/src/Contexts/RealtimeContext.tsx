@@ -68,22 +68,22 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * The campaign itself lives above this provider: its events are applied here. Renamed/opened → new data;
-   * deleted → leave it; the master switched maps → new `currentMapId` (the map editor follows it).
+   * deleted → leave it.
    */
   const applyCampaignEvent = useCallback((event: TableEvent) => {
     const campaign = campaignRef.current;
     if (!campaign || campaign.campaignId !== event.campaignId) return;
-    // 078: maps.changed too — the master's combo lists the campaign's active maps.
-    if (event.type === TABLE_EVENT.campaignChanged || event.type === TABLE_EVENT.mapCurrent || event.type === TABLE_EVENT.campaignDeleted
-      || event.type === TABLE_EVENT.mapsChanged)
+    // 078: maps.changed too — the master's combo lists the campaign's active maps. 108: the combo also tells where the
+    // characters are, which `character.map` and `party.changed` (a map deleted) announce.
+    if (event.type === TABLE_EVENT.campaignChanged || event.type === TABLE_EVENT.campaignDeleted
+      || event.type === TABLE_EVENT.mapsChanged || event.type === TABLE_EVENT.characterMap || event.type === TABLE_EVENT.partyChanged)
       void refreshRef.current();
     if (event.type === TABLE_EVENT.campaignChanged && event.data)
       selectRef.current({ ...(event.data as CampaignInfo) });
     else if (event.type === TABLE_EVENT.campaignDeleted) {
       selectRef.current(null);
       toast.warning(tRef.current('realtime.campaignDeleted'));
-    } else if (event.type === TABLE_EVENT.mapCurrent)
-      selectRef.current({ ...campaign, currentMapId: event.mapId });
+    }
   }, []);
 
   const dispatch = useCallback((event: TableEvent) => {

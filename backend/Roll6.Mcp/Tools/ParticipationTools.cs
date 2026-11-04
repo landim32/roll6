@@ -123,8 +123,8 @@ public static class ParticipationTools
         What it does: lists the participations of the current user's characters in one campaign (any status) — e.g. to see
         whether a request was approved.
         Who can use it: any authenticated user.
-        Returns: [participation], each with currentMove (how far the character may move per turn in this campaign) and
-        characterMove (the character's permanent move).
+        Returns: [participation], each with currentMove (how far the character may move per turn in this campaign),
+        characterMove (the character's permanent move) and mapId, mapName (the map where it stands, null off every map).
         Common errors: 404 campaign not found.
         Related tools: request_campaign_access.
         """)]

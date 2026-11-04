@@ -127,6 +127,25 @@ public class MapTokenTests
     }
 
     [Fact]
+    public void TransferTo_MovesTheSameRowFacingUpAndForgetsTheWalk()
+    {
+        var piece = MapToken.PlaceCharacter(30, 5, 70, "Aria", 4, 4);
+        piece.MapTokenId = 42;
+        piece.Face(3);
+        piece.WalkTo(285, 315, 1);
+        var created = piece.CreatedAt;
+
+        piece.TransferTo(31, 6, "Aria Nova", 2, 1);
+
+        piece.MapTokenId.Should().Be(42);
+        piece.CampaignCharacterId.Should().Be(70);
+        (piece.MapId, piece.TokenId, piece.Name).Should().Be((31L, 6L, "Aria Nova"));
+        (piece.X, piece.Y, piece.Look).Should().Be((2, 1, 0));
+        (piece.WalkX, piece.WalkY, piece.WalkYaw).Should().Be(((double?)null, (double?)null, (double?)null));
+        piece.CreatedAt.Should().Be(created);
+    }
+
+    [Fact]
     public void MoveTo_ClearsTheWalkPoint()
     {
         var piece = new MapToken();

@@ -73,14 +73,17 @@ public static class Roll6Guide
           character's `move` when the character joins (or is approved again), the owner or the master change it with
           `update_participation` (e.g. lower it for a wounded character; it may also go above `move`), and while nobody
           has adjusted it it follows the character's `move`. It never limits the master, and NPCs keep their own move.
-        - The campaign's **current map** (`set_current_map`, master) is the map all players follow in the app. It changes
-          only through that call (in the app, the master's "Tornar atual"); opening or editing other maps never moves the
-          players, and only an active map can be current. The current map has status 4 ("Atual"; at most one per
-          campaign), the previous one goes back to 1, and it can't be archived while current.
+        - **A character stands on one map at most**, and that map is the one its player sees in the app: there is no map
+          shared by the whole table, and a party may be split across maps. Only the master places characters
+          (`place_character_on_map`); a character on another map is refused naming that map until the call says
+          `transfer: true`, which takes the same piece there and makes the player's screen follow it. Where each character
+          stands comes as `mapId`/`mapName` in `list_campaign_characters` (the master sees all; a player only his own). A
+          character off every map still acts from the chat. Maps are active (1) or archived (2); a map with characters
+          can't be archived, and deleting one leaves its characters off every map. NPCs have no such rule.
         - Every campaign and every campaign map has an immutable **slug** (built from the name, unique on the whole
           site; renaming does not change it). `get_campaign_by_slug` and `get_map_by_slug` open them.
           `list_my_table_campaigns` lists the campaigns where you are the master or have an approved character, each
-          with the map the table is following.
+          with its maps: every active map for the master, only the maps of your characters for a player.
 
         ## Campaign status
         - Every campaign has a `status`: `1 Preparing` ("Preparando", new campaigns start here), `2 Active` ("Ativa"),
@@ -91,7 +94,7 @@ public static class Roll6Guide
           approve, accept). Pieces, NPC occurrences and new campaign maps answer 409 too — except for the master while
           the campaign is Preparing, so the table can be built before it starts.
         - The conversation chat always works: messages, photos, audios, dice rolls, polls and votes, reactions, replies,
-          whispers. Sheets, settings, the plan, archiving maps and the current map are never blocked either.
+          whispers. Sheets, settings, the plan and archiving maps are never blocked either.
 
         ## Free mode
         - The master switches the campaign's `freeMode` (`set_campaign_free_mode`, any status; read it in `get_campaign`,
@@ -108,7 +111,7 @@ public static class Roll6Guide
           log tools, pokes, the chat, the campaign status rules (outside Active everything stays frozen) and the
           occupancy rules of `move_map_token` (an occupied hex or a hex outside the grid is still refused).
         - **Shared walk** (069): while it is on, a player walks his own standing character in the 3D view; everyone sees
-          it walk and its piece follows hex by hex (`move_map_token` with `walk: true`, current map only). The walk passes
+          it walk and its piece follows hex by hex (`move_map_token` with `walk: true`). The walk passes
           through other pieces and may stop on an occupied hex — only walls of the 3D view and the map edge stop it.
         - When it goes **off**, the normal rules return from the next move of each actor: moves are again one per turn
           and limited. Switching it off is
@@ -132,7 +135,7 @@ public static class Roll6Guide
         ## Pieces (map tokens)
         - Types: `1 Character` (a campaign participation, blue), `2 Npc` (an NPC occurrence, red), `4 Object`
           (anything else, gray).
-        - Master: `add_object_to_map`, `place_character_on_map` (a participation; each character once per map),
+        - Master: `add_object_to_map`, `place_character_on_map` (a participation; each character on one map at most),
           `place_npc_on_map` (creates the occurrence and its piece), `change_map_token_image`, `update_map_token`,
           `delete_map_token`. Everyone at the table: `list_map_tokens`, `list_map_npcs`.
         - `move_map_token` moves and turns a piece (master: any piece; player: his own approved character).
@@ -164,7 +167,7 @@ public static class Roll6Guide
         - Only the master writes (`set_hex_marks` — up to 200 hexes at once, `kind: null` clears —, `add_map_drawing`,
           `delete_map_drawing`, `clear_map_paint`), while the campaign is active or being prepared; the master and
           approved participants read (`get_map_paint`, `get_hex_content` = the hex's mark + every piece covering it).
-          Players see paint changes live on the current map.
+          Players see paint changes live on the map where their character stands.
 
         ## 3D view
         - Every map can be seen in 3D in the web app (a button on the map): a real 3D scene built from the mask — blocks
@@ -396,7 +399,11 @@ public static class Roll6Guide
         - Every entry records who made it (`userId`/`userName`); moves record the movement points spent (`moved`); any
           change to a character's campaign values or an NPC occurrence is logged as a CharacterUpdate (type 4) with the
           fields before/after. `get_turn_summary` returns the whole turn as readable markdown (actions + positions).
-        - Running a turn as an assistant: `get_turn_data` (characters, NPC occurrences and actions in one call) → decide →
+        - **One turn for the whole campaign**: a split party shares the turn, its finish, its pending list and the chat. A
+          character's map doesn't change who owes an action; being taken to another map spends no Deslocamento, records no
+          movement and doesn't undo "already moved"; a reset never brings a piece back from another map.
+        - Running a turn as an assistant: `get_turn_data` (characters of every map and the NPC occurrences of the maps with
+          characters, each with its `mapId`, the maps in `maps`, and the actions, in one call) → decide →
           `process_turn` (all changes + narration in one atomic call; it also finishes the turn). Outside the GM mode,
           announce it first with `set_turn_processing` (`processing: true`, 101): the chat shows "O mestre começou a
           processar o turno N." and every footer "Processando o turno N…"; closing the turn ends it, and stopping without
@@ -433,9 +440,11 @@ public static class Roll6Guide
           visible), `409` conflict (occupied hex, already moved, in use, limits), `500` unexpected.
 
         ## Common flows
-        - Start a table: `create_campaign` → `create_map_model` (grid) → `add_map_to_campaign` → `set_current_map`.
+        - Start a table: `create_campaign` → `create_map_model` (grid) → `add_map_to_campaign` →
+          `place_character_on_map` for each character (players see the map where their character stands).
         - Bring a character: player `create_character` → `request_campaign_access`; master
           `approve_access_request` → `place_character_on_map`.
+        - Split the party: `place_character_on_map` with `transfer: true` takes one character to another map.
         - Add an enemy: `create_npc` (needs a token: `list_tokens`) → `add_npc_to_campaign` → `place_npc_on_map`.
         - Play a turn: `get_turn_state` → `move_map_token` / `act_in_turn` → master `finish_turn` →
           `list_turn_entries` for the summary.

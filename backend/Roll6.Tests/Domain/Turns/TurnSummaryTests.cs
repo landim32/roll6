@@ -12,6 +12,56 @@ public class TurnSummaryTests
 
     /// <summary>098: an action with a target says what it is about; one without is written as before.</summary>
     [Fact]
+    public void Build_OneMap_WritesNoMapHeading()
+    {
+        var text = TurnSummary.Build(Array.Empty<SummaryLine>(), new[]
+        {
+            new SummaryPosition("Cedric (José)", 1, 1, 0, "Porão"),
+            new SummaryPosition("Goblin (GM)", 2, 2, 3, "Porão")
+        });
+
+        text.Should().Be(string.Join("\n",
+            "## Ações",
+            "Nenhuma ação registrada.",
+            "## Posições",
+            "- Cedric (José) - (1, 1) - Norte",
+            "- Goblin (GM) - (2, 2) - Sul",
+            ""));
+    }
+
+    [Fact]
+    public void Build_SeveralMaps_WritesOneHeadingPerMap_ByName()
+    {
+        var text = TurnSummary.Build(Array.Empty<SummaryLine>(), new[]
+        {
+            new SummaryPosition("Cedric (José)", 1, 1, 0, "Taverna"),
+            new SummaryPosition("Goblin (GM)", 2, 2, 3, "Porão"),
+            new SummaryPosition("Ana (Bruna)", 3, 3, 1, "Taverna")
+        });
+
+        text.Should().EndWith(string.Join("\n",
+            "## Posições",
+            "### Porão",
+            "- Goblin (GM) - (2, 2) - Sul",
+            "### Taverna",
+            "- Ana (Bruna) - (3, 3) - Nordeste",
+            "- Cedric (José) - (1, 1) - Norte",
+            ""));
+    }
+
+    [Fact]
+    public void Build_MapNames_AreEscaped()
+    {
+        var text = TurnSummary.Build(Array.Empty<SummaryLine>(), new[]
+        {
+            new SummaryPosition("A", 1, 1, 0, "Mapa_1"),
+            new SummaryPosition("B", 2, 2, 0, "Outro")
+        });
+
+        text.Should().Contain("### Mapa\\_1\n");
+    }
+
+    [Fact]
     public void Line_ActionWithTarget_AppendsSobre_Escaped()
     {
         var onPiece = Line(TurnType.Action, "Cedric (José)") with

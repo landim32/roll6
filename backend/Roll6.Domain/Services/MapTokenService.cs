@@ -17,7 +17,7 @@ namespace Roll6.Domain.Services;
 /// <summary>
 /// Pieces on a campaign map. Only the map owner (the campaign master) writes; the master and approved
 /// participants read. A hex holds at most one piece and a piece takes every hex of its shape (031: its token's size
-/// for the current posture); a character appears at most once per map and its piece shows the participation's name,
+/// for the current posture); a character stands on one map at most (108) and its piece shows the participation's name,
 /// vitals, status, posture and campaign notes (as its sheet).
 /// </summary>
 public partial class MapTokenService : IMapTokenService
@@ -105,8 +105,10 @@ public partial class MapTokenService : IMapTokenService
 
     /// <summary>
     /// Places a campaign character: its own token, or — when it has none — the informed one, which is then
-    /// saved on the character too (011 FR-015), in the same transaction. The master places any approved
-    /// character; a player only his own (e.g. entering a map), later moves follow the turn rules (015/016).
+    /// saved on the character too (011 FR-015), in the same transaction. Only the master does it (108): a character on
+    /// another map comes with <c>transfer</c> (the same row changes map, so it is never on two), and without it the
+    /// answer names that map. Later moves follow the turn rules (015/016); taking it elsewhere costs no Deslocamento and
+    /// is no movement of the turn.
     /// </summary>
     public async Task<MapTokenInfo> PlaceCharacterAsync(long userId, MapTokenCharacterInsertInfo info)
     {
@@ -117,29 +119,62 @@ public partial class MapTokenService : IMapTokenService
             ?? throw new KeyNotFoundException("Participação não encontrada.");
         var character = await _characterRepository.GetByIdAsync(participation.CharacterId)
             ?? throw new KeyNotFoundException("Personagem não encontrado.");
-        if (map.UserId != userId && character.UserId != userId)
-            throw new UnauthorizedAccessException("Você só pode colocar os seus personagens no mapa.");
-        await EnsureMapEditableAsync(map, userId);
+        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId)
+            ?? throw new KeyNotFoundException("Campanha não encontrada.");
+        if (campaign.UserId != userId)
+            throw new UnauthorizedAccessException("Apenas o mestre coloca personagens nos mapas.");
+        campaign.EnsureMapEditable(true);
+        if (map.Status == MapStatus.Archived)
+            throw new ConflictException("Este mapa está arquivado.");
         if (participation.CampaignId != map.CampaignId || participation.Status != CampaignCharacterStatus.Approved)
             throw new ConflictException("Só personagens aprovados nesta campanha podem ser colocados no mapa.");
-        if (await _repository.GetByMapAndCampaignCharacterAsync(map.MapId, participation.CampaignCharacterId) != null)
-            throw new ConflictException("O personagem já está neste mapa.");
 
-        var tokenId = character.TokenId ?? info.TokenId
+        var piece = await _repository.GetByCampaignCharacterAsync(participation.CampaignCharacterId);
+        if (piece?.MapId == map.MapId)
+            throw new ConflictException("O personagem já está neste mapa.");
+        Map? origin = null;
+        if (piece != null)
+        {
+            origin = await _mapRepository.GetByIdAsync(piece.MapId)
+                ?? throw new KeyNotFoundException("Mapa não encontrado.");
+            if (!info.Transfer)
+                throw new ConflictException($"O personagem está no mapa {origin.Name}.");
+        }
+
+        var tokenId = character.TokenId ?? info.TokenId ?? piece?.TokenId
             ?? throw new DomainValidationException("tokenId", "Escolha um token para o personagem.");
         var token = await GetTokenAsync(tokenId);
         (await _occupancy.LoadAsync(map)).EnsureFits(info.X, info.Y, 0, MapOccupancyLoader.PieceSpace(token, participation.Posture), null);
 
+        piece?.TransferTo(map.MapId, tokenId, character.Name, info.X, info.Y);
         MapToken saved = null!;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             if (character.AssignTokenIfMissing(tokenId))
                 await _characterRepository.UpdateAsync(character);
-            saved = await _repository.InsertAsync(MapToken.PlaceCharacter(
-                map.MapId, tokenId, participation.CampaignCharacterId, character.Name, info.X, info.Y));
+            saved = piece != null
+                ? await _repository.UpdateAsync(piece)
+                : await _repository.InsertAsync(MapToken.PlaceCharacter(
+                    map.MapId, tokenId, participation.CampaignCharacterId, character.Name, info.X, info.Y));
         });
-        return await PublishPieceAsync(map, userId, await MapToDtoAsync(saved));
+
+        if (origin != null)
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKEN_DELETED, origin.CampaignId, userId, origin.MapId,
+                new { mapTokenId = saved.MapTokenId }));
+        var result = await PublishPieceAsync(map, userId, await MapToDtoAsync(saved));
+        await PublishCharacterMapAsync(campaign, userId, character.UserId, participation.CampaignCharacterId, map.MapId);
+        return result;
     }
+
+    /// <summary>
+    /// The character stands elsewhere now (108): the master and its owner reload it, and the owner's screen follows. Goes
+    /// only to them because a piece event of the map would never reach an owner looking at another one.
+    /// </summary>
+    private Task PublishCharacterMapAsync(Campaign campaign, long userId, long ownerUserId, long campaignCharacterId, long? mapId) =>
+        _notifier.PublishSplitAsync(
+            TableEvents.Create(TableEventType.CHARACTER_MAP, campaign.CampaignId, userId, mapId,
+                new CharacterMapEventInfo { CampaignCharacterId = campaignCharacterId, MapId = mapId }),
+            new[] { campaign.UserId, ownerUserId }.Distinct().ToList(), null);
 
     public async Task<MapTokenInfo> UpdateAsync(long userId, long mapTokenId, MapTokenUpdateInfo info)
     {
@@ -264,7 +299,7 @@ public partial class MapTokenService : IMapTokenService
     public async Task DeleteAsync(long userId, long mapTokenId)
     {
         var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
-        await EnsureMapEditableAsync(map, userId);
+        var campaign = await EnsureMapEditableAsync(map, userId);
         var occurrence = mapToken.MapNpcId is long mapNpcId ? await _mapNpcRepository.GetByIdAsync(mapNpcId) : null;
         occurrence?.Remove(DateTime.UtcNow);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -277,6 +312,11 @@ public partial class MapTokenService : IMapTokenService
             new { mapTokenId = mapToken.MapTokenId }));
         if (mapToken.MapNpcId != null)
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, map.CampaignId, userId));
+        // 108: the character is off every map now, and whoever owns it stops seeing this one.
+        if (mapToken.CampaignCharacterId is long participationId
+            && await _campaignCharacterRepository.GetByIdAsync(participationId) is { } participation
+            && await _characterRepository.GetByIdAsync(participation.CharacterId) is { } character)
+            await PublishCharacterMapAsync(campaign, userId, character.UserId, participationId, null);
     }
 
     /// <summary>Tells the table about a created/moved/changed piece (017) and hands the DTO back.</summary>

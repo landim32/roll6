@@ -139,7 +139,8 @@ public partial class TurnService : ITurnService
 
     /// <summary>
     /// Everything that happened in a turn as markdown (024): the entries in order and where every character/NPC piece
-    /// of the turn's map is — now for the turn in progress, after its last move for a finished turn.
+    /// is on the maps with characters and the ones the turn touched (108) — now for the turn in progress, after its last
+    /// move for a finished turn.
     /// </summary>
     public async Task<TurnSummaryInfo> GetSummaryAsync(long userId, long campaignId, int? turnNo)
     {
@@ -149,11 +150,12 @@ public partial class TurnService : ITurnService
 
         var entries = await _repository.ListByCampaignTurnAsync(campaignId, number);
         await MaskForViewerAsync(campaign, userId, entries);
-        var mapId = current
-            ? campaign.CurrentMapId ?? entries.LastOrDefault(e => e.MapId.HasValue)?.MapId
-            : entries.LastOrDefault(e => e.MapId.HasValue)?.MapId ?? campaign.CurrentMapId;
-        var pieces = mapId is long id
-            ? (await _mapTokenRepository.ListByMapAsync(id)).Where(p => p.CampaignCharacterId.HasValue || p.MapNpcId.HasValue).ToList()
+        var characterPieces = await _mapTokenRepository.ListCharacterPiecesByCampaignAsync(campaignId);
+        var maps = await LoadMapsAsync(characterPieces.Select(p => p.MapId)
+            .Concat(entries.Where(e => e.MapId.HasValue).Select(e => e.MapId!.Value)));
+        var mapNames = maps.ToDictionary(m => m.MapId, m => m.Name);
+        var pieces = maps.Count > 0
+            ? (await _mapTokenRepository.ListByMapIdsAsync(mapNames.Keys)).Where(p => p.CampaignCharacterId.HasValue || p.MapNpcId.HasValue).ToList()
             : new List<MapToken>();
 
         // Names in batch: characters (and owners), NPC occurrences, NPCs and authors — shared with the turn data (027).
@@ -164,19 +166,18 @@ public partial class TurnService : ITurnService
             pieces.Where(p => p.MapNpcId.HasValue).Select(p => p.MapNpcId!.Value));
         var lines = BuildLines(entries, names);
 
-        // Finished turn: each piece where its last move up to that turn left it (when on this map).
-        var lastMoves = current || mapId == null
+        // Finished turn: each piece where its last move up to that turn left it (when on the map where it is now).
+        var lastMoves = current || maps.Count == 0
             ? new Dictionary<(long?, long?), Turn>()
-            : (await _repository.ListLastMovementsAsync(campaignId, number)).Where(t => t.MapId == mapId)
-                .ToDictionary(t => (t.CharacterId, t.MapNpcId));
+            : (await _repository.ListLastMovementsAsync(campaignId, number)).ToDictionary(t => (t.CharacterId, t.MapNpcId));
         var positions = pieces.Select(p =>
         {
             long? characterId = p.CampaignCharacterId is long cc && participations.TryGetValue(cc, out var ch) ? ch : null;
             var key = (characterId, characterId.HasValue ? null : p.MapNpcId);
-            var (x, y, look) = lastMoves.TryGetValue(key, out var move) && move is { X: int mx, Y: int my, Look: int ml }
+            var (x, y, look) = lastMoves.TryGetValue(key, out var move) && move.MapId == p.MapId && move is { X: int mx, Y: int my, Look: int ml }
                 ? (mx, my, ml) : (p.X, p.Y, p.Look);
             var label = characterId is long cid ? names.CharacterLabel(cid) : names.NpcLabel(p.MapNpcId, null);
-            return new SummaryPosition(label, x, y, look);
+            return new SummaryPosition(label, x, y, look, mapNames.GetValueOrDefault(p.MapId));
         }).ToList();
 
         return new TurnSummaryInfo { CampaignId = campaignId, TurnNo = number, Markdown = TurnSummary.Build(lines, positions) };
@@ -206,7 +207,7 @@ public partial class TurnService : ITurnService
             campaign = await _campaignRepository.GetByIdAsync(campaignId)
                 ?? throw new KeyNotFoundException("Campanha não encontrada.");
             actor = await ResolveCharacterActorAsync(userId, campaign, characterId);
-            mapId = campaign.CurrentMapId;
+            mapId = await CharacterMapIdAsync(campaign.CampaignId, characterId);
         }
         else
             throw new DomainValidationException("mapTokenId",
@@ -317,7 +318,7 @@ public partial class TurnService : ITurnService
         var finished = campaign.CurrentTurn;
         campaign.AdvanceTurn();
         // The chat shows where the turn ended (041).
-        var divider = Turn.TurnFinished(campaignId, campaign.CurrentMapId, finished, userId);
+        var divider = Turn.TurnFinished(campaignId, null, finished, userId);
         // 099: every active repeated action is the actor's action of the new turn.
         var repeated = await RepeatedActionsAsync(campaign, userId);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>

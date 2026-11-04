@@ -410,11 +410,10 @@ public class MapPaintServiceTests
     // ---- audience ----
 
     [Fact]
-    public void PaintEvent_OfAMapThatIsNotCurrent_GoesOnlyToTheMaster()
+    public void PaintEvent_GoesToWhoIsOnTheMap()
     {
         var tableEvent = TableEvents.Create(TableEventType.MAP_PAINT_CHANGED, 10, MASTER, MAP);
 
-        TableEventAudience.For(tableEvent, currentMapId: 31).Should().Be(TableEventAudienceKind.MasterOnly);
-        TableEventAudience.For(tableEvent, currentMapId: MAP).Should().Be(TableEventAudienceKind.Everyone);
+        TableEventAudience.For(tableEvent).Should().Be(TableEventAudienceKind.Map);
     }
 }

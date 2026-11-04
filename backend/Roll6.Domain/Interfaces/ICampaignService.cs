@@ -10,7 +10,7 @@ public interface ICampaignService
     Task<CampaignInfo> GetByIdAsync(long campaignId);
     /// <summary>Same rule as <see cref="GetByIdAsync"/>: any logged-in user. 404 when the slug does not exist.</summary>
     Task<CampaignInfo> GetBySlugAsync(string slug);
-    /// <summary>Campaigns the user masters or plays, with the active map the table follows.</summary>
+    /// <summary>Campaigns the user masters or plays, with the maps each may open (108).</summary>
     Task<List<CampaignTableInfo>> ListTableAsync(long userId);
     Task<CampaignInfo> CreateAsync(long userId, CampaignInsertInfo info);
     Task<CampaignInfo> RenameAsync(long userId, long campaignId, CampaignInsertInfo info);
@@ -25,7 +25,4 @@ public interface ICampaignService
 
     /// <summary>True for the master and for users with an approved character (who may follow the table in real time).</summary>
     Task<bool> CanReadAsync(long userId, long campaignId);
-
-    /// <summary>Master: sets the map the players follow (017); publishes <c>map.current</c> when it changes.</summary>
-    Task<CampaignInfo> SetCurrentMapAsync(long userId, long campaignId, CampaignCurrentMapInfo info);
 }

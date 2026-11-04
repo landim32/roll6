@@ -109,7 +109,7 @@ body,
 }
 
 /* ---------- main layout ---------- */
-/* A player whose campaign has no current map yet (039): centered over the empty map area. */
+/* A player whose chosen character is on no map (108): centered over the empty map area. */
 .stm-no-map-notice {
   position: absolute;
   top: 50%;
@@ -725,6 +725,60 @@ body,
   position: absolute;
   inset: 0;
   overflow: hidden;
+}
+
+/* "O mestre está mudando o mapa" (108): a banner with a turning hex in the middle of the map, under the menu (10), over
+   the panels (9). It closes by itself and never takes the pointer. */
+.stm-map-changing {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.75rem 1.25rem;
+  background: var(--stm-surface);
+  border: 1px solid var(--stm-accent);
+  border-radius: var(--stm-radius);
+  box-shadow: var(--stm-shadow);
+  color: var(--stm-text);
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+  animation: stm-map-changing-in 0.2s ease-out;
+}
+
+.stm-map-changing::before {
+  content: "";
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.1rem;
+  background: var(--stm-accent);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  animation: stm-map-changing-hex 1.2s ease-in-out infinite;
+}
+
+@keyframes stm-map-changing-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 0.5rem));
+  }
+}
+
+@keyframes stm-map-changing-hex {
+  to {
+    transform: rotate(60deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stm-map-changing,
+  .stm-map-changing::before {
+    animation: none;
+  }
 }
 
 
@@ -2170,6 +2224,14 @@ button.stm-chat-quote { cursor: pointer; }
   align-items: center;
   gap: 4px;
   line-height: 1.2;
+}
+
+/* The map a character is on, on the master's cards (108). */
+.stm-party-map {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 .stm-party-name > span:first-child:not(.stm-turn-dot),

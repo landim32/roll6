@@ -554,21 +554,6 @@ public class CampaignController : ApiControllerBase
         }
     }
 
-    /// <summary>Master: sets the map the players follow (017); null clears it.</summary>
-    [HttpPut("{id:long}/current-map")]
-    [ProducesResponseType(typeof(CampaignInfo), StatusCodes.Status200OK)]
-    public async Task<IActionResult> SetCurrentMap(long id, [FromBody] CampaignCurrentMapInfo info)
-    {
-        try
-        {
-            return Ok(await _campaignService.SetCurrentMapAsync(CurrentUserId, id, info));
-        }
-        catch (Exception ex)
-        {
-            return HandleException(ex);
-        }
-    }
-
     /// <summary>Finishes the current turn (master); lists who hasn't acted unless forced.</summary>
     [HttpPost("{id:long}/turn/finish")]
     [ProducesResponseType(typeof(TurnFinishResultInfo), StatusCodes.Status200OK)]

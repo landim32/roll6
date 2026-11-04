@@ -14,9 +14,7 @@ public interface ICampaignRepository<TModel> where TModel : class
     Task<List<long>> ListGmModeIdsByOwnerAsync(long userId);
     /// <summary>Campaigns of all users (or only of <paramref name="ownerUserId"/>), optionally filtered by name.</summary>
     Task<(List<TModel> Items, int TotalCount)> ListPagedAsync(string? search, int skip, int take, long? ownerUserId);
-    /// <summary>
-    /// Campaigns the user masters or plays (approved character), ordered by name, with the active current map.
-    /// </summary>
+    /// <summary>Campaigns the user masters or plays (approved character), ordered by name.</summary>
     Task<List<CampaignTableRow>> ListTableAsync(long userId);
     Task<TModel> InsertAsync(TModel entity);
     Task<TModel> UpdateAsync(TModel entity);

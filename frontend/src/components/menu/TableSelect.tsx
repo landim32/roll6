@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { CampaignIcon, CollectionIcon, MapIcon } from '../ui/icons';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useMapEditor } from '../../hooks/useMapEditor';
+import { readStoredSelections } from '../../lib/characterSelection';
 import { tableEntries, triggerLabels } from '../../lib/tableSelect';
 import { isPlayable, statusLabelKey } from '../../lib/campaignStatus';
 import { isFreeMode } from '../../lib/freeMode';
@@ -16,9 +17,8 @@ interface TableSelectProps {
 /**
  * Single combo for the table: the trigger shows the open map over its campaign; the menu groups each campaign with
  * its maps below it, then the windows for other campaigns and maps. 078: by the user's role in each campaign — the
- * master sees his preparing/active campaigns with every current and active map (the current one marked "Atual"), a
- * player only his active campaigns with their current map. Choosing a map only opens it ("Tornar atual" moves the
- * players).
+ * master sees his preparing/active campaigns with every active map, a player only his active campaigns with the map of
+ * his chosen character (108). Choosing a map only opens it.
  */
 export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => {
   const { t } = useTranslation();
@@ -29,7 +29,7 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
   const entries = tableEntries(tableCampaigns, {
     campaignId: currentCampaign?.campaignId ?? null,
     mapId: draft.mapId,
-  });
+  }, readStoredSelections());
   // 049: a campaign that is not active says so next to its name.
   const statusOf = new Map(tableCampaigns.map((campaign) => [String(campaign.campaignId), campaign.status]));
   const statusBadge = (status: number | undefined) => (isPlayable(status) ? null : (
@@ -80,9 +80,6 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
                 >
                   <MapIcon size={12} />
                   <span className="text-truncate">{map.label}</span>
-                  {entry.isMaster && map.isCurrent && (
-                    <span className="badge text-bg-info ms-auto flex-shrink-0">{t('menu.currentMap')}</span>
-                  )}
                 </DropdownMenu.Item>
               ))}
               {entry.maps.length === 0 && (
@@ -91,7 +88,7 @@ export const TableSelect = ({ onOpenCampaign, onOpenMap }: TableSelectProps) => 
                   onSelect={() => navigate(entry.campaignPath)}
                 >
                   <MapIcon size={12} />
-                  <span className="text-truncate">{t('menu.noActiveMap')}</span>
+                  <span className="text-truncate">{t(entry.isMaster ? 'menu.noActiveMap' : 'menu.noMap')}</span>
                 </DropdownMenu.Item>
               )}
             </div>

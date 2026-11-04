@@ -191,8 +191,9 @@ public class CharacterService : ICharacterService
                 continue;
             var campaign = await _campaignRepository.GetByIdAsync(campaignId);
             if (campaign != null)
-                turns.Add(Turn.CharacterUpdate(campaign.CampaignId, campaign.CurrentMapId, character.CharacterId, null, null,
-                    campaign.CurrentTurn, userId, changes));
+                turns.Add(Turn.CharacterUpdate(campaign.CampaignId,
+                    (await _mapTokenRepository.GetByCampaignCharacterAsync(participation.CampaignCharacterId))?.MapId,
+                    character.CharacterId, null, null, campaign.CurrentTurn, userId, changes));
         }
         return turns;
     }

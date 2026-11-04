@@ -48,6 +48,7 @@ public class CampaignServiceTests
         });
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns<Func<Task>>(action => action());
         _mapRepository.Setup(r => r.ListPlayableByCampaignsAsync(It.IsAny<IReadOnlyCollection<long>>())).ReturnsAsync(new List<Map>());
+        _mapTokenRepository.Setup(r => r.ListMapsByCampaignsAsync(It.IsAny<IReadOnlyCollection<long>>())).ReturnsAsync(new List<CharacterMapRow>());
         _mapRepository.Setup(r => r.UpdateAsync(It.IsAny<Map>())).ReturnsAsync((Map m) => m);
         _turnRepository.Setup(r => r.ListChatMediaAsync(It.IsAny<long>())).ReturnsAsync(new List<string>());
         _service = new CampaignService(_repository.Object, _mapRepository.Object, _mapTokenRepository.Object,
@@ -145,11 +146,11 @@ public class CampaignServiceTests
     }
 
     [Fact]
-    public async Task ListTable_SetsMasterAndKeepsMissingMapNull()
+    public async Task ListTable_SetsMaster()
     {
         _repository.Setup(r => r.ListTableAsync(1)).ReturnsAsync(new List<CampaignTableRow>
         {
-            new() { CampaignId = 10, UserId = 1, Name = "Tormento Vil", Slug = "tormento-vil", CurrentMapId = 12, CurrentMapName = "Estrada 1", CurrentMapSlug = "estrada-1" },
+            new() { CampaignId = 10, UserId = 1, Name = "Tormento Vil", Slug = "tormento-vil" },
             new() { CampaignId = 9, UserId = 2, Name = "Teste 2", Slug = "teste-2" }
         });
 
@@ -157,11 +158,7 @@ public class CampaignServiceTests
 
         result.Should().HaveCount(2);
         result[0].IsMaster.Should().BeTrue();
-        result[0].CurrentMapSlug.Should().Be("estrada-1");
         result[1].IsMaster.Should().BeFalse();
-        result[1].CurrentMapId.Should().BeNull();
-        result[1].CurrentMapName.Should().BeNull();
-        result[1].CurrentMapSlug.Should().BeNull();
     }
 
     [Fact]
@@ -262,114 +259,70 @@ public class CampaignServiceTests
         await _service.Invoking(s => s.CanReadAsync(1, 99)).Should().ThrowAsync<KeyNotFoundException>();
     }
 
-    [Fact]
-    public async Task SetCurrentMap_Master_SavesAndPublishes()
-    {
-        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Active });
-
-        var result = await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 30 });
-
-        result.CurrentMapId.Should().Be(30);
-        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
-            e.Type == TableEventType.MAP_CURRENT && e.CampaignId == 10 && e.MapId == 30 && e.ActorUserId == 1)), Times.Once);
-    }
-
-    [Fact]
-    public async Task SetCurrentMap_SameMap_DoesNotPublish()
-    {
-        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
-        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Current });
-
-        await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 30 });
-
-        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
-        Published(TableEventType.MAP_CURRENT, Times.Never());
-    }
-
     // ---- 078: the map's status says which map is current ----
 
     [Fact]
-    public async Task SetCurrentMap_SwapsCurrentAndActive_InOneTransaction()
+    public async Task ListTable_TheMasterGetsEveryActiveMapWithAllItsCharacters()
     {
-        var old = new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Current, Name = "A" };
-        var next = new Map { MapId = 31, CampaignId = 10, Status = MapStatus.Active, Name = "B" };
-        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
-        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(old);
-        _mapRepository.Setup(r => r.GetByIdAsync(31)).ReturnsAsync(next);
-        var saved = new List<(long, MapStatus)>();
-        _mapRepository.Setup(r => r.UpdateAsync(It.IsAny<Map>())).Callback((Map m) => saved.Add((m.MapId, m.Status))).ReturnsAsync((Map m) => m);
-
-        var result = await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 31 });
-
-        // The old one first: the unique index allows one Current per campaign.
-        saved.Should().Equal((30L, MapStatus.Active), (31L, MapStatus.Current));
-        result.CurrentMapId.Should().Be(31);
-        _unitOfWork.Verify(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>()), Times.Once);
-        Published(TableEventType.MAP_CURRENT, Times.Once());
-        Published(TableEventType.MAPS_CHANGED, Times.Once());
-    }
-
-    [Fact]
-    public async Task SetCurrentMap_None_LeavesTheOldOneActive()
-    {
-        var old = new Map { MapId = 30, CampaignId = 10, Status = MapStatus.Current };
-        _repository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
-        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(old);
-
-        var result = await _service.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = null });
-
-        old.Status.Should().Be(MapStatus.Active);
-        result.CurrentMapId.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task ListTable_GivesTheMasterHisPlayableMaps_CurrentFirst_AndPlayersNone()
-    {
-        _repository.Setup(r => r.ListTableAsync(1)).ReturnsAsync(new List<CampaignTableRow>
-        {
-            new() { CampaignId = 10, UserId = 1, Name = "Tormento Vil", Slug = "tormento-vil", CurrentMapId = 31 },
-            new() { CampaignId = 9, UserId = 2, Name = "Outra", Slug = "outra", CurrentMapId = 40 }
-        });
-        _mapRepository.Setup(r => r.ListPlayableByCampaignsAsync(It.Is<IReadOnlyCollection<long>>(ids => ids.SequenceEqual(new[] { 10L }))))
-            .ReturnsAsync(new List<Map>
-            {
-                new() { MapId = 30, CampaignId = 10, Name = "Taberna 1", Slug = "taberna-1", Status = MapStatus.Active },
-                new() { MapId = 32, CampaignId = 10, Name = "Estrada 1", Slug = "estrada-1", Status = MapStatus.Active },
-                new() { MapId = 31, CampaignId = 10, Name = "Casa de apostas 1", Slug = "casa-de-apostas-1", Status = MapStatus.Current }
-            });
+        SetupSplitTable();
 
         var result = await _service.ListTableAsync(1);
 
-        result[0].Maps.Select(m => (m.MapId, m.Status)).Should().Equal((31L, 4), (32L, 1), (30L, 1));
-        result[1].Maps.Should().BeEmpty();
+        result[0].Maps.Select(m => (m.MapId, m.Status, m.CharacterCount)).Should().Equal((32L, 1, 0), (30L, 1, 2));
+        result[0].Maps[1].CharacterIds.Should().Equal(5, 7);
     }
 
     [Fact]
-    public async Task SetCurrentMap_PlayerOrForeignOrDeletedMap_Throws()
+    public async Task ListTable_APlayerGetsOnlyTheMapsOfHisCharacters_CountingOnlyThose()
     {
-        _mapRepository.Setup(r => r.GetByIdAsync(31)).ReturnsAsync(new Map { MapId = 31, CampaignId = 11, Status = MapStatus.Active });
-        _mapRepository.Setup(r => r.GetByIdAsync(32)).ReturnsAsync(new Map { MapId = 32, CampaignId = 10, Status = MapStatus.Deleted });
+        SetupSplitTable();
 
-        await _service.Invoking(s => s.SetCurrentMapAsync(2, 10, new CampaignCurrentMapInfo { MapId = 31 }))
-            .Should().ThrowAsync<UnauthorizedAccessException>();
-        await _service.Invoking(s => s.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 31 }))
-            .Should().ThrowAsync<DomainValidationException>();
-        await _service.Invoking(s => s.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 32 }))
-            .Should().ThrowAsync<DomainValidationException>();
-        Published(TableEventType.MAP_CURRENT, Times.Never());
+        var result = await _service.ListTableAsync(1);
+
+        result[1].Maps.Should().ContainSingle();
+        result[1].Maps[0].MapId.Should().Be(40);
+        result[1].Maps[0].CharacterCount.Should().Be(1);
+        result[1].Maps[0].CharacterIds.Should().Equal(3);
     }
 
     [Fact]
-    public async Task SetCurrentMap_ArchivedMap_IsRefused()
+    public async Task ListTable_APlayerOffEveryMap_GetsNoMaps()
     {
-        _mapRepository.Setup(r => r.GetByIdAsync(33)).ReturnsAsync(new Map { MapId = 33, CampaignId = 10, Status = MapStatus.Archived });
+        _repository.Setup(r => r.ListTableAsync(1)).ReturnsAsync(new List<CampaignTableRow>
+        {
+            new() { CampaignId = 9, UserId = 2, Name = "Outra", Slug = "outra" }
+        });
+        _mapRepository.Setup(r => r.ListPlayableByCampaignsAsync(It.IsAny<IReadOnlyCollection<long>>())).ReturnsAsync(new List<Map>
+        {
+            new() { MapId = 40, CampaignId = 9, Name = "Porão", Slug = "porao", Status = MapStatus.Active }
+        });
 
-        var error = await _service.Invoking(s => s.SetCurrentMapAsync(1, 10, new CampaignCurrentMapInfo { MapId = 33 }))
-            .Should().ThrowAsync<DomainValidationException>();
+        (await _service.ListTableAsync(1)).Single().Maps.Should().BeEmpty();
+    }
 
-        error.Which.Errors.Should().ContainKey("mapId");
-        _repository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
-        Published(TableEventType.MAP_CURRENT, Times.Never());
+    /// <summary>User 1 masters campaign 10 and plays campaign 9, where another player's character shares the map.</summary>
+    private void SetupSplitTable()
+    {
+        _repository.Setup(r => r.ListTableAsync(1)).ReturnsAsync(new List<CampaignTableRow>
+        {
+            new() { CampaignId = 10, UserId = 1, Name = "Tormento Vil", Slug = "tormento-vil" },
+            new() { CampaignId = 9, UserId = 2, Name = "Outra", Slug = "outra" }
+        });
+        _mapRepository.Setup(r => r.ListPlayableByCampaignsAsync(It.IsAny<IReadOnlyCollection<long>>())).ReturnsAsync(new List<Map>
+        {
+            new() { MapId = 30, CampaignId = 10, Name = "Taberna 1", Slug = "taberna-1", Status = MapStatus.Active },
+            new() { MapId = 32, CampaignId = 10, Name = "Estrada 1", Slug = "estrada-1", Status = MapStatus.Active },
+            new() { MapId = 40, CampaignId = 9, Name = "Porão", Slug = "porao", Status = MapStatus.Active },
+            new() { MapId = 41, CampaignId = 9, Name = "Taverna", Slug = "taverna", Status = MapStatus.Active }
+        });
+        _mapTokenRepository.Setup(r => r.ListMapsByCampaignsAsync(It.IsAny<IReadOnlyCollection<long>>())).ReturnsAsync(new List<CharacterMapRow>
+        {
+            new() { CampaignId = 10, MapId = 30, CharacterId = 7, OwnerUserId = 2 },
+            new() { CampaignId = 10, MapId = 30, CharacterId = 5, OwnerUserId = 3 },
+            new() { CampaignId = 9, MapId = 40, CharacterId = 3, OwnerUserId = 1 },
+            new() { CampaignId = 9, MapId = 40, CharacterId = 4, OwnerUserId = 2 },
+            new() { CampaignId = 9, MapId = 41, CharacterId = 6, OwnerUserId = 2 }
+        });
     }
 
     [Fact]

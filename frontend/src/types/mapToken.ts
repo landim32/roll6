@@ -121,6 +121,8 @@ export interface MapTokenCharacterInsertInfo {
   tokenId: number | null;
   x: number;
   y: number;
+  /** The master confirmed bringing the character from another map (108); without it that case is a 409. */
+  transfer?: boolean;
 }
 
 export interface MapTokenPositionInfo {
@@ -128,7 +130,7 @@ export interface MapTokenPositionInfo {
   y: number;
   /** New facing (0–5); omitted keeps the current one. */
   look?: number;
-  /** A free-mode walk position (069): own standing character, current map, other pieces ignored. */
+  /** A free-mode walk position (069): own standing character, other pieces ignored. */
   walk?: boolean;
 }
 

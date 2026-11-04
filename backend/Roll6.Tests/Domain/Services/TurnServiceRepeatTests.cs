@@ -99,7 +99,7 @@ public partial class TurnServiceTests
     [Fact]
     public async Task Finish_AppliesEveryRepetitionToTheNewTurn()
     {
-        _campaign.CurrentMapId = MAP;
+        _tablePieces.Add(_ariaPiece);
         _campaignCharacterRepository.Setup(r => r.ListByCampaignAsync(CAMPAIGN, true)).ReturnsAsync(new List<CampaignCharacter> { AriaPlay("Ataco") });
         _campaignCharacterRepository.Setup(r => r.ListRepeatingAsync(CAMPAIGN)).ReturnsAsync(new List<CampaignCharacter> { AriaPlay("Ataco") });
         _mapNpcRepository.Setup(r => r.ListRepeatingAsync(CAMPAIGN)).ReturnsAsync(new List<MapNpc>

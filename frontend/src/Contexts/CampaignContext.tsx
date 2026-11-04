@@ -10,7 +10,7 @@ import type { ListQuery, PagedList } from '../types/common';
 interface CampaignContextType {
   // State
   currentCampaign: CampaignInfo | null;
-  /** Campaigns the user masters or plays, with the map the table follows. */
+  /** Campaigns the user masters or plays, with their maps. */
   tableCampaigns: CampaignTableInfo[];
   /** The logged user is the master (owner) of the current campaign. */
   isMaster: boolean;
@@ -23,11 +23,6 @@ interface CampaignContextType {
   getCampaignBySlug: (slug: string) => Promise<CampaignInfo>;
   /** Reloads the table combo. A failed call keeps the list already shown. */
   refreshTableCampaigns: () => Promise<void>;
-  /**
-   * The master's deliberate "Tornar atual" (048): the map becomes the one the players follow. It never opens the map
-   * for the master. Throws the API error (the previous current map stays).
-   */
-  makeCurrentMap: (mapId: number) => Promise<CampaignInfo>;
   /** The master changes the campaign status (049). Throws the API error (the previous status stays). */
   setCampaignStatus: (status: number) => Promise<CampaignInfo>;
   /** The master switches the free mode (054). Throws the API error (the previous value stays). Never touches the turn. */
@@ -51,8 +46,6 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   const [tableCampaigns, setTableCampaigns] = useState<CampaignTableInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const currentRef = useRef<CampaignInfo | null>(null);
-  currentRef.current = currentCampaign;
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
@@ -75,13 +68,10 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const selectCampaign = useCallback((campaign: CampaignInfo | null) => {
-    const previousMapId = currentRef.current?.currentMapId ?? null;
-    currentRef.current = campaign;
     setCurrentCampaign(campaign);
     if (campaign) localStorage.setItem(CAMPAIGN_STORAGE_KEY, String(campaign.campaignId));
     else localStorage.removeItem(CAMPAIGN_STORAGE_KEY);
-    if (campaign && previousMapId !== (campaign.currentMapId ?? null)) void refreshTableCampaigns();
-  }, [refreshTableCampaigns]);
+  }, []);
 
   const listCampaigns = useCallback(async (query: ListQuery): Promise<PagedList<CampaignInfo>> => {
     try {
@@ -142,12 +132,6 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   const isMaster = !!currentCampaign && !!session && currentCampaign.userId === session.user.userId;
 
   const currentCampaignId = currentCampaign?.campaignId ?? null;
-  const makeCurrentMap = useCallback(async (mapId: number): Promise<CampaignInfo> => {
-    if (currentCampaignId === null) throw new Error('no campaign');
-    const campaign = await campaignService.setCurrentMap(currentCampaignId, mapId);
-    selectCampaign(campaign);
-    return campaign;
-  }, [currentCampaignId, selectCampaign]);
 
   const setCampaignStatus = useCallback(async (status: number): Promise<CampaignInfo> => {
     if (currentCampaignId === null) throw new Error('no campaign');
@@ -189,8 +173,8 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo<CampaignContextType>(() => ({
     currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug,
-    refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, setPendingNotice, setGmMode, setCampaignImage, selectCampaign, clearError,
-  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, makeCurrentMap, setCampaignStatus, setFreeMode, setPendingNotice, setGmMode, setCampaignImage, selectCampaign, clearError]);
+    refreshTableCampaigns, setCampaignStatus, setFreeMode, setPendingNotice, setGmMode, setCampaignImage, selectCampaign, clearError,
+  }), [currentCampaign, tableCampaigns, isMaster, loading, error, listCampaigns, createCampaign, getCampaignBySlug, refreshTableCampaigns, setCampaignStatus, setFreeMode, setPendingNotice, setGmMode, setCampaignImage, selectCampaign, clearError]);
 
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 };

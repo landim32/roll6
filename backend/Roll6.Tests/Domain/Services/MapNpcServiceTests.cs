@@ -94,6 +94,31 @@ public class MapNpcServiceTests
     }
 
     [Fact]
+    public async Task Create_SameNpcOnTwoMaps_BothStay_WithoutAnyConfirmation()
+    {
+        const long OTHER_MAP = MAP + 1;
+        _mapRepository.Setup(r => r.GetByIdAsync(OTHER_MAP)).ReturnsAsync(new Map { MapId = OTHER_MAP, CampaignId = CAMPAIGN, MapModelId = 50, UserId = MASTER, Status = MapStatus.Active });
+        _repository.Setup(r => r.ListByMapAsync(OTHER_MAP)).ReturnsAsync(new List<MapNpc>());
+
+        await _service.CreateAsync(MASTER, At(1, 1));
+        await _service.CreateAsync(MASTER, new MapNpcInsertInfo { MapId = OTHER_MAP, NpcId = NPC, X = 1, Y = 1 });
+
+        _insertedPieces.Select(p => p.MapId).Should().Equal(MAP, OTHER_MAP);
+        _mapTokenRepository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+        _mapTokenRepository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_NpcPieces_StayOutsideTheOneMapPerCharacterRule()
+    {
+        await _service.CreateAsync(MASTER, At(1, 1));
+        await _service.CreateAsync(MASTER, At(2, 1));
+
+        _insertedPieces.Should().OnlyContain(p => p.CampaignCharacterId == null && p.MapNpcId != null);
+        _mapTokenRepository.Verify(r => r.GetByCampaignCharacterAsync(It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Create_TwiceTheSameNpc_TwoOccurrences()
     {
         var first = await _service.CreateAsync(MASTER, At(1, 1));

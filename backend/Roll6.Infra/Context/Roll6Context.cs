@@ -110,7 +110,6 @@ public class Roll6Context : DbContext
             entity.HasIndex(e => e.Slug).IsUnique().HasDatabaseName("ix_campaigns_slug");
             entity.Property(e => e.Open).HasColumnName("open");
             entity.Property(e => e.CurrentTurn).HasColumnName("current_turn").HasDefaultValue(1).HasSentinel(0);
-            entity.Property(e => e.CurrentMapId).HasColumnName("current_map_id");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>()
                 .HasDefaultValue(CampaignStatus.Active).HasSentinel((CampaignStatus)0);
             entity.Property(e => e.FreeMode).HasColumnName("free_mode").HasDefaultValue(false);
@@ -118,9 +117,6 @@ public class Roll6Context : DbContext
             entity.Property(e => e.PendingNotice).HasColumnName("pending_notice").HasDefaultValue(true).HasSentinel(true);
             entity.Property(e => e.GmMode).HasColumnName("gm_mode").HasDefaultValue(false);
             entity.Property(e => e.Image).HasColumnName("image").HasMaxLength(260);
-            // Map the table follows (017); a map belongs to its campaign, so no navigation both ways.
-            entity.HasOne<Map>().WithMany().HasForeignKey(e => e.CurrentMapId)
-                .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_campaign_current");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             HasOwner(entity, "fk_user_campaign");
@@ -138,8 +134,6 @@ public class Roll6Context : DbContext
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(260).IsRequired();
             entity.Property(e => e.Slug).HasColumnName("slug").HasMaxLength(Slug.MAX_LENGTH).IsRequired();
             entity.HasIndex(e => e.Slug).IsUnique().HasDatabaseName("ix_maps_slug");
-            // 078: at most one current map ("Atual", status 4) per campaign.
-            entity.HasIndex(e => e.CampaignId).IsUnique().HasFilter("status = 4").HasDatabaseName("ix_maps_campaign_current");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>().HasDefaultValue(MapStatus.Active).HasSentinel((MapStatus)0);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
@@ -303,10 +297,11 @@ public class Roll6Context : DbContext
             entity.Property(e => e.CampaignCharacterId).HasColumnName("campaign_character_id");
             entity.HasOne<CampaignCharacter>().WithMany().HasForeignKey(e => e.CampaignCharacterId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_campaign_character_map_token");
-            entity.HasIndex(e => new { e.MapId, e.CampaignCharacterId })
+            // 108: a character stands on one map at most, whatever map that is.
+            entity.HasIndex(e => e.CampaignCharacterId)
                 .IsUnique()
                 .HasFilter("campaign_character_id IS NOT NULL")
-                .HasDatabaseName("ix_map_tokens_map_campaign_character");
+                .HasDatabaseName("ix_map_tokens_campaign_character");
             entity.Property(e => e.MapNpcId).HasColumnName("map_npc_id");
             entity.HasOne<MapNpc>().WithMany().HasForeignKey(e => e.MapNpcId)
                 .OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("fk_map_npc_map_token");

@@ -12,8 +12,8 @@ using Roll6.Infra.Interfaces.Repository;
 namespace Roll6.Application.Realtime;
 
 /// <summary>
-/// Sends table events to the campaign group through the SignalR hub (017); failures are only logged. Piece events of a
-/// map that isn't the campaign's current one go only to the master's connections (039, <see cref="TableEventAudience"/>).
+/// Sends table events to the campaign group through the SignalR hub (017); failures are only logged. Piece and paint
+/// events of a map go only to the master and to the owners of the characters on it (108, <see cref="TableEventAudience"/>).
 /// </summary>
 public class SignalRRealtimeNotifier : IRealtimeNotifier, INoticeChannel
 {
@@ -35,9 +35,9 @@ public class SignalRRealtimeNotifier : IRealtimeNotifier, INoticeChannel
     {
         try
         {
-            if (TableEventAudience.NeedsCampaign(tableEvent.Type, tableEvent.MapId))
+            if (TableEventAudience.For(tableEvent) == TableEventAudienceKind.Map)
             {
-                // This singleton reads the campaign in a scope of its own (the repository is scoped).
+                // This singleton reads the campaign in a scope of its own (the repositories are scoped).
                 using var scope = _scopes.CreateScope();
                 var campaign = await scope.ServiceProvider.GetRequiredService<ICampaignRepository<Campaign>>()
                     .GetByIdAsync(tableEvent.CampaignId);
@@ -46,13 +46,13 @@ public class SignalRRealtimeNotifier : IRealtimeNotifier, INoticeChannel
                     _logger.LogWarning("Campaign {CampaignId} not found for {Type}", tableEvent.CampaignId, tableEvent.Type);
                     return;
                 }
-                if (TableEventAudience.For(tableEvent, campaign.CurrentMapId) == TableEventAudienceKind.MasterOnly)
-                {
-                    var masterConnections = _connections.ConnectionsOf(campaign.UserId, tableEvent.CampaignId);
-                    if (masterConnections.Count > 0)
-                        await _hub.Clients.Clients(masterConnections).SendAsync(TableHub.EVENT_METHOD, tableEvent);
-                    return;
-                }
+                var owners = await scope.ServiceProvider.GetRequiredService<IMapTokenRepository<MapToken>>()
+                    .ListCharacterOwnerIdsAsync(tableEvent.MapId!.Value);
+                var audience = owners.Append(campaign.UserId).Distinct()
+                    .SelectMany(userId => _connections.ConnectionsOf(userId, tableEvent.CampaignId)).ToList();
+                if (audience.Count > 0)
+                    await _hub.Clients.Clients(audience).SendAsync(TableHub.EVENT_METHOD, tableEvent);
+                return;
             }
             await _hub.Clients.Group(TableConnections.GroupName(tableEvent.CampaignId))
                 .SendAsync(TableHub.EVENT_METHOD, tableEvent);

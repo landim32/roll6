@@ -246,8 +246,8 @@ public static class ChatTools
         in any mode (free mode included).
         Who can use it: the character's owner or the campaign master.
         Returns: the updated item. {{ITEM}}
-        Common errors: 400 not a text/action of a character, another turn, text over 2000 characters, the character has no
-        piece on the campaign's current map; 403 not the owner nor the master; 404 not found.
+        Common errors: 400 not a text/action of a character, another turn, text over 2000 characters; 403 not the owner
+        nor the master; 404 not found.
         Related tools: act_in_turn, list_chat_messages, get_turn_data.
         """)]
     public static Task<CallToolResult> ConvertChatEntry(

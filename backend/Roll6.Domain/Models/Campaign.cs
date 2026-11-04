@@ -21,9 +21,6 @@ public class Campaign
     /// <summary>Current turn of the campaign (016), starting at 1.</summary>
     public int CurrentTurn { get; set; } = 1;
 
-    /// <summary>Campaign map the master opened last (017): players follow it. Null when there is none.</summary>
-    public long? CurrentMapId { get; set; }
-
     /// <summary>
     /// Status (049). The model default is <see cref="CampaignStatus.Active"/> (what every campaign was before 049);
     /// <c>CampaignService.CreateAsync</c> starts new campaigns as <see cref="CampaignStatus.Preparing"/>.
@@ -86,13 +83,6 @@ public class Campaign
         if (turnNo < 1)
             throw new DomainValidationException("turnNo", "O turno deve ser maior que zero.");
         CurrentTurn = turnNo;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>Sets (or clears) the map the table follows.</summary>
-    public void SetCurrentMap(long? mapId)
-    {
-        CurrentMapId = mapId;
         UpdatedAt = DateTime.UtcNow;
     }
 

@@ -10,7 +10,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useMapToken } from '../../hooks/useMapToken';
-import { PARTICIPATION_MODE, participationMode } from '../../lib/campaignCharacterForm';
+import { participationMode } from '../../lib/campaignCharacterForm';
 import type { ParticipationMode } from '../../lib/campaignCharacterForm';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
 
@@ -35,7 +35,7 @@ export const PartyPanel = ({ onOpen, onEditNpc, onEditInstance, onRemoveInstance
   const { session } = useAuth();
   const { isMaster } = useCampaign();
   const { party, currentSelection } = useCharacter();
-  const { canPlace, canPlaceOwn } = useMapToken();
+  const { canPlace } = useMapToken();
   const { campaignNpcs } = useNpc();
 
   if (party.length === 0) return null;
@@ -73,8 +73,9 @@ export const PartyPanel = ({ onOpen, onEditNpc, onEditInstance, onRemoveInstance
             current={currentSelection === member.characterId}
             mode={mode}
             onOpen={() => onOpen(member, mode)}
-            // The master drags any card; a player only his own characters' cards.
-            draggable={canPlace || (canPlaceOwn && mode === PARTICIPATION_MODE.owner)}
+            // Only the master puts characters on maps (108); he also sees where each one is.
+            draggable={canPlace}
+            showMap={isMaster}
           />,
           ...(byMaster.get(member.campaignCharacterId) ?? []).map((npc) => allyCard(npc, owner, true)),
         ];

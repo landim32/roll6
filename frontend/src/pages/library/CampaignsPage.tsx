@@ -6,6 +6,8 @@ import { useCampaign } from '../../hooks/useCampaign';
 import { campaignEditPath, campaignNewPath } from '../../lib/libraryRoutes';
 import type { CampaignSubsection } from '../../lib/libraryRoutes';
 import { statusLabelKey } from '../../lib/campaignStatus';
+import { readStoredSelections } from '../../lib/characterSelection';
+import { playerMaps } from '../../lib/tableSelect';
 import type { CampaignInfo } from '../../types/campaign';
 import type { PagedList } from '../../types/common';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
@@ -118,7 +120,7 @@ export const CampaignsPage = ({ subsection }: CampaignsPageProps) => {
               figure={figure(campaign.imageUrl, campaign.name)}
               fallback={<CampaignIcon />}
               onOpen={() => play(campaign.slug, campaign.name)}
-              meta={campaign.currentMapName ?? undefined}
+              meta={playerMaps(campaign, readStoredSelections()).map((map) => map.name).join(', ') || undefined}
               badges={<span className="badge text-bg-secondary">{t(statusLabelKey(campaign.status))}</span>}
               actions={playButton(campaign.slug, campaign.name)}
             />

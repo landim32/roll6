@@ -34,6 +34,11 @@ interface CharacterContextType {
   myCharacters: CharacterInfo[];
   /** Participations of the user's characters in the current campaign. */
   myParticipations: CampaignCharacterInfo[];
+  /**
+   * Campaign `myParticipations` belong to: they lag one render behind a switch, so "not loaded yet" isn't mistaken for
+   * "the character is off every map" (108). Undefined before the first load.
+   */
+  participationsLoadedFor: number | null | undefined;
   /** Combo options: GM (master only) + own approved characters. */
   options: CharacterOption[];
   currentSelection: CharacterSelection | null;
@@ -187,9 +192,10 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
     void refreshParty();
   }, [refreshParty]);
 
-  // Real-time table (017): participations and party change for everyone at once.
+  // Real-time table (017): participations and party change for everyone at once; `character.map` (108) says where a
+  // character is now, which the map editor follows.
   useTableEvents((event) => {
-    if (event.type === TABLE_EVENT.partyChanged || event.type === TABLE_EVENT.resync) {
+    if (event.type === TABLE_EVENT.partyChanged || event.type === TABLE_EVENT.resync || event.type === TABLE_EVENT.characterMap) {
       void refresh(true);
       void refreshParty();
     }
@@ -350,7 +356,7 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
   const clearError = useCallback(() => setError(null), []);
 
   const value: CharacterContextType = {
-    myCharacters, myParticipations, options, currentSelection, currentCharacter, invites, party, loading, error,
+    myCharacters, myParticipations, participationsLoadedFor: loadedFor, options, currentSelection, currentCharacter, invites, party, loading, error,
     refresh, refreshParty, select, clearError,
     createCharacter, requestAccess, refreshInvites, acceptInvite, declineInvite,
     listCampaignCharacters, approve, deny, remove, invite, searchCharacters,

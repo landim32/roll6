@@ -75,6 +75,14 @@ public class CampaignCharacterInfo
     [JsonPropertyName("characterTokenId")]
     public long? CharacterTokenId { get; set; }
 
+    /// <summary>The map where the character stands (108); null off every map or when the reader may not know it.</summary>
+    [JsonPropertyName("mapId")]
+    public long? MapId { get; set; }
+
+    /// <summary>Name of <see cref="MapId"/> in the campaign.</summary>
+    [JsonPropertyName("mapName")]
+    public string? MapName { get; set; }
+
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 

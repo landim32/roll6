@@ -8,7 +8,7 @@ import { PARTICIPATION_MODE } from '../../lib/campaignCharacterForm';
 import { PARTICIPATION_DRAG_TYPE } from '../../lib/mapTokens';
 import type { ParticipationMode } from '../../lib/campaignCharacterForm';
 import type { CampaignCharacterInfo } from '../../types/campaignCharacter';
-import { ArrowRepeatIcon, EyeIcon, PencilIcon } from '../ui/icons';
+import { ArrowRepeatIcon, EyeIcon, MapIcon, PencilIcon } from '../ui/icons';
 import { PostureBadge } from '../ui/PostureBadge';
 import { POSTURE } from '../../types/mapToken';
 
@@ -21,13 +21,15 @@ interface PartyCardProps {
   onOpen: () => void;
   /** The master can drop the card on a hex of the open campaign map (011 US2). */
   draggable?: boolean;
+  /** The master sees which map the character is on (108). */
+  showMap?: boolean;
 }
 
 /**
  * One character of the party: round picture, name, life and energy bars (current/total), its status in the campaign
  * and its posture (031: badge when down or out of combat; out of combat also turns the picture black and white).
  */
-export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: PartyCardProps) => {
+export const PartyCard = ({ member, current, mode, onOpen, draggable = false, showMap = false }: PartyCardProps) => {
   const { t } = useTranslation();
   const { turnNo, entries } = useTurn();
   const view = mode === PARTICIPATION_MODE.viewer;
@@ -66,6 +68,12 @@ export const PartyCard = ({ member, current, mode, onOpen, draggable = false }: 
         <VitalBar label={t('party.energy')} current={member.currentEnergy} total={member.totalEnergy} variant="energy" />
         {member.characterStatus && (
           <small className="d-block text-body-secondary text-truncate" title={member.characterStatus}>{member.characterStatus}</small>
+        )}
+        {showMap && (
+          <small className="stm-party-map text-body-secondary" title={member.mapName ?? t('party.noMap')}>
+            <MapIcon size={10} />
+            <span className="text-truncate">{member.mapName ?? t('party.noMap')}</span>
+          </small>
         )}
       </div>
     </li>

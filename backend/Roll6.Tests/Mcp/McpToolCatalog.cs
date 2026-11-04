@@ -43,7 +43,8 @@ public static class McpToolCatalog
         "PUT /api/push/inbox/read",
         // 040: link previews for crawlers (anonymous HTML fragment and picture), not for assistants.
         "GET /api/meta/head/{**path}",
-        "GET /api/meta/image/map/{slug}.jpg"
+        "GET /api/meta/image/map/{slug}.jpg",
+        "GET /api/meta/image/campaign/{slug}.jpg"
     };
 
     public record Tool(MethodInfo Method, McpServerToolAttribute Attribute, string Name, string Description, ApiOperationAttribute? Operation);

@@ -16,9 +16,9 @@ public partial class TurnServiceTests
         new() { CampaignId = CAMPAIGN, CharacterId = characterId, Description = description };
 
     [Fact]
-    public async Task Act_ByCharacter_WithoutAPiece_RecordsTheActionOnTheCurrentMap()
+    public async Task Act_ByCharacter_RecordsTheActionOnTheMapWhereItStands()
     {
-        _campaign.CurrentMapId = MAP;
+        _tablePieces.Add(_ariaPiece);
 
         var result = await _service.ActAsync(PLAYER, ByCharacter(ARIA));
 
@@ -31,10 +31,8 @@ public partial class TurnServiceTests
     }
 
     [Fact]
-    public async Task Act_ByCharacter_WithoutACurrentMap_HasNoMap()
+    public async Task Act_ByCharacter_OffEveryMap_HasNoMap()
     {
-        _campaign.CurrentMapId = null;
-
         var result = await _service.ActAsync(PLAYER, ByCharacter(ARIA));
 
         result.MapId.Should().BeNull();

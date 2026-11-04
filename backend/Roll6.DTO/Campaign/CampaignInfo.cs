@@ -35,10 +35,6 @@ public class CampaignInfo
     [JsonPropertyName("gmMode")]
     public bool GmMode { get; set; }
 
-    /// <summary>Map the master opened last; players follow it (017).</summary>
-    [JsonPropertyName("currentMapId")]
-    public long? CurrentMapId { get; set; }
-
     /// <summary>The campaign's picture (090): the stored image name, null without one.</summary>
     [JsonPropertyName("image")]
     public string? Image { get; set; }

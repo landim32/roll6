@@ -82,7 +82,7 @@ public class MapRepository : IMapRepository<Map>
         if (campaignIds.Count == 0)
             return new List<Map>();
         return await _context.Maps.AsNoTracking()
-            .Where(e => campaignIds.Contains(e.CampaignId) && (e.Status == MapStatus.Active || e.Status == MapStatus.Current))
+            .Where(e => campaignIds.Contains(e.CampaignId) && e.Status == MapStatus.Active)
             .ToListAsync();
     }
 

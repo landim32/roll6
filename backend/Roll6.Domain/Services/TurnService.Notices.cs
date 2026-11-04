@@ -150,7 +150,7 @@ public partial class TurnService
             .OrderBy(u => u.Name, StringComparer.CurrentCulture)
             .Select(u => NoticeTexts.FirstName(u.Name))
             .ToList();
-        var saved = await _repository.InsertAsync(Turn.Poke(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId,
+        var saved = await _repository.InsertAsync(Turn.Poke(campaign.CampaignId, null, campaign.CurrentTurn, userId,
             string.IsNullOrEmpty(poker) ? "Alguém" : poker, NoticeTexts.JoinNames(names)));
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));
@@ -173,7 +173,7 @@ public partial class TurnService
         var poker = NoticeTexts.FirstName(users.FirstOrDefault(u => u.UserId == userId)?.Name);
         if (string.IsNullOrEmpty(poker))
             poker = "Alguém";
-        var saved = await _repository.InsertAsync(Turn.Poke(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId,
+        var saved = await _repository.InsertAsync(Turn.Poke(campaign.CampaignId, null, campaign.CurrentTurn, userId,
             poker, NoticeTexts.MASTER));
         var item = (await MapChatAsync(campaign, userId, new List<Turn> { saved })).Single();
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.CHAT_MESSAGE, campaign.CampaignId, userId, data: item));

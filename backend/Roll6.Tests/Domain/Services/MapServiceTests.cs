@@ -20,6 +20,8 @@ public class MapServiceTests
     private readonly Mock<ICampaignRepository<Campaign>> _campaignRepository = new();
     private readonly Mock<IMapModelRepository<MapModel>> _mapModelRepository = new();
     private readonly Mock<ICampaignCharacterRepository<CampaignCharacter>> _campaignCharacterRepository = new();
+    private readonly Mock<IMapTokenRepository<MapToken>> _mapTokenRepository = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<IRealtimeNotifier> _notifier = new();
     private readonly MapService _service;
 
@@ -28,8 +30,10 @@ public class MapServiceTests
         _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = OWNER_ID, Name = "Campanha" });
         _mapModelRepository.Setup(r => r.GetByIdAsync(20)).ReturnsAsync(new MapModel { MapModelId = 20, UserId = OTHER_USER_ID, Name = "Masmorra" });
         _repository.Setup(r => r.UpdateAsync(It.IsAny<Map>())).ReturnsAsync((Map m) => m);
+        _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _service = new MapService(_repository.Object, _campaignRepository.Object, _mapModelRepository.Object,
-            _campaignCharacterRepository.Object, Mock.Of<IImageStorageAppService>(), _notifier.Object);
+            _campaignCharacterRepository.Object, _mapTokenRepository.Object, _unitOfWork.Object,
+            Mock.Of<IImageStorageAppService>(), _notifier.Object);
     }
 
     private void SetupMap(MapStatus status = MapStatus.Active) =>
@@ -229,28 +233,71 @@ public class MapServiceTests
     }
 
     [Fact]
-    public async Task Delete_TheCurrentMap_ClearsItAndPublishes()
+    public async Task Delete_Publishes()
     {
         SetupMap();
-        var campaign = new Campaign { CampaignId = 10, UserId = OWNER_ID, Name = "Campanha", CurrentMapId = 30 };
-        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(campaign);
 
         await _service.DeleteAsync(OWNER_ID, 30);
 
-        campaign.CurrentMapId.Should().BeNull();
-        _campaignRepository.Verify(r => r.UpdateAsync(campaign), Times.Once);
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e =>
             e.Type == TableEventType.MAP_DELETED && e.CampaignId == 10 && e.MapId == 30)), Times.Once);
     }
 
     [Fact]
-    public async Task Delete_AnotherMap_KeepsTheCurrentOne()
+    public async Task Archive_WithCharactersOnTheMap_IsRefused()
     {
         SetupMap();
-        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = OWNER_ID, Name = "C", CurrentMapId = 31 });
+        _mapTokenRepository.Setup(r => r.AnyCharacterOnMapAsync(30)).ReturnsAsync(true);
+
+        var act = () => _service.UpdateAsync(OWNER_ID, 30, new MapUpdateInfo { Name = "Masmorra 1", Status = (int)MapStatus.Archived });
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.Message
+            .Should().Be("Há personagens neste mapa. Leve-os para outro mapa antes de arquivar.");
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<Map>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Archive_WithoutCharacters_Works()
+    {
+        SetupMap();
+
+        var result = await _service.UpdateAsync(OWNER_ID, 30, new MapUpdateInfo { Name = "Masmorra 1", Status = (int)MapStatus.Archived });
+
+        result.Status.Should().Be((int)MapStatus.Archived);
+    }
+
+    [Fact]
+    public async Task Rename_WithCharactersOnTheMap_Works()
+    {
+        SetupMap();
+        _mapTokenRepository.Setup(r => r.AnyCharacterOnMapAsync(30)).ReturnsAsync(true);
+
+        var result = await _service.UpdateAsync(OWNER_ID, 30, new MapUpdateInfo { Name = "Outro nome", Status = (int)MapStatus.Active });
+
+        result.Name.Should().Be("Outro nome");
+    }
+
+    [Fact]
+    public async Task Delete_TakesTheCharactersOffTheMapInTheSameTransaction_AndTheNpcsStay()
+    {
+        SetupMap();
 
         await _service.DeleteAsync(OWNER_ID, 30);
 
-        _campaignRepository.Verify(r => r.UpdateAsync(It.IsAny<Campaign>()), Times.Never);
+        _unitOfWork.Verify(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>()), Times.Once);
+        _mapTokenRepository.Verify(r => r.DeleteCharactersByMapAsync(30), Times.Once);
+        _mapTokenRepository.Verify(r => r.DeleteByMapIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
+        _repository.Verify(r => r.UpdateAsync(It.Is<Map>(m => m.Status == MapStatus.Deleted)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Delete_TellsThePartyToReload_WithoutTheMapChangeMessage()
+    {
+        SetupMap();
+
+        await _service.DeleteAsync(OWNER_ID, 30);
+
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.PARTY_CHANGED && e.CampaignId == 10)), Times.Once);
+        _notifier.Verify(n => n.PublishSplitAsync(It.IsAny<TableEventInfo>(), It.IsAny<IReadOnlyCollection<long>>(), It.IsAny<TableEventInfo?>()), Times.Never);
     }
 }

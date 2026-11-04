@@ -15,7 +15,7 @@ public class MapToken
 
     /// <summary>
     /// Participation shown by a Character token (name, vitals, status and sheet come from it); required for
-    /// the Character type and absent for the others. At most one per map.
+    /// the Character type and absent for the others. At most one piece across the campaign's maps (108).
     /// </summary>
     public long? CampaignCharacterId { get; set; }
 
@@ -94,6 +94,19 @@ public class MapToken
         mapToken.Update(name, (int)MapTokenType.Npc, null, 0, 0, null, 0, x, y, look);
         mapToken.CreatedAt = mapToken.UpdatedAt;
         return mapToken;
+    }
+
+    /// <summary>
+    /// The master takes the character to another map (108): the same row, so its id survives and the character is never
+    /// on two maps. It arrives facing up; what the character is (life, status, posture…) stays on the participation.
+    /// </summary>
+    public void TransferTo(long mapId, long tokenId, string name, int x, int y)
+    {
+        MapId = mapId;
+        TokenId = tokenId;
+        Name = Guard.RequiredText(name, "name", 260);
+        Look = 0;
+        MoveTo(x, y);
     }
 
     /// <summary>Another library token for the same piece: position, facing, type and link are kept.</summary>

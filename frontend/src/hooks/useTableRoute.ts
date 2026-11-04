@@ -95,13 +95,13 @@ export const useTableRoute = (guard: () => Promise<boolean>) => {
           return;
         }
 
-        // A player asking for a map that isn't the campaign's current one gets the current one (039); the URL
-        // follows through the state → URL effect below.
+        // A player asking for a map that isn't his character's gets his character's (108); the URL follows through the
+        // state → URL effect below.
         const { campaign, outcome } = await editorRef.current.openCampaignMapBySlug(path.slug!);
         if (cancelled) return;
         if (campaignRef.current.currentCampaign?.campaignId !== campaign.campaignId) campaignRef.current.selectCampaign(campaign);
-        if (outcome === 'redirected') toast.info(t('route.notCurrentMap'));
-        if (outcome === 'noCurrentMap') toast.info(t('map.noCurrentMap'));
+        if (outcome === 'redirected') toast.info(t('route.notOwnMap'));
+        if (outcome === 'noMap') toast.info(t('map.noCharacterMap'));
       } catch (err) {
         if (cancelled) return;
         toast.error(t(err instanceof ApiError && err.status === 403 ? 'route.forbidden' : 'route.notFound'));

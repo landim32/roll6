@@ -91,13 +91,13 @@ public partial class TurnService : IChatService
 
         Turn message;
         if (!string.IsNullOrWhiteSpace(info.Audio))
-            message = Turn.Recording(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
+            message = Turn.Recording(campaign.CampaignId, null, campaign.CurrentTurn, userId, characterId,
                 displayName, displayImage, info.Audio, info.AudioSeconds, info.Text);
         else if (!string.IsNullOrWhiteSpace(info.Image))
-            message = Turn.Photo(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
+            message = Turn.Photo(campaign.CampaignId, null, campaign.CurrentTurn, userId, characterId,
                 displayName, displayImage, info.Image, info.Text);
         else
-            message = Turn.Text(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
+            message = Turn.Text(campaign.CampaignId, null, campaign.CurrentTurn, userId, characterId,
                 displayName, displayImage, info.Text);
         await ApplyReplyAsync(message, info.ReplyToTurnId);
 
@@ -116,7 +116,7 @@ public partial class TurnService : IChatService
         // Drawn here, never by the client, so everyone sees the same fair roll.
         var dice = Enumerable.Range(0, Turn.ROLL_DICE)
             .Select(_ => System.Security.Cryptography.RandomNumberGenerator.GetInt32(1, Turn.ROLL_SIDES + 1)).ToArray();
-        var roll = Turn.DiceRoll(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
+        var roll = Turn.DiceRoll(campaign.CampaignId, null, campaign.CurrentTurn, userId, characterId,
             displayName, displayImage, dice, info.Text);
         await ApplyReplyAsync(roll, info.ReplyToTurnId);
         var saved = await SaveEntryAsync(roll, whisper);

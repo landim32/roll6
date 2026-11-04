@@ -14,8 +14,8 @@ namespace Roll6.Domain.Services;
 public partial class MapTokenService
 {
     /// <summary>
-    /// Whether the user may walk the piece now: on the campaign's current map, in free mode, a Character piece of his own
-    /// approved and standing character. The hub asks it before relaying a walk sample; never throws.
+    /// Whether the user may walk the piece now: in free mode, a Character piece of his own approved and standing character,
+    /// on the map where it is. The hub asks it before relaying a walk sample; never throws.
     /// </summary>
     public async Task<bool> CanWalkAsync(long userId, long mapTokenId, long campaignId)
     {
@@ -26,7 +26,7 @@ public partial class MapTokenService
         if (map == null || map.Status == MapStatus.Deleted || map.CampaignId != campaignId)
             return false;
         var campaign = await _campaignRepository.GetByIdAsync(campaignId);
-        if (campaign == null || !campaign.FreeMode || campaign.CurrentMapId != map.MapId)
+        if (campaign == null || !campaign.FreeMode)
             return false;
         var participation = await _campaignCharacterRepository.GetByIdAsync(participationId);
         if (participation == null || participation.Status != CampaignCharacterStatus.Approved || participation.Posture != Posture.Standing)
@@ -35,9 +35,20 @@ public partial class MapTokenService
         return character?.UserId == userId;
     }
 
+    public async Task<IReadOnlyCollection<long>> ListWalkAudienceAsync(long mapTokenId)
+    {
+        var mapToken = await _repository.GetByIdAsync(mapTokenId);
+        var map = mapToken != null ? await _mapRepository.GetByIdAsync(mapToken.MapId) : null;
+        var campaign = map != null ? await _campaignRepository.GetByIdAsync(map.CampaignId) : null;
+        if (campaign == null)
+            return Array.Empty<long>();
+        var owners = await _repository.ListCharacterOwnerIdsAsync(map!.MapId) ?? new List<long>();
+        return owners.Append(campaign.UserId).Distinct().ToList();
+    }
+
     /// <summary>
-    /// A walk position (069, <c>walk: true</c>): only in free mode, on the current map, for the caller's own standing
-    /// character — the master too must own it. The shape must be inside the grid; other pieces are ignored. No turn entry
+    /// A walk position (069, <c>walk: true</c>): only in free mode, for the caller's own standing character — the master
+    /// too must own it. The shape must be inside the grid; other pieces are ignored. No turn entry
     /// and no Deslocamento, like every free-mode move.
     /// </summary>
     private async Task<MapTokenInfo> WalkAsync(long userId, MapToken mapToken, MapTokenPositionInfo info)
@@ -48,8 +59,6 @@ public partial class MapTokenService
         var campaign = await EnsureMapEditableAsync(map, userId);
         if (!campaign.FreeMode)
             throw new ConflictException("Só é possível andar no modo livre.");
-        if (campaign.CurrentMapId != map.MapId)
-            throw new ConflictException("Só é possível andar no mapa atual da campanha.");
 
         var participation = mapToken.CampaignCharacterId is long participationId
             ? await _campaignCharacterRepository.GetByIdAsync(participationId)

@@ -88,9 +88,10 @@ public class TableHub : Hub
     }
 
     /// <summary>
-    /// One sample of the caller's free-mode walk (069): relayed as <c>walk</c> to the other connections of the campaign it
-    /// follows, never stored. Dropped silently when the connection follows no campaign, a value is not a number or the
-    /// caller may not walk that piece (<see cref="IMapTokenService.CanWalkAsync"/>, remembered for 10 s).
+    /// One sample of the caller's free-mode walk (069): relayed as <c>walk</c> to the master and the owners of the characters
+    /// on the piece's map (108), never stored. Dropped silently when the connection follows no campaign, a value is not a
+    /// number or the caller may not walk that piece (<see cref="IMapTokenService.CanWalkAsync"/>). The permission and the
+    /// audience are remembered for 10 s, so a sample costs no query; the client ignores pieces of maps it doesn't show.
     /// </summary>
     public async Task Walk(WalkInfo info)
     {
@@ -104,9 +105,13 @@ public class TableHub : Hub
         {
             if (!await _mapTokenService.CanWalkAsync(userId, info.MapTokenId, campaignId))
                 return;
-            _connections.AllowWalk(Context.ConnectionId, info.MapTokenId, now + WALK_PERMISSION_TTL);
+            _connections.AllowWalk(Context.ConnectionId, info.MapTokenId, now + WALK_PERMISSION_TTL,
+                await _mapTokenService.ListWalkAudienceAsync(info.MapTokenId));
         }
-        await Clients.OthersInGroup(TableConnections.GroupName(campaignId)).SendAsync(WALK_METHOD, new WalkMessageInfo
+        var peers = _connections.WalkPeers(Context.ConnectionId, info.MapTokenId);
+        if (peers.Count == 0)
+            return;
+        await Clients.Clients(peers).SendAsync(WALK_METHOD, new WalkMessageInfo
         {
             CampaignId = campaignId,
             UserId = userId,

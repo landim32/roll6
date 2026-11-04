@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { characterDropAction, npcDropAction, tokenAt, tokenOfParticipation } from './mapTokens';
+import { characterDropAction, npcDropAction, tokenAt, tokenOfParticipation, transferSource } from './mapTokens';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import type { MapTokenInfo } from '../types/mapToken';
@@ -50,6 +50,22 @@ describe('npcDropAction', () => {
   it('does nothing outside the grid, warns on a taken hex and places otherwise', () => {
     expect(npcDropAction({ hex: null, tokens })).toEqual({ kind: 'none' });
     expect(npcDropAction({ hex: { x: 1, y: 1 }, tokens })).toEqual({ kind: 'occupied' });
+    expect(npcDropAction({ hex: { x: 0, y: 0 }, tokens })).toEqual({ kind: 'place' });
+  });
+});
+
+describe('108: one map per character', () => {
+  it('names the map a character comes from', () => {
+    expect(transferSource({ mapId: 2, mapName: 'Taverna' }, 1)).toBe('Taverna');
+    expect(transferSource({ mapId: 2, mapName: null }, 1)).toBe('');
+  });
+
+  it('asks nothing for a character off every map or already on the open one', () => {
+    expect(transferSource({ mapId: null, mapName: null }, 1)).toBeNull();
+    expect(transferSource({ mapId: 1, mapName: 'Porão' }, 1)).toBeNull();
+  });
+
+  it('keeps asking nothing for NPCs: dropping one always creates a new piece, whatever map it is also on', () => {
     expect(npcDropAction({ hex: { x: 0, y: 0 }, tokens })).toEqual({ kind: 'place' });
   });
 });

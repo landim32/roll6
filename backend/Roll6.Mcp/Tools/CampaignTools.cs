@@ -12,7 +12,7 @@ public static class CampaignTools
 {
     private const string CAMPAIGN_FIELDS = """
         Campaign fields: campaignId, userId (the master), ownerName, name, slug (immutable URL slug), open (open campaigns
-        approve access requests at once), currentTurn, currentMapId (the map players follow), image/imageUrl (the
+        approve access requests at once), currentTurn, image/imageUrl (the
         campaign's picture on the library cards, null without one), createdAt, updatedAt.
         """;
 
@@ -37,7 +37,7 @@ public static class CampaignTools
     [McpServerTool(Name = "get_campaign", Title = "Get campaign", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}")]
     [Description($$"""
-        What it does: returns one campaign (public data: name, master, open/closed, current turn and current map).
+        What it does: returns one campaign (public data: name, master, open/closed, current turn).
         Who can use it: any authenticated user.
         Returns: the campaign. {{CAMPAIGN_FIELDS}}
         Common errors: 404 not found.
@@ -66,14 +66,14 @@ public static class CampaignTools
     [ApiOperation("GET", "/api/campaign/table")]
     [Description("""
         What it does: lists the campaigns where the current user is the master or has an approved character, each with
-        the map the table follows (omitted when there is no current map), its status, and — only for the campaigns the
-        user masters — every current and active map (current first, then by name), which the app's table combo offers
-        to the master; players follow only the current map.
+        its status and its maps by name: every active map for the campaigns the user masters, with all the characters on
+        each; only the maps where the user's characters stand for the campaigns he plays, with only those characters
+        (a player sees the map where his chosen character stands, and none while it is off every map).
         Who can use it: any authenticated user (the list is only their own table).
-        Returns: [{ campaignId, name, slug, status, freeMode, isMaster, currentMapId, currentMapName, currentMapSlug,
-        maps [{ mapId, name, slug, status (4 current, 1 active) }] }].
+        Returns: [{ campaignId, name, slug, status, freeMode, isMaster, maps [{ mapId, name, slug, status (1 active),
+        characterCount, characterIds }] }].
         Common errors: none.
-        Related tools: get_campaign_by_slug, get_map_by_slug, set_current_map.
+        Related tools: get_campaign_by_slug, get_map_by_slug, place_character_on_map.
         """)]
     public static Task<CallToolResult> ListMyTableCampaigns(Roll6ApiClient api) =>
         api.SendAsync(HttpMethod.Get, "/api/campaign/table");
@@ -83,7 +83,7 @@ public static class CampaignTools
     [Description("""
         What it does: creates a campaign; the current user becomes its master.
         Who can use it: any authenticated user.
-        Returns: the created campaign (turn 1, no current map).
+        Returns: the created campaign (turn 1).
         Common errors: 400 invalid name.
         Related tools: create_map_model, add_map_to_campaign, invite_character.
         """)]
@@ -244,26 +244,6 @@ public static class CampaignTools
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId) =>
         api.SendAsync(HttpMethod.Delete, $"/api/campaign/{campaignId}");
 
-    [McpServerTool(Name = "set_current_map", Title = "Set current map", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
-    [ApiOperation("PUT", "/api/campaign/{id}/current-map")]
-    [Description("""
-        What it does: sets the campaign map every player follows in the app — their screens switch to it in real time
-        (the master's own screen does not move). The chosen map's status becomes 4 (current) and the previous current
-        map goes back to 1 (active); mapId null leaves the campaign with no current map. This is the only way the
-        current map changes: opening, creating or editing maps never does, so the master can prepare another map while
-        the table plays on the current one.
-        Who can use it: only the master.
-        Returns: the updated campaign (currentMapId).
-        Common errors: 403 not the master, 404 map/campaign not found, 400 the map is not an active map of this campaign
-        (archived or deleted maps can't be current).
-        Related tools: list_campaign_maps, add_map_to_campaign.
-        """)]
-    public static Task<CallToolResult> SetCurrentMap(
-        Roll6ApiClient api,
-        [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
-        [Description("Map to follow (mapId of an active map of this campaign); null clears the current map.")] long? mapId) =>
-        api.SendAsync(HttpMethod.Put, $"/api/campaign/{campaignId}/current-map", new CampaignCurrentMapInfo { MapId = mapId });
-
     [McpServerTool(Name = "list_campaign_maps", Title = "List campaign maps", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("GET", "/api/campaign/{id}/map")]
     [Description("""
@@ -273,7 +253,7 @@ public static class CampaignTools
         imageHeight, imageTop, imageLeft, hexSize, userId, sequence, name, status (1 active, 2 archived), createdAt,
         updatedAt }], page, pageSize, totalCount }.
         Common errors: 403 not the master nor an approved participant, 404 campaign not found.
-        Related tools: get_map, list_map_tokens, set_current_map.
+        Related tools: get_map, list_map_tokens, place_character_on_map.
         """)]
     public static Task<CallToolResult> ListCampaignMaps(
         Roll6ApiClient api,
@@ -291,6 +271,7 @@ public static class CampaignTools
         Returns: [{ campaignCharacterId, campaignId, campaignName, campaignOwnerName, characterId, characterName,
         characterImageUrl, characterOwnerId, characterOwnerName, status (1 Invited, 2 RequestedAccess, 3 Approved,
         4 Denied), currentLife, currentEnergy, totalLife, totalEnergy, characterMove, characterStatus, characterTokenId,
+        mapId, mapName (where the character stands; null off every map, and for a player on other players' characters),
         createdAt, updatedAt }].
         Common errors: 403 not allowed, 404 campaign not found.
         Related tools: approve_access_request, get_participation, place_character_on_map.

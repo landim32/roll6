@@ -51,6 +51,9 @@ public partial class TurnServiceTests
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
     private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3 };
     private readonly MapToken _ariaPiece;
+    /// <summary>What stands on the maps (108): every per-map read of the fixture answers from these two lists.</summary>
+    private readonly List<MapToken> _tablePieces = new();
+    private readonly List<MapNpc> _tableOccurrences = new();
     private readonly Mock<IAskDispatcher> _askDispatcher = new();
     private readonly Mock<IGmDispatcher> _gmDispatcher = new();
     private readonly TurnService _service;
@@ -71,6 +74,19 @@ public partial class TurnServiceTests
         _mapTokenRepository.Setup(r => r.GetByIdAsync(GOBLIN_PIECE)).ReturnsAsync(goblin);
         _mapTokenRepository.Setup(r => r.GetByIdAsync(OBJECT_PIECE)).ReturnsAsync(chest);
         _mapTokenRepository.Setup(r => r.UpdateAsync(It.IsAny<MapToken>())).ReturnsAsync((MapToken t) => t);
+        _mapTokenRepository.Setup(r => r.ListByMapAsync(It.IsAny<long>())).ReturnsAsync((long id) =>
+            _tablePieces.Where(p => p.MapId == id).ToList());
+        _mapTokenRepository.Setup(r => r.ListCharacterPiecesByCampaignAsync(CAMPAIGN)).ReturnsAsync(() =>
+            _tablePieces.Where(p => p.CampaignCharacterId.HasValue).ToList());
+        _mapTokenRepository.Setup(r => r.ListByMapIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            _tablePieces.Where(p => ids.Contains(p.MapId)).ToList());
+        _mapTokenRepository.Setup(r => r.GetByCampaignCharacterAsync(It.IsAny<long>())).ReturnsAsync((long id) =>
+            _tablePieces.FirstOrDefault(p => p.CampaignCharacterId == id));
+        _mapTokenRepository.Setup(r => r.ListMapsByParticipationsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            _tablePieces.Where(p => p.CampaignCharacterId is long id && ids.Contains(id))
+                .Select(p => new CharacterMapRow { CampaignCharacterId = p.CampaignCharacterId!.Value, MapId = p.MapId }).ToList());
+        _mapNpcRepository.Setup(r => r.ListByMapIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync((IEnumerable<long> ids) =>
+            _tableOccurrences.Where(o => ids.Contains(o.MapId)).ToList());
 
         _campaignCharacterRepository.Setup(r => r.GetByIdAsync(PARTICIPATION)).ReturnsAsync(new CampaignCharacter
         {
@@ -612,14 +628,13 @@ public partial class TurnServiceTests
     [Fact]
     public async Task Summary_WithoutTurnNo_IsTheTurnInProgressWithCurrentPositions()
     {
-        _campaign.CurrentMapId = MAP;
         _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 3)).ReturnsAsync(new List<Turn>
         {
             Turn.Movement(CAMPAIGN, MAP, ARIA, null, null, 3, PLAYER, (4, 5, 3), (4, 4, 0), moved: 4),
             Turn.CharacterUpdate(CAMPAIGN, MAP, ARIA, null, null, 3, MASTER, new[] { new TurnChange("currentLife", "10", "6") }),
             Turn.Action(CAMPAIGN, MAP, null, NPC, MAP_NPC, 3, MASTER, "Grita")
         });
-        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken> { _ariaPiece });
+        _tablePieces.Add(_ariaPiece);
         _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter>
         {
             new() { CampaignCharacterId = PARTICIPATION, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved }
@@ -645,13 +660,12 @@ public partial class TurnServiceTests
     [Fact]
     public async Task Summary_FinishedTurn_UsesTheLastMoveUpToIt()
     {
-        _campaign.CurrentMapId = MAP;
         _repository.Setup(r => r.ListByCampaignTurnAsync(CAMPAIGN, 2)).ReturnsAsync(new List<Turn>());
         _repository.Setup(r => r.ListLastMovementsAsync(CAMPAIGN, 2)).ReturnsAsync(new List<Turn>
         {
             Turn.Movement(CAMPAIGN, MAP, ARIA, null, null, 2, PLAYER, (1, 1, 0), (1, 2, 3))
         });
-        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken> { _ariaPiece });
+        _tablePieces.Add(_ariaPiece);
         _campaignCharacterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CampaignCharacter>
         {
             new() { CampaignCharacterId = PARTICIPATION, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved }
@@ -687,8 +701,7 @@ public partial class TurnServiceTests
     /// <summary>Aria (player's, approved, piece at 4,4) and Bram (master's, approved, piece at 1,1), a goblin occurrence at 6,6.</summary>
     private (MapToken Bram, MapToken Goblin, CampaignCharacter AriaPlay, CampaignCharacter BramPlay, MapNpc Goblin1) Table()
     {
-        _campaign.CurrentMapId = MAP;
-        _mapRepository.Setup(r => r.GetByIdAsync(MAP)).ReturnsAsync(new Map { MapId = MAP, CampaignId = CAMPAIGN, MapModelId = 50, UserId = MASTER, Status = MapStatus.Active });
+        _mapRepository.Setup(r => r.GetByIdAsync(MAP)).ReturnsAsync(new Map { MapId = MAP, CampaignId = CAMPAIGN, MapModelId = 50, UserId = MASTER, Name = "Taverna", Status = MapStatus.Active });
         _mapModelRepository.Setup(r => r.GetByIdAsync(50)).ReturnsAsync(new MapModel { MapModelId = 50, GridWidth = 10, GridHeight = 10 });
         var ariaPlay = new CampaignCharacter
         {
@@ -708,14 +721,14 @@ public partial class TurnServiceTests
             new() { CharacterId = BRAM, UserId = MASTER, Name = "Bram", Life = 12, Energy = 6 }
         });
         var goblin1 = new MapNpc { MapNpcId = MAP_NPC, MapId = MAP, NpcId = NPC, Name = "Goblin 1", CurrentLife = 7, CurrentEnergy = 2 };
-        _mapNpcRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapNpc> { goblin1 });
+        _tableOccurrences.Add(goblin1);
         _mapNpcRepository.Setup(r => r.UpdateAsync(It.IsAny<MapNpc>())).ReturnsAsync((MapNpc m) => m);
         _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Npc> { new() { NpcId = NPC, Name = "Goblin", Life = 7, Energy = 2 } });
         var bram = MapToken.PlaceCharacter(MAP, 5, BRAM_PARTICIPATION, "Bram", 1, 1);
         bram.MapTokenId = BRAM_PIECE;
         var goblin = MapToken.PlaceNpc(MAP, 5, MAP_NPC, "Goblin 1", 6, 6, 0);
         goblin.MapTokenId = GOBLIN_PIECE;
-        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken> { _ariaPiece, bram, goblin });
+        _tablePieces.AddRange(new[] { _ariaPiece, bram, goblin });
         return (bram, goblin, ariaPlay, bramPlay, goblin1);
     }
 
@@ -729,6 +742,7 @@ public partial class TurnServiceTests
         var data = await _service.GetDataAsync(PLAYER, CAMPAIGN, null);
 
         (data.TurnNo, data.CurrentTurn, data.MapId).Should().Be((3, 3, (long?)MAP));
+        data.Maps.Should().ContainSingle().Which.Should().BeEquivalentTo(new { MapId = MAP, Name = "Taverna" });
         data.Characters.Select(c => (c.Name, c.PlayerName, c.CurrentLife, c.TotalLife, c.CurrentEnergy, c.TotalEnergy, c.Status, c.X, c.Y))
             .Should().Equal(("Aria", "User 2", 10, 10, 8, 8, "Agachada", (int?)4, (int?)4), ("Bram", "User 1", 12, 12, 5, 6, (string?)null, (int?)1, (int?)1));
         data.Characters[0].LookName.Should().NotBeNullOrEmpty();

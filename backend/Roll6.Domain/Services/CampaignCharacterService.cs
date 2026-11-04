@@ -148,7 +148,11 @@ public class CampaignCharacterService : ICampaignCharacterService
             return await MapToDtoAsync(await _repository.ListByCampaignAsync(campaignId, approvedOnly: false));
 
         if (await _repository.HasApprovedCharacterAsync(campaignId, userId))
-            return await MapToDtoAsync(await _repository.ListByCampaignAsync(campaignId, approvedOnly: true));
+        {
+            var party = await MapToDtoAsync(await _repository.ListByCampaignAsync(campaignId, approvedOnly: true));
+            party.ForEach(info => HideMapFrom(userId, info));
+            return party;
+        }
 
         throw new UnauthorizedAccessException("Apenas o mestre ou participantes aprovados podem ver os personagens da campanha.");
     }
@@ -162,7 +166,19 @@ public class CampaignCharacterService : ICampaignCharacterService
         if (character.UserId != userId && campaign.UserId != userId
             && !await _repository.HasApprovedCharacterAsync(campaign.CampaignId, userId))
             throw new UnauthorizedAccessException("Apenas o mestre ou participantes aprovados podem ver este personagem.");
-        return await MapToDetailAsync(participation);
+        var detail = await MapToDetailAsync(participation);
+        if (campaign.UserId != userId)
+            HideMapFrom(userId, detail);
+        return detail;
+    }
+
+    /// <summary>Where a character stands is for the master and its owner (108): another player only sees the party card.</summary>
+    private static void HideMapFrom(long userId, CampaignCharacterInfo info)
+    {
+        if (info.CharacterOwnerId == userId)
+            return;
+        info.MapId = null;
+        info.MapName = null;
     }
 
     /// <summary>
@@ -195,7 +211,8 @@ public class CampaignCharacterService : ICampaignCharacterService
             ("sheetFile", before.SheetFile, participation.SheetFile),
             ("posture", (int)before.Posture, (int)participation.Posture));
         var turn = changes.Count == 0 ? null
-            : Turn.CharacterUpdate(campaign.CampaignId, campaign.CurrentMapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes);
+            : Turn.CharacterUpdate(campaign.CampaignId, (await _mapTokenRepository.GetByCampaignCharacterAsync(campaignCharacterId))?.MapId,
+                character.CharacterId, null, null, campaign.CurrentTurn, userId, changes);
         if (info.TokenId.HasValue && await _tokenRepository.GetByIdAsync(info.TokenId.Value) == null)
             throw new KeyNotFoundException("Token não encontrado.");
         var tokenChanged = info.TokenId.HasValue && character.ChangeToken(info.TokenId.Value);
@@ -310,6 +327,8 @@ public class CampaignCharacterService : ICampaignCharacterService
             RepeatedAction = info.RepeatedAction,
             Posture = info.Posture,
             CharacterTokenId = info.CharacterTokenId,
+            MapId = info.MapId,
+            MapName = info.MapName,
             CreatedAt = info.CreatedAt,
             UpdatedAt = info.UpdatedAt,
             Sheet = participation.Sheet,
@@ -364,9 +383,12 @@ public class CampaignCharacterService : ICampaignCharacterService
             .ToDictionary(c => c.CharacterId);
         var userIds = campaigns.Values.Select(c => c.UserId).Concat(characters.Values.Select(c => c.UserId));
         var users = (await _userRepository.ListByIdsAsync(userIds)).ToDictionary(u => u.UserId, u => u.Name);
+        var places = (await _mapTokenRepository.ListMapsByParticipationsAsync(participations.Select(p => p.CampaignCharacterId)))
+            .ToDictionary(row => row.CampaignCharacterId);
 
         return participations.Select(p =>
         {
+            var place = places.GetValueOrDefault(p.CampaignCharacterId);
             var campaign = campaigns.GetValueOrDefault(p.CampaignId);
             var character = characters.GetValueOrDefault(p.CharacterId);
             return new CampaignCharacterInfo
@@ -391,6 +413,8 @@ public class CampaignCharacterService : ICampaignCharacterService
                 RepeatedAction = p.RepeatedAction, // 099
                 Posture = (int)p.Posture,
                 CharacterTokenId = character?.TokenId,
+                MapId = place?.MapId,
+                MapName = place?.MapName,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt
             };

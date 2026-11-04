@@ -21,7 +21,7 @@ public partial class TurnService
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
         var (characterId, displayName, displayImage) = await SpeakerAsync(userId, campaign, info.CharacterId);
-        var poll = Turn.Poll(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
+        var poll = Turn.Poll(campaign.CampaignId, null, campaign.CurrentTurn, userId, characterId,
             displayName, displayImage, info.Question);
         var options = ChatPollOption.CheckAll(info.Options);
         await ApplyReplyAsync(poll, info.ReplyToTurnId);

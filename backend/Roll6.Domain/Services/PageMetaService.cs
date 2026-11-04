@@ -8,8 +8,8 @@ namespace Roll6.Domain.Services;
 
 /// <summary>
 /// Link previews of the table's addresses (040), read by crawlers without login: a campaign map shows its name, its
-/// campaign, the master, its grid and its picture; a campaign shows its name, the master and its current map's
-/// picture. Nothing else of the table (pieces, NPCs, sheets, turns). Anything missing, deleted or failing is the
+/// campaign, the master, its grid and its picture; a campaign shows its name, the master and its own picture (108).
+/// Nothing else of the table (pieces, NPCs, sheets, turns). Anything missing, deleted or failing is the
 /// generic preview, so the page never shows a broken one.
 /// </summary>
 public class PageMetaService : IPageMetaService
@@ -58,9 +58,16 @@ public class PageMetaService : IPageMetaService
         return (await _mapModelRepository.GetByIdAsync(map.MapModelId))?.Image;
     }
 
+    public async Task<string?> CampaignImageAsync(string campaignSlug) =>
+        (await _campaignRepository.GetBySlugAsync(campaignSlug))?.Image;
+
     /// <summary>URL of the 1200×630 picture of a map (MetaController), stable because slugs never change (029).</summary>
     public static string MapImageUrl(string baseUrl, string mapSlug) =>
         $"{baseUrl}/api/meta/image/map/{Uri.EscapeDataString(mapSlug)}.jpg";
+
+    /// <summary>URL of the 1200×630 picture of a campaign: presigned URLs expire, and other sites keep previews (108).</summary>
+    public static string CampaignImageUrl(string baseUrl, string campaignSlug) =>
+        $"{baseUrl}/api/meta/image/campaign/{Uri.EscapeDataString(campaignSlug)}.jpg";
 
     private async Task<PageMeta> ForMapAsync(string slug, string baseUrl)
     {
@@ -79,7 +86,7 @@ public class PageMetaService : IPageMetaService
                 PageMetaHtml.DESCRIPTION_MAX),
             $"{baseUrl}/map/{Uri.EscapeDataString(map.Slug)}",
             string.Empty, 0, 0, string.Empty, $"Mapa {map.Name}");
-        return WithImage(meta, baseUrl, model.Image != null ? map.Slug : null);
+        return WithImage(meta, baseUrl, model.Image != null ? MapImageUrl(baseUrl, map.Slug) : null);
     }
 
     private async Task<PageMeta> ForCampaignAsync(string slug, string baseUrl)
@@ -88,29 +95,25 @@ public class PageMetaService : IPageMetaService
         if (campaign == null)
             return PageMeta.Generic(baseUrl);
         var master = await _userRepository.GetByIdAsync(campaign.UserId);
-        var current = campaign.CurrentMapId is long mapId ? await _mapRepository.GetByIdAsync(mapId) : null;
-        if (current?.Status == MapStatus.Deleted)
-            current = null;
-        var model = current != null ? await _mapModelRepository.GetByIdAsync(current.MapModelId) : null;
 
         var meta = new PageMeta(
             PageMetaHtml.Truncate(campaign.Name, PageMetaHtml.TITLE_MAX),
             PageMetaHtml.Truncate(CampaignLine(campaign, master), PageMetaHtml.DESCRIPTION_MAX),
             $"{baseUrl}/campaign/{Uri.EscapeDataString(campaign.Slug)}",
-            string.Empty, 0, 0, string.Empty, current != null ? $"Mapa {current.Name}" : campaign.Name);
-        return WithImage(meta, baseUrl, model?.Image != null ? current!.Slug : null);
+            string.Empty, 0, 0, string.Empty, campaign.Name);
+        return WithImage(meta, baseUrl, campaign.Image != null ? CampaignImageUrl(baseUrl, campaign.Slug) : null);
     }
 
     private static string CampaignLine(Campaign campaign, User? master) =>
         master != null ? $"Campanha {campaign.Name}, mestre {master.Name}." : $"Campanha {campaign.Name}.";
 
-    /// <summary>The map's 1200×630 picture when it has one, else the brand's.</summary>
-    private static PageMeta WithImage(PageMeta meta, string baseUrl, string? mapSlug)
+    /// <summary>The page's 1200×630 picture when it has one, else the brand's.</summary>
+    private static PageMeta WithImage(PageMeta meta, string baseUrl, string? imageUrl)
     {
-        if (mapSlug != null)
+        if (imageUrl != null)
             return meta with
             {
-                ImageUrl = MapImageUrl(baseUrl, mapSlug),
+                ImageUrl = imageUrl,
                 ImageWidth = PageMeta.IMAGE_WIDTH,
                 ImageHeight = PageMeta.IMAGE_HEIGHT,
                 ImageType = "image/jpeg"

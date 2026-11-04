@@ -222,14 +222,24 @@ public class MapTokenServiceTests
     }
 
     [Fact]
-    public async Task PlaceCharacter_ByTheCharactersOwner_Places()
+    public async Task PlaceCharacter_ByTheCharactersOwner_IsRefused()
     {
         SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
 
-        var result = await _service.PlaceCharacterAsync(2, Place());
+        var act = () => _service.PlaceCharacterAsync(2, Place());
 
-        result.CampaignCharacterId.Should().Be(APPROVED);
-        (result.X, result.Y).Should().Be((3, 2));
+        (await act.Should().ThrowAsync<UnauthorizedAccessException>())
+            .Which.Message.Should().Be("Apenas o mestre coloca personagens nos mapas.");
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_ByAPlayer_IsRefusedEvenWhileTheCampaignIsPaused()
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", Status = CampaignStatus.Paused });
+
+        await _service.Invoking(s => s.PlaceCharacterAsync(2, Place())).Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]
@@ -259,11 +269,247 @@ public class MapTokenServiceTests
     public async Task PlaceCharacter_AlreadyOnTheMap_Throws()
     {
         SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
-        _repository.Setup(r => r.GetByMapAndCampaignCharacterAsync(30, APPROVED)).ReturnsAsync(new MapToken { MapTokenId = 45 });
+        _repository.Setup(r => r.GetByCampaignCharacterAsync(APPROVED)).ReturnsAsync(new MapToken { MapTokenId = 45, MapId = 30 });
+
+        foreach (var transfer in new[] { false, true })
+        {
+            var info = Place();
+            info.Transfer = transfer;
+
+            var act = () => _service.PlaceCharacterAsync(1, info);
+
+            (await act.Should().ThrowAsync<ConflictException>()).Which.Message.Should().Be("O personagem já está neste mapa.");
+        }
+    }
+
+    // ---- 108: one map per character ----
+
+    /// <summary>Aria stands on "Taverna" (31), facing down-right; the target is map 30.</summary>
+    private MapToken SetupOnOtherMap(long ownerUserId = 2)
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
+        _characterRepository.Setup(r => r.GetByIdAsync(ARIA)).ReturnsAsync(() => new Character
+        {
+            CharacterId = ARIA, UserId = ownerUserId, Name = "Aria", Move = 5, TokenId = 6
+        });
+        _mapRepository.Setup(r => r.GetByIdAsync(31)).ReturnsAsync(new Map { MapId = 31, CampaignId = 10, MapModelId = 50, UserId = 1, Name = "Taverna", Status = MapStatus.Active });
+        var piece = MapToken.PlaceCharacter(31, 6, APPROVED, "Aria", 1, 1);
+        piece.MapTokenId = 42;
+        piece.Face(2);
+        _repository.Setup(r => r.GetByCampaignCharacterAsync(APPROVED)).ReturnsAsync(piece);
+        return piece;
+    }
+
+    private static MapTokenCharacterInsertInfo Transfer(int x = 3, int y = 2)
+    {
+        var info = Place(x: x, y: y);
+        info.Transfer = true;
+        return info;
+    }
+
+    private void VerifyNothingChanged()
+    {
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Never);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+        _notifier.Verify(n => n.PublishSplitAsync(It.IsAny<TableEventInfo>(), It.IsAny<IReadOnlyCollection<long>>(), It.IsAny<TableEventInfo?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_OffEveryMap_PlacesWithoutTransfer()
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
+
+        var result = await _service.PlaceCharacterAsync(1, Place());
+
+        result.MapId.Should().Be(30);
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_OffEveryMap_TransferHasNoEffect()
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
+
+        var result = await _service.PlaceCharacterAsync(1, Transfer());
+
+        result.MapId.Should().Be(30);
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_OnAnotherMap_WithoutTransfer_NamesTheMap_AndChangesNothing()
+    {
+        SetupOnOtherMap();
 
         var act = () => _service.PlaceCharacterAsync(1, Place());
 
-        await act.Should().ThrowAsync<ConflictException>().WithMessage("*já está neste mapa*");
+        (await act.Should().ThrowAsync<ConflictException>()).Which.Message.Should().Be("O personagem está no mapa Taverna.");
+        VerifyNothingChanged();
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_WithTransfer_MovesTheSameRowFacingUp()
+    {
+        var piece = SetupOnOtherMap();
+
+        var result = await _service.PlaceCharacterAsync(1, Transfer());
+
+        result.MapTokenId.Should().Be(42);
+        result.MapId.Should().Be(30);
+        (result.X, result.Y, result.Look).Should().Be((3, 2, 0));
+        _repository.Verify(r => r.UpdateAsync(It.Is<MapToken>(t => t.MapTokenId == 42 && t.MapId == 30)), Times.Once);
+        _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Never);
+        _repository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
+        piece.CampaignCharacterId.Should().Be(APPROVED);
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_WithTransfer_TouchesNeitherTheParticipationNorTheTurn()
+    {
+        SetupOnOtherMap();
+
+        await _service.PlaceCharacterAsync(1, Transfer());
+
+        _campaignCharacterRepository.Verify(r => r.UpdateAsync(It.IsAny<CampaignCharacter>()), Times.Never);
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_WithTransfer_TellsBothMaps()
+    {
+        SetupOnOtherMap();
+
+        await _service.PlaceCharacterAsync(1, Transfer());
+
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_DELETED && e.MapId == 31)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_UPSERTED && e.MapId == 30)), Times.Once);
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_WithTransfer_OnAnOccupiedHex_LeavesThePieceOnItsMap()
+    {
+        var piece = SetupOnOtherMap();
+        _repository.Setup(r => r.ListByMapAsync(30)).ReturnsAsync(new List<MapToken> { new() { MapTokenId = 99, MapId = 30, TokenId = 5, X = 3, Y = 2 } });
+
+        var act = () => _service.PlaceCharacterAsync(1, Transfer());
+
+        await act.Should().ThrowAsync<ConflictException>().WithMessage("*ocupado*");
+        (piece.MapId, piece.X, piece.Y, piece.Look).Should().Be((31L, 1, 1, 2));
+        VerifyNothingChanged();
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_WithTransfer_OutsideTheGrid_LeavesThePieceOnItsMap()
+    {
+        var piece = SetupOnOtherMap();
+
+        var act = () => _service.PlaceCharacterAsync(1, Transfer(x: 10, y: 0));
+
+        await act.Should().ThrowAsync<DomainValidationException>();
+        piece.MapId.Should().Be(31);
+        VerifyNothingChanged();
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_OnAnArchivedMap_IsRefused()
+    {
+        var piece = SetupOnOtherMap();
+        _mapRepository.Setup(r => r.GetByIdAsync(30)).ReturnsAsync(new Map { MapId = 30, CampaignId = 10, MapModelId = 50, UserId = 1, Status = MapStatus.Archived });
+
+        var act = () => _service.PlaceCharacterAsync(1, Transfer());
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.Message.Should().Be("Este mapa está arquivado.");
+        piece.MapId.Should().Be(31);
+        VerifyNothingChanged();
+    }
+
+    [Fact]
+    public async Task PlaceCharacter_LosingTheRaceOnTheIndex_ChangesNothingElse()
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
+        _repository.Setup(r => r.InsertAsync(It.IsAny<MapToken>())).ThrowsAsync(new ConflictException("O personagem já está em um mapa."));
+
+        var act = () => _service.PlaceCharacterAsync(1, Place());
+
+        await act.Should().ThrowAsync<ConflictException>();
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+        _notifier.Verify(n => n.PublishSplitAsync(It.IsAny<TableEventInfo>(), It.IsAny<IReadOnlyCollection<long>>(), It.IsAny<TableEventInfo?>()), Times.Never);
+    }
+
+    private void VerifyCharacterMap(long? mapId, params long[] audience) =>
+        _notifier.Verify(n => n.PublishSplitAsync(
+            It.Is<TableEventInfo>(e => e.Type == TableEventType.CHARACTER_MAP && e.CampaignId == 10 && e.MapId == mapId
+                && ((CharacterMapEventInfo)e.Data!).CampaignCharacterId == APPROVED && ((CharacterMapEventInfo)e.Data!).MapId == mapId),
+            It.Is<IReadOnlyCollection<long>>(users => users.OrderBy(u => u).SequenceEqual(audience)),
+            null), Times.Once);
+
+    [Fact]
+    public async Task CharacterMap_OnPlacing_GoesToTheMasterAndTheOwner()
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
+
+        await _service.PlaceCharacterAsync(1, Place());
+
+        VerifyCharacterMap(30, 1, 2);
+    }
+
+    [Fact]
+    public async Task CharacterMap_OnTransfer_GoesToTheMasterAndTheOwner()
+    {
+        SetupOnOtherMap();
+
+        await _service.PlaceCharacterAsync(1, Transfer());
+
+        VerifyCharacterMap(30, 1, 2);
+    }
+
+    [Fact]
+    public async Task CharacterMap_OfTheMastersOwnCharacter_ListsHimOnce()
+    {
+        SetupOnOtherMap(ownerUserId: 1);
+
+        await _service.PlaceCharacterAsync(1, Transfer());
+
+        VerifyCharacterMap(30, 1);
+    }
+
+    [Fact]
+    public async Task CharacterMap_OnDeletingThePiece_HasNoMap()
+    {
+        SetupParticipation(APPROVED, 10, CampaignCharacterStatus.Approved, ARIA, tokenId: 6);
+        _repository.Setup(r => r.GetByIdAsync(42)).ReturnsAsync(MapToken.PlaceCharacter(30, 6, APPROVED, "Aria", 3, 2));
+
+        await _service.DeleteAsync(1, 42);
+
+        VerifyCharacterMap(null, 1, 2);
+    }
+
+    [Fact]
+    public async Task CharacterMap_NotPublishedForNpcOrObjectPieces()
+    {
+        _repository.Setup(r => r.GetByIdAsync(40)).ReturnsAsync(new MapToken { MapTokenId = 40, MapId = 30, TokenId = 5, Name = "Baú" });
+        _repository.Setup(r => r.GetByIdAsync(41)).ReturnsAsync(new MapToken { MapTokenId = 41, MapId = 30, TokenId = 5, Name = "Goblin", TokenType = MapTokenType.Npc, MapNpcId = 90 });
+        _mapNpcRepository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(new MapNpc { MapNpcId = 90, MapId = 30, NpcId = 1, Name = "Goblin" });
+
+        await _service.DeleteAsync(1, 40);
+        await _service.DeleteAsync(1, 41);
+
+        _notifier.Verify(n => n.PublishSplitAsync(It.IsAny<TableEventInfo>(), It.IsAny<IReadOnlyCollection<long>>(), It.IsAny<TableEventInfo?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Transfer_DoesNotMoveTheAllyTheCharacterCommands()
+    {
+        SetupOnOtherMap();
+        var ally = new MapToken { MapTokenId = 41, MapId = 31, TokenId = 5, Name = "Lobo", TokenType = MapTokenType.Npc, MapNpcId = 90, X = 2, Y = 2 };
+        _repository.Setup(r => r.ListByMapNpcIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<MapToken> { ally });
+
+        await _service.PlaceCharacterAsync(1, Transfer());
+
+        ally.MapId.Should().Be(31);
+        _repository.Verify(r => r.UpdateAsync(It.Is<MapToken>(t => t.MapTokenId == 41)), Times.Never);
+        _mapNpcRepository.Verify(r => r.UpdateAsync(It.IsAny<MapNpc>()), Times.Never);
     }
 
     [Fact]
@@ -1106,10 +1352,10 @@ public class MapTokenServiceTests
 
     // ---- 069: the shared walk ----
 
-    private void CampaignIsFreeOn(long? currentMapId = 30) =>
+    private void CampaignIsFreeOn() =>
         _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign
         {
-            CampaignId = 10, UserId = 1, Name = "C", CurrentTurn = 3, FreeMode = true, CurrentMapId = currentMapId
+            CampaignId = 10, UserId = 1, Name = "C", CurrentTurn = 3, FreeMode = true
         });
 
     private static MapTokenPositionInfo Walk(int x, int y, int look = 0) => new() { X = x, Y = y, Look = look, Walk = true };
@@ -1180,7 +1426,7 @@ public class MapTokenServiceTests
     public async Task Walk_OutsideFreeMode_Refuses()
     {
         AriaPiece();
-        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C" });
 
         (await _service.Invoking(s => s.MoveAsync(2, 42, Walk(3, 2))).Should().ThrowAsync<ConflictException>())
             .Which.Message.Should().Be("Só é possível andar no modo livre.");
@@ -1188,13 +1434,18 @@ public class MapTokenServiceTests
     }
 
     [Fact]
-    public async Task Walk_OnAnotherMapThanTheCurrent_Refuses()
+    public async Task Walk_WorksOnWhicheverMapTheCharacterStands()
     {
-        AriaPiece();
-        CampaignIsFreeOn(currentMapId: 31);
+        var piece = AriaPiece();
+        piece.MapId = 31;
+        _mapRepository.Setup(r => r.GetByIdAsync(31)).ReturnsAsync(new Map { MapId = 31, CampaignId = 10, MapModelId = 50, UserId = 1, Status = MapStatus.Active });
+        _repository.Setup(r => r.ListByMapAsync(31)).ReturnsAsync(new List<MapToken> { piece });
+        CampaignIsFreeOn();
 
-        (await _service.Invoking(s => s.MoveAsync(2, 42, Walk(3, 2))).Should().ThrowAsync<ConflictException>())
-            .Which.Message.Should().Be("Só é possível andar no mapa atual da campanha.");
+        var result = await _service.MoveAsync(2, 42, Walk(3, 2));
+
+        (result.MapId, result.X, result.Y).Should().Be((31L, 3, 2));
+        (await _service.CanWalkAsync(2, 42, 10)).Should().BeTrue();
     }
 
     [Theory]
@@ -1247,7 +1498,7 @@ public class MapTokenServiceTests
     }
 
     [Fact]
-    public async Task CanWalk_OwnStandingCharacterOnCurrentMapInFreeMode()
+    public async Task CanWalk_OwnStandingCharacterInFreeMode()
     {
         AriaPiece();
         CampaignIsFreeOn();
@@ -1260,14 +1511,22 @@ public class MapTokenServiceTests
     }
 
     [Fact]
-    public async Task CanWalk_NotInFreeModeOrNotTheCurrentMap_IsFalse()
+    public async Task CanWalk_NotInFreeMode_IsFalse()
     {
         AriaPiece();
-        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C", CurrentMapId = 30 });
-        (await _service.CanWalkAsync(2, 42, 10)).Should().BeFalse();
+        _campaignRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(new Campaign { CampaignId = 10, UserId = 1, Name = "C" });
 
-        CampaignIsFreeOn(currentMapId: 31);
         (await _service.CanWalkAsync(2, 42, 10)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task WalkAudience_IsTheMasterAndWhoIsOnTheMap()
+    {
+        AriaPiece();
+        _repository.Setup(r => r.ListCharacterOwnerIdsAsync(30)).ReturnsAsync(new List<long> { 2, 3, 1 });
+
+        (await _service.ListWalkAudienceAsync(42)).Should().BeEquivalentTo(new long[] { 1, 2, 3 });
+        (await _service.ListWalkAudienceAsync(404)).Should().BeEmpty();
     }
 
     [Fact]

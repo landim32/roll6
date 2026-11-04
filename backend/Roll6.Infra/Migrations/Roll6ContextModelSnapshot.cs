@@ -260,10 +260,6 @@ namespace Roll6.Infra.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CurrentMapId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("current_map_id");
-
                     b.Property<int>("CurrentTurn")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -327,8 +323,6 @@ namespace Roll6.Infra.Migrations
 
                     b.HasKey("CampaignId")
                         .HasName("campaigns_pkey");
-
-                    b.HasIndex("CurrentMapId");
 
                     b.HasIndex("Slug")
                         .IsUnique()
@@ -837,11 +831,6 @@ namespace Roll6.Infra.Migrations
                     b.HasKey("MapId")
                         .HasName("maps_pkey");
 
-                    b.HasIndex("CampaignId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_maps_campaign_current")
-                        .HasFilter("status = 4");
-
                     b.HasIndex("MapModelId");
 
                     b.HasIndex("Slug")
@@ -1247,7 +1236,12 @@ namespace Roll6.Infra.Migrations
                     b.HasKey("MapTokenId")
                         .HasName("map_tokens_pkey");
 
-                    b.HasIndex("CampaignCharacterId");
+                    b.HasIndex("CampaignCharacterId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_map_tokens_campaign_character")
+                        .HasFilter("campaign_character_id IS NOT NULL");
+
+                    b.HasIndex("MapId");
 
                     b.HasIndex("MapNpcId")
                         .IsUnique()
@@ -1255,11 +1249,6 @@ namespace Roll6.Infra.Migrations
                         .HasFilter("map_npc_id IS NOT NULL");
 
                     b.HasIndex("TokenId");
-
-                    b.HasIndex("MapId", "CampaignCharacterId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_map_tokens_map_campaign_character")
-                        .HasFilter("campaign_character_id IS NOT NULL");
 
                     b.ToTable("map_tokens", (string)null);
                 });
@@ -2062,11 +2051,6 @@ namespace Roll6.Infra.Migrations
 
             modelBuilder.Entity("Roll6.Domain.Models.Campaign", b =>
                 {
-                    b.HasOne("Roll6.Domain.Models.Map", null)
-                        .WithMany()
-                        .HasForeignKey("CurrentMapId")
-                        .HasConstraintName("fk_map_campaign_current");
-
                     b.HasOne("Roll6.Domain.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")

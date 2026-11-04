@@ -12,7 +12,8 @@ export const TABLE_EVENT = {
   mapSaved: 'map.saved',
   mapsChanged: 'maps.changed',
   mapDeleted: 'map.deleted',
-  mapCurrent: 'map.current',
+  /** A character entered, changed or left a map (108), to the master and its owner; data = CharacterMapEvent. */
+  characterMap: 'character.map',
   campaignChanged: 'campaign.changed',
   campaignDeleted: 'campaign.deleted',
   /** A chat message or end-of-turn divider was saved (041); data = ChatItemInfo. */
@@ -42,6 +43,13 @@ export interface TableEvent {
   mapId: number | null;
   actorUserId: number;
   data: unknown;
+}
+
+/** Data of `character.map` (108). */
+export interface CharacterMapEvent {
+  campaignCharacterId: number;
+  /** The map the character is on now; null = it left every map. */
+  mapId: number | null;
 }
 
 /** State of the real-time connection. */

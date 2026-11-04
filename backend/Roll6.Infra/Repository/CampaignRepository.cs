@@ -72,9 +72,6 @@ public class CampaignRepository : ICampaignRepository<Campaign>
                       && participation.Status == CampaignCharacterStatus.Approved
                       && _context.Characters.Any(character =>
                           character.CharacterId == participation.CharacterId && character.UserId == userId))
-            join map in _context.Maps.AsNoTracking().Where(map => map.Status == MapStatus.Active || map.Status == MapStatus.Current)
-                on campaign.CurrentMapId equals map.MapId into maps
-            from map in maps.DefaultIfEmpty()
             orderby campaign.Name.ToLower(), campaign.CampaignId
             select new CampaignTableRow
             {
@@ -85,10 +82,7 @@ public class CampaignRepository : ICampaignRepository<Campaign>
                 Status = (int)campaign.Status,
                 FreeMode = campaign.FreeMode,
                 PendingNotice = campaign.PendingNotice,
-                Image = campaign.Image,
-                CurrentMapId = map != null ? map.MapId : null,
-                CurrentMapName = map != null ? map.Name : null,
-                CurrentMapSlug = map != null ? map.Slug : null
+                Image = campaign.Image
             }).ToListAsync();
     }
 
