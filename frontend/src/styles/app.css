@@ -2234,6 +2234,12 @@ button.stm-chat-quote { cursor: pointer; }
   min-width: 0;
 }
 
+.stm-party-map-link {
+  max-width: 100%;
+  font-size: 0.875em;
+  text-align: left;
+}
+
 .stm-party-name > span:first-child:not(.stm-turn-dot),
 .stm-party-name > .stm-turn-dot + span {
   overflow: hidden;
