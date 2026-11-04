@@ -12,7 +12,7 @@ public static class MapTools
     private const string RETURNS = """
         Returns: the map { mapId, campaignId, mapModelId, mapModelName, mapModelImageUrl, gridWidth, gridHeight, imageWidth,
         imageHeight, imageTop, imageLeft, hexSize, userId (master), sequence, name, slug (immutable URL slug),
-        status (1 active, 2 archived, 4 current — the one map the players follow), createdAt, updatedAt }.
+        status (1 active, 2 archived), createdAt, updatedAt }.
         """;
 
     [McpServerTool(Name = "get_map", Title = "Get map", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -47,11 +47,11 @@ public static class MapTools
     [ApiOperation("POST", "/api/map")]
     [Description($$"""
         What it does: adds a map model to a campaign as a new campaign map (named after the model plus a sequence number).
-        Pieces are placed on campaign maps. Consider set_current_map afterwards so players follow it.
+        Pieces are placed on campaign maps; players see the map where their character stands (place_character_on_map).
         Who can use it: only the master of the campaign (any map model can be used).
         {{RETURNS}}
         Common errors: 403 not the master, 404 campaign/map model not found.
-        Related tools: list_map_models, create_map_model, set_current_map.
+        Related tools: list_map_models, create_map_model, place_character_on_map.
         """)]
     public static Task<CallToolResult> AddMapToCampaign(
         Roll6ApiClient api,
@@ -63,14 +63,13 @@ public static class MapTools
     [ApiOperation("PUT", "/api/map/{id}")]
     [Description($$"""
         What it does: renames a campaign map and sets its status: 1 active or 2 archived (archived maps stay listed and
-        keep their pieces). The current map (status 4) is made only by set_current_map: status 4 here is refused, the
-        current map can't be archived (make another map current first) and 1 on it keeps it current. To delete use
-        delete_map.
+        keep their objects and NPCs). A map with characters can't be archived: take them to another map first
+        (place_character_on_map with transfer: true). To delete use delete_map.
         Who can use it: only the master.
         {{RETURNS}}
-        Common errors: 403 not the master, 404 not found, 400 invalid name or status ("Use “Tornar atual” para tornar um
-        mapa atual.", "Torne outro mapa atual antes de arquivar este.").
-        Related tools: get_map.
+        Common errors: 403 not the master, 404 not found, 400 invalid name or status, 409 "Há personagens neste mapa.
+        Leve-os para outro mapa antes de arquivar."
+        Related tools: get_map, place_character_on_map.
         """)]
     public static Task<CallToolResult> UpdateMap(
         Roll6ApiClient api,
@@ -82,8 +81,8 @@ public static class MapTools
     [McpServerTool(Name = "delete_map", Title = "Delete map", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/map/{id}")]
     [Description($$"""
-        What it does: deletes a campaign map (players with it open are sent away; if it was the current map, the campaign
-        has none). {{McpDocs.DESTRUCTIVE}}
+        What it does: deletes a campaign map: its character pieces go with it, leaving those characters off every map, and
+        players with it open are sent away. {{McpDocs.DESTRUCTIVE}}
         Who can use it: only the master.
         Returns: { ok: true }.
         Common errors: 403 not the master, 404 not found.

@@ -18,15 +18,18 @@ interface MapTokenContextType {
   mapTokens: MapTokenInfo[];
   /** Only the master of the current campaign places, moves and changes pieces (011 FR-012). */
   canPlace: boolean;
-  /** A map of the current campaign is open: players may place their own approved characters on it. */
+  /** A map of the current campaign is open and may change: players move their own pieces and set their posture on it. */
   canPlaceOwn: boolean;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
   /** New object piece from the hex menu (NPCs come from the NPC panel). */
   addToken: (token: TokenInfo, x: number, y: number) => Promise<MapTokenInfo>;
-  /** Places a party character; `tokenId` is saved on the character when it has none. */
-  placeCharacter: (participation: CampaignCharacterInfo, x: number, y: number, tokenId?: number) => Promise<MapTokenInfo>;
+  /**
+   * Places a party character (master only); `tokenId` is saved on the character when it has none. `transfer` brings a
+   * character from another map, after the master confirmed it (108).
+   */
+  placeCharacter: (participation: CampaignCharacterInfo, x: number, y: number, tokenId?: number, transfer?: boolean) => Promise<MapTokenInfo>;
   /** Moves (and optionally turns) a piece; players only their own characters, within the move (015). */
   moveToken: (mapTokenId: number, x: number, y: number, look?: number) => Promise<MapTokenInfo>;
   changeToken: (mapTokenId: number, tokenId: number) => Promise<MapTokenInfo>;
@@ -120,15 +123,14 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [run, mapId]);
 
-  const placeCharacter = useCallback(async (participation: CampaignCharacterInfo, x: number, y: number, tokenId?: number) => {
+  const placeCharacter = useCallback(async (participation: CampaignCharacterInfo, x: number, y: number, tokenId?: number, transfer = false) => {
     const result = await run(() => mapTokenService.placeCharacter({
-      mapId: requireMap(), campaignCharacterId: participation.campaignCharacterId, tokenId: tokenId ?? null, x, y,
+      mapId: requireMap(), campaignCharacterId: participation.campaignCharacterId, tokenId: tokenId ?? null, x, y, transfer,
     }));
+    // The party cards tell which map each character is on (108).
+    void refreshParty();
     // The chosen token became the character's own: reload what shows it.
-    if (participation.characterTokenId === null) {
-      void refreshParty();
-      void refreshCharacters(true);
-    }
+    if (participation.characterTokenId === null) void refreshCharacters(true);
     return result;
   },
   // eslint-disable-next-line react-hooks/exhaustive-deps

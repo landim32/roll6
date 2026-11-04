@@ -103,7 +103,7 @@ public partial class TurnService : IGmService
     /// <summary>A line of the GM in the chat: the master's user, shown as "GM", to the whole group, no notice.</summary>
     private async Task GmLineAsync(Campaign campaign, int turnNo, string text)
     {
-        var turn = Turn.GmNotice(campaign.CampaignId, campaign.CurrentMapId, turnNo, campaign.UserId, text);
+        var turn = Turn.GmNotice(campaign.CampaignId, null, turnNo, campaign.UserId, text);
         var saved = await SaveEntryAsync(turn, null);
         var item = (await MapChatAsync(campaign, campaign.UserId, new List<Turn> { saved })).Single();
         await PublishEntryAsync(campaign, campaign.UserId, saved, item, TableEventType.CHAT_MESSAGE);

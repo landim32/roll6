@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 namespace Roll6.DTO.Turn;
 
 /// <summary>
-/// The whole table for an AI assistant in one call (027): approved characters, NPC occurrences of the current map and
-/// the "## Ações" markdown of the turn.
+/// The whole table for an AI assistant in one call (027): approved characters, the NPC occurrences of every map with
+/// characters (108: a split party plays one turn on several maps) and the "## Ações" markdown of the turn.
 /// </summary>
 public class TurnDataInfo
 {
@@ -19,9 +19,13 @@ public class TurnDataInfo
     [JsonPropertyName("currentTurn")]
     public int CurrentTurn { get; set; }
 
-    /// <summary>Current map of the campaign (positions and NPCs), null when none.</summary>
+    /// <summary>The one map with characters; null when there are none or several (108: read <see cref="Maps"/>).</summary>
     [JsonPropertyName("mapId")]
     public long? MapId { get; set; }
+
+    /// <summary>The maps with characters, by name (108).</summary>
+    [JsonPropertyName("maps")]
+    public List<TurnMapInfo> Maps { get; set; } = new();
 
     [JsonPropertyName("characters")]
     public List<TurnDataCharacterInfo> Characters { get; set; } = new();
@@ -32,6 +36,16 @@ public class TurnDataInfo
     /// <summary>Same text as the "## Ações" section of the turn summary.</summary>
     [JsonPropertyName("actions")]
     public string Actions { get; set; } = string.Empty;
+}
+
+/// <summary>A map where the turn is being played (108).</summary>
+public class TurnMapInfo
+{
+    [JsonPropertyName("mapId")]
+    public long MapId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
 }
 
 /// <summary>An approved character of the campaign (energy is the fatigue).</summary>
@@ -81,7 +95,11 @@ public class TurnDataCharacterInfo
     [JsonPropertyName("posture")]
     public int Posture { get; set; } = 1;
 
-    /// <summary>Piece on the current map (null without one).</summary>
+    /// <summary>Map where the character stands (108); null off every map, and then there is no position.</summary>
+    [JsonPropertyName("mapId")]
+    public long? MapId { get; set; }
+
+    /// <summary>The character's piece (null off every map).</summary>
     [JsonPropertyName("mapTokenId")]
     public long? MapTokenId { get; set; }
 
@@ -100,7 +118,7 @@ public class TurnDataCharacterInfo
     public string? LookName { get; set; }
 }
 
-/// <summary>An NPC occurrence on the current map (totals are the NPC's).</summary>
+/// <summary>An NPC occurrence on a map with characters (totals are the NPC's).</summary>
 public class TurnDataNpcInfo
 {
     [JsonPropertyName("mapNpcId")]
@@ -108,6 +126,10 @@ public class TurnDataNpcInfo
 
     [JsonPropertyName("npcId")]
     public long NpcId { get; set; }
+
+    /// <summary>Map of the occurrence (108).</summary>
+    [JsonPropertyName("mapId")]
+    public long MapId { get; set; }
 
     [JsonPropertyName("mapTokenId")]
     public long? MapTokenId { get; set; }

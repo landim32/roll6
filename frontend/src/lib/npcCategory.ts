@@ -47,7 +47,7 @@ export const groupNpcs = (npcs: readonly CampaignNpcInfo[], partyIds: readonly n
 
 /**
  * The NPCs of the scene (076): an ally always (it travels with the party), an enemy or neutral only while it has at least
- * one piece on the map open on screen — for players the campaign's current map (Q2 = A), for the master whatever map they
+ * one piece on the map open on screen — for players the map of their character (108), for the master whatever map they
  * opened; the rule is the same for both (Q1 = A). No open campaign map (`mapId` null) leaves only the allies. Pieces of
  * another map, left over for an instant while a new map loads, are ignored. The input order is kept.
  */

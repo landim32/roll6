@@ -11,8 +11,11 @@ public class TableConnections
 
     private readonly object _lock = new();
     private readonly Dictionary<string, Connection> _connections = new();
-    /// <summary>Walks this connection may relay, until when (069): the permission is checked again every 10 s.</summary>
-    private readonly Dictionary<(string ConnectionId, long MapTokenId), DateTime> _walks = new();
+    /// <summary>
+    /// Walks this connection may relay, until when and to which users (069/108): both are checked again every 10 s, so a
+    /// sample never costs a query.
+    /// </summary>
+    private readonly Dictionary<(string ConnectionId, long MapTokenId), (DateTime Until, IReadOnlyCollection<long> Audience)> _walks = new();
 
     public void Add(string connectionId, long userId)
     {
@@ -39,13 +42,30 @@ public class TableConnections
     public bool IsWalkAllowed(string connectionId, long mapTokenId, DateTime now)
     {
         lock (_lock)
-            return _walks.TryGetValue((connectionId, mapTokenId), out var until) && until > now;
+            return _walks.TryGetValue((connectionId, mapTokenId), out var walk) && walk.Until > now;
     }
 
-    /// <summary>Remembers that the connection may walk the piece until <paramref name="until"/> (069).</summary>
-    public void AllowWalk(string connectionId, long mapTokenId, DateTime until)
+    /// <summary>Remembers that the connection may walk the piece until <paramref name="until"/>, and who sees it (069/108).</summary>
+    public void AllowWalk(string connectionId, long mapTokenId, DateTime until, IReadOnlyCollection<long> audience)
     {
-        lock (_lock) _walks[(connectionId, mapTokenId)] = until;
+        lock (_lock) _walks[(connectionId, mapTokenId)] = (until, audience);
+    }
+
+    /// <summary>
+    /// The other connections that see a walk (108): those of the remembered users following the walker's campaign. Read
+    /// on every sample, so someone who just connected gets it.
+    /// </summary>
+    public List<string> WalkPeers(string connectionId, long mapTokenId)
+    {
+        lock (_lock)
+        {
+            if (!_walks.TryGetValue((connectionId, mapTokenId), out var walk)
+                || !_connections.TryGetValue(connectionId, out var walker) || walker.CampaignId is not long campaignId)
+                return new List<string>();
+            return _connections
+                .Where(c => c.Key != connectionId && c.Value.CampaignId == campaignId && walk.Audience.Contains(c.Value.UserId))
+                .Select(c => c.Key).ToList();
+        }
     }
 
     private void ForgetWalks(string connectionId)

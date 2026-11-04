@@ -43,6 +43,12 @@ export interface CampaignCharacterInfo {
   posture: Posture;
   /** The character's token; without one, placing it on the map asks for a token. */
   characterTokenId: number | null;
+  /**
+   * The campaign map the character is on (108: at most one), and its name; null off every map. The list of a campaign
+   * brings them for the master and for the viewer's own characters only.
+   */
+  mapId: number | null;
+  mapName: string | null;
   createdAt: string;
   updatedAt: string;
 }

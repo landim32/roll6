@@ -62,6 +62,7 @@ public class CampaignCharacterServiceTests
         _repository.Setup(r => r.UpdateAsync(It.IsAny<CampaignCharacter>())).ReturnsAsync((CampaignCharacter c) => c);
         _unitOfWork.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>())).Returns((Func<Task> action) => action());
         _imageStorage.Setup(s => s.GetUrl(It.IsAny<string?>())).Returns((string? file) => file == null ? null : $"https://cdn/{file}");
+        _mapTokenRepository.Setup(r => r.ListMapsByParticipationsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CharacterMapRow>());
 
         _service = new CampaignCharacterService(_repository.Object, _campaignRepository.Object,
             _characterRepository.Object, _userRepository.Object, _mapTokenRepository.Object, _tokenRepository.Object, _unitOfWork.Object,
@@ -69,6 +70,83 @@ public class CampaignCharacterServiceTests
     }
 
     private static CampaignCharacterRequestInfo Request(long campaignId) => new() { CampaignId = campaignId, CharacterId = CHARACTER };
+
+    // ---- 108: where each character stands ----
+
+    private const long OTHER_CHARACTER = 21;
+
+    /// <summary>Bruno's Thorin (70) stands on "Porão"; the master's Gimli (71) is off every map.</summary>
+    private void SetupSplitParty()
+    {
+        var participations = new List<CampaignCharacter>
+        {
+            new() { CampaignCharacterId = 70, CampaignId = OPEN_CAMPAIGN, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved },
+            new() { CampaignCharacterId = 71, CampaignId = OPEN_CAMPAIGN, CharacterId = OTHER_CHARACTER, Status = CampaignCharacterStatus.Approved }
+        };
+        _repository.Setup(r => r.ListByCampaignAsync(OPEN_CAMPAIGN, It.IsAny<bool>())).ReturnsAsync(participations);
+        _repository.Setup(r => r.HasApprovedCharacterAsync(OPEN_CAMPAIGN, It.IsAny<long>())).ReturnsAsync(true);
+        _repository.Setup(r => r.ListByCampaignAndUserAsync(OPEN_CAMPAIGN, PLAYER_ID)).ReturnsAsync(participations.Take(1).ToList());
+        _characterRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Character>
+        {
+            new() { CharacterId = CHARACTER, UserId = PLAYER_ID, Name = "Thorin" },
+            new() { CharacterId = OTHER_CHARACTER, UserId = OUTSIDER_ID, Name = "Gimli" }
+        });
+        _mapTokenRepository.Setup(r => r.ListMapsByParticipationsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<CharacterMapRow>
+        {
+            new() { CampaignCharacterId = 70, MapId = 12, MapName = "Porão" },
+            new() { CampaignCharacterId = 71, MapId = 13, MapName = "Taverna" }
+        });
+    }
+
+    [Fact]
+    public async Task List_TheMasterSeesTheMapOfEveryCharacter()
+    {
+        SetupSplitParty();
+
+        var party = await _service.ListByCampaignAsync(MASTER_ID, OPEN_CAMPAIGN);
+
+        party.Select(p => (p.CampaignCharacterId, p.MapId, p.MapName)).Should()
+            .Equal((70L, (long?)12, "Porão"), (71L, (long?)13, "Taverna"));
+    }
+
+    [Fact]
+    public async Task List_APlayerSeesTheMapOnlyOfHisOwnCharacters()
+    {
+        SetupSplitParty();
+
+        var party = await _service.ListByCampaignAsync(PLAYER_ID, OPEN_CAMPAIGN);
+
+        party.Select(p => (p.CampaignCharacterId, p.MapId, p.MapName)).Should()
+            .Equal((70L, (long?)12, "Porão"), (71L, (long?)null, (string?)null));
+    }
+
+    [Fact]
+    public async Task ListMine_BringsTheMapOfEachCharacter()
+    {
+        SetupSplitParty();
+
+        var mine = await _service.ListMineAsync(PLAYER_ID, OPEN_CAMPAIGN);
+
+        mine.Should().ContainSingle().Which.MapName.Should().Be("Porão");
+    }
+
+    [Fact]
+    public async Task Get_ShowsTheMapToTheMasterAndTheOwner_NotToAnotherPlayer()
+    {
+        _repository.Setup(r => r.GetByIdAsync(70)).ReturnsAsync(new CampaignCharacter
+        {
+            CampaignCharacterId = 70, CampaignId = OPEN_CAMPAIGN, CharacterId = CHARACTER, Status = CampaignCharacterStatus.Approved
+        });
+        _repository.Setup(r => r.HasApprovedCharacterAsync(OPEN_CAMPAIGN, OUTSIDER_ID)).ReturnsAsync(true);
+        _mapTokenRepository.Setup(r => r.ListMapsByParticipationsAsync(It.IsAny<IEnumerable<long>>()))
+            .ReturnsAsync(new List<CharacterMapRow> { new() { CampaignCharacterId = 70, MapId = 12, MapName = "Porão" } });
+
+        (await _service.GetByIdAsync(MASTER_ID, 70)).MapId.Should().Be(12);
+        (await _service.GetByIdAsync(PLAYER_ID, 70)).MapName.Should().Be("Porão");
+        var seenByAnother = await _service.GetByIdAsync(OUTSIDER_ID, 70);
+        seenByAnother.MapId.Should().BeNull();
+        seenByAnother.MapName.Should().BeNull();
+    }
 
     [Fact]
     public async Task Deny_And_Remove_ClearTheMasterOfItsAllies()

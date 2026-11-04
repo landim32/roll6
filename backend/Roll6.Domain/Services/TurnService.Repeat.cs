@@ -71,7 +71,7 @@ public partial class TurnService
             campaign = await _campaignRepository.GetByIdAsync(campaignId)
                 ?? throw new KeyNotFoundException("Campanha não encontrada.");
             actor = await ResolveCharacterActorAsync(userId, campaign, characterId);
-            mapId = campaign.CurrentMapId;
+            mapId = await CharacterMapIdAsync(campaign.CampaignId, characterId);
         }
         else
             throw new DomainValidationException("mapTokenId",
@@ -122,19 +122,23 @@ public partial class TurnService
 
     /// <summary>
     /// 099: the actions every active repetition of the campaign adds to the turn that just started (call after
-    /// <see cref="Campaign.AdvanceTurn"/>, insert inside the same transaction). Characters act on the campaign's current
-    /// map (or none); NPC instances on their own map. Authored by whoever set the repetition (else
+    /// <see cref="Campaign.AdvanceTurn"/>, insert inside the same transaction). Characters act on the map where they stand
+    /// (or none); NPC instances on their own map. Authored by whoever set the repetition (else
     /// <paramref name="fallbackUserId"/>). No notices: an automatic action is not news.
     /// </summary>
     private async Task<List<Turn>> RepeatedActionsAsync(Campaign campaign, long fallbackUserId,
         IReadOnlySet<long>? clearedParticipations = null, IReadOnlySet<long>? clearedInstances = null)
     {
         var turns = new List<Turn>();
-        foreach (var participation in await _campaignCharacterRepository.ListRepeatingAsync(campaign.CampaignId) ?? new())
+        var repeating = (await _campaignCharacterRepository.ListRepeatingAsync(campaign.CampaignId) ?? new())
+            .Where(p => clearedParticipations?.Contains(p.CampaignCharacterId) != true).ToList();
+        var places = repeating.Count == 0 ? new Dictionary<long, long>()
+            : (await _mapTokenRepository.ListMapsByParticipationsAsync(repeating.Select(p => p.CampaignCharacterId)))
+                .ToDictionary(row => row.CampaignCharacterId, row => row.MapId);
+        foreach (var participation in repeating)
         {
-            if (clearedParticipations?.Contains(participation.CampaignCharacterId) == true)
-                continue;
-            turns.Add(Turn.Action(campaign.CampaignId, campaign.CurrentMapId, participation.CharacterId, null, null,
+            turns.Add(Turn.Action(campaign.CampaignId, places.TryGetValue(participation.CampaignCharacterId, out var mapId) ? mapId : null,
+                participation.CharacterId, null, null,
                 campaign.CurrentTurn, participation.RepeatedActionUserId ?? fallbackUserId, participation.RepeatedAction,
                 null, RepeatSource.TurnStart));
         }

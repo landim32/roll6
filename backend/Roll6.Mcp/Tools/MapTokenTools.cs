@@ -52,13 +52,18 @@ public static class MapTokenTools
     [Description($$"""
         What it does: places an approved character of the campaign on a free hex of a campaign map (blue piece). The piece
         uses the character's token; if the character has none, pass tokenId and it is also saved on the character.
-        A character appears at most once per map.
-        Who can use it: the master (any approved character) or the character's owner (own characters only); once on
-        the map, players move it with move_map_token (turn and move limits apply).
+        A character stands on one map of the campaign at most, and that map is the one its player sees. When it is on
+        another map the call is refused naming that map; call again with transfer: true to take it (the same piece moves,
+        keeping life, status, posture, the turn's action and the one-move rule; it spends no Deslocamento and records no
+        movement). The player's screen follows the character.
+        Who can use it: only the master, even for a player's own character; once on the map, players move it with
+        move_map_token (turn and move limits apply).
         {{RETURNS}}
-        Common errors: 403 neither the master nor the character's owner, 404 not found, 409 not approved / already on this map / a hex of the
-        shape occupied, 400 no token or shape outside the grid.
-        Related tools: list_campaign_characters (campaignCharacterId, characterTokenId), move_map_token.
+        Common errors: 403 "Apenas o mestre coloca personagens nos mapas.", 404 not found or map deleted, 409 "O personagem
+        está no mapa X." (send transfer: true) / "O personagem já está neste mapa." / "Este mapa está arquivado." / not
+        approved / a hex of the shape occupied / campaign not editable, 400 no token or shape outside the grid.
+        Related tools: list_campaign_characters (campaignCharacterId, characterTokenId, mapId, mapName), move_map_token,
+        delete_map_token.
         """)]
     public static Task<CallToolResult> PlaceCharacterOnMap(
         Roll6ApiClient api,
@@ -66,10 +71,11 @@ public static class MapTokenTools
         [Description(McpDocs.PARTICIPATION_ID + " Must be approved in the map's campaign.")] long campaignCharacterId,
         [Description(McpDocs.X)] int x,
         [Description(McpDocs.Y)] int y,
-        [Description("Token to use only when the character has none (tokenId from list_tokens); ignored otherwise.")] long? tokenId = null) =>
+        [Description("Token to use only when the character has none (tokenId from list_tokens); ignored otherwise.")] long? tokenId = null,
+        [Description("True = take the character from the map where it is now (confirmed by the master). Omit otherwise; it has no effect on a character off every map.")] bool transfer = false) =>
         api.SendAsync(HttpMethod.Post, "/api/maptoken/character", new MapTokenCharacterInsertInfo
         {
-            MapId = mapId, CampaignCharacterId = campaignCharacterId, TokenId = tokenId, X = x, Y = y
+            MapId = mapId, CampaignCharacterId = campaignCharacterId, TokenId = tokenId, X = x, Y = y, Transfer = transfer
         });
 
     [McpServerTool(Name = "move_map_token", Title = "Move piece", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -89,7 +95,7 @@ public static class MapTokenTools
         Free mode (set_campaign_free_mode): character and NPC pieces move any number of times per turn, without the
         Deslocamento limit, and no Movement entry is written; an occupied hex or a hex outside the grid is still refused.
         Walk (walk = true, free mode only): the position a player reached walking his own standing character in the 3D
-        view — on the campaign's current map only, other pieces ignored (they may end up on the same hex), no turn entry,
+        view, on the map where it stands — other pieces ignored (they may end up on the same hex), no turn entry,
         no Deslocamento. The master cannot walk pieces either; he moves them without walk. Leaving free mode is refused
         while pieces share a hex. walkX/walkY/walkYaw (all three, with walk) keep the exact point the figure stopped at
         inside its hex (map pixels, 40 px hexes; it must round to x/y) and its direction in radians, so the 3D view draws it
@@ -97,7 +103,7 @@ public static class MapTokenTools
         Returns: the updated piece (walkX/walkY/walkYaw null = the middle of the hex).
         Common errors: 409 a hex of the piece's shape occupied or already moved this turn, 400 beyond the move or shape
         outside the grid (big pieces need their whole shape free at every step and turn), 403 not your piece. With walk:
-        409 "Só é possível andar no modo livre." / "Só é possível andar no mapa atual da campanha." / "Um personagem
+        409 "Só é possível andar no modo livre." / "Um personagem
         caído não anda.", 403 "Você só pode andar com os seus personagens.", 400 shape outside the grid.
         Related tools: list_map_tokens (ids and positions), get_map (grid size), get_turn_state, reset_turn.
         """)]
@@ -107,7 +113,7 @@ public static class MapTokenTools
         [Description("Destination column. " + McpDocs.X)] int x,
         [Description("Destination row. " + McpDocs.Y)] int y,
         [Description(McpDocs.LOOK_OPTIONAL)] int? look = null,
-        [Description("True = a free-mode walk position of your own standing character (ignores other pieces, current map only, no turn entry). Omit for a normal move.")] bool? walk = null,
+        [Description("True = a free-mode walk position of your own standing character (ignores other pieces, no turn entry). Omit for a normal move.")] bool? walk = null,
         [Description("With walk: exact horizontal point of the figure in map pixels; must lie in the hex x/y. Omit = the middle of the hex.")] double? walkX = null,
         [Description("With walk: exact vertical point of the figure in map pixels; must lie in the hex x/y.")] double? walkY = null,
         [Description("With walk: exact direction the figure faces, in radians (0 = up the map, clockwise).")] double? walkYaw = null) =>
@@ -187,7 +193,8 @@ public static class MapTokenTools
     [McpServerTool(Name = "delete_map_token", Title = "Delete piece", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/maptoken/{id}")]
     [Description($$"""
-        What it does: removes a piece from the map; an NPC piece takes its occurrence (and turn entries) with it; the
+        What it does: removes a piece from the map; a character piece leaves that character off every map (its player sees a
+        notice instead of a map); an NPC piece takes its occurrence (and turn entries) with it; the
         library token is kept. {{McpDocs.DESTRUCTIVE}}
         Who can use it: only the master.
         Returns: { ok: true }.

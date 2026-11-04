@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Roll6.DTO.Campaign;
 
-/// <summary>Campaign shown in the table combo, with the map players currently follow when it is active.</summary>
+/// <summary>Campaign shown in the table combo, with the maps the caller may open from it.</summary>
 public class CampaignTableInfo
 {
     [JsonPropertyName("campaignId")]
@@ -36,21 +36,9 @@ public class CampaignTableInfo
     [JsonPropertyName("isMaster")]
     public bool IsMaster { get; set; }
 
-    /// <summary>Active map the table follows. Null when there is none or it is not active.</summary>
-    [JsonPropertyName("currentMapId")]
-    public long? CurrentMapId { get; set; }
-
-    /// <summary>Name of <see cref="CurrentMapId"/>. Null when there is no active current map.</summary>
-    [JsonPropertyName("currentMapName")]
-    public string? CurrentMapName { get; set; }
-
-    /// <summary>Slug of <see cref="CurrentMapId"/>. Null when there is no active current map.</summary>
-    [JsonPropertyName("currentMapSlug")]
-    public string? CurrentMapSlug { get; set; }
-
     /// <summary>
-    /// 078: the Current and Active maps of the campaign, Current first then by name — only for campaigns the caller
-    /// masters (empty for players, who only follow the current map). Feeds the master's table combo.
+    /// 078/108: the active maps by name. The master gets all of them with every character; a player only the maps of his
+    /// characters, with only those. Feeds the table combo.
     /// </summary>
     [JsonPropertyName("maps")]
     public List<TableMapInfo> Maps { get; set; } = new();
@@ -68,7 +56,15 @@ public class TableMapInfo
     [JsonPropertyName("slug")]
     public string Slug { get; set; } = string.Empty;
 
-    /// <summary>1 Active, 4 Current.</summary>
+    /// <summary>1 Active.</summary>
     [JsonPropertyName("status")]
     public int Status { get; set; }
+
+    /// <summary>Characters on the map (108), only the caller's own for a player: <see cref="CharacterIds"/> counted.</summary>
+    [JsonPropertyName("characterCount")]
+    public int CharacterCount { get; set; }
+
+    /// <summary>Characters (characterId) on the map, only the caller's own for a player.</summary>
+    [JsonPropertyName("characterIds")]
+    public List<long> CharacterIds { get; set; } = new();
 }

@@ -29,7 +29,7 @@ export const buildCharacterOptions = ({ isMaster, myCharacters, myParticipations
 /** Keeps the stored choice while it is still an option; otherwise the first option, or null. */
 export const resolveSelection = (
   stored: CharacterSelection | null | undefined,
-  options: CharacterOption[],
+  options: { key: CharacterSelection }[],
 ): CharacterSelection | null => {
   if (stored != null && options.some((o) => o.key === stored)) return stored;
   return options[0]?.key ?? null;

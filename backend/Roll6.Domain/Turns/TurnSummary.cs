@@ -33,12 +33,12 @@ public sealed record SummaryLine
     public RepeatSource? Repeated { get; init; }
 }
 
-/// <summary>Where a character/NPC piece is (column/row, odd-q) and where it looks.</summary>
-public sealed record SummaryPosition(string Actor, int X, int Y, int Look);
+/// <summary>Where a character/NPC piece is (column/row, odd-q), where it looks and on which map (108).</summary>
+public sealed record SummaryPosition(string Actor, int X, int Y, int Look, string? Map = null);
 
 /// <summary>
-/// Readable markdown of a turn (024): "## Ações" (entries in order) and "## Posições" (pieces by name). Pure: the
-/// service resolves names, authors and positions.
+/// Readable markdown of a turn (024): "## Ações" (entries in order) and "## Posições" (pieces by name, under a
+/// "### {map}" per map when the party is split, 108). Pure: the service resolves names, authors and positions.
 /// </summary>
 public static class TurnSummary
 {
@@ -54,8 +54,14 @@ public static class TurnSummary
         var text = new StringBuilder(BuildActions(lines));
         text.Append("## Posições\n");
         var pieces = positions.OrderBy(p => p.Actor, StringComparer.CurrentCultureIgnoreCase).ToList();
-        foreach (var piece in pieces)
-            text.Append($"- {Escape(piece.Actor)} - ({piece.X}, {piece.Y}) - {Direction(piece.Look)}\n");
+        var maps = pieces.GroupBy(p => p.Map).OrderBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase).ToList();
+        foreach (var map in maps)
+        {
+            if (maps.Count > 1)
+                text.Append($"### {Escape(map.Key)}\n");
+            foreach (var piece in map)
+                text.Append($"- {Escape(piece.Actor)} - ({piece.X}, {piece.Y}) - {Direction(piece.Look)}\n");
+        }
         if (pieces.Count == 0)
             text.Append("Nenhuma peça no mapa.\n");
         return text.ToString();

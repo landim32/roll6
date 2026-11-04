@@ -21,8 +21,6 @@ export interface CampaignInfo {
   pendingNotice?: boolean;
   /** GM mode (096) — see `lib/gmMode`. A missing value reads as false. */
   gmMode?: boolean;
-  /** Campaign map the master opened last; players follow it (017). */
-  currentMapId: number | null;
   /** The campaign's picture on the library cards (090): the stored name and its presigned URL; null without one. */
   image?: string | null;
   imageUrl?: string | null;
@@ -30,7 +28,7 @@ export interface CampaignInfo {
   updatedAt: string;
 }
 
-/** Campaign in the table combo, with the active map the table follows. */
+/** Campaign in the table combo, with its maps. */
 export interface CampaignTableInfo {
   campaignId: number;
   name: string;
@@ -44,11 +42,8 @@ export interface CampaignTableInfo {
   /** Presigned URL of the campaign's picture (090); null without one. */
   imageUrl?: string | null;
   isMaster: boolean;
-  currentMapId: number | null;
-  currentMapName: string | null;
-  currentMapSlug: string | null;
-  /** 078: the current and active maps of a campaign the user masters (current first); empty for players. */
-  maps?: TableMapInfo[];
+  /** The master gets every active map; a player only the maps where his characters are (108). */
+  maps: TableMapInfo[];
 }
 
 /** A map in the table combo (078). */
@@ -56,8 +51,11 @@ export interface TableMapInfo {
   mapId: number;
   name: string;
   slug: string;
-  /** 4 current, 1 active. */
   status: number;
+  /** Characters on the map (108): all of them for the master, only his own for a player. */
+  characterCount: number;
+  /** Their ids, same rule. */
+  characterIds: number[];
 }
 
 /** Data to create a campaign. */

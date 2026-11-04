@@ -26,7 +26,7 @@ public partial class TurnService : IAskService
     {
         var campaign = await GetReadableCampaignAsync(userId, campaignId);
         var (characterId, displayName, displayImage) = await SpeakerAsync(userId, campaign, info.CharacterId);
-        var question = Turn.Question(campaign.CampaignId, campaign.CurrentMapId, campaign.CurrentTurn, userId, characterId,
+        var question = Turn.Question(campaign.CampaignId, null, campaign.CurrentTurn, userId, characterId,
             displayName, displayImage, info.Text);
         if (!_askDispatcher.IsAgentConnected(campaign.UserId))
             throw new ConflictException(ASK_OFFLINE);

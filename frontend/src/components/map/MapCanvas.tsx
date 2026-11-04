@@ -26,7 +26,7 @@ import { SpeechBubbleLayer } from './SpeechBubbleLayer';
 import { TokenLayer } from './TokenLayer';
 import { TurnTrailLayer } from './TurnTrailLayer';
 
-export type { TokenPickRequest } from '../../hooks/useMapInteraction';
+export type { TokenPickRequest, TransferRequest } from '../../hooks/useMapInteraction';
 
 /** Moves under this distance (px) between press and release count as a click, not a pan. */
 const CLICK_TOLERANCE = 4;

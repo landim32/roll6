@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { GridSizeFooter } from '../components/map/GridSizeFooter';
 import { MapCanvas } from '../components/map/MapCanvas';
-import type { TokenPickRequest } from '../components/map/MapCanvas';
+import type { TokenPickRequest, TransferRequest } from '../components/map/MapCanvas';
 import { MapControls } from '../components/map/MapControls';
 import { NpcPanel } from '../components/map/NpcPanel';
 import { MapNpcFormModal } from '../components/npcs/MapNpcFormModal';
@@ -27,6 +27,7 @@ import { UnsavedChangesModal } from '../components/modals/UnsavedChangesModal';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { InstallHint } from '../components/install/InstallHint';
 import { IosInstallGuide } from '../components/install/IosInstallGuide';
+import { useCharacter } from '../hooks/useCharacter';
 import { useChat } from '../hooks/useChat';
 import { useMapEditor } from '../hooks/useMapEditor';
 import { DESKTOP_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
@@ -34,6 +35,7 @@ import { useCampaign } from '../hooks/useCampaign';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { LAYOUT_MODE, isChatVisible, isMapVisible } from '../lib/layoutMode';
 import { setMapRegion } from '../lib/mapRegion';
+import { ownMapOf } from '../lib/viewerMap';
 import { useMapToken } from '../hooks/useMapToken';
 import { useTurn } from '../hooks/useTurn';
 import { useTableRoute } from '../hooks/useTableRoute';
@@ -52,10 +54,12 @@ const IsoView = lazy(() => import('../components/iso/IsoView'));
  * mounted in the last); every other window opens as a modal over it.
  */
 export const MainPage = () => {
-  const { isDirty, draft, viewMode, setViewMode } = useMapEditor();
+  const { isDirty, draft, viewMode, setViewMode, mapChanging } = useMapEditor();
   const { currentCampaign, isMaster } = useCampaign();
-  /** A player in a campaign whose master hasn't picked a map yet sees no map, and says so (039). */
-  const noCurrentMap = !!currentCampaign && !isMaster && currentCampaign.currentMapId === null && draft.mapId === null;
+  const { currentSelection, myParticipations, participationsLoadedFor } = useCharacter();
+  /** A player whose chosen character is off every map sees no map, and says so (108); chat and panels stay. */
+  const noCharacterMap = !!currentCampaign && !isMaster && draft.mapId === null && typeof currentSelection === 'number'
+    && participationsLoadedFor === currentCampaign.campaignId && ownMapOf(currentSelection, myParticipations) === null;
   // The tab says what is open (040): "{map} — {campaign} | Roll6", "{model} | Roll6", "{campaign} | Roll6" or "Roll6".
   useDocumentTitle({
     mapName: draft.mapModelId !== null ? draft.name : null,
@@ -70,6 +74,8 @@ export const MainPage = () => {
   const [editing, setEditing] = useState<CharacterEditTarget | null>(null);
   /** What the tokens modal was opened for from the map (hex menu or a character without a token). */
   const [tokenPick, setTokenPick] = useState<TokenPickRequest | null>(null);
+  /** A character dropped here while on another map, waiting for the master's answer (108). */
+  const [transferring, setTransferring] = useState<TransferRequest | null>(null);
   /** "Incluir NPC" window and the NPC whose pencil was clicked (014). */
   const [npcPickerOpen, setNpcPickerOpen] = useState(false);
   const navigate = useNavigate();
@@ -122,9 +128,28 @@ export const MainPage = () => {
         toast.success(t('toast.mapTokenChanged', { name: tokenPick.name }));
         break;
       case 'character':
-        await placeCharacter(tokenPick.participation, tokenPick.x, tokenPick.y, token.tokenId);
+        await placeCharacter(tokenPick.participation, tokenPick.x, tokenPick.y, token.tokenId, tokenPick.transfer);
         toast.success(t('toast.mapTokenAdded', { name: tokenPick.participation.characterName }));
         break;
+    }
+  };
+
+  /**
+   * The master confirmed bringing the character (108). Without a token the choice comes first and carries the transfer.
+   * A refusal (the hex was taken meanwhile…) closes the window: the toast explains and the character stays where it was.
+   */
+  const onConfirmTransfer = async () => {
+    if (!transferring) return;
+    const { participation, hex, chooseToken } = transferring;
+    if (chooseToken) {
+      setTokenPick({ kind: 'character', participation, x: hex.x, y: hex.y, transfer: true });
+      return;
+    }
+    try {
+      await placeCharacter(participation, hex.x, hex.y, undefined, true);
+      toast.success(t('toast.mapTokenAdded', { name: participation.characterName }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
     }
   };
 
@@ -178,6 +203,7 @@ export const MainPage = () => {
                   setViewMode('2d');
                 }}
                 onPickToken={setTokenPick}
+                onConfirmTransfer={setTransferring}
                 onDeleteToken={setToDelete}
                 onEditNpc={setEditingInstance}
                 onAct={setActing}
@@ -189,6 +215,7 @@ export const MainPage = () => {
           ) : (
             <MapCanvas
               onPickToken={setTokenPick}
+              onConfirmTransfer={setTransferring}
               onDeleteToken={setToDelete}
               onEditNpc={setEditingInstance}
               onAct={setActing}
@@ -202,6 +229,8 @@ export const MainPage = () => {
           <NpcPanel onAdd={() => setNpcPickerOpen(true)} onEdit={editNpc} onEditInstance={setEditingInstance} onRemoveInstance={askRemoveInstance} />
           <MapControls onOpenImage={openImage} />
           <GridSizeFooter onEditGrid={() => setGridOpen(true)} />
+          {/* Inside the map region: nobody in the library or with only the chat on screen sees it (108). */}
+          {mapChanging && <div className="stm-map-changing" role="status">{t('map.changing')}</div>}
         </div>
       )}
       {showChat && (
@@ -215,7 +244,7 @@ export const MainPage = () => {
           </div>
         </div>
       )}
-      {noCurrentMap && <div className="stm-no-map-notice" role="status">{t('map.noCurrentMap')}</div>}
+      {noCharacterMap && <div className="stm-no-map-notice" role="status">{t('map.noCharacterMap')}</div>}
       {/* Installable app (042): the one-time phone notice and the iOS guide. */}
       <InstallHint />
       <IosInstallGuide />
@@ -233,6 +262,14 @@ export const MainPage = () => {
         onOpenChange={(o) => { if (!o) setTokenPick(null); }}
         title={tokenPickTitle}
         onSelect={onTokenChosen}
+      />
+      <ConfirmModal
+        open={transferring !== null}
+        onOpenChange={(o) => { if (!o) setTransferring(null); }}
+        title={t('map.transferTitle')}
+        message={transferring ? t('map.transferConfirm', { name: transferring.mapName }) : ''}
+        confirmLabel={t('map.transferButton')}
+        onConfirm={onConfirmTransfer}
       />
       <NpcPickerModal open={npcPickerOpen} onOpenChange={setNpcPickerOpen} />
       <MapNpcFormModal piece={editingInstance} onClose={() => setEditingInstance(null)} />

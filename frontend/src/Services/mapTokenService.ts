@@ -39,7 +39,10 @@ class MapTokenService {
     return this.send('POST', '', data);
   }
 
-  /** Places a campaign character (saves the token on it when it had none). */
+  /**
+   * Places a campaign character, master only (saves the token on it when it had none). On another map it answers 409
+   * unless `transfer` is set, which brings it here in one operation (108).
+   */
   async placeCharacter(data: MapTokenCharacterInsertInfo): Promise<MapTokenInfo> {
     return this.send('POST', '/character', data);
   }

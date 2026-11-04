@@ -108,16 +108,14 @@ public partial class TurnService
         return await BuildDataAsync(campaign, CheckTurnNo(campaign, turnNo), userId);
     }
 
-    /// <summary>Approved characters, NPC occurrences of the current map (current values) and the actions of the turn.</summary>
+    /// <summary>Approved characters, NPC occurrences of the maps with characters (current values) and the actions of the turn.</summary>
     private async Task<TurnDataInfo> BuildDataAsync(Campaign campaign, int turnNo, long? viewerId = null)
     {
         var entries = await _repository.ListByCampaignTurnAsync(campaign.CampaignId, turnNo);
         // 047: whispered actions are masked for whoever reads the data (the master sees them whole).
         await MaskForViewerAsync(campaign, viewerId ?? campaign.UserId, entries);
         var participations = await _campaignCharacterRepository.ListByCampaignAsync(campaign.CampaignId, approvedOnly: true);
-        var mapId = campaign.CurrentMapId;
-        var pieces = mapId is long id ? await _mapTokenRepository.ListByMapAsync(id) : new List<MapToken>();
-        var occurrences = mapId is long mid ? await _mapNpcRepository.ListByMapAsync(mid) : new List<MapNpc>();
+        var (maps, pieces, occurrences) = await LoadPlayedMapsAsync(campaign.CampaignId);
         var npcTotals = (await _npcRepository.ListByIdsAsync(occurrences.Select(o => o.NpcId).Distinct())).ToDictionary(n => n.NpcId);
         var names = await LoadNamesAsync(campaign, entries, participations.Select(p => p.CharacterId), occurrences.Select(o => o.MapNpcId));
 
@@ -129,7 +127,9 @@ public partial class TurnService
             CampaignId = campaign.CampaignId,
             TurnNo = turnNo,
             CurrentTurn = campaign.CurrentTurn,
-            MapId = mapId,
+            // 108: consumers that read a single map keep working while the party is together.
+            MapId = maps.Count == 1 ? maps[0].MapId : null,
+            Maps = maps.Select(m => new TurnMapInfo { MapId = m.MapId, Name = m.Name }).ToList(),
             Characters = participations
                 .Where(p => names.Characters.ContainsKey(p.CharacterId))
                 .Select(p =>
@@ -151,6 +151,7 @@ public partial class TurnService
                         Status = p.CharacterStatus,
                         RepeatedAction = p.RepeatedAction,
                         Posture = (int)p.Posture,
+                        MapId = piece?.MapId,
                         MapTokenId = piece?.MapTokenId,
                         X = piece?.X,
                         Y = piece?.Y,
@@ -169,6 +170,7 @@ public partial class TurnService
                     {
                         MapNpcId = o.MapNpcId,
                         NpcId = o.NpcId,
+                        MapId = o.MapId,
                         MapTokenId = piece?.MapTokenId,
                         Name = o.Name,
                         CurrentLife = o.CurrentLife,
@@ -190,6 +192,35 @@ public partial class TurnService
         };
     }
 
+    /// <summary>
+    /// The maps with characters, by name, with all their pieces and NPC occurrences (108): where the turn is being played.
+    /// </summary>
+    private async Task<(List<Map> Maps, List<MapToken> Pieces, List<MapNpc> Occurrences)> LoadPlayedMapsAsync(long campaignId)
+    {
+        var characterPieces = await _mapTokenRepository.ListCharacterPiecesByCampaignAsync(campaignId);
+        var maps = await LoadMapsAsync(characterPieces.Select(p => p.MapId));
+        if (maps.Count == 0)
+            return (maps, new List<MapToken>(), new List<MapNpc>());
+        var mapIds = maps.Select(m => m.MapId).ToList();
+        return (maps, await _mapTokenRepository.ListByMapIdsAsync(mapIds), await _mapNpcRepository.ListByMapIdsAsync(mapIds));
+    }
+
+    /// <summary>These maps, the deleted ones left out, by name. A table has only a few.</summary>
+    private async Task<List<Map>> LoadMapsAsync(IEnumerable<long> mapIds)
+    {
+        var maps = new List<Map>();
+        foreach (var mapId in mapIds.Distinct())
+            if (await _mapRepository.GetByIdAsync(mapId) is { IsDeleted: false } map)
+                maps.Add(map);
+        return maps.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(m => m.MapId).ToList();
+    }
+
+    /// <summary>The map where a character stands now (108), null off every map: an actor's entries carry it.</summary>
+    private async Task<long?> CharacterMapIdAsync(long campaignId, long characterId) =>
+        await _campaignCharacterRepository.GetAsync(campaignId, characterId) is { } participation
+            ? (await _mapTokenRepository.GetByCampaignCharacterAsync(participation.CampaignCharacterId))?.MapId
+            : null;
+
     // ------------------------------------------------------------------ processing
 
     /// <summary>A validated change to one piece (participation or occurrence), applied only if the whole batch is valid.</summary>
@@ -198,6 +229,14 @@ public partial class TurnService
         public string Key { get; init; } = string.Empty;
         public MapToken? Piece { get; init; }
         public (int X, int Y, int Look)? Target { get; set; }
+    }
+
+    /// <summary>A map of the batch (108): positions are checked map by map, a hex of one says nothing about another.</summary>
+    private sealed class ProcessMapState
+    {
+        public required Map Map { get; init; }
+        public MapModel? Model { get; init; }
+        public required List<MapToken> Pieces { get; init; }
     }
 
     /// <summary>
@@ -230,17 +269,20 @@ public partial class TurnService
         if (narration?.Length > Turn.MAX_NARRATION)
             Error("narration", $"A narração deve ter no máximo {Turn.MAX_NARRATION} caracteres.");
 
-        var mapId = campaign.CurrentMapId;
-        var map = mapId is long currentMapId ? await _mapRepository.GetByIdAsync(currentMapId) : null;
-        var model = map != null ? await _mapModelRepository.GetByIdAsync(map.MapModelId) : null;
-        var pieces = map != null ? await _mapTokenRepository.ListByMapAsync(map.MapId) : new List<MapToken>();
+        var (maps, pieces, mapOccurrences) = await LoadPlayedMapsAsync(campaignId);
+        var states = new Dictionary<long, ProcessMapState>();
+        foreach (var map in maps)
+            states[map.MapId] = new ProcessMapState
+            {
+                Map = map,
+                Model = await _mapModelRepository.GetByIdAsync(map.MapModelId),
+                Pieces = pieces.Where(p => p.MapId == map.MapId).ToList()
+            };
         var participations = (await _campaignCharacterRepository.ListByCampaignAsync(campaignId, approvedOnly: true))
             .GroupBy(p => p.CharacterId).ToDictionary(g => g.Key, g => g.First());
         var characters = (await _characterRepository.ListByIdsAsync(characterItems.Select(c => c.CharacterId).Distinct()))
             .ToDictionary(c => c.CharacterId);
-        var occurrences = map != null
-            ? (await _mapNpcRepository.ListByMapAsync(map.MapId)).ToDictionary(o => o.MapNpcId)
-            : new Dictionary<long, MapNpc>();
+        var occurrences = mapOccurrences.ToDictionary(o => o.MapNpcId);
         var npcs = (await _npcRepository.ListByIdsAsync(occurrences.Values.Select(o => o.NpcId).Distinct())).ToDictionary(n => n.NpcId);
 
         var turns = new List<Turn>();
@@ -251,13 +293,13 @@ public partial class TurnService
         var clearedParticipations = new HashSet<long>();
         var clearedInstances = new HashSet<long>();
 
-        (int X, int Y, int Look)? Target(string prefix, TurnProcessPieceInfo item, MapToken? piece)
+        (int X, int Y, int Look)? Target(string prefix, TurnProcessPieceInfo item, MapToken? piece, string noPiece)
         {
             if (item.X == null && item.Y == null && item.Look == null)
                 return null;
             if (piece == null)
             {
-                Error($"{prefix}.x", "Não há peça no mapa atual para mover.");
+                Error($"{prefix}.x", noPiece);
                 return null;
             }
             if (item.X.HasValue != item.Y.HasValue)
@@ -320,7 +362,7 @@ public partial class TurnService
                 Error($"{prefix}.currentMove", "O deslocamento não pode ser negativo.");
             CheckVitals(prefix, life, energy, character.Life, character.Energy);
             var piece = pieces.FirstOrDefault(p => p.CampaignCharacterId == participation.CampaignCharacterId);
-            var target = Target(prefix, item, piece);
+            var target = Target(prefix, item, piece, "O personagem não está em um mapa.");
             if (errors.Count > 0)
                 continue;
 
@@ -336,7 +378,7 @@ public partial class TurnService
                 participation.ChangePosture((int)posture);
                 participation.ChangeMove(move);
                 updatedParticipations.Add(participation);
-                turns.Add(Turn.CharacterUpdate(campaignId, mapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes));
+                turns.Add(Turn.CharacterUpdate(campaignId, piece?.MapId, character.CharacterId, null, null, campaign.CurrentTurn, userId, changes));
             }
             if (item.ClearRepeatedAction && participation.ClearRepeatedAction())
             {
@@ -354,7 +396,7 @@ public partial class TurnService
             var prefix = $"npcs[{i}]";
             if (!occurrences.TryGetValue(item.MapNpcId, out var occurrence))
             {
-                Error($"{prefix}.mapNpcId", "A ocorrência de NPC não está no mapa atual da campanha.");
+                Error($"{prefix}.mapNpcId", "O NPC não está em um mapa com personagens.");
                 continue;
             }
             var npc = npcs.GetValueOrDefault(occurrence.NpcId);
@@ -369,7 +411,7 @@ public partial class TurnService
             var posture = NewPosture(prefix, item, occurrence.Posture);
             CheckVitals(prefix, life, energy, totalLife, totalEnergy);
             var piece = pieces.FirstOrDefault(p => p.MapNpcId == occurrence.MapNpcId);
-            var target = Target(prefix, item, piece);
+            var target = Target(prefix, item, piece, "A ocorrência de NPC não tem peça no mapa.");
             if (errors.Count > 0)
                 continue;
 
@@ -384,7 +426,7 @@ public partial class TurnService
                 occurrence.Update(occurrence.Name, life, energy, status, totalLife, totalEnergy, move);
                 occurrence.ChangePosture((int)posture);
                 updatedOccurrences.Add(occurrence);
-                turns.Add(Turn.CharacterUpdate(campaignId, mapId, null, occurrence.NpcId, occurrence.MapNpcId, campaign.CurrentTurn, userId, changes));
+                turns.Add(Turn.CharacterUpdate(campaignId, occurrence.MapId, null, occurrence.NpcId, occurrence.MapNpcId, campaign.CurrentTurn, userId, changes));
             }
             if (item.ClearRepeatedAction && occurrence.ClearRepeatedAction())
             {
@@ -403,20 +445,24 @@ public partial class TurnService
             : piece.MapNpcId is long mn ? occurrences.GetValueOrDefault(mn)?.Posture : null;
         var spaces = await _occupancy.SpacesAsync(pieces, PostureOf);
         var movingIds = moved.Select(m => m.Piece!.MapTokenId).ToHashSet();
-        var taken = Occupancy.Build(pieces.Where(p => !movingIds.Contains(p.MapTokenId))
-            .Select(p => new PieceShape(p.MapTokenId, p.X, p.Y, p.Look, spaces[p.MapTokenId])));
-        var claimed = new HashSet<(int X, int Y)>();
-        foreach (var change in moved)
+        foreach (var state in states.Values)
         {
-            var (x, y, look) = change.Target!.Value;
-            if (look < 0 || look > MapToken.MAX_LOOK)
-                continue;
-            var hexes = HexGrid.Footprint(x, y, look, spaces[change.Piece!.MapTokenId]);
-            if (model != null && hexes.Any(h => !HexGrid.IsInsideGrid(h.X, h.Y, model.GridWidth, model.GridHeight)))
-                Error(change.Key, "A peça não cabe na grid do mapa nessa posição.");
-            else if (hexes.Any(h => taken.IsBlocked(h.X, h.Y, change.Piece.MapTokenId) || claimed.Contains(h)))
-                Error(change.Key, $"O hex ({x}, {y}) já está ocupado.");
-            claimed.UnionWith(hexes);
+            var model = state.Model;
+            var taken = Occupancy.Build(state.Pieces.Where(p => !movingIds.Contains(p.MapTokenId))
+                .Select(p => new PieceShape(p.MapTokenId, p.X, p.Y, p.Look, spaces[p.MapTokenId])));
+            var claimed = new HashSet<(int X, int Y)>();
+            foreach (var change in moved.Where(m => m.Piece!.MapId == state.Map.MapId))
+            {
+                var (x, y, look) = change.Target!.Value;
+                if (look < 0 || look > MapToken.MAX_LOOK)
+                    continue;
+                var hexes = HexGrid.Footprint(x, y, look, spaces[change.Piece!.MapTokenId]);
+                if (model != null && hexes.Any(h => !HexGrid.IsInsideGrid(h.X, h.Y, model.GridWidth, model.GridHeight)))
+                    Error(change.Key, "A peça não cabe na grid do mapa nessa posição.");
+                else if (hexes.Any(h => taken.IsBlocked(h.X, h.Y, change.Piece.MapTokenId) || claimed.Contains(h)))
+                    Error(change.Key, $"O hex ({x}, {y}) já está ocupado.");
+                claimed.UnionWith(hexes);
+            }
         }
 
         if (errors.Count > 0)
@@ -426,24 +472,25 @@ public partial class TurnService
         {
             var piece = change.Piece!;
             var (x, y, look) = change.Target!.Value;
+            var model = states[piece.MapId].Model;
             var cost = HexGrid.MovementCost(piece.X, piece.Y, piece.Look, x, y, look,
                 model?.GridWidth ?? int.MaxValue, model?.GridHeight ?? int.MaxValue, (_, _) => false, spaces[piece.MapTokenId]);
             long? characterId = piece.CampaignCharacterId is long cc
                 ? participations.Values.FirstOrDefault(p => p.CampaignCharacterId == cc)?.CharacterId : null;
             long? npcId = piece.MapNpcId is long mn ? occurrences.GetValueOrDefault(mn)?.NpcId : null;
-            turns.Add(Turn.Movement(campaignId, mapId, characterId, characterId.HasValue ? null : npcId,
+            turns.Add(Turn.Movement(campaignId, piece.MapId, characterId, characterId.HasValue ? null : npcId,
                 characterId.HasValue ? null : piece.MapNpcId, campaign.CurrentTurn, userId,
                 (piece.X, piece.Y, piece.Look), (x, y, look), cost));
             piece.MoveTo(x, y);
             piece.Face(look);
         }
         if (narration != null)
-            turns.Add(Turn.Narration(campaignId, mapId, campaign.CurrentTurn, userId, narration));
+            turns.Add(Turn.Narration(campaignId, null, campaign.CurrentTurn, userId, narration));
 
         var finished = campaign.CurrentTurn;
         campaign.AdvanceTurn();
         // The chat shows where the turn ended, after its narration (041).
-        turns.Add(Turn.TurnFinished(campaignId, mapId, finished, userId));
+        turns.Add(Turn.TurnFinished(campaignId, null, finished, userId));
         // 099: the repetitions still active start the new turn (the ones cleared above do not).
         turns.AddRange(await RepeatedActionsAsync(campaign, userId, clearedParticipations, clearedInstances));
         await _unitOfWork.ExecuteInTransactionAsync(async () =>

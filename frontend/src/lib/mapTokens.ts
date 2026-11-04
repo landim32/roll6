@@ -53,6 +53,18 @@ export const characterDropAction = ({ hex, tokens, participation, columns, rows 
   return participation.characterTokenId === null ? { kind: 'chooseToken' } : { kind: 'place' };
 };
 
+/**
+ * The map a character would be brought from (108): its name when it is on another map, null when placing it asks nothing
+ * (off every map, or already on the open one). Empty name = the map's name didn't come along, the master is asked anyway.
+ */
+export const transferSource = (
+  participation: Pick<CampaignCharacterInfo, 'mapId' | 'mapName'>,
+  openMapId: number | null,
+): string | null => {
+  if (participation.mapId === null || participation.mapId === openMapId) return null;
+  return participation.mapName ?? '';
+};
+
 /** Data type of a campaign NPC card being dragged onto the map (value = npcId). */
 export const NPC_DRAG_TYPE = 'application/x-roll6-npc';
 

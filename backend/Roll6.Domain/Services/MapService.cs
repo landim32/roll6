@@ -1,3 +1,5 @@
+using Roll6.Domain.Enums;
+using Roll6.Domain.Exceptions;
 using Roll6.Domain.Grid;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
@@ -16,6 +18,8 @@ public class MapService : IMapService
     private readonly ICampaignRepository<Campaign> _campaignRepository;
     private readonly IMapModelRepository<MapModel> _mapModelRepository;
     private readonly ICampaignCharacterRepository<CampaignCharacter> _campaignCharacterRepository;
+    private readonly IMapTokenRepository<MapToken> _mapTokenRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IImageStorageAppService _imageStorage;
     private readonly IRealtimeNotifier _notifier;
 
@@ -24,10 +28,14 @@ public class MapService : IMapService
         ICampaignRepository<Campaign> campaignRepository,
         IMapModelRepository<MapModel> mapModelRepository,
         ICampaignCharacterRepository<CampaignCharacter> campaignCharacterRepository,
+        IMapTokenRepository<MapToken> mapTokenRepository,
+        IUnitOfWork unitOfWork,
         IImageStorageAppService imageStorage,
         IRealtimeNotifier notifier)
     {
         _notifier = notifier;
+        _mapTokenRepository = mapTokenRepository;
+        _unitOfWork = unitOfWork;
         _repository = repository;
         _campaignRepository = campaignRepository;
         _mapModelRepository = mapModelRepository;
@@ -93,6 +101,9 @@ public class MapService : IMapService
     {
         var map = await GetOwnedAsync(userId, mapId);
         map.Update(info.Name, info.Status);
+        // 108: a character always stands on an active map; an archived one would leave its player without a screen.
+        if (map.Status == MapStatus.Archived && await _mapTokenRepository.AnyCharacterOnMapAsync(mapId))
+            throw new ConflictException("Há personagens neste mapa. Leve-os para outro mapa antes de arquivar.");
         var updated = await _repository.UpdateAsync(map);
         var result = MapToDto(updated, await _mapModelRepository.GetByIdAsync(updated.MapModelId));
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAPS_CHANGED, result.CampaignId, userId, result.MapId, result));
@@ -103,20 +114,20 @@ public class MapService : IMapService
     {
         var map = await GetOwnedAsync(userId, mapId);
         map.MarkDeleted();
-        await _repository.UpdateAsync(map);
+        // 108: the characters leave with the map, or they could never be placed again (one piece per character).
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await _mapTokenRepository.DeleteCharactersByMapAsync(map.MapId);
+            await _repository.UpdateAsync(map);
+        });
         await AfterDeletedAsync(map, userId);
     }
 
-    /// <summary>A deleted map stops being the one the table follows, and whoever has it open closes it (017).</summary>
+    /// <summary>Whoever has a deleted map open closes it (017), and its characters are off every map now (108).</summary>
     private async Task AfterDeletedAsync(Map map, long userId)
     {
-        var campaign = await _campaignRepository.GetByIdAsync(map.CampaignId);
-        if (campaign?.CurrentMapId == map.MapId)
-        {
-            campaign.SetCurrentMap(null);
-            await _campaignRepository.UpdateAsync(campaign);
-        }
         await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_DELETED, map.CampaignId, userId, map.MapId));
+        await _notifier.PublishAsync(TableEvents.Create(TableEventType.PARTY_CHANGED, map.CampaignId, userId));
     }
 
     /// <summary>Returns the map when it exists, is not deleted and belongs to the user.</summary>

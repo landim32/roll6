@@ -67,8 +67,8 @@ public partial class TurnService
         var to = info.To?.Trim().ToLowerInvariant();
         if (to == "action")
         {
-            // 080: a character acts with or without a piece; the action is kept on the current map, if any.
-            turn.ToAction(campaign.CurrentMapId);
+            // 080: a character acts with or without a piece; the action is kept on the map where it stands, if any.
+            turn.ToAction(await CharacterMapIdAsync(campaign.CampaignId, characterId));
             // 044/073: one valid action per character and turn, in any mode.
             var cancelled = await CancelValidActionsAsync(campaign, characterId, null, except: turn.TurnId);
             // 099: declaring another action ends the character's repeated action.

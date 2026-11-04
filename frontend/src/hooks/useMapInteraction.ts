@@ -13,7 +13,7 @@ import { hexCenter, isInsideGrid, lookToward } from '../lib/hexGrid';
 import type { Offset, Point } from '../lib/hexGrid';
 import { pickTarget } from '../lib/actionTarget';
 import { canConfirm, canPickDestination, MOVEMENT_KIND } from '../lib/movement';
-import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt } from '../lib/mapTokens';
+import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt, transferSource } from '../lib/mapTokens';
 import { isFreeMode } from '../lib/freeMode';
 import { menuAllowed, movementOverlay, shapeAt } from '../lib/mapInteraction';
 import type { MapInteractionContext } from '../lib/mapInteraction';
@@ -26,11 +26,24 @@ import type { CampaignCharacterInfo } from '../types/campaignCharacter';
 export type TokenPickRequest =
   | { kind: 'add'; x: number; y: number }
   | { kind: 'change'; mapTokenId: number; name: string }
-  | { kind: 'character'; participation: CampaignCharacterInfo; x: number; y: number };
+  /** `transfer`: the master already confirmed bringing the character from another map (108). */
+  | { kind: 'character'; participation: CampaignCharacterInfo; x: number; y: number; transfer?: boolean };
+
+/** A character dropped on the open map while on another one (108): the page asks the master first. */
+export interface TransferRequest {
+  participation: CampaignCharacterInfo;
+  hex: Offset;
+  /** Name of the map it is on. */
+  mapName: string;
+  /** The character has no token: confirming goes on to choosing one. */
+  chooseToken: boolean;
+}
 
 /** What a view of the map asks the page for: the windows the hex menu opens. */
 export interface MapInteractionProps {
   onPickToken: (request: TokenPickRequest) => void;
+  /** A card dropped for a character that is on another map: nothing changes until the page confirms (108). */
+  onConfirmTransfer: (request: TransferRequest) => void;
   /** Asks to remove a piece (the page confirms first); `mapNpcId` set = an NPC instance leaving the map (051). */
   onDeleteToken: (target: { mapTokenId: number; name: string; mapNpcId: number | null }) => void;
   /** "Editar NPC" on an NPC piece (051): the page opens the instance form. */
@@ -216,14 +229,10 @@ export const useMapInteraction = (props: MapInteractionProps) => {
 
   // ---------- party cards dropped on the map ----------
 
-  /** Party cards move/place a character; NPC cards add a new piece (014). */
+  /** Party cards move/place a character; NPC cards add a new piece (014). Only the master drags cards (108). */
   const isNpcDrag = (types: readonly string[]) => types.includes(NPC_DRAG_TYPE);
-  const acceptsDrag = (types: readonly string[]) => {
-    const isParticipation = types.includes(PARTICIPATION_DRAG_TYPE);
-    if (canPlace) return isParticipation || isNpcDrag(types);
-    // Players only drag the cards of their own characters (the only draggable ones for them).
-    return canPlaceOwn && isParticipation;
-  };
+  const acceptsDrag = (types: readonly string[]) =>
+    canPlace && (types.includes(PARTICIPATION_DRAG_TYPE) || isNpcDrag(types));
   /** The effect a card dragged over the map shows. */
   const dropEffectOf = (types: readonly string[]): 'copy' | 'move' => (isNpcDrag(types) ? 'copy' : 'move');
 
@@ -252,7 +261,6 @@ export const useMapInteraction = (props: MapInteractionProps) => {
     const id = Number(data.getData(PARTICIPATION_DRAG_TYPE));
     const participation = party.find((p) => p.campaignCharacterId === id);
     if (!participation || !hex) return;
-    if (!canPlace && participation.characterOwnerId !== userId) return;
 
     const action = characterDropAction({ hex, tokens: mapTokens, participation, columns: draft.gridWidth, rows: draft.gridHeight });
     try {
@@ -264,21 +272,24 @@ export const useMapInteraction = (props: MapInteractionProps) => {
           toast.warning(t('mapTokens.doesNotFit'));
           break;
         case 'move':
-          // Players move a piece already on the map with "Mover" (turn and move limits).
-          if (!canPlace) {
-            toast.info(t('mapTokens.useMove', { name: participation.characterName }));
-            break;
-          }
           await moveToken(action.mapTokenId, hex.x, hex.y);
           void refreshTurn();
           break;
         case 'place':
-          await placeCharacter(participation, hex.x, hex.y);
-          toast.success(t('toast.mapTokenAdded', { name: participation.characterName }));
+        case 'chooseToken': {
+          const chooseToken = action.kind === 'chooseToken';
+          // On another map: nothing happens until the master confirms (108).
+          const mapName = transferSource(participation, draft.mapId);
+          if (mapName !== null) {
+            props.onConfirmTransfer({ participation, hex, mapName, chooseToken });
+          } else if (chooseToken) {
+            props.onPickToken({ kind: 'character', participation, x: hex.x, y: hex.y });
+          } else {
+            await placeCharacter(participation, hex.x, hex.y);
+            toast.success(t('toast.mapTokenAdded', { name: participation.characterName }));
+          }
           break;
-        case 'chooseToken':
-          props.onPickToken({ kind: 'character', participation, x: hex.x, y: hex.y });
-          break;
+        }
         default:
           break;
       }

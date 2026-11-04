@@ -104,7 +104,7 @@ public static class TurnTools
         What it does: returns everything that happened in a turn as readable markdown (Portuguese), ready to paste in a chat
         or a campaign log: "## Ações" (moves with from/to, facing and movement points spent, actions in quotes, the master's
         results, and every change to characters/NPCs with who made it and the values before and after) and "## Posições"
-        (where each character and NPC piece of the turn's map is and where it looks).
+        (where each character and NPC piece is and where it looks, under a "### map" per map when the party is split).
         Who can use it: the campaign master or a player with an approved character in the campaign.
         Returns: { campaignId, turnNo, markdown }. Without turnNo it is the turn in progress.
         Common errors: 400 turnNo below 1 or above the current turn, 403 no access to the campaign, 404 campaign not found.
@@ -123,16 +123,19 @@ public static class TurnTools
         (characterId, name, playerName, currentLife/totalLife, currentEnergy/totalEnergy — energy is the fatigue —,
         currentMove — the Deslocamento, how far the player may move it per turn in this campaign — and move — the
         character's permanent move —, status and,
-        when it has a piece on the current map, x/y/look/lookName), every NPC occurrence on the current map (mapNpcId, name,
-        current/total life and energy, status, x/y/look/lookName) and "actions": the "## Ações" markdown of the turn (moves,
+        when it stands on a map, mapId and x/y/look/lookName; off every map mapId is null and there is no position), every
+        NPC occurrence on the maps with characters (mapNpcId, mapId, name, current/total life and energy, status,
+        x/y/look/lookName) and "actions": the "## Ações" markdown of the turn (moves,
         actions, results, changes, narration, with who made them; an action declared with "Agir sobre…" ends with
         "→ sobre <the piece or the hex, with its distance and data at declaration time>" — resolve it against that piece, by
         identity, not by name; the structured target is on the entries of get_turn_state / list_turn_entries). Each
         character and NPC carries repeatedAction (099): its standing order, applied as its action at every turn start
         ("(ação repetida)" in the actions); when its goal is met send clearRepeatedAction: true in process_turn.
         Who can use it: the campaign master or a player with an approved character in the campaign.
-        Returns: { campaignId, turnNo, currentTurn, mapId, characters[], npcs[], actions }. Without turnNo it is the turn in
-        progress (values are always the current ones).
+        Returns: { campaignId, turnNo, currentTurn, mapId, maps[{ mapId, name }], characters[], npcs[], actions }. maps = the
+        maps with characters, by name; a party may be split across them, so read each character's own mapId. The root mapId
+        is the only map with characters, null when there are none or several. Without turnNo it is the turn in progress
+        (values are always the current ones).
         Common errors: 400 turnNo below 1 or above the current turn, 403 no access to the campaign, 404 campaign not found.
         Related tools: process_turn, get_participation (sheet and campaign notes), get_turn_summary.
         """)]
@@ -152,18 +155,21 @@ public static class TurnTools
         characters). Everything is validated first — current values never above the totals, the whole shape of each moved
         piece inside the grid and on free hexes (checked after all moves, so two pieces may swap) — and saved together: if any item is invalid nothing
         changes and the turn does not advance. Every change is logged in the turn by the master (moves without the one-move
-        limit). Campaign notes and sheets are not changed here (use update_participation). {{McpDocs.DESTRUCTIVE}}
+        limit). Positions are checked map by map: a piece moves only on the map where it stands, and the same hex on two
+        maps doesn't collide; taking a character to another map is place_character_on_map. Campaign notes and sheets are not
+        changed here (use update_participation). {{McpDocs.DESTRUCTIVE}}
         Who can use it: only the campaign master.
         Returns: { finishedTurn, turnNo (new turn in progress), data } where data is the turn data of the processed turn.
         Common errors: 400 with keys per item such as characters[0].currentLife, npcs[1].x, narration or batch (empty,
-        repeated items), 403 not the master, 404 campaign not found.
+        repeated items), characters[0].x "O personagem não está em um mapa." (moving a character off every map), npcs[0].mapNpcId
+        "O NPC não está em um mapa com personagens.", 403 not the master, 404 campaign not found.
         Related tools: get_turn_data, get_turn_summary, update_participation.
         """)]
     public static Task<CallToolResult> ProcessTurn(
         Roll6ApiClient api,
         [Description(McpDocs.CAMPAIGN_ID)] long campaignId,
         [Description("Changes to characters: [{ characterId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, clearRepeatedAction?, posture?, x?, y?, look? }]; omit unchanged fields. clearRepeatedAction: true removes the character's repeated action (099) when its goal was met, so the next turn does not apply it.")] List<TurnProcessCharacterInfo>? characters = null,
-        [Description("Changes to NPC occurrences on the current map: [{ mapNpcId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, clearRepeatedAction?, posture?, x?, y?, look? }]; omit unchanged fields. clearRepeatedAction: true removes the instance's repeated action (099).")] List<TurnProcessNpcInfo>? npcs = null,
+        [Description("Changes to NPC occurrences on the maps with characters (npcs of get_turn_data): [{ mapNpcId, currentLife?, currentEnergy?, currentMove?, status?, clearStatus?, clearRepeatedAction?, posture?, x?, y?, look? }]; omit unchanged fields. clearRepeatedAction: true removes the instance's repeated action (099).")] List<TurnProcessNpcInfo>? npcs = null,
         [Description("What happened in the turn, in plain text or markdown (up to 10000 characters); stays in the turn log.")] string? narration = null) =>
         api.SendAsync(HttpMethod.Post, $"/api/campaign/{campaignId}/turn/process", new TurnProcessInfo
         {

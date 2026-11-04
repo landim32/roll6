@@ -23,8 +23,6 @@ public static class TableEventType
     public const string MAPS_CHANGED = "maps.changed";
     /// <summary>A campaign map was deleted.</summary>
     public const string MAP_DELETED = "map.deleted";
-    /// <summary>The master opened another campaign map (players follow).</summary>
-    public const string MAP_CURRENT = "map.current";
     /// <summary>Campaign renamed or opened/closed; data = CampaignInfo.</summary>
     public const string CAMPAIGN_CHANGED = "campaign.changed";
     /// <summary>The campaign was deleted.</summary>
@@ -50,4 +48,10 @@ public static class TableEventType
 
     /// <summary>The paint of a map changed (107): hex marks and/or drawings. Data = MapPaintChangeInfo (the delta).</summary>
     public const string MAP_PAINT_CHANGED = "mapPaint.changed";
+
+    /// <summary>
+    /// A character was placed on, taken to or removed from a map (108). Only to the master and its owner.
+    /// Data = CharacterMapEventInfo.
+    /// </summary>
+    public const string CHARACTER_MAP = "character.map";
 }

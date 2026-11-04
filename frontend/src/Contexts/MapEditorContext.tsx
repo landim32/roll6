@@ -1,17 +1,21 @@
 import { mapRegionCenter } from '../lib/mapRegion';
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { mapModelService } from '../Services/mapModelService';
 import { mapService } from '../Services/mapService';
 import { campaignService } from '../Services/campaignService';
+import { campaignCharacterService } from '../Services/campaignCharacterService';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useTableEvents } from '../hooks/useRealtime';
 import { TABLE_EVENT } from '../types/realtime';
+import type { CharacterMapEvent } from '../types/realtime';
 import { MAP_STORAGE_KEY } from '../Services/apiHelpers';
 import { parseTablePath } from '../lib/tableRoute';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaign } from '../hooks/useCampaign';
+import { useCharacter } from '../hooks/useCharacter';
 import { gridPixelSize, HEX_SIZE } from '../lib/hexGrid';
 import {
   createEmptyDraft, draftFromMapModel, isSameDraft, MAX_GRID_SIZE, MIN_GRID_SIZE, toMapModelInsert,
@@ -26,7 +30,8 @@ import type { ViewQuality } from '../lib/viewQuality';
 import { MAP_STATUS_DELETED } from '../types/map';
 import type { MapInfo } from '../types/map';
 import type { CampaignInfo } from '../types/campaign';
-import { isMasterOf, viewerMapDecision } from '../lib/viewerMap';
+import { isMasterOf, masterDefaultMap, ownParticipationOf, storedOwnMap, viewerMapDecision } from '../lib/viewerMap';
+import { readStoredSelections } from '../lib/characterSelection';
 import { canEditMap } from '../lib/campaignStatus';
 
 /** Zoom limits and step (research R3). */
@@ -35,6 +40,9 @@ export const MAX_ZOOM = 4;
 const ZOOM_STEP = 1.25;
 /** Initial offset so the grid does not start under the top menu. */
 const INITIAL_VIEW = { zoom: 1, panX: 40, panY: 80 };
+/** "O mestre está mudando o mapa" (108): stays at least this long to be readable, and never longer than the limit. */
+const MAP_CHANGE_MIN_MS = 1500;
+const MAP_CHANGE_MAX_MS = 15_000;
 
 /** Screen transform of the map (not saved). */
 export interface MapView {
@@ -94,6 +102,8 @@ interface MapEditorContextType {
   setPaintMode: (on: boolean) => void;
   loading: boolean;
   error: string | null;
+  /** The master is taking the player's chosen character to another map (108): the screen says so until it is ready. */
+  mapChanging: boolean;
   // View
   zoomAt: (factor: number, screenX: number, screenY: number) => void;
   zoomIn: (screenX: number, screenY: number) => void;
@@ -134,8 +144,8 @@ interface MapEditorContextType {
   /** `keepView` keeps zoom/pan (the same map reloaded because someone saved it, 017). */
   loadMapModel: (mapModelId: number, map?: MapInfo | null, options?: { keepView?: boolean }) => Promise<MapDraft>;
   /**
-   * Opens a campaign map by its URL slug — or, for a player, the campaign's current map instead (039): the choice is
-   * made before loading, so a map the master hasn't revealed never shows. Returns what was opened and its campaign.
+   * Opens a campaign map by its URL slug — or, for a player, the map of his chosen character instead (108): the choice is
+   * made before loading, so another map never shows. Returns what was opened and its campaign.
    */
   openCampaignMapBySlug: (slug: string) => Promise<OpenBySlugResult>;
   discardChanges: () => void;
@@ -182,16 +192,25 @@ const writeStoredMap = (map: StoredMap | null) => {
   }
 };
 
-/** What `openCampaignMapBySlug` did (039): the asked map, the current one instead, or nothing (no current map). */
+/** What `openCampaignMapBySlug` did: the asked map, the character's instead, or nothing (the character is on no map). */
 export interface OpenBySlugResult {
   map: MapInfo | null;
   campaign: CampaignInfo;
-  outcome: 'opened' | 'redirected' | 'noCurrentMap';
+  outcome: 'opened' | 'redirected' | 'noMap';
+}
+
+/** The message on screen (108): which event it answers (A→B→C keeps only the last) and the map it waits for. */
+interface MapChange {
+  seq: number;
+  target: number | null;
+  shownAt: number;
 }
 
 export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const { session } = useAuth();
-  const { currentCampaign, isMaster, refreshTableCampaigns } = useCampaign();
+  const { currentCampaign, isMaster, tableCampaigns, refreshTableCampaigns } = useCampaign();
+  const { currentSelection, myParticipations, participationsLoadedFor } = useCharacter();
+  const { pathname } = useLocation();
   const [draft, setDraft] = useState<MapDraft>(createEmptyDraft);
   const { t } = useTranslation();
   /** Mask URL of the draft, read by `setImage` without making it depend on the draft. */
@@ -204,6 +223,10 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   const [paintMode, setPaintModeState] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapChanging, setMapChanging] = useState(false);
+  const mapChangeRef = useRef<MapChange>({ seq: 0, target: null, shownAt: 0 });
+  /** Campaign whose landing map was already decided (108 FR-020): once per campaign, so "Novo mapa" never brings it back. */
+  const landedRef = useRef<number | null>(null);
 
   const handleError = (err: unknown): never => {
     setError(err instanceof Error ? err.message : 'Unknown error');
@@ -211,6 +234,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const userId = session?.user.userId ?? null;
+  const campaignId = currentCampaign?.campaignId ?? null;
   const isDirty = !isSameDraft(draft, saved);
   const canEdit = draft.mapId === null || (isMaster && currentCampaign?.campaignId === draft.campaignId);
   const isCopy = draft.mapModelId !== null && draft.ownerUserId !== userId;
@@ -374,7 +398,10 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     if (!keepView) setView(INITIAL_VIEW);
   }, []);
 
-  const newMap = useCallback(() => resetTo(createEmptyDraft()), [resetTo]);
+  const newMap = useCallback(() => {
+    landedRef.current = campaignId;
+    resetTo(createEmptyDraft());
+  }, [resetTo, campaignId]);
 
   const loadMapModel = useCallback(async (mapModelId: number, map?: MapInfo | null, options?: { keepView?: boolean }): Promise<MapDraft> => {
     try {
@@ -461,18 +488,23 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   const viewerDecisionFor = async (map: MapInfo, campaign?: CampaignInfo) => {
     const owner = campaign ?? await campaignOfMap(map);
+    const master = isMasterOf(owner, session?.user.userId);
+    // This runs before CharacterContext has the campaign (108 R4), so the user's participations are read here.
+    const ownMapId = master ? null : storedOwnMap(
+      owner.campaignId, await campaignCharacterService.listMine(owner.campaignId), readStoredSelections());
     return viewerMapDecision({
-      isMaster: isMasterOf(owner, session?.user.userId),
+      isMaster: master,
       mapId: map.mapId,
       mapCampaignId: map.campaignId,
       campaignId: owner.campaignId,
-      currentMapId: owner.currentMapId,
+      ownMapId,
     });
   };
 
   // Once logged in, reopen the remembered map (a campaign map through its map, else the model alone).
   useEffect(() => {
     markRestored(false);
+    landedRef.current = null;
     if (!session) return;
     // A /campaign or /map address is resolved by useTableRoute; restoring here would race it.
     if (parseTablePath(window.location.pathname).kind !== 'root') {
@@ -491,7 +523,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
         if (cancelled) return;
         if (map && map.status === MAP_STATUS_DELETED) throw new Error('map deleted');
         if (map) {
-          // A player reopens only the campaign's current map, silently (039 FR-003).
+          // A player reopens only the map of his character, silently (039 FR-003, 108).
           const decision = await viewerDecisionFor(map);
           if (cancelled) return;
           if (decision.kind === 'none') {
@@ -521,11 +553,12 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   // ---------- real-time table (017) ----------
 
-  // The current map changes only by the master's deliberate "Tornar atual" (048): opening a map here never does.
-  const campaignId = currentCampaign?.campaignId ?? null;
-  const currentMapId = currentCampaign?.currentMapId ?? null;
+  // The chosen character's place on the table (108). Only `myParticipations`: the party hides other players' maps.
+  const ownParticipation = ownParticipationOf(currentSelection, myParticipations);
+  const ownMapId = ownParticipation?.mapId ?? null;
+  const ownMapName = ownParticipation?.mapName ?? '';
 
-  /** Opens a campaign map by id (following the master or reloading the same map). */
+  /** Opens a campaign map by id (following the character or reloading the same map). */
   const openCampaignMap = useCallback(async (mapId: number, options?: { keepView?: boolean }) => {
     const map = await mapService.getById(mapId);
     if (map.status === MAP_STATUS_DELETED) return null;
@@ -538,9 +571,9 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
     const campaign = await campaignOfMap(map);
     const decision = await viewerDecisionFor(map, campaign);
     if (decision.kind === 'none') {
-      // No current map: a player sees none, so whatever map of this campaign was open goes away (039 FR-004).
+      // The character is on no map: the player sees none, so whatever map of this campaign was open goes away.
       if (draft.campaignId === campaign.campaignId) newMap();
-      return { map: null, campaign, outcome: 'noCurrentMap' };
+      return { map: null, campaign, outcome: 'noMap' };
     }
     const opened = decision.kind === 'redirect' ? await mapService.getById(decision.mapId!) : map;
     await loadMapModel(opened.mapModelId, opened);
@@ -548,41 +581,131 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- viewerDecisionFor only reads campaignOfMap and the session
   }, [loadMapModel, campaignOfMap, draft.campaignId, newMap, session?.user.userId]);
 
+  // ---------- "O mestre está mudando o mapa" (108 R11) ----------
+
+  const stopMapChange = useCallback(() => {
+    const change = mapChangeRef.current;
+    change.seq += 1;
+    change.target = null;
+    setMapChanging(false);
+  }, []);
+
+  /** Only the live `character.map` calls this: a resync, another chosen character or opening the campaign say nothing. */
+  const startMapChange = useCallback((mapId: number) => {
+    const change = mapChangeRef.current;
+    change.seq += 1;
+    const { seq } = change;
+    change.target = mapId;
+    change.shownAt = Date.now();
+    setMapChanging(true);
+    window.setTimeout(() => {
+      if (mapChangeRef.current.seq === seq) stopMapChange();
+    }, MAP_CHANGE_MAX_MS);
+  }, [stopMapChange]);
+
+  /** The awaited map is ready: the message goes once it was on screen long enough. Another map changes nothing (A→B→C). */
+  const finishMapChange = useCallback((mapId: number) => {
+    const change = mapChangeRef.current;
+    if (change.target !== mapId) return;
+    const { seq } = change;
+    window.setTimeout(() => {
+      if (mapChangeRef.current.seq === seq) stopMapChange();
+    }, Math.max(0, MAP_CHANGE_MIN_MS - (Date.now() - change.shownAt)));
+  }, [stopMapChange]);
+
+  /** A message left from another campaign or session has nothing to wait for. */
+  useEffect(() => stopMapChange, [campaignId, userId, stopMapChange]);
+
   /**
-   * Players see only the campaign's current map (039): on entering the campaign (after the restore, so it wins over
-   * the remembered map), whenever the master switches, and whenever another map of the campaign ends up open. With no
-   * current map the open map of the campaign is closed. Unsaved changes are never discarded (players can't edit
-   * campaign maps, so for them this never blocks).
+   * Players see only the map of their chosen character (108): on entering the campaign (after the restore, so it wins
+   * over the remembered map), whenever the character changes map or another character is chosen, and whenever another map
+   * of the campaign ends up open. With the character off every map the open map of the campaign is closed. Unsaved changes
+   * are never discarded.
    */
   const followedRef = useRef<string | null>(null);
+  /** Map being opened by this effect: it may run again before the answer arrives. */
+  const followingRef = useRef<number | null>(null);
   useEffect(() => {
     if (!restored) return;
-    // Two triggers: the campaign or its current map changed (follow), or another map of this campaign is open.
+    // Participations of another campaign (or none yet) say nothing: "still loading" must not read as "off every map".
+    if (!isMaster && campaignId !== null && participationsLoadedFor !== campaignId) return;
+    // Two triggers: the campaign or the character's map changed (follow), or another map of this campaign is open.
     // A library model (no mapId) or a map of another campaign is left alone.
-    const key = `${campaignId}:${currentMapId}`;
+    const key = `${campaignId}:${ownMapId}`;
     const switched = followedRef.current !== key;
     followedRef.current = key;
-    const otherMapOfCampaign = draft.mapId !== null && draft.campaignId === campaignId && draft.mapId !== currentMapId;
+    const otherMapOfCampaign = draft.mapId !== null && draft.campaignId === campaignId && draft.mapId !== ownMapId;
     if (!switched && !otherMapOfCampaign) return;
-    if (isMaster || campaignId === null || draft.mapId === currentMapId) return;
-    if (currentMapId === null) {
+    if (isMaster || campaignId === null) return;
+    if (ownMapId === null) {
+      stopMapChange();
       if (draft.mapId !== null && draft.campaignId === campaignId && !isDirty) newMap();
       return;
     }
-    if (isDirty) {
-      toast.warning(t('realtime.mapChangedDirty'));
+    if (draft.mapId === ownMapId) {
+      finishMapChange(ownMapId);
       return;
     }
-    const hadMap = draft.mapId !== null;
-    openCampaignMap(currentMapId)
+    if (isDirty) {
+      stopMapChange();
+      // Followed once the changes are saved or discarded.
+      followedRef.current = null;
+      toast.warning(t('realtime.mapChangedUnsaved', { name: ownMapName }));
+      return;
+    }
+    if (followingRef.current === ownMapId) return;
+    const target = ownMapId;
+    followingRef.current = target;
+    const giveUp = () => {
+      if (mapChangeRef.current.target === target) stopMapChange();
+    };
+    openCampaignMap(target)
       .then((opened) => {
-        if (opened && hadMap) toast.info(t('realtime.followedMap', { name: opened.name }));
+        if (opened) finishMapChange(target);
+        else giveUp();
       })
-      .catch(() => { /* not accessible (yet): stay on the current map */ });
-  }, [restored, campaignId, currentMapId, isMaster, isDirty, draft.mapId, draft.campaignId, openCampaignMap, newMap, t]);
+      .catch(() => {
+        giveUp();
+        toast.error(t('realtime.followFailed'));
+      })
+      .finally(() => {
+        if (followingRef.current === target) followingRef.current = null;
+      });
+  }, [restored, campaignId, ownMapId, ownMapName, participationsLoadedFor, isMaster, isDirty, draft.mapId, draft.campaignId,
+    openCampaignMap, newMap, stopMapChange, finishMapChange, t]);
+
+  /**
+   * Where the master lands on opening a campaign with no map chosen (108 FR-020): the map with most characters. Decided
+   * once per campaign, whatever the answer: a map already open (or an unsaved new one) also settles it, so closing it
+   * later doesn't bring this back. Only on the campaign's own address; the library and the root may still become it.
+   */
+  useEffect(() => {
+    if (!restored || !isMaster || currentCampaign === null || landedRef.current === currentCampaign.campaignId) return;
+    if (draft.mapModelId !== null || isDirty) {
+      landedRef.current = currentCampaign.campaignId;
+      return;
+    }
+    const path = parseTablePath(pathname);
+    if (path.kind !== 'campaign' || path.slug !== currentCampaign.slug) return;
+    const table = tableCampaigns.find((campaign) => campaign.campaignId === currentCampaign.campaignId);
+    if (!table) return;
+    landedRef.current = currentCampaign.campaignId;
+    const mapId = masterDefaultMap(table.maps);
+    if (mapId !== null) openCampaignMap(mapId).catch(() => toast.error(t('realtime.followFailed')));
+  }, [restored, isMaster, currentCampaign, draft.mapModelId, isDirty, pathname, tableCampaigns, openCampaignMap, t]);
 
   useTableEvents((event) => {
-    if (event.type === TABLE_EVENT.mapSaved) {
+    if (event.type === TABLE_EVENT.characterMap) {
+      const moved = event.data as CharacterMapEvent | null;
+      if (isMaster || isDirty || !moved || moved.campaignCharacterId !== ownParticipation?.campaignCharacterId) return;
+      if (moved.mapId === null) stopMapChange();
+      else if (moved.mapId !== draft.mapId) startMapChange(moved.mapId);
+      else {
+        // Back to the map on screen before the trip ended (A→B→A): nothing left to wait for.
+        mapChangeRef.current.target = moved.mapId;
+        finishMapChange(moved.mapId);
+      }
+    } else if (event.type === TABLE_EVENT.mapSaved) {
       const savedModelId = (event.data as { mapModelId?: number } | null)?.mapModelId;
       if (savedModelId === undefined || savedModelId !== draft.mapModelId) return;
       if (isDirty) {
@@ -601,7 +724,7 @@ export const MapEditorProvider = ({ children }: { children: ReactNode }) => {
 
   const value: MapEditorContextType = {
     draft, saved, isDirty, canEdit, needsName, isCopy, hexSize, gridSize, view, resizeMode, editMode, setEditMode,
-    paintMode, setPaintMode, loading, error,
+    paintMode, setPaintMode, loading, error, mapChanging,
     zoomAt, zoomIn, zoomOut, panBy, centerOn,
     setImage, setImageLayout, setGridSize, toggleResizeMode,
     setMaskImage, setBackgroundImage, setWallTextureImage, viewMode, setViewMode, fov, setFov, viewQuality, setViewQuality,

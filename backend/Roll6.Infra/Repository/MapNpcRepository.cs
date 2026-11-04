@@ -33,6 +33,15 @@ public class MapNpcRepository : IMapNpcRepository<MapNpc>
             .ToListAsync();
     }
 
+    public async Task<List<MapNpc>> ListByMapIdsAsync(IEnumerable<long> mapIds)
+    {
+        var idList = mapIds.Distinct().ToList();
+        return await _context.MapNpcs.AsNoTracking()
+            .Where(e => idList.Contains(e.MapId) && e.RemovedAt == null)
+            .OrderBy(e => e.Name).ThenBy(e => e.MapNpcId)
+            .ToListAsync();
+    }
+
     public async Task<List<MapNpc>> ListRepeatingAsync(long campaignId)
     {
         return await _context.MapNpcs.AsNoTracking()

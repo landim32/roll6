@@ -128,7 +128,7 @@ public partial class TurnServiceChatTests
         await _service.StartedAsync(JOB);
 
         _repository.Verify(r => r.InsertAsync(It.Is<Turn>(t => t.TurnType == TurnType.GmNotice && t.UserId == MASTER && t.CharacterId == null
-            && t.TurnNo == 3 && t.MapId == MAP && t.Description == "O GM começou a processar o turno 3.")), Times.Once);
+            && t.TurnNo == 3 && t.MapId == null && t.Description == "O GM começou a processar o turno 3.")), Times.Once);
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_MESSAGE)), Times.Once);
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.GM_CHANGED)), Times.Once);
         _queue.Verify(q => q.Enqueue(It.IsAny<TableNotice>()), Times.Never, "no notice for a line of the GM");

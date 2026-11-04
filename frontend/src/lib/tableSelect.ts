@@ -1,14 +1,12 @@
 import { CAMPAIGN_STATUS } from './campaignStatus';
-import { MAP_STATUS_CURRENT } from '../types/map';
-import type { CampaignTableInfo } from '../types/campaign';
+import type { CharacterSelection } from './characterSelection';
+import type { CampaignTableInfo, TableMapInfo } from '../types/campaign';
 
 /** A map line of the table combo (078). */
 export interface TableMapEntry {
   key: string;
   label: string;
   path: string;
-  /** The campaign's current map ("Atual"). */
-  isCurrent: boolean;
   /** It is the map open now. */
   active: boolean;
 }
@@ -19,9 +17,9 @@ export interface TableEntry {
   campaignLabel: string;
   campaignPath: string;
   campaignActive: boolean;
-  /** The user masters this campaign (its maps are all the playable ones), else plays in it (only the current map). */
+  /** The user masters this campaign (its maps are all the active ones), else plays in it (only his character's map). */
   isMaster: boolean;
-  /** Empty when the campaign has no map to offer (the line "Sem mapa ativo" opens the campaign). */
+  /** Empty when the campaign has no map to offer (the empty line opens the campaign). */
   maps: TableMapEntry[];
 }
 
@@ -56,29 +54,36 @@ export const showsInTable = (campaign: Pick<CampaignTableInfo, 'status' | 'isMas
 const mapPath = (slug: string) => `/map/${encodeURIComponent(slug)}`;
 
 /**
- * One entry per campaign the combo offers (078): the master gets every current and active map of the campaign (the
- * current one first and marked), a player only its current map — he never picks another map here. Choosing a map only
- * opens it: the current map changes only through "Tornar atual".
+ * The maps a player has in a campaign (108): the server sends only the ones with his characters, and the chosen character
+ * narrows them to its map. Nothing chosen there yet leaves them all (the choice only exists once the campaign is opened).
  */
-export const tableEntries = (campaigns: CampaignTableInfo[], open: OpenTable): TableEntry[] =>
-  campaigns.filter(showsInTable).map((campaign) => {
-    const current = campaign.currentMapId !== null && campaign.currentMapSlug
-      ? [{ mapId: campaign.currentMapId, name: campaign.currentMapName ?? '', slug: campaign.currentMapSlug, status: MAP_STATUS_CURRENT }]
-      : [];
-    // The master's list comes from the server; an older answer without it falls back to the current map.
-    const maps = campaign.isMaster && campaign.maps ? campaign.maps : current;
-    return {
-      key: String(campaign.campaignId),
-      campaignLabel: campaign.name,
-      campaignPath: `/campaign/${encodeURIComponent(campaign.slug)}`,
-      campaignActive: open.campaignId === campaign.campaignId,
-      isMaster: campaign.isMaster,
-      maps: maps.map((map) => ({
-        key: `${campaign.campaignId}:${map.mapId}`,
-        label: map.name,
-        path: mapPath(map.slug),
-        isCurrent: map.status === MAP_STATUS_CURRENT || map.mapId === campaign.currentMapId,
-        active: open.mapId === map.mapId,
-      })),
-    };
-  });
+export const playerMaps = (
+  campaign: Pick<CampaignTableInfo, 'campaignId' | 'maps'>,
+  selections: Record<string, CharacterSelection>,
+): TableMapInfo[] => {
+  const chosen = selections[campaign.campaignId];
+  return typeof chosen === 'number' ? campaign.maps.filter((map) => map.characterIds.includes(chosen)) : campaign.maps;
+};
+
+/**
+ * One entry per campaign the combo offers (078): the master gets every active map of the campaign, a player only the map
+ * of his chosen character (108) — he never picks another map here. Choosing a map only opens it.
+ */
+export const tableEntries = (
+  campaigns: CampaignTableInfo[],
+  open: OpenTable,
+  selections: Record<string, CharacterSelection> = {},
+): TableEntry[] =>
+  campaigns.filter(showsInTable).map((campaign) => ({
+    key: String(campaign.campaignId),
+    campaignLabel: campaign.name,
+    campaignPath: `/campaign/${encodeURIComponent(campaign.slug)}`,
+    campaignActive: open.campaignId === campaign.campaignId,
+    isMaster: campaign.isMaster,
+    maps: (campaign.isMaster ? campaign.maps : playerMaps(campaign, selections)).map((map) => ({
+      key: `${campaign.campaignId}:${map.mapId}`,
+      label: map.name,
+      path: mapPath(map.slug),
+      active: open.mapId === map.mapId,
+    })),
+  }));

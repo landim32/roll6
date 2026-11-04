@@ -41,7 +41,7 @@ public partial class TurnServiceChatTests
     private readonly Mock<IUserRepository<User>> _userRepository = new();
     private readonly Mock<IChatReadRepository<ChatRead>> _chatReadRepository = new();
     private readonly Mock<IImageStorageAppService> _imageStorage = new();
-    private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3, CurrentMapId = MAP };
+    private readonly Campaign _campaign = new() { CampaignId = CAMPAIGN, UserId = MASTER, Name = "C", CurrentTurn = 3 };
     private readonly Mock<IAskDispatcher> _askDispatcher = new();
     private readonly Mock<IGmDispatcher> _gmDispatcher = new();
     private readonly TurnService _service;
@@ -112,7 +112,7 @@ public partial class TurnServiceChatTests
         var item = await _service.SendAsync(PLAYER, CAMPAIGN, new ChatSendInfo { CharacterId = ARIA, Text = "Abro a porta" });
 
         (item.Kind, item.DisplayName, item.DisplayImageUrl, item.Text, item.TurnNo, item.MapId, item.CanDelete)
-            .Should().Be(("text", "Aria", "https://cdn/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png", "Abro a porta", 3, (long?)MAP, true));
+            .Should().Be(("text", "Aria", "https://cdn/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png", "Abro a porta", 3, (long?)null, true));
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.CHAT_MESSAGE && e.CampaignId == CAMPAIGN)), Times.Once);
     }
 
@@ -650,28 +650,30 @@ public partial class TurnServiceChatTests
     [Fact]
     public async Task Convert_TextToAction_WithoutAPiece_Works()
     {
-        // 080: a character acts from the chat with or without a piece; the action stays on the current map.
+        // 080: a character acts from the chat with or without a piece; off every map the action has no map either.
         var text = AriaText(71);
-        _mapTokenRepository.Setup(r => r.ListByMapAsync(MAP)).ReturnsAsync(new List<MapToken>());
+        text.MapId = null;
 
         await _service.ConvertAsync(PLAYER, 71, new ChatConvertInfo { To = "action" });
 
-        (text.IsValidAction, text.MapId).Should().Be((true, (long?)MAP));
+        (text.IsValidAction, text.MapId).Should().Be((true, (long?)null));
         _queue.Verify(q => q.Enqueue(It.Is<TableNotice>(n => n.Kind == NoticeKind.Action)), Times.Once);
     }
 
     [Fact]
-    public async Task Convert_TextToAction_WithoutACurrentMap_Works_AndGoesBack()
+    public async Task Convert_TextToAction_TakesTheMapWhereTheCharacterStands_AndGoesBackWithoutIt()
     {
-        _campaign.CurrentMapId = null;
         var text = AriaText(74);
+        text.MapId = null;
+        _campaignCharacterRepository.Setup(r => r.GetAsync(CAMPAIGN, ARIA)).ReturnsAsync(new CampaignCharacter
+            { CampaignCharacterId = 700, CampaignId = CAMPAIGN, CharacterId = ARIA, Status = CampaignCharacterStatus.Approved });
+        _mapTokenRepository.Setup(r => r.GetByCampaignCharacterAsync(700)).ReturnsAsync(MapToken.PlaceCharacter(MAP, 5, 700, "Aria", 2, 2));
 
         await _service.ConvertAsync(PLAYER, 74, new ChatConvertInfo { To = "action" });
-        text.IsValidAction.Should().BeTrue();
+        (text.IsValidAction, text.MapId).Should().Be((true, (long?)MAP));
 
         await _service.ConvertAsync(PLAYER, 74, new ChatConvertInfo { To = "message" });
-        text.TurnType.Should().Be(TurnType.Text);
-        _campaign.CurrentMapId = MAP;
+        (text.TurnType, text.MapId).Should().Be((TurnType.Text, (long?)null));
     }
 
     [Fact]

@@ -9,4 +9,7 @@ public interface IPageMetaService
 
     /// <summary>Stored image name of an active map's model, for its preview picture; null when there is none.</summary>
     Task<string?> MapImageAsync(string mapSlug);
+
+    /// <summary>Stored picture of a campaign, for its preview; null when there is none.</summary>
+    Task<string?> CampaignImageAsync(string campaignSlug);
 }

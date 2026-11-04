@@ -425,6 +425,7 @@ public class Turn
         TurnType = TurnType.Text;
         DisplayName = Guard.RequiredText(displayName, "displayName", 260);
         DisplayImage = displayImage;
+        MapId = null; // 108: only actor records stand on a map
         Target = null; // 098: a message is about nobody
         Repeated = null; // 099: nor does it repeat
     }

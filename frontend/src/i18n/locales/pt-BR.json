@@ -30,13 +30,12 @@
     "backToTable": "Voltar para campanha",
     "currentCampaign": "Campanha atual",
     "chooseCampaign": "Escolher campanha",
-    "currentMap": "Mapa atual",
     "unnamedMap": "Mapa sem nome",
     "saveMap": "Salvar mapa",
     "readOnly": "Somente leitura",
     "tableSelect": "Mesa",
     "noActiveMap": "Sem mapa ativo",
-    "currentMap": "Atual",
+    "noMap": "Sem mapa",
     "noMapOpen": "Sem mapa",
     "otherCampaigns": "Outras campanhas…",
     "maps": "Mapas…"
@@ -44,7 +43,7 @@
   "route": {
     "notFound": "Campanha ou mapa não encontrado.",
     "forbidden": "Você não tem acesso a este mapa.",
-    "notCurrentMap": "Apenas o mapa atual da campanha pode ser aberto."
+    "notOwnMap": "Você só pode abrir o mapa do seu personagem."
   },
   "userMenu": {
     "label": "Menu do usuário",
@@ -851,7 +850,6 @@
   "mapTokens": {
     "hexOccupied": "O hex precisa estar livre.",
     "doesNotFit": "A peça não cabe aqui.",
-    "useMove": "{{name}} já está no mapa: use \"Mover\" no menu da peça.",
     "chooseCharacterToken": "Escolher token de {{name}}",
     "deleteTitle": "Excluir token",
     "deleteMessage": "Excluir {{name}} do mapa? A peça sai deste mapa; o token continua na biblioteca."
@@ -947,7 +945,8 @@
     "view": "Ver {{name}}",
     "life": "Vida",
     "energy": "Energia",
-    "vital": "{{label}} {{current}} de {{total}}"
+    "vital": "{{label}} {{current}} de {{total}}",
+    "noMap": "Sem mapa"
   },
   "profile": {
     "title": "Editar usuário",
@@ -970,7 +969,11 @@
     }
   },
   "map": {
-    "noCurrentMap": "O mestre ainda não escolheu um mapa.",
+    "noCharacterMap": "Seu personagem ainda não está em um mapa.",
+    "changing": "O mestre está mudando o mapa",
+    "transferTitle": "Trazer personagem",
+    "transferConfirm": "O personagem está no mapa {{name}}, tem certeza que deseja trazê-lo para este mapa?",
+    "transferButton": "Trazer",
     "zoomIn": "Aproximar",
     "zoomOut": "Afastar",
     "image": "Imagem",
@@ -1143,7 +1146,7 @@
   },
   "unsaved": {
     "title": "Alterações não salvas",
-    "message": "O mapa atual tem alterações não salvas. Deseja salvar antes de continuar?",
+    "message": "O mapa aberto tem alterações não salvas. Deseja salvar antes de continuar?",
     "save": "Salvar",
     "discard": "Descartar",
     "cancel": "Cancelar"
@@ -1271,7 +1274,8 @@
     "reconnecting": "Reconectando…",
     "offline": "Sem tempo real",
     "offlineHint": "As alterações dos outros chegam a cada 15 segundos até a conexão voltar.",
-    "followedMap": "O mestre levou a mesa para o mapa {{name}}.",
+    "followFailed": "Não foi possível abrir o novo mapa.",
+    "mapChangedUnsaved": "O mestre levou seu personagem para o mapa {{name}}. Salve ou descarte para acompanhar.",
     "mapChangedDirty": "O mapa foi alterado por outra pessoa; salve ou descarte para ver a nova versão.",
     "mapDeleted": "O mapa aberto foi excluído.",
     "campaignDeleted": "A campanha foi excluída."
@@ -1283,7 +1287,6 @@
     "tabNpcs": "NPCs",
     "tabMaps": "Mapas",
     "tabPlan": "Plano",
-    "currentMap": "Atual",
     "noMaps": "Esta campanha ainda não tem mapas.",
     "openMap": "Abrir",
     "editMap": "Editar mapa",
@@ -1534,12 +1537,6 @@
     "guideStep3": "Abra o Roll6 pelo novo ícone na tela de início: ele abre em tela cheia, como um aplicativo.",
     "guideOtherBrowser": "Neste navegador, use o botão de compartilhar do próprio navegador; se \"Adicionar à Tela de Início\" não aparecer, abra o roll6.site no Safari.",
     "guideClose": "Entendi"
-  },
-  "currentMap": {
-    "make": "Tornar atual",
-    "confirm": "Levar os jogadores para o mapa {{name}}?",
-    "confirmButton": "Levar os jogadores",
-    "changed": "Os jogadores foram levados para o mapa {{name}}."
   },
   "npcInstance": {
     "title": "Editar {{name}}",

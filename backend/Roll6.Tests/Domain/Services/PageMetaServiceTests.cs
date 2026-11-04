@@ -13,13 +13,15 @@ public class PageMetaServiceTests
     private const string BASE = "https://roll6.site";
     private const string IMAGE = "0123456789abcdef0123456789abcdef.png";
 
+    private const string CAMPAIGN_IMAGE = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.png";
+
     private readonly Mock<IMapRepository<Map>> _maps = new();
     private readonly Mock<ICampaignRepository<Campaign>> _campaigns = new();
     private readonly Mock<IMapModelRepository<MapModel>> _models = new();
     private readonly Mock<IUserRepository<User>> _users = new();
     private readonly PageMetaService _service;
 
-    private readonly Campaign _campaign = new() { CampaignId = 10, UserId = 1, Name = "A Torre", Slug = "a-torre", CurrentMapId = 30 };
+    private readonly Campaign _campaign = new() { CampaignId = 10, UserId = 1, Name = "A Torre", Slug = "a-torre", Image = CAMPAIGN_IMAGE };
     private readonly Map _map = new() { MapId = 30, CampaignId = 10, MapModelId = 50, Name = "Estrada 1", Slug = "estrada-1" };
 
     public PageMetaServiceTests()
@@ -82,25 +84,37 @@ public class PageMetaServiceTests
     }
 
     [Fact]
-    public async Task Campaign_ShowsItsCurrentMapImage()
+    public async Task Campaign_ShowsItsOwnPicture()
     {
         var meta = await _service.ForPathAsync("campaign/a-torre", BASE);
 
         meta.Title.Should().Be("A Torre");
         meta.Description.Should().Be("Campanha A Torre, mestre Rodrigo.");
         meta.Url.Should().Be($"{BASE}/campaign/a-torre");
-        meta.ImageUrl.Should().Be($"{BASE}/api/meta/image/map/estrada-1.jpg");
+        meta.ImageUrl.Should().Be($"{BASE}/api/meta/image/campaign/a-torre.jpg");
+        (meta.ImageWidth, meta.ImageHeight, meta.ImageType).Should().Be((PageMeta.IMAGE_WIDTH, PageMeta.IMAGE_HEIGHT, "image/jpeg"));
+        meta.ImageAlt.Should().Be("A Torre");
     }
 
     [Fact]
-    public async Task CampaignWithoutCurrentMap_UsesTheBrandImage()
+    public async Task CampaignWithoutPicture_UsesTheBrandImage()
     {
-        _campaign.CurrentMapId = null;
+        _campaign.Image = null;
 
         var meta = await _service.ForPathAsync("campaign/a-torre", BASE);
 
         meta.Title.Should().Be("A Torre");
         meta.ImageUrl.Should().Be($"{BASE}/brand/og-default.png");
+    }
+
+    [Fact]
+    public async Task CampaignImage_IsTheStoredPicture_OrNothing()
+    {
+        (await _service.CampaignImageAsync("a-torre")).Should().Be(CAMPAIGN_IMAGE);
+        (await _service.CampaignImageAsync("nao-existe")).Should().BeNull();
+
+        _campaign.Image = null;
+        (await _service.CampaignImageAsync("a-torre")).Should().BeNull();
     }
 
     [Fact]

@@ -4,20 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import { MagicIcon, MapIcon, PencilIcon, PlusSquareIcon } from '../../components/ui/icons';
-import { MakeCurrentMapButton } from '../../components/campaign/MakeCurrentMapButton';
 import { LibraryPageHeader } from '../../components/library/LibraryPageHeader';
 import { CardGrid } from '../../components/library/CardGrid';
 import { LibraryCard } from '../../components/library/LibraryCard';
 import { useLegacyTab } from '../../components/library/useLegacyTab';
 import { useAuth } from '../../hooks/useAuth';
 import { useCampaign } from '../../hooks/useCampaign';
+import { useCharacter } from '../../hooks/useCharacter';
 import { useMapEditor } from '../../hooks/useMapEditor';
 import { mapModelService } from '../../Services/mapModelService';
 import { mapService } from '../../Services/mapService';
 import { mapEditPath, mapGeneratorPath } from '../../lib/libraryRoutes';
 import type { MapSubsection } from '../../lib/libraryRoutes';
-import { visibleCampaignMaps } from '../../lib/viewerMap';
-import { canMakeCurrent } from '../../lib/currentMap';
+import { ownMapOf, visibleCampaignMaps } from '../../lib/viewerMap';
 import { canEditMap } from '../../lib/campaignStatus';
 import type { PagedList } from '../../types/common';
 import { MAP_STATUS_DELETED } from '../../types/map';
@@ -33,7 +32,7 @@ interface MapsPageProps {
 
 /**
  * "Mapas" of the library (087; was the maps window): the user's own library maps, the search and the current
- * campaign's maps (a player sees only the current one, 039) — since 090 one submenu each, as cards in 3 columns with
+ * campaign's maps (a player sees only his character's, 108) — since 090 one submenu each, as cards in 3 columns with
  * the map's picture. Choosing one opens it on the table; the pencil (own maps) goes to the map's edit page; "Novo
  * mapa" opens an empty map on the table. Replacing an unsaved map asks first.
  */
@@ -45,7 +44,11 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
   const { session } = useAuth();
   const userId = session?.user.userId ?? null;
   const { currentCampaign, isMaster } = useCampaign();
+  const { currentSelection, myParticipations, participationsLoadedFor } = useCharacter();
   const { loadMapModel, newMap, isDirty, canEdit } = useMapEditor();
+  const ownMapId = ownMapOf(currentSelection, myParticipations);
+  // Until the participations of this campaign arrive a player's map isn't known ("none" would be a lie).
+  const ownMapKnown = isMaster || participationsLoadedFor === currentCampaign?.campaignId;
   const [campaignMaps, setCampaignMaps] = useState<PagedList<MapInfo> | null>(null);
   const [models, setModels] = useState<PagedList<MapModelInfo> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,18 +58,18 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
   // The master adds any map of the list to the current campaign (not at a paused or finished table).
   const canAddToCampaign = !!currentCampaign && isMaster && canEditMap(currentCampaign.status, true);
 
-  const loadCampaignMaps = useCallback(async (campaignId: number, currentMapId: number | null, page: number): Promise<PagedList<MapInfo>> => {
+  const loadCampaignMaps = useCallback(async (campaignId: number, page: number): Promise<PagedList<MapInfo>> => {
     if (isMaster) return mapService.listByCampaign(campaignId, page, PAGE_SIZE);
-    const current = currentMapId !== null ? [await mapService.getById(currentMapId)] : [];
-    const items = visibleCampaignMaps(current.filter((m) => m.status !== MAP_STATUS_DELETED), { isMaster, currentMapId });
+    const own = ownMapId !== null ? [await mapService.getById(ownMapId)] : [];
+    const items = visibleCampaignMaps(own.filter((m) => m.status !== MAP_STATUS_DELETED), { isMaster, ownMapId });
     return { items, page: 1, pageSize: PAGE_SIZE, totalCount: items.length };
-  }, [isMaster]);
+  }, [isMaster, ownMapId]);
 
   const load = useCallback(async (page: number) => {
     setLoading(true);
     try {
       if (tab === 'campaign') {
-        setCampaignMaps(currentCampaign ? await loadCampaignMaps(currentCampaign.campaignId, currentCampaign.currentMapId, page) : null);
+        setCampaignMaps(currentCampaign && ownMapKnown ? await loadCampaignMaps(currentCampaign.campaignId, page) : null);
       } else {
         setModels(await mapModelService.list({ page, pageSize: PAGE_SIZE, mine: tab === 'mine', search: tab === 'search' ? search : undefined }));
       }
@@ -75,12 +78,12 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, [tab, currentCampaign, loadCampaignMaps, search, t]);
+  }, [tab, currentCampaign, ownMapKnown, loadCampaignMaps, search, t]);
 
   useEffect(() => {
     void load(1);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- search reloads only on submit
-  }, [tab, currentCampaign]);
+  }, [tab, currentCampaign, ownMapKnown, ownMapId]);
 
   /** Runs an action that replaces the table's map: asks first when its draft has unsaved changes. */
   const replacing = (action: () => Promise<void>) => {
@@ -166,7 +169,7 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
       )}
       {tab === 'campaign' ? (
         currentCampaign && !isMaster && campaignMaps && campaignMaps.items.length === 0 ? (
-          <p className="text-body-secondary">{t('map.noCurrentMap')}</p>
+          <p className="text-body-secondary">{t('map.noCharacterMap')}</p>
         ) : currentCampaign ? (
           <CardGrid
             items={loading && !campaignMaps ? null : campaignMaps?.items ?? null}
@@ -176,28 +179,17 @@ export const MapsPage = ({ subsection }: MapsPageProps) => {
             page={campaignMaps?.page ?? 1}
             totalPages={campaignTotal}
             onPage={(page) => { void load(page); }}
-            renderCard={(m) => {
-              const makeCurrent = canMakeCurrent(m, { isMaster, currentMapId: currentCampaign.currentMapId ?? null });
-              const editable = m.userId === userId;
-              return (
-                <LibraryCard
-                  ratio="wide"
-                  title={m.name}
-                  figure={figure(m.mapModelImageUrl, m.name)}
-                  fallback={<MapIcon />}
-                  onOpen={() => openCampaignMap(m)}
-                  meta={gridText(m.gridWidth, m.gridHeight)}
-                  badges={m.mapId === currentCampaign.currentMapId
-                    ? <span className="badge text-bg-info">{t('campaignSettings.currentMap')}</span> : undefined}
-                  actions={makeCurrent || editable ? (
-                    <>
-                      {makeCurrent && <MakeCurrentMapButton map={m} />}
-                      {editable && editButton(m.mapModelId, m)}
-                    </>
-                  ) : undefined}
-                />
-              );
-            }}
+            renderCard={(m) => (
+              <LibraryCard
+                ratio="wide"
+                title={m.name}
+                figure={figure(m.mapModelImageUrl, m.name)}
+                fallback={<MapIcon />}
+                onOpen={() => openCampaignMap(m)}
+                meta={gridText(m.gridWidth, m.gridHeight)}
+                actions={m.userId === userId ? editButton(m.mapModelId, m) : undefined}
+              />
+            )}
           />
         ) : (
           <p className="text-body-secondary">{t('mapModal.noCampaign')}</p>

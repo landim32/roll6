@@ -32,7 +32,7 @@ public static class McpDocs
 
     public const string CAMPAIGN_ID = "Id of the campaign (campaignId from list_campaigns / get_campaign).";
     public const string SLUG = "URL slug (lowercase, from the name at creation; it never changes). Example: \"tormento-vil\".";
-    public const string MAP_ID = "Id of the campaign map (mapId from list_campaign_maps or get_campaign.currentMapId).";
+    public const string MAP_ID = "Id of the campaign map (mapId from list_campaign_maps or list_my_table_campaigns).";
     public const string MAP_TOKEN_ID = "Id of the piece on the map (mapTokenId from list_map_tokens).";
     public const string PARTICIPATION_ID = "Id of the participation (campaignCharacterId from list_campaign_characters, list_my_participations or list_my_invites).";
 
