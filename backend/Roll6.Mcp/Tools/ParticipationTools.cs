@@ -123,7 +123,7 @@ public static class ParticipationTools
         What it does: lists the participations of the current user's characters in one campaign (any status) — e.g. to see
         whether a request was approved.
         Who can use it: any authenticated user.
-        Returns: [participation], each with currentMove (how far the character may move per turn in this campaign),
+        Returns: [participation], each with currentMove (how far the character should move per turn in this campaign),
         characterMove (the character's permanent move) and mapId, mapName (the map where it stands, null off every map).
         Common errors: 404 campaign not found.
         Related tools: request_campaign_access.
@@ -143,7 +143,7 @@ public static class ParticipationTools
         Returns: the participation plus sheet (this campaign's sheet), sheetFile/sheetFileUrl/sheetFileType (this
         campaign's sheet file), characterSheet (the character's own sheet, read-only here),
         characterTokenName/characterTokenImageUrl, currentMove (the Deslocamento: movement points per turn on this
-        campaign's maps, the player's limit) and characterMove (the character's permanent move, where currentMove starts).
+        campaign's maps; a reference for the turn's processing, moves are not refused past it) and characterMove (the character's permanent move, where currentMove starts).
         Common errors: 403 not allowed, 404 not found.
         Related tools: update_participation.
         """)]
@@ -157,7 +157,7 @@ public static class ParticipationTools
     [Description("""
         What it does: changes the campaign values of an approved character: current life and energy (up to the totals;
         0 or less is allowed and does not change posture), optionally the Deslocamento (`currentMove`, how many movement
-        points the player may spend per turn with this character on this campaign's maps — e.g. lower it for a wounded
+        points the character should spend per turn with this character on this campaign's maps — e.g. lower it for a wounded
         character; the character's own move never changes), free-text status (e.g. "poisoned"), optionally the posture
         (standing, down or out of combat), the campaign sheet (`sheet`) and its sheet file (`sheetFile`). The campaign
         sheet is this campaign's own copy of the character's sheet, made when the character joined: write the

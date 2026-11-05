@@ -50,7 +50,7 @@ public static class Roll6Guide
           occurrences (history kept too). Each campaign NPC has a **category** (071): Inimigo (default), Neutro or Aliado
           (`update_campaign_npc`). Allies show on the party's side and, when the master gives one a **master character**
           (an approved character of the campaign), the current owner of that character commands all its occurrences:
-          act, reset, move (within the occurrence's Deslocamento), posture, and life/energy/status. Name, Deslocamento,
+          act, reset, move, posture, and life/energy/status. Name, Deslocamento,
           removal and new occurrences stay with the master. Pieces carry `npcCategory` and `commanderUserId`.
         - **Map models**: the image + grid layout (a reusable map). A **campaign map** is a map model added to a
           campaign; its pieces live on the campaign map.
@@ -68,11 +68,13 @@ public static class Roll6Guide
           participation's `sheet` and `sheetFile`, copied from the character when they join and from then on editable
           only here, by the owner or the master (`update_participation`). The character's own sheet and sheet file are
           never changed by campaign play, and the master cannot change them at all.
-        - **Deslocamento** (`currentMove`, per participation): how many movement points a player may spend per turn with
-          the character on this campaign's maps — the limit of `move_map_token` for players. It starts at the
+        - **Deslocamento** (`currentMove`, per participation): how many movement points the character should spend per
+          turn on this campaign's maps. `move_map_token` does not enforce it, for players or the master: past it the app
+          only draws the path in red, and the rules are applied when the turn is processed (the piece is sent back with
+          process_turn when needed). It starts at the
           character's `move` when the character joins (or is approved again), the owner or the master change it with
           `update_participation` (e.g. lower it for a wounded character; it may also go above `move`), and while nobody
-          has adjusted it it follows the character's `move`. It never limits the master, and NPCs keep their own move.
+          has adjusted it it follows the character's `move`. NPCs keep their own move.
         - **A character stands on one map at most**, and that map is the one its player sees in the app: there is no map
           shared by the whole table, and a party may be split across maps. Only the master places characters
           (`place_character_on_map`); a character on another map is refused naming that map until the call says
@@ -101,8 +103,8 @@ public static class Roll6Guide
           `get_campaign_by_slug`, `list_my_table_campaigns`). It is a flag of the campaign: it stays on across turns
           until the master turns it off, and switching it never touches the turn (no confirmation, no finish, nothing
           cancelled or deleted).
-        - While it is **on**: character and NPC pieces move any number of times per turn (`move_map_token`), without the Deslocamento limit
-          and **without a Movement entry** — nothing is recorded, so there is no trail and the summary's positions are
+        - While it is **on**: character and NPC pieces move any number of times per turn (`move_map_token`)
+          **without a Movement entry** — nothing is recorded, so there is no trail and the summary's positions are
           just where the pieces are; `finish_turn` finishes at once (no pending list); no "Falta apenas você…" notice;
           `reset_turn` only cancels the actor's actions and leaves the piece where it is.
         - Actions are **not** changed by it: an actor has one valid action per turn in any mode, and a new action (or
@@ -127,9 +129,10 @@ public static class Roll6Guide
           pieces take several hexes (see "Posture and piece size").
         - **`look`** = the side a piece faces, **0–5 clockwise starting at the top**: 0 up, 1 up-right, 2 down-right,
           3 down, 4 down-left, 5 up-left.
-        - Movement cost (enforced for players): 1 for each step into the hex ahead, 1 for each 60° turn; the shortest
-          path goes around other pieces; the total must fit the character's **Deslocamento** in the campaign
-          (`currentMove` of the participation). The master moves anything freely.
+        - Movement cost: 1 for each step into the hex ahead, 1 for each 60° turn; the shortest path goes around other
+          pieces. It is compared with the character's **Deslocamento** in the campaign (`currentMove` of the
+          participation) only as a warning: nobody is refused for going past it, and the move's `moved` keeps the points
+          spent so the turn's processing can send the piece back.
           A big piece needs its whole shape free and inside the grid at every step and turn.
 
         ## Pieces (map tokens)

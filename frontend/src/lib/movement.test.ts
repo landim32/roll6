@@ -41,13 +41,13 @@ describe('path phase', () => {
   it('has no path to blocked hexes', () => {
     const state = hoverPath(start({}, (x, y) => x === 2 && y === 1), { x: 2, y: 1 });
     expect(state.phase === 'path' && state.cost).toBeNull();
-    expect(canPickDestination(state, true)).toBe(false);
+    expect(canPickDestination(state)).toBe(false);
   });
 
-  it('lets the master go past the move but not a player', () => {
+  it('lets anyone go past the move, the red path is only a warning', () => {
     const far = hoverPath(start({ total: 3 }), { x: 2, y: 6 });
-    expect(canPickDestination(far, false)).toBe(false);
-    expect(canPickDestination(far, true)).toBe(true);
+    expect(currentStatus(far)).toBe('over');
+    expect(canPickDestination(far)).toBe(true);
   });
 });
 
@@ -61,14 +61,13 @@ describe('facing phase', () => {
     const turned = pointFacing(facing, 3);
     expect(turned.phase !== 'idle' && turned.cost).toBe(5);
     expect(previewOf(turned)).toEqual({ x: 2, y: 0, look: 3 });
-    expect(canConfirm(turned, false)).toBe(true);
+    expect(canConfirm(turned)).toBe(true);
   });
 
-  it('blocks a player past the move', () => {
+  it('confirms past the move too', () => {
     const turned = pointFacing(pickDestination(hoverPath(start({ total: 3 }), { x: 2, y: 0 })), 3);
     expect(currentStatus(turned)).toBe('over');
-    expect(canConfirm(turned, false)).toBe(false);
-    expect(canConfirm(turned, true)).toBe(true);
+    expect(canConfirm(turned)).toBe(true);
   });
 
   it('does nothing when idle', () => {
@@ -93,7 +92,7 @@ describe('free mode (054): unlimited pieces', () => {
     expect(state.cost).toBe(0);
     expect(state.trail).toEqual([]);
     expect(currentStatus(state)).toBe('ok');
-    expect(canPickDestination(state, false)).toBe(true);
+    expect(canPickDestination(state)).toBe(true);
     expect(previewHexes(state)).toEqual([{ x: 4, y: 7 }]);
     expect(previewOf(state)).toEqual({ x: 2, y: 2, look: 0 });
   });
@@ -103,8 +102,7 @@ describe('free mode (054): unlimited pieces', () => {
     if (state.phase !== 'path') throw new Error('path expected');
     expect(state.cost).toBeNull();
     expect(currentStatus(state)).toBe('over');
-    expect(canPickDestination(state, false)).toBe(false);
-    expect(canPickDestination(state, true)).toBe(false);
+    expect(canPickDestination(state)).toBe(false);
     expect(previewHexes(state)).toEqual([{ x: 4, y: 4 }]);
   });
 
@@ -112,19 +110,19 @@ describe('free mode (054): unlimited pieces', () => {
     const facing = pickDestination(hoverPath(unlimited(), { x: 4, y: 7 }, fits));
     if (facing.phase !== 'facing') throw new Error('facing expected');
     expect(facing.look).toBe(0);
-    expect(canConfirm(facing, false)).toBe(true);
+    expect(canConfirm(facing)).toBe(true);
 
     const turned = pointFacing(facing, 3, fits);
     if (turned.phase !== 'facing') throw new Error('facing expected');
     expect(turned.look).toBe(3);
     expect(turned.cost).toBe(0);
     expect(turned.trail).toEqual([]);
-    expect(canConfirm(turned, false)).toBe(true);
+    expect(canConfirm(turned)).toBe(true);
 
     const blocked = pointFacing(facing, 3, () => false);
     if (blocked.phase !== 'facing') throw new Error('facing expected');
     expect(blocked.cost).toBeNull();
-    expect(canConfirm(blocked, false)).toBe(false);
+    expect(canConfirm(blocked)).toBe(false);
   });
 
   it('leaves limited pieces as they were', () => {
@@ -146,13 +144,13 @@ describe('big pieces (031)', () => {
     // In column 0 the line could not turn sideways; in column 2 it can, and facing down is the same line.
     state = pointFacing(state, 3);
     expect(currentStatus(state)).not.toBeNull();
-    expect(canConfirm(state, true)).toBe(true);
+    expect(canConfirm(state)).toBe(true);
     expect(previewHexes(state)).toEqual([{ x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 1 }]);
   });
 
   it('never reaches a facing whose shape leaves the grid', () => {
     const state = pointFacing(pickDestination(hoverPath(start({ space: 3, x: 0, y: 3 }), { x: 0, y: 2 })), 1);
     expect(state.phase === 'facing' && state.cost).toBeNull();
-    expect(canConfirm(state, true)).toBe(false);
+    expect(canConfirm(state)).toBe(false);
   });
 });

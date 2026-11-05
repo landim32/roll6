@@ -121,7 +121,7 @@ public static class TurnTools
     [Description("""
         What it does: returns the whole table in ONE call, to decide what happened in a turn: every approved character
         (characterId, name, playerName, currentLife/totalLife, currentEnergy/totalEnergy — energy is the fatigue —,
-        currentMove — the Deslocamento, how far the player may move it per turn in this campaign — and move — the
+        currentMove — the Deslocamento, how far it should move per turn in this campaign, not enforced on moves — and move — the
         character's permanent move —, status and,
         when it stands on a map, mapId and x/y/look/lookName; off every map mapId is null and there is no position), every
         NPC occurrence on the maps with characters (mapNpcId, mapId, name, current/total life and energy, status,

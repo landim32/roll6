@@ -726,40 +726,30 @@ public class MapTokenServiceTests
         _repository.Verify(r => r.InsertAsync(It.IsAny<MapToken>()), Times.Never);
     }
 
-    // ---- 037: the Deslocamento of the campaign limits the player, not the character's move ----
+    // ---- 037: the Deslocamento never refuses a move; the points spent are recorded for the table's skill ----
 
     [Fact]
-    public async Task Move_PlayerIsLimitedByTheCampaignDeslocamento()
+    public async Task Move_PlayerBeyondTheDeslocamento_IsAllowedAndRecordsThePointsSpent()
     {
         AriaPiece(currentMove: 1);
+        Turn? recorded = null;
+        _turnRepository.Setup(r => r.InsertAsync(It.IsAny<Turn>())).Callback((Turn t) => recorded = t).ReturnsAsync((Turn t) => t);
 
-        // 2 steps ahead costs 2: within the character's move (5) but beyond the Deslocamento (1).
-        (await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 }))
-            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
-        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
-
-        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 });
-        (moved.X, moved.Y).Should().Be((2, 1));
-    }
-
-    [Fact]
-    public async Task Move_PlayerMayGoBeyondTheCharactersMove_WhenTheDeslocamentoAllows()
-    {
-        AriaPiece(currentMove: 6);
-
-        // Turning around (3) and walking 3 hexes down (3) costs 6 > move 5, = Deslocamento 6.
+        // Turning around (3) and walking 3 hexes down (3) costs 6 > Deslocamento 1.
         var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 5, Look = 3 });
 
         (moved.X, moved.Y).Should().Be((2, 5));
+        recorded!.Moved.Should().Be(6);
     }
 
     [Fact]
-    public async Task Move_ZeroDeslocamento_RefusesAnyStep()
+    public async Task Move_ZeroDeslocamento_StillMoves()
     {
         AriaPiece(currentMove: 0);
 
-        (await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 }))
-            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
+        var moved = await _service.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 });
+
+        (moved.X, moved.Y).Should().Be((2, 1));
     }
 
     [Fact]
@@ -897,17 +887,6 @@ public class MapTokenServiceTests
         CampaignIsFree();
 
         await _service.Invoking(s => s.MoveAsync(3, 42, new MapTokenPositionInfo { X = 2, Y = 1 })).Should().ThrowAsync<UnauthorizedAccessException>();
-        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Move_PlayerBeyondItsMove_Throws()
-    {
-        AriaPiece();
-
-        // Turning around and walking 3 hexes down costs 6 > move 5.
-        (await _service.Invoking(s => s.MoveAsync(2, 42, new MapTokenPositionInfo { X = 2, Y = 5, Look = 3 }))
-            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
         _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
     }
 
@@ -1315,15 +1294,13 @@ public class MapTokenServiceTests
     }
 
     [Fact]
-    public async Task Move_PlayerCommandingTheAlly_MovesWithinItsDeslocamento()
+    public async Task Move_PlayerCommandingTheAlly_MayGoBeyondItsDeslocamento()
     {
         WolfPiece(currentMove: 1);
 
-        (await _service.Invoking(s => s.MoveAsync(2, 60, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 }))
-            .Should().ThrowAsync<DomainValidationException>()).Which.Errors.Should().ContainKey("move");
+        var moved = await _service.MoveAsync(2, 60, new MapTokenPositionInfo { X = 2, Y = 0, Look = 0 });
 
-        var moved = await _service.MoveAsync(2, 60, new MapTokenPositionInfo { X = 2, Y = 1, Look = 0 });
-        (moved.X, moved.Y).Should().Be((2, 1));
+        (moved.X, moved.Y).Should().Be((2, 0));
     }
 
     [Fact]
