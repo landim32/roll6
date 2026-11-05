@@ -57,7 +57,7 @@ public static class MapTokenTools
         keeping life, status, posture, the turn's action and the one-move rule; it spends no Deslocamento and records no
         movement). The player's screen follows the character.
         Who can use it: only the master, even for a player's own character; once on the map, players move it with
-        move_map_token (turn and move limits apply).
+        move_map_token (once per turn).
         {{RETURNS}}
         Common errors: 403 "Apenas o mestre coloca personagens nos mapas.", 404 not found or map deleted, 409 "O personagem
         está no mapa X." (send transfer: true) / "O personagem já está neste mapa." / "Este mapa está arquivado." / not
@@ -84,16 +84,16 @@ public static class MapTokenTools
         What it does: moves a piece on a campaign map to another hex and optionally turns it. For characters and NPC
         occurrences the move is recorded in the current turn (each moves once per turn) and everyone at the table sees it
         in real time.
-        Who can use it: the master (any piece, any distance); a player only the piece of his own approved character, once
-        per turn, within the character's Deslocamento in this campaign (currentMove of get_participation — not the
-        character's own move, which only sets where the Deslocamento starts), and the pieces of an ally NPC he commands
-        (update_campaign_npc), within that occurrence's Deslocamento (currentMove of list_map_npcs).
+        Who can use it: the master (any piece); a player only the piece of his own approved character, once per turn,
+        and the pieces of an ally NPC he commands (update_campaign_npc). Any distance for everybody: the Deslocamento
+        (currentMove of get_participation / list_map_npcs) is not enforced here, the turn's processing sends back a piece
+        that went past it.
         Coordinates: x = column, y = row of the rectangular flat-top hex grid (odd columns shifted half a hex down),
         0-based, inside gridWidth × gridHeight of the map. look = side the piece faces, 0-5 clockwise from the top side
         (0 up, 1 up-right, 2 down-right, 3 down, 4 down-left, 5 up-left).
-        Cost (players): 1 per step into the hex ahead + 1 per 60° turn, shortest path around other pieces.
-        Free mode (set_campaign_free_mode): character and NPC pieces move any number of times per turn, without the
-        Deslocamento limit, and no Movement entry is written; an occupied hex or a hex outside the grid is still refused.
+        Cost: 1 per step into the hex ahead + 1 per 60° turn, shortest path around other pieces.
+        Free mode (set_campaign_free_mode): character and NPC pieces move any number of times per turn and no Movement
+        entry is written; an occupied hex or a hex outside the grid is still refused.
         Walk (walk = true, free mode only): the position a player reached walking his own standing character in the 3D
         view, on the map where it stands — other pieces ignored (they may end up on the same hex), no turn entry,
         no Deslocamento. The master cannot walk pieces either; he moves them without walk. Leaving free mode is refused

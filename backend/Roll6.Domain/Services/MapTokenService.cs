@@ -187,9 +187,9 @@ public partial class MapTokenService : IMapTokenService
     }
 
     /// <summary>
-    /// Moves and turns a piece (015). The master moves any piece without limit; a player moves only the piece of
-    /// his own approved character, and the cheapest cost (1 per step into the hex ahead + 1 per 60° turn,
-    /// around the other pieces) must fit the participation's Deslocamento (037, not the character's own move).
+    /// Moves and turns a piece (015). The master moves any piece; a player moves only the piece of his own approved
+    /// character or of an ally he commands. Nobody is limited by the Deslocamento (037): going past it only turns the
+    /// path red, and the table's skill (`validar-movimento`, `gm`) brings the piece back when the rules say so.
     /// </summary>
     public async Task<MapTokenInfo> MoveAsync(long userId, long mapTokenId, MapTokenPositionInfo info)
     {
@@ -205,7 +205,7 @@ public partial class MapTokenService : IMapTokenService
         var look = info.Look ?? mapToken.Look;
         var layout = await _occupancy.LoadAsync(map);
         if (map.UserId != userId)
-            await EnsurePlayerMoveAsync(userId, layout, mapToken, info.X, info.Y, look, campaign);
+            await EnsurePlayerMayMoveAsync(userId, mapToken, campaign);
         layout.EnsureFits(info.X, info.Y, look, layout.SpaceOf(mapToken), mapToken.MapTokenId);
 
         // Characters and NPC occurrences move once per turn, and the move is recorded (016); objects don't.
@@ -250,23 +250,16 @@ public partial class MapTokenService : IMapTokenService
     }
 
     /// <summary>
-    /// A player moves only his own approved character, within its Deslocamento in this campaign (037) — the whole
-    /// shape around the other pieces. In free mode (054) only the ownership check remains: any distance, any path.
+    /// A player moves only his own approved character; any distance, the Deslocamento is not checked here.
     /// </summary>
-    private async Task EnsurePlayerMoveAsync(long userId, MapLayout layout, MapToken mapToken, int x, int y, int look, Campaign campaign)
+    private async Task EnsurePlayerMayMoveAsync(long userId, MapToken mapToken, Campaign campaign)
     {
-        var freeMode = campaign.FreeMode;
-        // 071: the player commanding an ally moves its pieces like his own character, within the occurrence's Deslocamento.
+        // 071: the player commanding an ally moves its pieces like his own character.
         if (mapToken.MapNpcId is long mapNpcId)
         {
             var mapNpc = await _mapNpcRepository.GetByIdAsync(mapNpcId);
             if (mapNpc == null || !await _npcCommand.CommandsAsync(userId, campaign, mapNpc.NpcId))
                 throw new UnauthorizedAccessException("Você só pode mover os seus personagens e aliados.");
-            if (freeMode)
-                return;
-            var npcCost = layout.MovementCost(mapToken, x, y, look);
-            if (npcCost == null || npcCost > mapNpc.CurrentMove)
-                throw new DomainValidationException("move", "O movimento passou do máximo.");
             return;
         }
         var participation = mapToken.CampaignCharacterId is long participationId
@@ -275,12 +268,6 @@ public partial class MapTokenService : IMapTokenService
         var character = participation != null ? await _characterRepository.GetByIdAsync(participation.CharacterId) : null;
         if (participation == null || participation.Status != CampaignCharacterStatus.Approved || character?.UserId != userId)
             throw new UnauthorizedAccessException("Você só pode mover os seus personagens.");
-        if (freeMode)
-            return;
-
-        var cost = layout.MovementCost(mapToken, x, y, look);
-        if (cost == null || cost > participation.CurrentMove)
-            throw new DomainValidationException("move", "O movimento passou do máximo.");
     }
 
     public async Task<MapTokenInfo> ChangeTokenAsync(long userId, long mapTokenId, MapTokenTokenInfo info)

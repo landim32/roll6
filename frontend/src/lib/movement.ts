@@ -3,7 +3,8 @@ import type { MoveState, MovementField, Offset } from './hexGrid';
 
 /**
  * State of the "Mover" mode (015): choose the destination following the cheapest path (1 per step into the
- * hex ahead + 1 per 60° turn), then choose the facing; a player can't go past the piece's move.
+ * hex ahead + 1 per 60° turn), then choose the facing. Past the piece's move the path only turns red: everyone may
+ * go on, and the table's skill brings the piece back when the rules say so.
  */
 
 /**
@@ -98,15 +99,12 @@ export const statusOf = (piece: MovingPiece, cost: number | null): MovementStatu
 export const currentStatus = (state: MovementState): MovementStatus | null =>
   (state.phase === 'idle' ? null : statusOf(state.piece, state.cost));
 
-/** Players can't go past the move; the master can (FR-010/FR-011). Unreachable hexes never. */
-const allowed = (state: MovementState, isMaster: boolean): boolean =>
-  state.phase !== 'idle' && state.cost !== null && (isMaster || currentStatus(state) !== 'over');
+/** Any hex with a path, past the move too; only unreachable hexes are refused. */
+export const canPickDestination = (state: MovementState): boolean =>
+  state.phase === 'path' && state.target !== null && state.cost !== null;
 
-export const canPickDestination = (state: MovementState, isMaster: boolean): boolean =>
-  state.phase === 'path' && state.target !== null && allowed(state, isMaster);
-
-export const canConfirm = (state: MovementState, isMaster: boolean): boolean =>
-  state.phase === 'facing' && allowed(state, isMaster);
+export const canConfirm = (state: MovementState): boolean =>
+  state.phase === 'facing' && state.cost !== null;
 
 /** First click: the piece goes to the target, arriving with the facing of the last step. */
 export const pickDestination = (state: MovementState): MovementState => {

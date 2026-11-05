@@ -843,7 +843,6 @@
   "movement": {
     "counter": "Movimento",
     "hint": "Escolha o destino e depois o sentido (no celular, toque duas vezes em cada). Esc ou botão direito cancela.",
-    "overLimit": "O movimento passou do máximo.",
     "unreachable": "Não há caminho até esse hex.",
     "blocked": "Esse hex não está livre para a peça."
   },

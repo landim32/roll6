@@ -147,8 +147,8 @@ public static class CampaignTools
     [McpServerTool(Name = "set_campaign_free_mode", Title = "Set campaign free mode", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/campaign/{id}/free-mode")]
     [Description("""
-        What it does: switches the campaign's free mode (054) on or off. While it is on: character and NPC pieces move any number of times per turn, without
-        the Deslocamento limit and without a Movement entry (so there is no trail and nothing to undo); finish_turn
+        What it does: switches the campaign's free mode (054) on or off. While it is on: character and NPC pieces move any number of times per turn,
+        without a Movement entry (so there is no trail and nothing to undo); finish_turn
         finishes at once without the pending list; no "Falta apenas você…" notice goes out; reset_turn only cancels the
         actions and leaves the piece where it is. Nothing else changes: process_turn, set_current_turn, the turn number,
         the chat, pokes and the campaign status keep working as always, and the mode stays on after a turn finishes.

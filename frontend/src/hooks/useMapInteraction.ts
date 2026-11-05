@@ -13,6 +13,7 @@ import { hexCenter, isInsideGrid, lookToward } from '../lib/hexGrid';
 import type { Offset, Point } from '../lib/hexGrid';
 import { pickTarget } from '../lib/actionTarget';
 import { canConfirm, canPickDestination, MOVEMENT_KIND } from '../lib/movement';
+import type { MovementKind } from '../lib/movement';
 import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt, transferSource } from '../lib/mapTokens';
 import { isFreeMode } from '../lib/freeMode';
 import { menuAllowed, movementOverlay, shapeAt } from '../lib/mapInteraction';
@@ -151,6 +152,9 @@ export const useMapInteraction = (props: MapInteractionProps) => {
     }
   };
 
+  const warnRefused = (kind: MovementKind) =>
+    toast.warning(t(kind === MOVEMENT_KIND.unlimited ? 'movement.blocked' : 'movement.unreachable'));
+
   /**
    * Movement mode clicks: pick the destination, then confirm the facing. A touch screen has no hover, so a tap
    * on another hex (or toward another side) first shows that path/facing; tapping it again confirms. With a
@@ -163,13 +167,8 @@ export const useMapInteraction = (props: MapInteractionProps) => {
         movement.hover(hex);
         return;
       }
-      if (state.cost === null) {
-        if (state.target)
-          toast.warning(t(state.piece.kind === MOVEMENT_KIND.unlimited ? 'movement.blocked' : 'movement.unreachable'));
-        return;
-      }
-      if (!canPickDestination(state, canPlace)) {
-        toast.warning(t('movement.overLimit'));
+      if (!canPickDestination(state)) {
+        if (state.target) warnRefused(state.piece.kind);
         return;
       }
       movement.pick();
@@ -181,8 +180,8 @@ export const useMapInteraction = (props: MapInteractionProps) => {
       movement.face(look);
       return;
     }
-    if (!canConfirm(state, canPlace)) {
-      toast.warning(t('movement.overLimit'));
+    if (!canConfirm(state)) {
+      warnRefused(state.piece.kind);
       return;
     }
     try {
