@@ -69,7 +69,7 @@ export const MapHexMenu = ({ interaction }: MapHexMenuProps) => {
           onDelete={() => {
             if (!menuToken) return;
             setPickedHex(menu.hex);
-            onDeleteToken({ mapTokenId: menuToken.mapTokenId, name: menuToken.name, mapNpcId: menuToken.mapNpcId });
+            onDeleteToken({ mapTokenId: menuToken.mapTokenId, name: menuToken.name, mapNpcId: menuToken.mapNpcId, posture: menuToken.posture });
           }}
         />
       )}

@@ -14,14 +14,11 @@ const rotate = (v: [number, number, number], k: [number, number, number], angle:
 };
 
 describe('isoMiniature', () => {
-  it('tips over down and out-of-combat characters and NPCs, never objects', () => {
-    for (const tokenType of [MAP_TOKEN_TYPE.character, MAP_TOKEN_TYPE.npc]) {
+  it('tips over down and out-of-combat pieces, objects included (109)', () => {
+    for (const tokenType of [MAP_TOKEN_TYPE.character, MAP_TOKEN_TYPE.npc, MAP_TOKEN_TYPE.object]) {
       expect(miniatureState({ tokenType, posture: POSTURE.standing })).toEqual({ tipped: false, gray: false });
       expect(miniatureState({ tokenType, posture: POSTURE.down })).toEqual({ tipped: true, gray: false });
       expect(miniatureState({ tokenType, posture: POSTURE.outOfCombat })).toEqual({ tipped: true, gray: true });
-    }
-    for (const posture of [POSTURE.standing, POSTURE.down, POSTURE.outOfCombat]) {
-      expect(miniatureState({ tokenType: MAP_TOKEN_TYPE.object, posture })).toEqual({ tipped: false, gray: false });
     }
   });
 

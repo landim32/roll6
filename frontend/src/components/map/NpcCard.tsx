@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import type { DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import { TurnStatusDot } from '../ui/TurnStatusDot';
@@ -5,7 +7,7 @@ import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
 import { npcStatus, occurrenceStatus } from '../../lib/turnStatus';
 import { VitalBar } from './VitalBar';
-import { NPC_DRAG_TYPE } from '../../lib/mapTokens';
+import { MAP_NPC_DRAG_TYPE, NPC_DRAG_TYPE } from '../../lib/mapTokens';
 import type { MapTokenInfo } from '../../types/mapToken';
 import { NPC_CATEGORY } from '../../types/npc';
 import type { CampaignNpcInfo } from '../../types/npc';
@@ -17,7 +19,10 @@ interface NpcCardProps {
   npc: CampaignNpcInfo;
   /** Master only: the pencil opens the NPC form; players see the card without it. */
   onEdit?: () => void;
-  /** The master can drop the card on a hex of the open campaign map: each drop is a new piece. */
+  /**
+   * The master can drop the card on a hex of the open campaign map: the card's head adds a new piece, an instance row
+   * moves that piece (109). Either way the dragged picture is one unit, never the whole card.
+   */
   draggable: boolean;
   /** Master only (051): pencil and X on each instance row. */
   onEditInstance?: (piece: MapTokenInfo) => void;
@@ -40,6 +45,11 @@ export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstan
   const occurrenceIds = occurrences.map((token) => token.mapNpcId!);
   // 031: the picture turns black and white when every occurrence on the map is out of combat.
   const allOut = occurrences.length > 0 && occurrences.every((token) => token.posture === POSTURE.outOfCombat);
+  const avatar = useRef<HTMLSpanElement>(null);
+  /** 109: the browser would drag a picture of the whole card (every instance); show one unit instead. */
+  const dragOne = (event: DragEvent) => {
+    if (avatar.current) event.dataTransfer.setDragImage(avatar.current, avatar.current.offsetWidth / 2, avatar.current.offsetHeight / 2);
+  };
   return (
     <li
       className={`stm-party-card${draggable ? ' stm-party-draggable' : ''}${compact ? ' stm-ally-card' : ''}`}
@@ -47,9 +57,10 @@ export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstan
       onDragStart={draggable ? (event) => {
         event.dataTransfer.setData(NPC_DRAG_TYPE, String(npc.npcId));
         event.dataTransfer.effectAllowed = 'copy';
+        dragOne(event);
       } : undefined}
     >
-      <span className={`d-inline-flex flex-shrink-0${allOut ? ' stm-grayscale' : ''}`}>
+      <span ref={avatar} className={`d-inline-flex flex-shrink-0${allOut ? ' stm-grayscale' : ''}`}>
         <CharacterAvatar name={npc.name} imageUrl={npc.imageUrl ?? npc.tokenImageUrl} size={compact ? 24 : 32} />
       </span>
       <div className="stm-party-info">
@@ -73,7 +84,16 @@ export const NpcCard = ({ npc, onEdit, draggable, onEditInstance, onRemoveInstan
         ) : (
           <ul className="list-unstyled mb-0" aria-label={t('npcs.occurrences', { name: npc.name })}>
             {occurrences.map((piece) => (
-              <li key={piece.mapTokenId} className="mt-1">
+              <li key={piece.mapTokenId} className={`mt-1${draggable ? ' stm-instance-draggable' : ''}`}
+                draggable={draggable}
+                onDragStart={draggable ? (event) => {
+                  // 109: this row moves its own piece; the card around it must not start its drag too.
+                  event.stopPropagation();
+                  event.dataTransfer.setData(MAP_NPC_DRAG_TYPE, String(piece.mapTokenId));
+                  event.dataTransfer.effectAllowed = 'move';
+                  dragOne(event);
+                } : undefined}
+              >
                 {/* 051: every instance has its own name; the master edits or removes it from here. */}
                 <small className="d-flex align-items-center gap-1" title={piece.name}>
                   {turnNo !== null && <TurnStatusDot status={occurrenceStatus(entries, piece.mapNpcId!)} />}

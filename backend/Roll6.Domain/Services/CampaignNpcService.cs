@@ -2,6 +2,7 @@ using Roll6.Domain.Enums;
 using Roll6.Domain.Exceptions;
 using Roll6.Domain.Interfaces;
 using Roll6.Domain.Models;
+using Roll6.Domain.Npcs;
 using Roll6.Domain.Realtime;
 using Roll6.DTO.CampaignNpc;
 using Roll6.DTO.Realtime;
@@ -80,7 +81,10 @@ public class CampaignNpcService : ICampaignNpcService
         return result;
     }
 
-    /// <summary>Removes the NPC from the campaign together with its occurrences (and their pieces) on the campaign's maps.</summary>
+    /// <summary>
+    /// Removes the NPC from the campaign together with its occurrences on the campaign's maps. Their pieces go too, except
+    /// those of occurrences down or out of combat, which stay as Object pieces (109, <see cref="NpcRemoval"/>).
+    /// </summary>
     public async Task RemoveAsync(long userId, long campaignNpcId)
     {
         var campaignNpc = await _repository.GetByIdAsync(campaignNpcId)
@@ -90,11 +94,27 @@ public class CampaignNpcService : ICampaignNpcService
         // 051: the instances leave the maps but stay named in the turn entries (soft removal).
         var mapNpcIds = await _mapNpcRepository.ListIdsByCampaignAndNpcAsync(campaignNpc.CampaignId, campaignNpc.NpcId);
         var instances = mapNpcIds.Count == 0 ? new List<MapNpc>() : await _mapNpcRepository.ListByIdsAsync(mapNpcIds);
+        var pieces = mapNpcIds.Count == 0 ? new List<MapToken>()
+            : (await _mapTokenRepository.ListByMapNpcIdsAsync(mapNpcIds) ?? new List<MapToken>());
+        var piecesByInstance = pieces.Where(p => p.MapNpcId.HasValue).ToDictionary(p => p.MapNpcId!.Value);
+        var bodies = new List<MapToken>();
+        var bodyInstanceIds = new HashSet<long>();
+        foreach (var instance in instances)
+        {
+            if (piecesByInstance.TryGetValue(instance.MapNpcId, out var piece) && NpcRemoval.LeavesBody(instance, piece))
+            {
+                bodies.Add(piece);
+                bodyInstanceIds.Add(instance.MapNpcId);
+            }
+        }
+        var deletedIds = mapNpcIds.Where(id => !bodyInstanceIds.Contains(id)).ToList();
         var now = DateTime.UtcNow;
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            if (mapNpcIds.Count > 0)
-                await _mapTokenRepository.DeleteByMapNpcIdsAsync(mapNpcIds);
+            foreach (var body in bodies)
+                await _mapTokenRepository.UpdateAsync(body);
+            if (deletedIds.Count > 0)
+                await _mapTokenRepository.DeleteByMapNpcIdsAsync(deletedIds);
             foreach (var instance in instances)
             {
                 if (instance.Remove(now))

@@ -1,4 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { useEffect, useRef } from 'react';
 import { mapRegionCenter } from '../../lib/mapRegion';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -32,8 +33,35 @@ interface MapControlsProps {
  * and the isometric one) and, behind "Editar mapa" (107), scene image, image resize mode and — in 2D — "Pintar". In the 3D views the zoom buttons drive the view (field of
  * view, or the distance its handler registered) and the image buttons are hidden.
  */
+/** Room kept between the column of buttons and the NPC panel above it: the 1rem bottom margin plus a gap. */
+const CONTROLS_CLEARANCE = 24;
+
+/**
+ * 109: the NPC panel on the right ends above this column (`--stm-controls-space`). The column changes height with the
+ * edit mode, the view and the layout, so its real height is measured and written on the map region; the value in
+ * `styles/app.css` is only the fallback before the first measure.
+ */
+const useControlsSpace = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = ref.current;
+    const region = element?.closest<HTMLElement>('.stm-map-region');
+    if (!element || !region || typeof ResizeObserver === 'undefined') return undefined;
+    const write = () => region.style.setProperty('--stm-controls-space', `${Math.ceil(element.offsetHeight) + CONTROLS_CLEARANCE}px`);
+    write();
+    const observer = new ResizeObserver(write);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      region.style.removeProperty('--stm-controls-space');
+    };
+  }, []);
+  return ref;
+};
+
 export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   const { t } = useTranslation();
+  const controlsRef = useControlsSpace();
   const { currentCampaign, isMaster } = useCampaign();
   const {
     view, zoomIn, zoomOut, resizeMode, toggleResizeMode, canEdit: canEditModel, draft, viewMode, setViewMode, fov, setFov,
@@ -62,7 +90,7 @@ export const MapControls = ({ onOpenImage }: MapControlsProps) => {
   };
 
   return (
-    <div className="stm-controls">
+    <div className="stm-controls" ref={controlsRef}>
       <button type="button" className="btn btn-secondary" title={t('map.zoomIn')} aria-label={t('map.zoomIn')}
         disabled={in3d ? !storyWalking && fov <= FOV_MIN : view.zoom >= MAX_ZOOM}
         onClick={() => (in3d && storyWalking ? storyZoom(-1) : in3d ? setFov(fov - FOV_STEP) : zoomIn(...center()))}><PlusIcon size={20} /></button>

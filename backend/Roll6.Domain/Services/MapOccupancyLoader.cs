@@ -115,12 +115,15 @@ public sealed class MapOccupancyLoader
             return new Dictionary<long, int>();
         var tokens = (await _tokenRepository.ListByIdsAsync(pieces.Select(p => p.TokenId).Distinct()) ?? new List<Token>())
             .ToDictionary(t => t.TokenId);
-        return pieces.ToDictionary(p => p.MapTokenId, p => PieceSpace(tokens.GetValueOrDefault(p.TokenId), postureOf(p)));
+        // 109: an Object piece keeps its own posture; the others take it from the character/NPC they show.
+        return pieces.ToDictionary(p => p.MapTokenId, p => PieceSpace(tokens.GetValueOrDefault(p.TokenId), IsObject(p) ? p.Posture : postureOf(p)));
     }
 
     /// <summary>Size of a piece that is about to be placed with this token and posture.</summary>
     public async Task<int> SpaceOfTokenAsync(long tokenId, Posture? posture) =>
         PieceSpace(await _tokenRepository.GetByIdAsync(tokenId), posture);
+
+    private static bool IsObject(MapToken piece) => piece.CampaignCharacterId == null && piece.MapNpcId == null;
 
     private async Task<Dictionary<long, Posture?>> PosturesAsync(IReadOnlyCollection<MapToken> pieces)
     {

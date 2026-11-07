@@ -59,7 +59,9 @@ export const canTakeTurn = (token: MapTokenInfo, ctx: MapInteractionContext): bo
 
 /** Posture (031): the master on characters and NPCs, a player on his own characters and commanded allies (071). */
 export const canSetPosture = (token: MapTokenInfo, ctx: MapInteractionContext): boolean =>
-  ctx.mapId !== null && ctx.canPlaceOwn && token.tokenType !== MAP_TOKEN_TYPE.object && (ctx.canPlace || isOwnPiece(token, ctx));
+  ctx.mapId !== null && ctx.canPlaceOwn
+  // 109: an object's posture is the master's alone.
+  && (token.tokenType === MAP_TOKEN_TYPE.object ? ctx.canPlace : ctx.canPlace || isOwnPiece(token, ctx));
 
 /** Players only get a menu (Mover / Agir / Resetar turno / Postura) on the pieces they may use; the master everywhere. */
 export const menuAllowed = (piece: MapTokenInfo | undefined, ctx: MapInteractionContext): boolean =>

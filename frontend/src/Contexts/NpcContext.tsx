@@ -11,6 +11,7 @@ import { useRealtime, useTableEvents } from '../hooks/useRealtime';
 import { TABLE_EVENT } from '../types/realtime';
 import { CAMPAIGN_CHARACTER_STATUS } from '../types/campaignCharacter';
 import type { ListQuery, PagedList } from '../types/common';
+import type { AutoPlacedNpc } from '../lib/mapTokens';
 import type { CampaignNpcInfo, CampaignNpcUpdateInfo, MapNpcInfo, MapNpcUpdateInfo, NpcInfo, NpcInsertInfo } from '../types/npc';
 
 interface NpcContextType {
@@ -35,6 +36,11 @@ interface NpcContextType {
   updateCampaignNpc: (campaignNpcId: number, data: CampaignNpcUpdateInfo) => Promise<CampaignNpcInfo>;
   /** New occurrence (and piece) on the open campaign map; without a hex (052) the server picks a free one near the middle. */
   placeOnMap: (npcId: number, x?: number, y?: number) => Promise<MapNpcInfo>;
+  /**
+   * The last instance placed without a hex (near the middle, 052/076): a drop of that NPC's card right after it moves
+   * this instance instead of adding another (109, `lib/mapTokens.npcDropAction`).
+   */
+  recentAutoPlaced: AutoPlacedNpc | null;
   /** Changes one instance on the map (051): name, current vitals, Deslocamento, status, posture. */
   updateInstance: (mapNpcId: number, data: MapNpcUpdateInfo) => Promise<MapNpcInfo>;
   /** Takes one instance off the map (051); the NPC stays in the campaign, its history stays in the chat. */
@@ -55,6 +61,7 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
   const [campaignNpcs, setCampaignNpcs] = useState<CampaignNpcInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentAutoPlaced, setRecentAutoPlaced] = useState<AutoPlacedNpc | null>(null);
   /** Campaign whose NPCs are wanted; late responses for another campaign are dropped. */
   const campaignRef = useRef<number | null>(null);
 
@@ -159,6 +166,7 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
     const mapId = draft.mapId;
     if (mapId === null) throw new Error('no campaign map open');
     const result = await run(() => mapNpcService.create({ mapId, npcId, x, y, look: 0 }));
+    if (x === undefined || y === undefined) setRecentAutoPlaced({ npcId, mapNpcId: result.mapNpcId, at: Date.now() });
     await refreshMapTokens();
     // The card counts the instances (051).
     await refreshCampaignNpcs();
@@ -183,7 +191,7 @@ export const NpcProvider = ({ children }: { children: ReactNode }) => {
   const value: NpcContextType = {
     campaignNpcs, loading, error, refreshCampaignNpcs, clearError,
     searchMyNpcs, getNpc, createNpc, updateNpc, addToCampaign, removeFromCampaign, updateCampaignNpc, placeOnMap, updateInstance,
-    removeFromMap,
+    removeFromMap, recentAutoPlaced,
   };
   return <NpcContext.Provider value={value}>{children}</NpcContext.Provider>;
 };

@@ -256,6 +256,27 @@ public class MapNpcServiceTests
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Once);
     }
 
+    [Theory]
+    [InlineData(Posture.Down)]
+    [InlineData(Posture.OutOfCombat)]
+    public async Task Delete_FallenInstance_LeavesTheBodyAsAnObject(Posture posture)
+    {
+        var instance = new MapNpc { MapNpcId = 90, MapId = MAP, NpcId = NPC, Name = "Goblin 2", Posture = posture };
+        _repository.Setup(r => r.GetByIdAsync(90)).ReturnsAsync(instance);
+        _mapTokenRepository.Setup(r => r.GetByMapNpcIdAsync(90)).ReturnsAsync(new MapToken
+        {
+            MapTokenId = 70, MapId = MAP, TokenId = 5, MapNpcId = 90, TokenType = MapTokenType.Npc, Name = "Goblin 2", X = 3, Y = 4, Look = 1
+        });
+
+        await _service.DeleteAsync(MASTER, 90);
+
+        _mapTokenRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
+        _mapTokenRepository.Verify(r => r.UpdateAsync(It.Is<MapToken>(t => t.MapTokenId == 70 && t.TokenType == MapTokenType.Object && t.MapNpcId == null
+            && t.Posture == posture && t.Name == "Goblin 2" && t.X == 3 && t.Y == 4 && t.Look == 1)), Times.Once);
+        _repository.Verify(r => r.UpdateAsync(It.Is<MapNpc>(m => m.MapNpcId == 90 && m.IsRemoved)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKENS_CHANGED && e.MapId == MAP)), Times.Once);
+    }
+
     [Fact]
     public async Task RemovedInstance_IsNotFoundForUpdateAndDelete()
     {

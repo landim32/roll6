@@ -11,7 +11,8 @@ public partial class MapTokenService
     /// <summary>
     /// Standing, down or out of combat (031), from the piece menu. A character's posture belongs to its participation
     /// (every piece of it in the campaign shows it) and may be changed by its owner or the master; an NPC's belongs to
-    /// the occurrence and only the master changes it. Objects have none. Never refused for lack of space: a piece that
+    /// the occurrence and only the master changes it. An Object piece keeps its own (109): only the master changes it and
+    /// nothing is recorded in the turn (objects have no turn). Never refused for lack of space: a piece that
     /// lies down over another one stays like that until it moves. The change is recorded in the turn like the other
     /// character/NPC changes (024).
     /// </summary>
@@ -28,8 +29,18 @@ public partial class MapTokenService
         else if (mapToken.MapNpcId is long mapNpcId)
             await SetNpcPostureAsync(userId, map, editable, mapToken, mapNpcId, info.Posture);
         else
-            throw new DomainValidationException("posture", "Objetos não têm postura.");
+            await SetObjectPostureAsync(userId, map, mapToken, info.Posture);
         return await MapToDtoAsync(mapToken);
+    }
+
+    private async Task SetObjectPostureAsync(long userId, Map map, MapToken mapToken, int posture)
+    {
+        if (map.UserId != userId)
+            throw new UnauthorizedAccessException("Apenas o mestre altera a postura de objetos.");
+        if (!mapToken.ChangePosture(posture))
+            return;
+        await _repository.UpdateAsync(mapToken);
+        await PublishPieceAsync(map, userId, await MapToDtoAsync(mapToken));
     }
 
     private async Task SetCharacterPostureAsync(long userId, Map map, long participationId, int posture)

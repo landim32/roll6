@@ -1189,6 +1189,12 @@ namespace Roll6.Infra.Migrations
                         .HasColumnType("character varying(260)")
                         .HasColumnName("name");
 
+                    b.Property<int>("Posture")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("posture");
+
                     b.Property<string>("Sheet")
                         .HasMaxLength(20000)
                         .HasColumnType("character varying(20000)")

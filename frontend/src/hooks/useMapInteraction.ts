@@ -14,7 +14,8 @@ import type { Offset, Point } from '../lib/hexGrid';
 import { pickTarget } from '../lib/actionTarget';
 import { canConfirm, canPickDestination, MOVEMENT_KIND } from '../lib/movement';
 import type { MovementKind } from '../lib/movement';
-import { characterDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt, transferSource } from '../lib/mapTokens';
+import { characterDropAction, MAP_NPC_DRAG_TYPE, mapNpcDropAction, NPC_DRAG_TYPE, npcDropAction, PARTICIPATION_DRAG_TYPE, tokenAt, transferSource } from '../lib/mapTokens';
+import type { MapNpcDropAction } from '../lib/mapTokens';
 import { isFreeMode } from '../lib/freeMode';
 import { menuAllowed, movementOverlay, shapeAt } from '../lib/mapInteraction';
 import type { MapInteractionContext } from '../lib/mapInteraction';
@@ -46,7 +47,8 @@ export interface MapInteractionProps {
   /** A card dropped for a character that is on another map: nothing changes until the page confirms (108). */
   onConfirmTransfer: (request: TransferRequest) => void;
   /** Asks to remove a piece (the page confirms first); `mapNpcId` set = an NPC instance leaving the map (051). */
-  onDeleteToken: (target: { mapTokenId: number; name: string; mapNpcId: number | null }) => void;
+  /** `posture` (109): a fallen NPC leaves its body, so the confirmation says so. */
+  onDeleteToken: (target: { mapTokenId: number; name: string; mapNpcId: number | null; posture?: number | null }) => void;
   /** "Editar NPC" on an NPC piece (051): the page opens the instance form. */
   onEditNpc: (piece: MapTokenInfo) => void;
   /** "Agir" on a piece (the page opens the action modal, 016). */
@@ -82,7 +84,7 @@ export const useMapInteraction = (props: MapInteractionProps) => {
   const movement = useTokenMovement();
   const { currentCampaign } = useCampaign();
   const freeMode = isFreeMode(currentCampaign);
-  const { placeOnMap } = useNpc();
+  const { placeOnMap, recentAutoPlaced } = useNpc();
   const { turnNo, entries: turnEntries, refresh: refreshTurn } = useTurn();
   const userId = session?.user.userId;
 
@@ -228,20 +230,56 @@ export const useMapInteraction = (props: MapInteractionProps) => {
 
   // ---------- party cards dropped on the map ----------
 
-  /** Party cards move/place a character; NPC cards add a new piece (014). Only the master drags cards (108). */
+  /**
+   * Party cards move/place a character; NPC cards add a new piece (014) and an NPC instance row moves its piece (109).
+   * Only the master drags cards (108).
+   */
   const isNpcDrag = (types: readonly string[]) => types.includes(NPC_DRAG_TYPE);
+  const isInstanceDrag = (types: readonly string[]) => types.includes(MAP_NPC_DRAG_TYPE);
   const acceptsDrag = (types: readonly string[]) =>
-    canPlace && (types.includes(PARTICIPATION_DRAG_TYPE) || isNpcDrag(types));
+    canPlace && (types.includes(PARTICIPATION_DRAG_TYPE) || isNpcDrag(types) || isInstanceDrag(types));
   /** The effect a card dragged over the map shows. */
-  const dropEffectOf = (types: readonly string[]): 'copy' | 'move' => (isNpcDrag(types) ? 'copy' : 'move');
+  const dropEffectOf = (types: readonly string[]): 'copy' | 'move' =>
+    (isNpcDrag(types) && !isInstanceDrag(types) ? 'copy' : 'move');
+
+  /** Moves one NPC piece where a drop asked (109); false when the action was not a move. */
+  const applyNpcMove = async (action: MapNpcDropAction, hex: Offset | null): Promise<boolean> => {
+    if (action.kind === 'occupied') toast.warning(t('mapTokens.hexOccupied'));
+    if (action.kind === 'blocked') toast.warning(t('mapTokens.doesNotFit'));
+    if (action.kind !== 'move' || !hex) return action.kind !== 'none';
+    try {
+      const moved = await moveToken(action.mapTokenId, hex.x, hex.y);
+      void refreshTurn();
+      toast.success(t('toast.npcMoved', { name: moved.name }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+    }
+    return true;
+  };
+
+  const dropInstance = async (mapTokenId: number, hex: Offset | null) => {
+    const piece = mapTokens.find((token) => token.mapTokenId === mapTokenId);
+    if (!piece) {
+      toast.error(t('common.unknownError'));
+      return;
+    }
+    await applyNpcMove(mapNpcDropAction({ hex, piece, tokens: mapTokens, columns: draft.gridWidth, rows: draft.gridHeight }), hex);
+  };
 
   const dropNpc = async (npcId: number, hex: Offset | null) => {
-    const action = npcDropAction({ hex, tokens: mapTokens });
+    const action = npcDropAction({
+      hex, tokens: mapTokens, npcId, recentAutoPlaced, now: Date.now(), columns: draft.gridWidth, rows: draft.gridHeight,
+    });
     if (action.kind === 'occupied') {
       toast.warning(t('mapTokens.hexOccupied'));
       return;
     }
-    if (action.kind !== 'place' || !hex) return;
+    if (action.kind !== 'place') {
+      // 109: right after "Incluir NPC" put it near the middle, this drop moves that same instance.
+      await applyNpcMove(action, hex);
+      return;
+    }
+    if (!hex) return;
     try {
       const placed = await placeOnMap(npcId, hex.x, hex.y);
       toast.success(t('toast.npcPlaced', { name: placed.name }));
@@ -253,6 +291,10 @@ export const useMapInteraction = (props: MapInteractionProps) => {
   /** A card dropped on `hex` (the caller checked `acceptsDrag`). */
   const drop = async (data: DataTransfer, hex: Offset | null) => {
     hover(null);
+    if (isInstanceDrag([...data.types])) {
+      await dropInstance(Number(data.getData(MAP_NPC_DRAG_TYPE)), hex);
+      return;
+    }
     if (isNpcDrag([...data.types])) {
       await dropNpc(Number(data.getData(NPC_DRAG_TYPE)), hex);
       return;

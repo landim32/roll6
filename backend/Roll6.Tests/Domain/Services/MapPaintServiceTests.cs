@@ -266,7 +266,7 @@ public class MapPaintServiceTests
         npcHex.Pieces.Should().ContainSingle().Which.Should().BeEquivalentTo(new { MapTokenId = 42L, Name = "Goblin 2", MapNpcId = (long?)12, Posture = (int?)2 });
 
         var objectHex = await _service.GetHexContentAsync(MASTER, MAP, 2, 2);
-        objectHex.Pieces.Should().ContainSingle().Which.Should().BeEquivalentTo(new { Name = "Baú", Posture = (int?)null });
+        objectHex.Pieces.Should().ContainSingle().Which.Should().BeEquivalentTo(new { Name = "Baú", Posture = (int?)1 }); // 109: objects have their own posture
     }
 
     [Fact]

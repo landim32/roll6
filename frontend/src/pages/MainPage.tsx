@@ -8,6 +8,7 @@ import { MapControls } from '../components/map/MapControls';
 import { NpcPanel } from '../components/map/NpcPanel';
 import { MapNpcFormModal } from '../components/npcs/MapNpcFormModal';
 import type { MapTokenInfo } from '../types/mapToken';
+import { POSTURE } from '../types/mapToken';
 import { PartyPanel } from '../components/map/PartyPanel';
 import { TopMenu } from '../components/menu/TopMenu';
 import { ActModal } from '../components/modals/ActModal';
@@ -82,7 +83,7 @@ export const MainPage = () => {
   /** The NPC card's pencil opens that NPC's own page in the library (098; 087 sent it to the campaign's NPC list). */
   const editNpc = (npc: CampaignNpcInfo) => navigate(npcPath(npc.npcId));
   /** Piece waiting for the delete confirmation; with `mapNpcId` it is an NPC instance leaving the map (051). */
-  const [toDelete, setToDelete] = useState<{ mapTokenId: number; name: string; mapNpcId: number | null } | null>(null);
+  const [toDelete, setToDelete] = useState<{ mapTokenId: number; name: string; mapNpcId: number | null; posture?: number | null } | null>(null);
   /** NPC instance open in "Editar NPC" (051). */
   const [editingInstance, setEditingInstance] = useState<MapTokenInfo | null>(null);
   /** Piece acting ("Agir") and piece waiting for the "Resetar turno" confirmation (016). */
@@ -155,7 +156,14 @@ export const MainPage = () => {
 
   /** The X of an instance row (051): same confirmation as "Retirar do mapa" on the piece. */
   const askRemoveInstance = (piece: MapTokenInfo) =>
-    setToDelete({ mapTokenId: piece.mapTokenId, name: piece.name, mapNpcId: piece.mapNpcId });
+    setToDelete({ mapTokenId: piece.mapTokenId, name: piece.name, mapNpcId: piece.mapNpcId, posture: piece.posture });
+
+  /** 109: an NPC that is down or out of combat leaves its body on the map. */
+  const deleteMessageKey = (target: { mapNpcId: number | null; posture?: number | null }) => {
+    if (target.mapNpcId === null) return 'mapTokens.deleteMessage';
+    return target.posture === POSTURE.down || target.posture === POSTURE.outOfCombat
+      ? 'npcs.removeFromMapLeavesBody' : 'npcs.removeFromMapMessage';
+  };
 
   const onConfirmDelete = async () => {
     if (!toDelete) return;
@@ -277,7 +285,7 @@ export const MainPage = () => {
         open={toDelete !== null}
         onOpenChange={(o) => { if (!o) setToDelete(null); }}
         title={t(toDelete?.mapNpcId !== null && toDelete !== null ? 'npcs.removeFromMapTitle' : 'mapTokens.deleteTitle')}
-        message={toDelete ? t(toDelete.mapNpcId !== null ? 'npcs.removeFromMapMessage' : 'mapTokens.deleteMessage', { name: toDelete.name }) : ''}
+        message={toDelete ? t(deleteMessageKey(toDelete), { name: toDelete.name }) : ''}
         confirmLabel={t(toDelete?.mapNpcId !== null && toDelete !== null ? 'hexMenu.removeNpc' : 'hexMenu.deleteToken')}
         onConfirm={onConfirmDelete}
         danger

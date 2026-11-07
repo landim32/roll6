@@ -139,7 +139,7 @@ public class MapTokenInfo
     [JsonPropertyName("walkYaw")]
     public double? WalkYaw { get; set; }
 
-    /// <summary>Posture of the character/NPC occurrence: 1 standing, 2 down, 3 out of combat; null for objects (031).</summary>
+    /// <summary>Posture of the character/NPC occurrence: 1 standing, 2 down, 3 out of combat; an Object piece has its own (109, set by the master).</summary>
     [JsonPropertyName("posture")]
     public int? Posture { get; set; }
 

@@ -281,23 +281,32 @@ public partial class MapTokenService : IMapTokenService
 
     /// <summary>
     /// Removes the piece; the piece of an NPC occurrence takes the occurrence off the map with it (051: marked removed,
-    /// its turn entries stay named).
+    /// its turn entries stay named). A down or out-of-combat occurrence leaves its body (109): the piece stays as an
+    /// Object, so the table gets <c>mapToken.upserted</c> instead of <c>mapToken.deleted</c>.
     /// </summary>
     public async Task DeleteAsync(long userId, long mapTokenId)
     {
         var (mapToken, map) = await GetOwnedAsync(userId, mapTokenId);
         var campaign = await EnsureMapEditableAsync(map, userId);
         var occurrence = mapToken.MapNpcId is long mapNpcId ? await _mapNpcRepository.GetByIdAsync(mapNpcId) : null;
+        var wasNpc = mapToken.MapNpcId != null;
+        var body = occurrence != null && NpcRemoval.LeavesBody(occurrence, mapToken);
         occurrence?.Remove(DateTime.UtcNow);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            await _repository.DeleteAsync(mapToken.MapTokenId);
+            if (body)
+                await _repository.UpdateAsync(mapToken);
+            else
+                await _repository.DeleteAsync(mapToken.MapTokenId);
             if (occurrence != null)
                 await _mapNpcRepository.UpdateAsync(occurrence);
         });
-        await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKEN_DELETED, map.CampaignId, userId, map.MapId,
-            new { mapTokenId = mapToken.MapTokenId }));
-        if (mapToken.MapNpcId != null)
+        if (body)
+            await PublishPieceAsync(map, userId, await MapToDtoAsync(mapToken));
+        else
+            await _notifier.PublishAsync(TableEvents.Create(TableEventType.MAP_TOKEN_DELETED, map.CampaignId, userId, map.MapId,
+                new { mapTokenId = mapToken.MapTokenId }));
+        if (wasNpc)
             await _notifier.PublishAsync(TableEvents.Create(TableEventType.TURN_CHANGED, map.CampaignId, userId));
         // 108: the character is off every map now, and whoever owns it stops seeing this one.
         if (mapToken.CampaignCharacterId is long participationId
@@ -444,7 +453,9 @@ public partial class MapTokenService : IMapTokenService
                 WalkX = mapToken.WalkX,
                 WalkY = mapToken.WalkY,
                 WalkYaw = mapToken.WalkYaw,
-                Space = MapOccupancyLoader.PieceSpace(token, null),
+                // 109: an Object piece has its own posture; character/NPC pieces overwrite both below.
+                Posture = (int)mapToken.Posture,
+                Space = MapOccupancyLoader.PieceSpace(token, mapToken.Posture),
                 UpSpace = MapOccupancyLoader.PieceSpace(token, null),
                 CreatedAt = mapToken.CreatedAt,
                 UpdatedAt = mapToken.UpdatedAt

@@ -288,6 +288,8 @@ public class Roll6Context : DbContext
             entity.Property(e => e.WalkX).HasColumnName("walk_x");
             entity.Property(e => e.WalkY).HasColumnName("walk_y");
             entity.Property(e => e.WalkYaw).HasColumnName("walk_yaw");
+            // 109: only Object pieces read it.
+            entity.Property(e => e.Posture).HasColumnName("posture").HasConversion<int>().HasDefaultValue(Posture.Standing).HasSentinel((Posture)0);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType(TIMESTAMP).HasDefaultValueSql("now()");
             entity.HasOne<Map>().WithMany().HasForeignKey(e => e.MapId)

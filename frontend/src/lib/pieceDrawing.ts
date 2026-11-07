@@ -103,7 +103,7 @@ export const baseColorOf = (token: { tokenType: number; npcCategory?: number | n
   isAllyPiece(token) ? ALLY_BASE_COLOR : BASE_COLORS[token.tokenType] ?? OBJECT_BASE_COLOR;
 
 /**
- * Whether a piece is drawn in the 3D view (034): only the ones standing (objects have no posture and always stand) and
+ * Whether a piece is drawn in the 3D view (034): only the ones standing (objects follow their own posture, 109) and
  * whose token has the "2,5D" front image (036) — a token without it has no figure to draw, so it is left out, and so is
  * its speech balloon. The other three sides are optional: with the front alone the figure still shows from every side.
  * A piece that is down or out of combat is lying, and the 3D view only draws figures standing up, so it is left out

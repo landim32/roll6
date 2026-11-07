@@ -180,12 +180,38 @@ public class CampaignNpcServiceTests
 
         await _service.RemoveAsync(MASTER, 3);
 
-        _mapTokenRepository.Verify(r => r.DeleteByMapNpcIdsAsync(occurrences), Times.Once);
+        _mapTokenRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(occurrences))), Times.Once);
         instances.Should().OnlyContain(i => i.IsRemoved);
         _mapNpcRepository.Verify(r => r.UpdateAsync(It.Is<MapNpc>(m => m.IsRemoved)), Times.Exactly(2));
         _mapNpcRepository.Verify(r => r.DeleteRangeAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
         _turnRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.IsAny<IEnumerable<long>>()), Times.Never);
         _repository.Verify(r => r.DeleteAsync(3), Times.Once);
+    }
+
+    [Fact]
+    public async Task Remove_FallenOccurrencesLeaveTheirBodies_StandingOnesAreDeleted()
+    {
+        _repository.Setup(r => r.GetByIdAsync(3)).ReturnsAsync(new CampaignNpc { CampaignNpcId = 3, CampaignId = CAMPAIGN, NpcId = NPC });
+        var occurrences = new List<long> { 90, 91 };
+        _mapNpcRepository.Setup(r => r.ListIdsByCampaignAndNpcAsync(CAMPAIGN, NPC)).ReturnsAsync(occurrences);
+        _mapNpcRepository.Setup(r => r.ListByIdsAsync(occurrences)).ReturnsAsync(new List<MapNpc>
+        {
+            new() { MapNpcId = 90, MapId = 30, NpcId = NPC, Name = "Goblin", Posture = Posture.Standing },
+            new() { MapNpcId = 91, MapId = 30, NpcId = NPC, Name = "Goblin 2", Posture = Posture.Down }
+        });
+        _mapTokenRepository.Setup(r => r.ListByMapNpcIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<MapToken>
+        {
+            new() { MapTokenId = 70, MapId = 30, TokenId = 5, MapNpcId = 90, TokenType = MapTokenType.Npc, Name = "Goblin", X = 1, Y = 1 },
+            new() { MapTokenId = 71, MapId = 30, TokenId = 5, MapNpcId = 91, TokenType = MapTokenType.Npc, Name = "Goblin 2", X = 2, Y = 2 }
+        });
+
+        await _service.RemoveAsync(MASTER, 3);
+
+        _mapTokenRepository.Verify(r => r.DeleteByMapNpcIdsAsync(It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new long[] { 90 }))), Times.Once);
+        _mapTokenRepository.Verify(r => r.UpdateAsync(It.Is<MapToken>(t => t.MapTokenId == 71 && t.TokenType == MapTokenType.Object
+            && t.MapNpcId == null && t.Posture == Posture.Down && t.X == 2 && t.Y == 2)), Times.Once);
+        _mapTokenRepository.Verify(r => r.UpdateAsync(It.Is<MapToken>(t => t.MapTokenId == 70)), Times.Never);
+        _mapNpcRepository.Verify(r => r.UpdateAsync(It.Is<MapNpc>(m => m.IsRemoved)), Times.Exactly(2));
     }
 
     [Fact]
