@@ -3489,3 +3489,47 @@ button.stm-library-card-open:focus-visible { outline: 2px solid var(--stm-accent
   text-align: right;
   color: var(--stm-text);
 }
+
+/* 110: "Nova versão do Roll6 disponível" — bottom middle, above the footer and every window, clear of the menu, the map
+   buttons (bottom right) and the side panels. */
+.stm-update-notice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--stm-footer-height) + 12px);
+  transform: translateX(-50%);
+  z-index: 2000;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--stm-surface-2);
+  border: 1px solid var(--stm-accent);
+  border-radius: var(--stm-radius);
+  box-shadow: var(--stm-shadow);
+  color: var(--bs-body-color);
+  font-size: 0.875rem;
+}
+
+.stm-update-notice > svg {
+  flex-shrink: 0;
+  color: var(--stm-accent);
+}
+
+.stm-update-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.stm-update-notice .btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 767.98px) {
+  .stm-update-notice {
+    bottom: calc(var(--stm-footer-height) + 8px);
+    gap: 0.4rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}

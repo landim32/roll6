@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { GridSizeFooter } from '../components/map/GridSizeFooter';
@@ -9,6 +9,7 @@ import { NpcPanel } from '../components/map/NpcPanel';
 import { MapNpcFormModal } from '../components/npcs/MapNpcFormModal';
 import type { MapTokenInfo } from '../types/mapToken';
 import { POSTURE } from '../types/mapToken';
+import { usePendingChanges } from '../hooks/usePendingChanges';
 import { PartyPanel } from '../components/map/PartyPanel';
 import { TopMenu } from '../components/menu/TopMenu';
 import { ActModal } from '../components/modals/ActModal';
@@ -101,16 +102,8 @@ export const MainPage = () => {
   const showChat = isChatVisible(layout);
   const desktop = useMediaQuery(DESKTOP_QUERY);
 
-  // Closing or reloading the tab with unsaved changes asks the browser to confirm.
-  useEffect(() => {
-    if (!isDirty) return;
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [isDirty]);
+  // Closing or reloading the tab with unsaved changes asks the browser to confirm; "Atualizar" asks too (110).
+  usePendingChanges('map-draft', isDirty);
 
   // With no image yet there is nothing to replace, so image+ opens without the unsaved guard.
   const openImage = async () => {

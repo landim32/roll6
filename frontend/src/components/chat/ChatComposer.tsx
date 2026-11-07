@@ -25,6 +25,7 @@ import { audioExtension, canRecord } from '../../lib/audioFormat';
 import { isPlayable } from '../../lib/campaignStatus';
 import { actionTarget } from '../../lib/chatComposer';
 import { MAX_QUESTION, askAvailability, parseAskPrefix } from '../../lib/askComposer';
+import { usePendingChanges } from '../../hooks/usePendingChanges';
 
 /** Longest message (backend Turn.MAX_TEXT) and action (Turn.MAX_DESCRIPTION). */
 const MAX_TEXT = 4000;
@@ -49,6 +50,8 @@ export const ChatComposer = () => {
   const { mapTokens } = useMapToken();
   const { act } = useTurn();
   const [text, setText] = useState('');
+  // 110: "Atualizar" asks before throwing away a text not sent yet (closing the tab still doesn't).
+  usePendingChanges('chat-composer', text.trim().length > 0, { warnOnUnload: false });
   const [mode, setMode] = useState<ComposerMode>('talk');
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);

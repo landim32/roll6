@@ -2,6 +2,7 @@ import { Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useMapEditor } from '../../hooks/useMapEditor';
+import { usePendingChanges } from '../../hooks/usePendingChanges';
 import { APP_NAME } from '../../lib/documentTitle';
 import { isAnimationEditorPath } from '../../lib/libraryRoutes';
 import { tableReturnPath } from '../../lib/libraryReturn';
@@ -25,15 +26,8 @@ export const LibraryLayout = () => {
     document.title = `${t('library.title')} | ${APP_NAME}`;
   }, [t]);
 
-  useEffect(() => {
-    if (!(isDirty && canEdit)) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [isDirty, canEdit]);
+  // The table's unsaved map survives the trip to the library: closing the tab asks, and so does "Atualizar" (110).
+  usePendingChanges('library-map', isDirty && canEdit);
 
   return (
     <div className="stm-library-page">
