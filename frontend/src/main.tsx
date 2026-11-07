@@ -22,8 +22,9 @@ import { NpcProvider } from './Contexts/NpcContext';
 import { RealtimeProvider } from './Contexts/RealtimeContext';
 import { TokenProvider } from './Contexts/TokenContext';
 import { TurnProvider } from './Contexts/TurnContext';
+import { UpdateProvider } from './Contexts/UpdateContext';
 
-// Provider chain: Auth → Install (the installable app, 042) → Push (Web Push on this device, 043) → Campaign (needs the session) → Realtime (table events
+// Provider chain: Update (the "new version" notice, 110 — outermost, so the login page has it too) → Auth → Install (the installable app, 042) → Push (Web Push on this device, 043) → Campaign (needs the session) → Realtime (table events
 // of the current campaign; every provider below reacts to them) → Character (needs the campaign) → MapEditor →
 // Token (library) → Animation (the animation library, 059) → MapToken (pieces of the open map: needs the editor,
 // the campaign and the characters) → MapPaint (marks and drawings of the open campaign map, 107) →
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
   {
     path: '*',
     element: (
+      <UpdateProvider>
       <AuthProvider>
         <InstallProvider>
           <PushProvider>
@@ -66,6 +68,7 @@ const router = createBrowserRouter([
           </PushProvider>
         </InstallProvider>
       </AuthProvider>
+      </UpdateProvider>
     ),
   },
 ]);

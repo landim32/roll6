@@ -1577,5 +1577,13 @@
     "blockedJoin": "A campanha precisa estar ativa para receber personagens.",
     "blockedPlay": "A campanha precisa estar ativa.",
     "hint": "Fora de \"Ativa\" só a conversa do chat continua; em \"Preparando\" o mestre ainda monta os mapas."
+  },
+  "update": {
+    "title": "Nova versão do Roll6 disponível",
+    "reload": "Atualizar",
+    "later": "Depois",
+    "confirmTitle": "Atualizar o Roll6",
+    "confirmMessage": "Há alterações que ainda não foram salvas. Descartar e atualizar agora?",
+    "confirm": "Descartar e atualizar"
   }
 }
