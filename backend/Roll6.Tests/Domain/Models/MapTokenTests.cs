@@ -156,4 +156,49 @@ public class MapTokenTests
 
         (piece.WalkX, piece.WalkY, piece.WalkYaw).Should().Be(((double?)null, (double?)null, (double?)null));
     }
+
+    // ---- 109: posture of objects and the body of a fallen NPC ----
+
+    [Fact]
+    public void ChangePosture_ValidatesAndReportsAChange()
+    {
+        var piece = new MapToken { TokenType = MapTokenType.Object, Name = "Baú" };
+
+        piece.ChangePosture(2).Should().BeTrue();
+        piece.Posture.Should().Be(Posture.Down);
+        piece.ChangePosture(2).Should().BeFalse();
+        piece.Invoking(p => p.ChangePosture(0)).Should().Throw<DomainValidationException>().Which.Errors.Should().ContainKey("posture");
+        piece.Invoking(p => p.ChangePosture(4)).Should().Throw<DomainValidationException>();
+    }
+
+    [Fact]
+    public void LeaveBody_KeepsPlaceAndTokenAndDropsTheNpcData()
+    {
+        var piece = MapToken.PlaceNpc(30, 5, 92, "Goblin", 4, 3, 2);
+        piece.MapTokenId = 63;
+        piece.Life = 7;
+        piece.Status = "ferido";
+        piece.Sheet = "ficha";
+        piece.WalkX = 1;
+
+        piece.LeaveBody("Goblin 2", Posture.OutOfCombat);
+
+        piece.TokenType.Should().Be(MapTokenType.Object);
+        piece.MapNpcId.Should().BeNull();
+        piece.Posture.Should().Be(Posture.OutOfCombat);
+        piece.Name.Should().Be("Goblin 2");
+        (piece.MapTokenId, piece.MapId, piece.TokenId, piece.X, piece.Y, piece.Look).Should().Be((63L, 30L, 5L, 4, 3, 2));
+        (piece.Life, piece.Energy, piece.Move).Should().Be((0, 0, 0));
+        piece.Status.Should().BeNull();
+        piece.Sheet.Should().BeNull();
+        piece.WalkX.Should().BeNull();
+    }
+
+    [Fact]
+    public void LeaveBody_OnAnObject_Throws()
+    {
+        var piece = new MapToken { TokenType = MapTokenType.Object, Name = "Baú" };
+
+        piece.Invoking(p => p.LeaveBody("x", Posture.Down)).Should().Throw<DomainValidationException>();
+    }
 }

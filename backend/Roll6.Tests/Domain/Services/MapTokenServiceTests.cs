@@ -1097,13 +1097,94 @@ public class MapTokenServiceTests
         _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Once);
     }
 
+    // ---- 109: objects have their own posture ----
+
     [Fact]
-    public async Task SetPosture_Object_Throws()
+    public async Task SetPosture_Object_MasterSavesItWithoutATurnEntry()
+    {
+        _repository.Setup(r => r.GetByIdAsync(62)).ReturnsAsync(new MapToken { MapTokenId = 62, MapId = 30, TokenId = 5, TokenType = MapTokenType.Object, Name = "Baú" });
+        _tokenRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Token> { new() { TokenId = 5, Name = "Baú", UpSpace = 1, DownSpace = 2 } });
+
+        var result = await _service.SetPostureAsync(1, 62, new MapTokenPostureInfo { Posture = 2 });
+
+        result.Posture.Should().Be(2);
+        result.Space.Should().Be(2);
+        _repository.Verify(r => r.UpdateAsync(It.Is<MapToken>(t => t.MapTokenId == 62 && t.Posture == Posture.Down)), Times.Once);
+        _turnRepository.Verify(r => r.InsertAsync(It.IsAny<Turn>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_UPSERTED && e.MapId == 30)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetPosture_Object_OnlyTheMaster()
+    {
+        _repository.Setup(r => r.GetByIdAsync(62)).ReturnsAsync(new MapToken { MapTokenId = 62, MapId = 30, TokenId = 5, TokenType = MapTokenType.Object, Name = "Baú" });
+        _campaignCharacterRepository.Setup(r => r.HasApprovedCharacterAsync(10, 2)).ReturnsAsync(true);
+
+        await _service.Invoking(s => s.SetPostureAsync(2, 62, new MapTokenPostureInfo { Posture = 2 })).Should().ThrowAsync<UnauthorizedAccessException>();
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetPosture_Object_SamePosture_ChangesNothing()
+    {
+        _repository.Setup(r => r.GetByIdAsync(62)).ReturnsAsync(new MapToken { MapTokenId = 62, MapId = 30, TokenId = 5, TokenType = MapTokenType.Object, Name = "Baú", Posture = Posture.Down });
+
+        await _service.SetPostureAsync(1, 62, new MapTokenPostureInfo { Posture = 2 });
+
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.IsAny<TableEventInfo>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetPosture_Object_InvalidValue_Throws()
     {
         _repository.Setup(r => r.GetByIdAsync(62)).ReturnsAsync(new MapToken { MapTokenId = 62, MapId = 30, TokenId = 5, TokenType = MapTokenType.Object, Name = "Baú" });
 
-        (await _service.Invoking(s => s.SetPostureAsync(1, 62, new MapTokenPostureInfo { Posture = 2 })).Should().ThrowAsync<DomainValidationException>())
+        (await _service.Invoking(s => s.SetPostureAsync(1, 62, new MapTokenPostureInfo { Posture = 7 })).Should().ThrowAsync<DomainValidationException>())
             .Which.Errors.Should().ContainKey("posture");
+    }
+
+    // ---- 109: a fallen NPC leaves its body ----
+
+    private MapToken SetupNpcPiece(Posture posture)
+    {
+        var piece = new MapToken { MapTokenId = 63, MapId = 30, TokenId = 5, MapNpcId = 92, TokenType = MapTokenType.Npc, Name = "Goblin", X = 4, Y = 3, Look = 2 };
+        _repository.Setup(r => r.GetByIdAsync(63)).ReturnsAsync(piece);
+        var occurrence = new MapNpc { MapNpcId = 92, MapId = 30, NpcId = 8, Name = "Goblin 2", Posture = posture };
+        _mapNpcRepository.Setup(r => r.GetByIdAsync(92)).ReturnsAsync(occurrence);
+        _mapNpcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<MapNpc> { occurrence });
+        _npcRepository.Setup(r => r.ListByIdsAsync(It.IsAny<IEnumerable<long>>())).ReturnsAsync(new List<Npc>());
+        return piece;
+    }
+
+    [Theory]
+    [InlineData(Posture.Down)]
+    [InlineData(Posture.OutOfCombat)]
+    public async Task Delete_FallenNpcPiece_LeavesTheBodyAsAnObject(Posture posture)
+    {
+        SetupNpcPiece(posture);
+
+        await _service.DeleteAsync(1, 63);
+
+        _repository.Verify(r => r.DeleteAsync(It.IsAny<long>()), Times.Never);
+        _repository.Verify(r => r.UpdateAsync(It.Is<MapToken>(t => t.MapTokenId == 63 && t.TokenType == MapTokenType.Object && t.MapNpcId == null
+            && t.Posture == posture && t.Name == "Goblin 2" && t.X == 4 && t.Y == 3 && t.Look == 2 && t.TokenId == 5)), Times.Once);
+        _mapNpcRepository.Verify(r => r.UpdateAsync(It.Is<MapNpc>(m => m.MapNpcId == 92 && m.RemovedAt != null)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_UPSERTED && e.MapId == 30)), Times.Once);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_DELETED)), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.TURN_CHANGED)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Delete_StandingNpcPiece_DeletesIt()
+    {
+        SetupNpcPiece(Posture.Standing);
+
+        await _service.DeleteAsync(1, 63);
+
+        _repository.Verify(r => r.DeleteAsync(63), Times.Once);
+        _repository.Verify(r => r.UpdateAsync(It.IsAny<MapToken>()), Times.Never);
+        _notifier.Verify(n => n.PublishAsync(It.Is<TableEventInfo>(e => e.Type == TableEventType.MAP_TOKEN_DELETED && e.MapId == 30)), Times.Once);
     }
 
     // ---- 031: pieces of several hexes ----
@@ -1161,7 +1242,7 @@ public class MapTokenServiceTests
         var result = await _service.ListByMapAsync(2, 30);
 
         result.Single().Space.Should().Be(10);
-        result.Single().Posture.Should().BeNull();
+        result.Single().Posture.Should().Be((int)Posture.Standing); // 109: an object's own posture
     }
 
     private const string UP_IMAGE = "0123456789abcdef0123456789abcdef.png";

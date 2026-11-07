@@ -85,8 +85,9 @@ describe('canTakeTurn', () => {
 });
 
 describe('canSetPosture', () => {
-  it('follows the same owners and never objects', () => {
-    expect(canSetPosture(CHEST, master())).toBe(false);
+  it('follows the same owners; objects only for the master (109)', () => {
+    expect(canSetPosture(CHEST, master())).toBe(true);
+    expect(canSetPosture(CHEST, player())).toBe(false);
     expect(canSetPosture(BORIN, master())).toBe(true);
     expect(canSetPosture(ARIA, player())).toBe(true);
     expect(canSetPosture(BORIN, player())).toBe(false);

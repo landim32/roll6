@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { characterDropAction, isOutsideOpenMap, npcDropAction, tokenAt, tokenOfParticipation, transferSource } from './mapTokens';
+import { AUTO_PLACE_GRACE_MS, characterDropAction, isOutsideOpenMap, mapNpcDropAction, npcDropAction, tokenAt, tokenOfParticipation, transferSource } from './mapTokens';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
 import type { MapTokenInfo } from '../types/mapToken';
@@ -98,5 +98,37 @@ describe('isOutsideOpenMap', () => {
     expect(isOutsideOpenMap(null, 1)).toBe(true);
     expect(isOutsideOpenMap(null, null)).toBe(true);
     expect(isOutsideOpenMap(2, null)).toBe(true);
+  });
+});
+
+describe('109: dragging one NPC instance', () => {
+  const npcPiece = { ...piece(20, 4, 4), mapNpcId: 5, npcId: 3, tokenType: MAP_TOKEN_TYPE.npc };
+  const all = [...tokens, npcPiece];
+
+  it('moves only that piece, never onto another one', () => {
+    expect(mapNpcDropAction({ hex: null, piece: npcPiece, tokens: all, columns: 10, rows: 10 })).toEqual({ kind: 'none' });
+    expect(mapNpcDropAction({ hex: { x: 4, y: 4 }, piece: npcPiece, tokens: all, columns: 10, rows: 10 })).toEqual({ kind: 'same' });
+    expect(mapNpcDropAction({ hex: { x: 1, y: 1 }, piece: npcPiece, tokens: all, columns: 10, rows: 10 })).toEqual({ kind: 'occupied' });
+    expect(mapNpcDropAction({ hex: { x: 6, y: 6 }, piece: npcPiece, tokens: all, columns: 10, rows: 10 })).toEqual({ kind: 'move', mapTokenId: 20 });
+  });
+
+  it('refuses a big shape that leaves the grid or covers another piece', () => {
+    // Facing up, a 2-hex piece also takes the hex behind it (y + 1).
+    const big = { ...npcPiece, space: 2 };
+    expect(mapNpcDropAction({ hex: { x: 6, y: 9 }, piece: big, tokens: [big], columns: 10, rows: 10 })).toEqual({ kind: 'blocked' });
+    expect(mapNpcDropAction({ hex: { x: 1, y: 0 }, piece: big, tokens: [...tokens, big], columns: 10, rows: 10 })).toEqual({ kind: 'blocked' });
+    expect(mapNpcDropAction({ hex: { x: 6, y: 3 }, piece: big, tokens: [big], columns: 10, rows: 10 })).toEqual({ kind: 'move', mapTokenId: 20 });
+  });
+
+  it('moves the instance "Incluir NPC" just placed instead of adding another', () => {
+    const recentAutoPlaced = { npcId: 3, mapNpcId: 5, at: 1000 };
+    const drop = (npcId: number, now: number, hex = { x: 6, y: 6 }) =>
+      npcDropAction({ hex, tokens: all, npcId, recentAutoPlaced, now, columns: 10, rows: 10 });
+    expect(drop(3, 1000 + AUTO_PLACE_GRACE_MS - 1)).toEqual({ kind: 'move', mapTokenId: 20 });
+    expect(drop(3, 1000 + AUTO_PLACE_GRACE_MS)).toEqual({ kind: 'place' });
+    expect(drop(4, 2000)).toEqual({ kind: 'place' });
+    expect(drop(3, 2000, { x: 1, y: 1 })).toEqual({ kind: 'occupied' });
+    // The recent piece is gone (removed by someone else): back to a new piece.
+    expect(npcDropAction({ hex: { x: 6, y: 6 }, tokens, npcId: 3, recentAutoPlaced, now: 2000 })).toEqual({ kind: 'place' });
   });
 });

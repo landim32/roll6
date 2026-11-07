@@ -47,7 +47,9 @@ public static class Roll6Guide
           follows a changed NPC move only while untouched); its piece shows them with the NPC's sheet. `update_map_npc`
           changes one occurrence; `delete_map_npc` takes it off the map keeping the NPC in the campaign and everything it
           did in the chat and the turn summary under its name; `remove_npc_from_campaign` removes the NPC and all its
-          occurrences (history kept too). Each campaign NPC has a **category** (071): Inimigo (default), Neutro or Aliado
+          occurrences (history kept too). Either way, an occurrence that is down or out of combat leaves its **body**: the
+          piece stays on its hex as an Object piece (same id and token, the occurrence's name and posture, no link to the
+          NPC); standing occurrences take their piece with them. Each campaign NPC has a **category** (071): Inimigo (default), Neutro or Aliado
           (`update_campaign_npc`). Allies show on the party's side and, when the master gives one a **master character**
           (an approved character of the campaign), the current owner of that character commands all its occurrences:
           act, reset, move, posture, and life/energy/status. Name, Deslocamento,
@@ -149,7 +151,8 @@ public static class Roll6Guide
           character's (for all its pieces in the campaign); only the master changes an NPC's. Tools:
           `set_piece_posture`, or `posture` in `update_participation`, `update_map_npc` and `process_turn`. It is logged
           in the turn and is separate from the free-text status and from life: 0 or below does not lay the piece down.
-          Objects have none. A library NPC (`create_npc`/`update_npc`) also has a `posture`: the one each new occurrence
+          Object pieces have their own posture too (109): only the master changes it with `set_piece_posture`, and it is
+          not logged (objects have no turn). A library NPC (`create_npc`/`update_npc`) also has a `posture`: the one each new occurrence
           starts with (default standing); the piece is placed with the size of that posture.
         - Tokens have a standing size (`upSpace`) and an optional down size (`downSpace`), each **1, 2, 3, 7 or 10**
           hexes; a piece takes the down size while down or out of combat. Pieces return `space` = hexes taken now.

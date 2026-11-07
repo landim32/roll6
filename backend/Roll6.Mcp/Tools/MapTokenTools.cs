@@ -140,16 +140,17 @@ public static class MapTokenTools
     [McpServerTool(Name = "set_piece_posture", Title = "Set piece posture", ReadOnly = false, Idempotent = true, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/maptoken/{id}/posture")]
     [Description($$"""
-        What it does: sets whether the character or NPC shown by a piece is standing (1), down (2, "Caído") or out of
-        combat (3, "Fora de combate"). Down and out-of-combat pieces are drawn lying down and take the token's down size
+        What it does: sets whether the character, NPC or object shown by a piece is standing (1), down (2, "Caído") or
+        out of combat (3, "Fora de combate"). Down and out-of-combat pieces are drawn lying down and take the token's down size
         (e.g. a 1-hex token that is 2 hexes lying also takes the hex behind it); out-of-combat pieces are also drawn in
         black and white. A character's posture belongs to its participation, so every piece of it in the campaign
-        changes; an NPC's belongs to that occurrence. Never refused for lack of space: a piece that lies down over
+        changes; an NPC's belongs to that occurrence; an object piece keeps its own (not logged in the turn). Never refused for lack of space: a piece that lies down over
         another one stays so until it moves. Recorded in the turn log like the other character/NPC changes; the same
         posture again changes nothing. Free-text status (update_participation / update_map_npc) is separate.
-        Who can use it: the character's owner or the master; NPC pieces the master or the player commanding the ally.
+        Who can use it: the character's owner or the master; NPC pieces the master or the player commanding the ally;
+        object pieces only the master.
         {{RETURNS}}
-        Common errors: 400 object piece or posture not 1-3, 403 not allowed, 404 piece not found, 409 character not approved.
+        Common errors: 400 posture not 1-3, 403 not allowed, 404 piece not found, 409 character not approved.
         Related tools: list_map_tokens, update_participation, update_map_npc, process_turn.
         """)]
     public static Task<CallToolResult> SetPiecePosture(
@@ -194,8 +195,9 @@ public static class MapTokenTools
     [ApiOperation("DELETE", "/api/maptoken/{id}")]
     [Description($$"""
         What it does: removes a piece from the map; a character piece leaves that character off every map (its player sees a
-        notice instead of a map); an NPC piece takes its occurrence (and turn entries) with it; the
-        library token is kept. {{McpDocs.DESTRUCTIVE}}
+        notice instead of a map); an NPC piece takes its occurrence off the map (its turn entries
+        stay) — and when that occurrence is down or out of combat the piece is not removed but stays as an Object piece
+        (the body: same id, hex and token, the occurrence's name and posture); the library token is kept. {{McpDocs.DESTRUCTIVE}}
         Who can use it: only the master.
         Returns: { ok: true }.
         Common errors: 403 not the master, 404 not found.

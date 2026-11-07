@@ -186,7 +186,7 @@ public class MapPaintService : IMapPaintService
         Posture? PostureOf(MapToken piece) =>
             piece.CampaignCharacterId is long participationId ? participations.GetValueOrDefault(participationId)?.Posture
             : piece.MapNpcId is long occurrenceId ? occurrences.GetValueOrDefault(occurrenceId)?.Posture
-            : null;
+            : piece.Posture; // 109: an Object piece has its own
 
         var spaces = await _occupancy.SpacesAsync(pieces, PostureOf);
         var occupancy = Occupancy.Build(pieces.Select(p => new PieceShape(p.MapTokenId, p.X, p.Y, p.Look, spaces[p.MapTokenId])));

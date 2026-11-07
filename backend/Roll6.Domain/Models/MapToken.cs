@@ -51,6 +51,12 @@ public class MapToken
     public double? WalkY { get; set; }
     public double? WalkYaw { get; set; }
 
+    /// <summary>
+    /// Posture of an Object piece (109): standing, down or out of combat, set by the master. Characters read theirs from
+    /// the participation and NPC pieces from the occurrence, so for them this stays Standing and is ignored.
+    /// </summary>
+    public Posture Posture { get; set; } = Posture.Standing;
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -151,5 +157,36 @@ public class MapToken
             throw new DomainValidationException("look", $"O campo look deve estar entre 0 e {MAX_LOOK}.");
         Look = look;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>The posture of an Object piece (109); false when it is already that one.</summary>
+    public bool ChangePosture(int posture)
+    {
+        var value = Guard.ValidPosture(posture, "posture");
+        if (value == Posture)
+            return false;
+        Posture = value;
+        UpdatedAt = DateTime.UtcNow;
+        return true;
+    }
+
+    /// <summary>
+    /// An NPC piece whose occurrence leaves the map while down or out of combat (109): the body stays where it fell as an
+    /// Object piece with no link to the NPC — same id, map, token, hex and facing, the occurrence's name and posture.
+    /// </summary>
+    public void LeaveBody(string name, Posture posture)
+    {
+        if (MapNpcId == null)
+            throw new DomainValidationException("mapNpcId", "Só peças de NPC deixam o corpo no mapa.");
+        MapNpcId = null;
+        TokenType = MapTokenType.Object;
+        Posture = posture;
+        Name = Guard.RequiredText(name, "name", 260);
+        Life = 0;
+        Energy = 0;
+        Move = 0;
+        Status = null;
+        Sheet = null;
+        MoveTo(X, Y);
     }
 }

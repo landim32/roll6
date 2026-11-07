@@ -1,14 +1,14 @@
 import { HEX_SIZE } from './hexGrid';
 import type { Point } from './hexGrid';
 import type { MapTokenInfo } from '../types/mapToken';
-import { MAP_TOKEN_TYPE, POSTURE } from '../types/mapToken';
+import { POSTURE } from '../types/mapToken';
 
 /**
  * The pieces of the isometric view as tabletop miniatures (104): a token with a 3D model or a "2,5D" figure stands on a
  * round base of one color; when the piece is down or out of combat the whole miniature — figure and base — lies knocked
  * over backwards on the table, resting on the edge of its base and on its head (nothing floats), along the piece's down
- * shape, and out of combat it is also drawn in black and white (the 2D map's convention). Objects have no posture and
- * always stand. Pure: `components/iso/isoPieces` builds the scene from these rules.
+ * shape, and out of combat it is also drawn in black and white (the 2D map's convention). Objects follow their own
+ * posture (109) like the others. Pure: `components/iso/isoPieces` builds the scene from these rules.
  */
 
 /** Share of the circle as large as the piece's shape that the base covers (the colored hexes still show around it). */
@@ -40,7 +40,6 @@ export interface TipPose {
 }
 
 export const miniatureState = (token: Pick<MapTokenInfo, 'posture' | 'tokenType'>): MiniatureState => {
-  if (token.tokenType === MAP_TOKEN_TYPE.object) return { tipped: false, gray: false };
   const gray = token.posture === POSTURE.outOfCombat;
   return { tipped: gray || token.posture === POSTURE.down, gray };
 };

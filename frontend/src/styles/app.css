@@ -1,6 +1,7 @@
 /* Roll6 — dark theme only (Bootstrap 5.3 data-bs-theme="dark" on <html>). Brand colors: styles/theme.css (038). */
 :root {
-  /* Column of map controls (4 × 48 px buttons) in the bottom-right corner, kept clear by the NPC panel. */
+  /* Column of map controls in the bottom-right corner, kept clear by the NPC panel. Fallback only: MapControls measures
+     the column and writes the real value on .stm-map-region (109). */
   --stm-controls-space: 240px;
   --stm-grid-line: rgba(230, 230, 240, 0.35);
   /* Installed app on a phone with a notch (042, viewport-fit=cover): the menu goes under the status bar and the bottom
@@ -2567,6 +2568,17 @@ button.stm-chat-quote { cursor: pointer; }
 
 .stm-party-draggable:active {
   cursor: grabbing;
+}
+
+/* 109: an NPC instance row drags its own piece; its outline shows which unit goes. */
+.stm-instance-draggable {
+  border-radius: var(--stm-radius-sm);
+  outline: 1px solid transparent;
+  outline-offset: 1px;
+}
+
+.stm-instance-draggable:hover {
+  outline-color: var(--bs-border-color);
 }
 
 /* Tokens modal: 3-column grid of choices */

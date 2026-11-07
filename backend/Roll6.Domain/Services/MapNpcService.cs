@@ -160,16 +160,22 @@ public class MapNpcService : IMapNpcService
     }
 
     /// <summary>
-    /// Takes the instance off the map (051): its piece goes, the row is marked removed and its turn entries stay — the
-    /// chat and the summary keep naming it. The NPC stays in the campaign.
+    /// Takes the instance off the map (051): the row is marked removed and its turn entries stay — the chat and the
+    /// summary keep naming it. The NPC stays in the campaign. Its piece goes too, unless the instance is down or out of
+    /// combat: then the body stays on the map as an Object piece (109, <see cref="NpcRemoval"/>).
     /// </summary>
     public async Task DeleteAsync(long userId, long mapNpcId)
     {
         var (mapNpc, map) = await GetOwnedAsync(userId, mapNpcId);
+        var piece = await _mapTokenRepository.GetByMapNpcIdAsync(mapNpc.MapNpcId);
+        var body = piece != null && NpcRemoval.LeavesBody(mapNpc, piece);
         mapNpc.Remove(DateTime.UtcNow);
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            await _mapTokenRepository.DeleteByMapNpcIdsAsync(new[] { mapNpc.MapNpcId });
+            if (body)
+                await _mapTokenRepository.UpdateAsync(piece!);
+            else
+                await _mapTokenRepository.DeleteByMapNpcIdsAsync(new[] { mapNpc.MapNpcId });
             await _repository.UpdateAsync(mapNpc);
         });
         await PublishPiecesChangedAsync(map, userId);

@@ -71,7 +71,8 @@ public static class MapNpcTools
     [McpServerTool(Name = "delete_map_npc", Title = "Delete NPC occurrence", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [ApiOperation("DELETE", "/api/mapnpc/{id}")]
     [Description($$"""
-        What it does: takes an NPC occurrence off the map: its piece is removed, the NPC stays in the campaign and the
+        What it does: takes an NPC occurrence off the map: its piece is removed — unless the occurrence is down or out of
+        combat, when the piece stays on its hex as an Object piece (the body, no link to the NPC) —, the NPC stays in the campaign and the
         other occurrences stay where they are. What the occurrence did (moves, actions, changes) stays in the chat and
         the turn summary under its name. To remove the NPC and every occurrence from the campaign use
         remove_npc_from_campaign. {{McpDocs.DESTRUCTIVE}}

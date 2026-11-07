@@ -14,10 +14,11 @@ import { useMapToken } from '../../hooks/useMapToken';
 import { imageService } from '../../Services/imageService';
 import { cropToFile } from '../../lib/cropImage';
 import { afterAddAction } from '../../lib/npcCategory';
+import { hexCenter } from '../../lib/hexGrid';
 import { emptyNpcForm, toNpcInsert, validateNpcForm } from '../../lib/npcForm';
 import type { NpcForm } from '../../lib/npcForm';
 import type { PagedList } from '../../types/common';
-import type { NpcInfo } from '../../types/npc';
+import type { MapNpcInfo, NpcInfo } from '../../types/npc';
 
 interface NpcPickerModalProps {
   open: boolean;
@@ -32,12 +33,13 @@ const SEARCH_DELAY_MS = 300;
  * An NPC already in the campaign (052) adds another instance to the open campaign map instead — the server picks a free
  * hex near the middle — and is only unavailable while no campaign map is open. Since 076 an NPC that joins also gets a
  * piece on the open map the same way (the panel lists only the scene, so its card would never show otherwise); with no
- * room it stays in the campaign with a warning, and without a map the master may place on it only joins.
+ * room it stays in the campaign with a warning, and without a map the master may place on it only joins. Since 109 the
+ * view centers the new piece and the toast says where it went, so it never shows up unnoticed in the middle of the map.
  */
 export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
   const { t } = useTranslation();
   const { campaignNpcs, searchMyNpcs, createNpc, addToCampaign, placeOnMap } = useNpc();
-  const { draft } = useMapEditor();
+  const { draft, hexSize, view, centerOn } = useMapEditor();
   const canPlace = draft.mapId !== null;
   const { canPlace: canPlacePieces } = useMapToken();
   const [tab, setTab] = useState('mine');
@@ -82,6 +84,14 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
 
   const inCampaign = new Set(campaignNpcs.map((c) => c.npcId));
 
+  /** 109: the instance the server put near the middle: centered on screen, named in the toast. */
+  const showPlaced = (instance: MapNpcInfo) => {
+    toast.success(t('toast.npcAutoPlaced', { name: instance.name }));
+    if (instance.x === null || instance.y === null) return;
+    const center = hexCenter(instance.x, instance.y, hexSize);
+    window.requestAnimationFrame(() => centerOn(center.x, center.y, view.zoom));
+  };
+
   /** 076: joins the campaign and, where the master may place pieces, the open map too. */
   const joinAndPlace = async (npc: NpcInfo) => {
     await addToCampaign(npc.npcId);
@@ -90,8 +100,7 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
       return;
     }
     try {
-      await placeOnMap(npc.npcId);
-      toast.success(t('toast.npcAddedPlaced', { name: npc.name }));
+      showPlaced(await placeOnMap(npc.npcId));
     } catch {
       toast.warning(t('npcs.addedNotPlaced', { name: npc.name }));
     }
@@ -101,8 +110,7 @@ export const NpcPickerModal = ({ open, onOpenChange }: NpcPickerModalProps) => {
     setBusy(true);
     try {
       if (inCampaign.has(npc.npcId)) {
-        const instance = await placeOnMap(npc.npcId);
-        toast.success(t('toast.npcPlaced', { name: instance.name }));
+        showPlaced(await placeOnMap(npc.npcId));
       } else {
         await joinAndPlace(npc);
       }
