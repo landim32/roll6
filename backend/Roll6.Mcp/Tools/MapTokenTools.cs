@@ -78,6 +78,29 @@ public static class MapTokenTools
             MapId = mapId, CampaignCharacterId = campaignCharacterId, TokenId = tokenId, X = x, Y = y, Transfer = transfer
         });
 
+    [McpServerTool(Name = "change_piece_map", Title = "Move piece to another map", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
+    [ApiOperation("PUT", "/api/maptoken/{id}/map")]
+    [Description($$"""
+        What it does: takes a character or NPC piece to another active map of the same campaign, to the same hex (column/row)
+        and facing it had; when its shape doesn't fit there (occupied or outside the smaller grid) it goes to the free hex
+        nearest to it and adjusted is true. The same piece moves — for an NPC the same instance, keeping its life, energy,
+        status, posture, Deslocamento, repeated action and turn entries (renumbered only when that map already has an
+        instance with its name, e.g. "Guarda 2" → "Guarda 3"); a character keeps its participation and its player's screen
+        follows it. No movement is recorded and no Deslocamento is spent. Objects can't change map.
+        Who can use it: only the master, in an active campaign (or one in preparation).
+        Returns: { mapToken (the piece on the target map, as in list_map_tokens), fromMapId, adjusted }.
+        Common errors: 403 not the master, 404 piece or map not found (also a map of another campaign), 400 an object piece,
+        409 "A peça já está neste mapa." / "Este mapa está arquivado." / "Não há um hex livre para a peça neste mapa." /
+        campaign paused or finished.
+        Related tools: list_campaign_maps (target mapId), list_map_tokens (mapTokenId), place_character_on_map,
+        move_map_token, list_map_npcs.
+        """)]
+    public static Task<CallToolResult> ChangePieceMap(
+        Roll6ApiClient api,
+        [Description(McpDocs.MAP_TOKEN_ID + " A character or NPC piece.")] long mapTokenId,
+        [Description("Target map (mapId from list_campaign_maps): an active map of the same campaign, other than the piece's.")] long mapId) =>
+        api.SendAsync(HttpMethod.Put, $"/api/maptoken/{mapTokenId}/map", new MapTokenMapInfo { MapId = mapId });
+
     [McpServerTool(Name = "move_map_token", Title = "Move piece", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [ApiOperation("PUT", "/api/maptoken/{id}/position")]
     [Description("""

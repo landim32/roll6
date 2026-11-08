@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canMove, canSetPosture, canTakeTurn, isOwnPiece, menuAllowed, shapeAt } from './mapInteraction';
+import { canChangeMap, canMove, canSetPosture, canTakeTurn, isOwnPiece, menuAllowed, shapeAt } from './mapInteraction';
 import type { MapInteractionContext } from './mapInteraction';
 import { CAMPAIGN_STATUS } from './campaignStatus';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
@@ -44,6 +44,20 @@ describe('isOwnPiece', () => {
     expect(isOwnPiece(WOLF, player())).toBe(true);
     expect(isOwnPiece(BORIN, player())).toBe(false);
     expect(isOwnPiece(GOBLIN, player())).toBe(false);
+  });
+});
+
+describe('canChangeMap', () => {
+  it('is the master’s, on character and NPC pieces of a campaign map', () => {
+    for (const token of [ARIA, BORIN, GOBLIN, WOLF]) expect(canChangeMap(token, master())).toBe(true);
+    expect(canChangeMap(CHEST, master())).toBe(false);
+    expect(canChangeMap(ARIA, master({ mapId: null }))).toBe(false);
+    expect(canChangeMap(ARIA, master({ canPlaceOwn: false }))).toBe(false);
+  });
+
+  it('is never a player’s, not even for his own character or commanded ally', () => {
+    expect(canChangeMap(ARIA, player())).toBe(false);
+    expect(canChangeMap(WOLF, player())).toBe(false);
   });
 });
 

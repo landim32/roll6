@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { useMapToken } from '../../hooks/useMapToken';
 import { useTurn } from '../../hooks/useTurn';
 import type { MapInteraction } from '../../hooks/useMapInteraction';
-import { canMove, canSetPosture, canTakeTurn, isOwnPiece } from '../../lib/mapInteraction';
+import { canChangeMap, canMove, canSetPosture, canTakeTurn, isOwnPiece } from '../../lib/mapInteraction';
 import { repeatedActionOf } from '../../lib/repeatedAction';
 import { hasEntries } from '../../lib/turnStatus';
 import { HexMenu } from './HexMenu';
@@ -22,7 +22,7 @@ export const MapHexMenu = ({ interaction }: MapHexMenuProps) => {
   const { setPosture } = useMapToken();
   const { entries: turnEntries } = useTurn();
   const { props, ctx, menu, menuToken, movement, overlay, closeMenu, setPickedHex, startTargeting } = interaction;
-  const { onPickToken, onDeleteToken, onEditNpc, onAct, onRepeated, onResetTurn } = props;
+  const { onPickToken, onDeleteToken, onEditNpc, onChangeMap, onAct, onRepeated, onResetTurn } = props;
   const actor = menuToken && {
     mapTokenId: menuToken.mapTokenId, name: menuToken.name, characterId: menuToken.characterId, mapNpcId: menuToken.mapNpcId,
   };
@@ -41,6 +41,7 @@ export const MapHexMenu = ({ interaction }: MapHexMenuProps) => {
           token={menuToken ? { name: menuToken.name, imageUrl: menuToken.upImageUrl } : null}
           canManage={ctx.canPlace}
           onEditNpc={menuToken && menuToken.mapNpcId !== null && (ctx.canPlace || isOwnPiece(menuToken, ctx)) ? () => onEditNpc(menuToken) : undefined}
+          onChangeMap={menuToken && canChangeMap(menuToken, ctx) ? () => onChangeMap(menuToken) : undefined}
           deleteLabel={menuToken && menuToken.mapNpcId !== null ? t('hexMenu.removeNpc') : undefined}
           onMove={menuToken && canMove(menuToken, ctx) ? () => movement.start(menuToken) : undefined}
           onAct={takesTurn && actor ? () => onAct(actor) : undefined}

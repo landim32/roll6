@@ -115,6 +115,18 @@ public class MapToken
         MoveTo(x, y);
     }
 
+    /// <summary>
+    /// The master takes the piece to another map (111): the same row on the new map and hex, facing the same way; a walk
+    /// point is forgotten. <paramref name="name"/> replaces the name when given (an NPC instance renumbered there).
+    /// </summary>
+    public void MoveToMap(long mapId, int x, int y, string? name = null)
+    {
+        MapId = mapId;
+        if (name != null)
+            Name = Guard.RequiredText(name, "name", 260);
+        MoveTo(x, y);
+    }
+
     /// <summary>Another library token for the same piece: position, facing, type and link are kept.</summary>
     public void ChangeToken(long tokenId)
     {

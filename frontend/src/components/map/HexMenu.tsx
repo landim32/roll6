@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '../ui/CharacterAvatar';
 import {
-  ArrowRepeatIcon, CrosshairIcon, HeartbreakIcon, MoveIcon, PencilIcon, PersonFillDownIcon, PersonStandingIcon, PlusIcon, SpeechIcon,
+  ArrowRepeatIcon, CrosshairIcon, HeartbreakIcon, MapIcon, MoveIcon, PencilIcon, PersonFillDownIcon, PersonStandingIcon, PlusIcon, SpeechIcon,
   SwapIcon, TrashIcon, UndoIcon,
 } from '../ui/icons';
 import type { IconProps } from '../ui/icons';
@@ -40,6 +40,8 @@ interface HexMenuProps {
   canManage?: boolean;
   /** "Editar NPC" (051): the instance form of an NPC piece; the master's, and since 071 the commander's of an ally. */
   onEditNpc?: () => void;
+  /** "Mudar de mapa" (111): the master takes a character/NPC piece to another map of the campaign. */
+  onChangeMap?: () => void;
   /** Text of the destructive item: "Excluir" for tokens, "Retirar do mapa" for NPC pieces (051). */
   deleteLabel?: string;
   onClose: () => void;
@@ -65,7 +67,7 @@ const MARGIN = 8;
  */
 export const HexMenu = ({
   left, top, token = null, onAdd, onChange, onDelete, onMove, onAct, onActOn, onRepeated, repeatedActive = false, onResetTurn, posture = null, onPosture, canManage = true,
-  onEditNpc, deleteLabel, onClose,
+  onEditNpc, onChangeMap, deleteLabel, onClose,
 }: HexMenuProps) => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -193,6 +195,12 @@ export const HexMenu = ({
         <button type="button" className="stm-float-menu-item" role="menuitem" onClick={choose(onEditNpc)}>
           <span>{t('hexMenu.editNpc')}</span>
           <PencilIcon size={18} />
+        </button>
+      )}
+      {token && onChangeMap && (
+        <button type="button" className="stm-float-menu-item" role="menuitem" onClick={choose(onChangeMap)}>
+          <span>{t('hexMenu.changeMap')}</span>
+          <MapIcon size={18} />
         </button>
       )}
       {!canManage ? null : token ? (

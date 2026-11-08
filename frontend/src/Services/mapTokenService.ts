@@ -1,5 +1,6 @@
 import type {
-  MapTokenCharacterInsertInfo, MapTokenInfo, MapTokenInsertInfo, MapTokenPositionInfo, MapTokenPostureInfo, MapTokenTokenInfo,
+  MapTokenCharacterInsertInfo, MapTokenInfo, MapTokenInsertInfo, MapTokenMapInfo, MapTokenMapResultInfo, MapTokenPositionInfo,
+  MapTokenPostureInfo, MapTokenTokenInfo,
 } from '../types/mapToken';
 import { API_URL, getHeaders, handleApiResponse } from './apiHelpers';
 import type { WalkWrite } from '../lib/walkSync';
@@ -66,6 +67,14 @@ class MapTokenService {
   /** Standing, down or out of combat (031): character owner or master; NPC pieces only the master. */
   async setPosture(id: number, data: MapTokenPostureInfo): Promise<MapTokenInfo> {
     return this.send('PUT', `/${id}/posture`, data);
+  }
+
+  /** Takes a character/NPC piece to the same place of another map of the campaign (111, master only). */
+  async changeMap(id: number, data: MapTokenMapInfo): Promise<MapTokenMapResultInfo> {
+    const response = await fetch(`${API_BASE}/${id}/map`, {
+      method: 'PUT', headers: getHeaders(true), body: JSON.stringify(data),
+    });
+    return this.handleResponse<MapTokenMapResultInfo>(response);
   }
 
   /** Removes the piece from the map (the library token is kept). */

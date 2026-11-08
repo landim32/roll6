@@ -14,6 +14,8 @@ import { PartyPanel } from '../components/map/PartyPanel';
 import { TopMenu } from '../components/menu/TopMenu';
 import { ActModal } from '../components/modals/ActModal';
 import { RepeatedActionModal } from '../components/modals/RepeatedActionModal';
+import { ChangeMapModal } from '../components/modals/ChangeMapModal';
+import type { TableMapInfo } from '../types/campaign';
 import type { RepeatedTarget } from '../components/modals/RepeatedActionModal';
 import { CampaignCharacterModal } from '../components/modals/CampaignCharacterModal';
 import { GridSizeModal } from '../components/modals/GridSizeModal';
@@ -93,7 +95,9 @@ export const MainPage = () => {
   const [repeating, setRepeating] = useState<RepeatedTarget | null>(null);
   const [toReset, setToReset] = useState<{ mapTokenId: number; name: string } | null>(null);
   const { reset: resetTurn } = useTurn();
-  const { addToken, changeToken, placeCharacter, deleteToken } = useMapToken();
+  const { addToken, changeToken, placeCharacter, deleteToken, changeMap } = useMapToken();
+  /** Piece whose "Mudar de mapa" window is open (111). */
+  const [changingMap, setChangingMap] = useState<MapTokenInfo | null>(null);
   const { t } = useTranslation();
   const { canRead: chatReadable, layoutMode } = useChat();
   // Without access to a campaign's chat the table is only the map, whatever was chosen before.
@@ -181,6 +185,20 @@ export const MainPage = () => {
     }
   };
 
+  /** "Mudar de mapa" (111): the piece leaves this map; the toast offers to open where it went. */
+  const onChooseMap = async (map: TableMapInfo) => {
+    if (!changingMap) return;
+    try {
+      const result = await changeMap(changingMap, map.mapId);
+      toast.success(t(result.adjusted ? 'toast.pieceMapAdjusted' : 'toast.pieceMapChanged', { name: result.mapToken.name, map: map.name }), {
+        action: { label: t('toast.openMap'), onClick: () => navigate(`/map/${encodeURIComponent(map.slug)}`) },
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.unknownError'));
+      throw err;
+    }
+  };
+
   const tokenPickTitle = tokenPick?.kind === 'character'
     ? t('mapTokens.chooseCharacterToken', { name: tokenPick.participation.characterName })
     : undefined;
@@ -207,10 +225,11 @@ export const MainPage = () => {
                 onConfirmTransfer={setTransferring}
                 onDeleteToken={setToDelete}
                 onEditNpc={setEditingInstance}
+                onChangeMap={setChangingMap}
                 onAct={setActing}
                 onRepeated={setRepeating}
                 onResetTurn={setToReset}
-                picking={tokenPick !== null || toDelete !== null || acting !== null || repeating !== null}
+                picking={tokenPick !== null || toDelete !== null || acting !== null || repeating !== null || changingMap !== null}
               />
             </Suspense>
           ) : (
@@ -219,10 +238,11 @@ export const MainPage = () => {
               onConfirmTransfer={setTransferring}
               onDeleteToken={setToDelete}
               onEditNpc={setEditingInstance}
+              onChangeMap={setChangingMap}
               onAct={setActing}
               onRepeated={setRepeating}
               onResetTurn={setToReset}
-              picking={tokenPick !== null || toDelete !== null || acting !== null || repeating !== null}
+              picking={tokenPick !== null || toDelete !== null || acting !== null || repeating !== null || changingMap !== null}
             />
           )}
           <PartyPanel onOpen={(participation, mode) => setEditing({ participation, mode })}
@@ -285,6 +305,7 @@ export const MainPage = () => {
       />
       <ActModal open={acting !== null} piece={acting} onClose={() => setActing(null)} />
       <RepeatedActionModal piece={repeating} onClose={() => setRepeating(null)} />
+      <ChangeMapModal piece={changingMap} onClose={() => setChangingMap(null)} onChoose={onChooseMap} />
       <ConfirmModal
         open={toReset !== null}
         onOpenChange={(o) => { if (!o) setToReset(null); }}
