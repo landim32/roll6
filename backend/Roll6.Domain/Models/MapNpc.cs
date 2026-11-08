@@ -106,6 +106,19 @@ public class MapNpc
         return true;
     }
 
+    /// <summary>
+    /// The instance goes to another map with its piece (111): everything it is (vitals, status, posture, Deslocamento,
+    /// repeated action, turn entries) stays; only the name may change (numbered on that map).
+    /// </summary>
+    public void MoveToMap(long mapId, string name)
+    {
+        if (IsRemoved)
+            throw new KeyNotFoundException("NPC do mapa não encontrado.");
+        MapId = mapId;
+        Name = Guard.RequiredText(name, "name", MAX_NAME);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     /// <summary>Starts with the NPC's name, status and posture and the current values at the NPC's totals.</summary>
     public static MapNpc FromNpc(long mapId, Npc npc)
     {

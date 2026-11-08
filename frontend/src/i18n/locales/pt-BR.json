@@ -821,7 +821,15 @@
     "resetTurn": "Resetar turno",
     "posture": "Postura",
     "editNpc": "Editar NPC",
+    "changeMap": "Mudar de mapa",
     "removeNpc": "Retirar do mapa"
+  },
+  "changeMap": {
+    "title": "Mudar {{name}} de mapa",
+    "hint": "A peça vai para o mesmo lugar no mapa escolhido (ou para o hex livre mais próximo).",
+    "noOtherMap": "Não há outro mapa ativo nesta campanha.",
+    "characters_one": "{{count}} personagem",
+    "characters_other": "{{count}} personagens"
   },
   "repeated": {
     "title": "Ação repetida — {{name}}",
@@ -1202,6 +1210,9 @@
     "tokenMoved": "{{name}} movido.",
     "mapTokenAdded": "{{name}} colocado no mapa.",
     "mapTokenChanged": "Token de {{name}} alterado.",
+    "pieceMapChanged": "{{name}} foi para {{map}}.",
+    "pieceMapAdjusted": "{{name}} foi para {{map}}, num hex próximo (o lugar estava ocupado).",
+    "openMap": "Abrir mapa",
     "mapTokenDeleted": "{{name}} excluído do mapa.",
     "turnFinished": "Turno {{no}} finalizado.",
     "actionRecorded": "Ação registrada.",

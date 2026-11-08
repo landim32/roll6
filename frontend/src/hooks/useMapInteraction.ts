@@ -51,6 +51,8 @@ export interface MapInteractionProps {
   onDeleteToken: (target: { mapTokenId: number; name: string; mapNpcId: number | null; posture?: number | null }) => void;
   /** "Editar NPC" on an NPC piece (051): the page opens the instance form. */
   onEditNpc: (piece: MapTokenInfo) => void;
+  /** "Mudar de mapa" on a character/NPC piece (111): the page opens the map picker. */
+  onChangeMap: (piece: MapTokenInfo) => void;
   /** "Agir" on a piece (the page opens the action modal, 016). */
   onAct: (target: ActTarget) => void;
   /** "Ação repetida…" on a piece (099): the page opens the repeated-action window. */

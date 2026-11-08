@@ -80,7 +80,9 @@ public static class Roll6Guide
         - **A character stands on one map at most**, and that map is the one its player sees in the app: there is no map
           shared by the whole table, and a party may be split across maps. Only the master places characters
           (`place_character_on_map`); a character on another map is refused naming that map until the call says
-          `transfer: true`, which takes the same piece there and makes the player's screen follow it. Where each character
+          `transfer: true`, which takes the same piece there and makes the player's screen follow it. To take a piece
+          already on a map elsewhere **keeping its place**, the master calls `change_piece_map` (characters and NPCs: same
+          hex and facing, or the nearest free hex — `adjusted`; NPC instances keep everything). Where each character
           stands comes as `mapId`/`mapName` in `list_campaign_characters` (the master sees all; a player only his own). A
           character off every map still acts from the chat. Maps are active (1) or archived (2); a map with characters
           can't be archived, and deleting one leaves its characters off every map. NPCs have no such rule.
@@ -141,7 +143,8 @@ public static class Roll6Guide
         - Types: `1 Character` (a campaign participation, blue), `2 Npc` (an NPC occurrence, red), `4 Object`
           (anything else, gray).
         - Master: `add_object_to_map`, `place_character_on_map` (a participation; each character on one map at most),
-          `place_npc_on_map` (creates the occurrence and its piece), `change_map_token_image`, `update_map_token`,
+          `place_npc_on_map` (creates the occurrence and its piece), `change_piece_map` (a character/NPC piece to
+          another map, same place), `change_map_token_image`, `update_map_token`,
           `delete_map_token`. Everyone at the table: `list_map_tokens`, `list_map_npcs`.
         - `move_map_token` moves and turns a piece (master: any piece; player: his own approved character).
 

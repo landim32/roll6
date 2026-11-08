@@ -146,6 +146,22 @@ public class MapTokenTests
     }
 
     [Fact]
+    public void MoveToMap_KeepsLookAndForgetsTheWalk()
+    {
+        var piece = MapToken.PlaceCharacter(30, 5, 70, "Aria", 4, 4);
+        piece.Face(3);
+        piece.WalkTo(285, 315, 1);
+
+        piece.MoveToMap(31, 4, 4);
+
+        (piece.MapId, piece.X, piece.Y, piece.Look, piece.Name, piece.TokenId).Should().Be((31L, 4, 4, 3, "Aria", 5L));
+        (piece.WalkX, piece.WalkY, piece.WalkYaw).Should().Be(((double?)null, (double?)null, (double?)null));
+
+        piece.MoveToMap(32, 1, 2, "Aria 2");
+        (piece.MapId, piece.Name).Should().Be((32L, "Aria 2"));
+    }
+
+    [Fact]
     public void MoveTo_ClearsTheWalkPoint()
     {
         var piece = new MapToken();

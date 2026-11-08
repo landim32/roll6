@@ -119,6 +119,24 @@ public class MapNpcTests
     }
 
     [Fact]
+    public void MoveToMap_ChangesMapAndNameOnly()
+    {
+        var instance = new MapNpc { MapNpcId = 9, MapId = 30, NpcId = 8, Name = "Guarda 2", CurrentLife = 3, Status = "ferido", CurrentMove = 4 };
+
+        instance.MoveToMap(31, "Guarda 3");
+
+        (instance.MapId, instance.Name, instance.CurrentLife, instance.Status, instance.CurrentMove).Should().Be((31L, "Guarda 3", 3, "ferido", 4));
+    }
+
+    [Fact]
+    public void MoveToMap_RemovedInstance_IsNotFound()
+    {
+        var instance = new MapNpc { MapNpcId = 9, MapId = 30, Name = "Guarda", RemovedAt = DateTime.UtcNow };
+
+        FluentActions.Invoking(() => instance.MoveToMap(31, "Guarda")).Should().Throw<KeyNotFoundException>();
+    }
+
+    [Fact]
     public void NextName_FitsTheLimit()
     {
         var longName = new string('x', MapNpc.MAX_NAME);

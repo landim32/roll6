@@ -81,6 +81,43 @@ public class OccupancyTests
     }
 
     [Fact]
+    public void NearestFree_FreePoint_IsThePointItself()
+    {
+        Occupancy.Build(Array.Empty<PieceShape>()).NearestFree(2, 6, 0, 1, 10, 8).Should().Be((2, 6));
+    }
+
+    [Fact]
+    public void NearestFree_TakenPoint_IsANeighbourWithTiesUpThenLeft()
+    {
+        var occupancy = Occupancy.Build(new[] { new PieceShape(1, 5, 3, 0, 1) });
+
+        var found = occupancy.NearestFree(5, 3, 0, 1, 10, 8);
+
+        found.Should().NotBeNull();
+        HexGrid.Distance(5, 3, found!.Value.X, found.Value.Y).Should().Be(1);
+        found.Should().Be((5, 2));
+    }
+
+    [Fact]
+    public void NearestFree_PointOutsideTheGrid_IsTheNearestHexInside()
+    {
+        var found = Occupancy.Build(Array.Empty<PieceShape>()).NearestFree(10, 8, 0, 1, 4, 4);
+
+        found.Should().Be((3, 3));
+    }
+
+    [Fact]
+    public void NearestFree_BigShape_FitsWholeAndFullGridIsNull()
+    {
+        var found = Occupancy.Build(Array.Empty<PieceShape>()).NearestFree(0, 0, 0, 7, 10, 8);
+        found.Should().NotBeNull();
+        foreach (var (x, y) in HexGrid.Footprint(found!.Value.X, found.Value.Y, 0, 7))
+            HexGrid.IsInsideGrid(x, y, 10, 8).Should().BeTrue();
+
+        Occupancy.Build(new[] { new PieceShape(1, 0, 0, 0, 1) }).NearestFree(0, 0, 0, 1, 1, 1).Should().BeNull();
+    }
+
+    [Fact]
     public void Overlaps_NoneWhenEveryHexHasOnePiece()
     {
         Occupancy.Build(new[] { new PieceShape(1, 1, 1, 0, 1), new PieceShape(2, 3, 1, 0, 1) }).Overlaps().Should().BeEmpty();

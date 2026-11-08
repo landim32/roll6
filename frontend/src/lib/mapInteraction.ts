@@ -63,6 +63,14 @@ export const canSetPosture = (token: MapTokenInfo, ctx: MapInteractionContext): 
   // 109: an object's posture is the master's alone.
   && (token.tokenType === MAP_TOKEN_TYPE.object ? ctx.canPlace : ctx.canPlace || isOwnPiece(token, ctx));
 
+/**
+ * "Mudar de mapa" (111): only the master (who may edit the map — `canPlace` includes the campaign status), on a campaign
+ * map, for character and NPC pieces; objects stay where they are.
+ */
+export const canChangeMap = (token: MapTokenInfo, ctx: MapInteractionContext): boolean =>
+  ctx.mapId !== null && ctx.canPlace && ctx.canPlaceOwn
+  && (token.tokenType === MAP_TOKEN_TYPE.character || token.tokenType === MAP_TOKEN_TYPE.npc);
+
 /** Players only get a menu (Mover / Agir / Resetar turno / Postura) on the pieces they may use; the master everywhere. */
 export const menuAllowed = (piece: MapTokenInfo | undefined, ctx: MapInteractionContext): boolean =>
   ctx.canPlace || (!!piece && (canMove(piece, ctx) || canTakeTurn(piece, ctx) || canSetPosture(piece, ctx)));

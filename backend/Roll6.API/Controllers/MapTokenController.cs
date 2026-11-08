@@ -78,6 +78,24 @@ public class MapTokenController : ApiControllerBase
         }
     }
 
+    /// <summary>
+    /// Takes a character or NPC piece to another active map of the campaign (111), to the same hex and facing or the free
+    /// hex nearest to it. Master only; no movement is recorded.
+    /// </summary>
+    [HttpPut("{id:long}/map")]
+    [ProducesResponseType(typeof(MapTokenMapResultInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ChangeMap(long id, [FromBody] MapTokenMapInfo info)
+    {
+        try
+        {
+            return Ok(await _mapTokenService.ChangeMapAsync(CurrentUserId, id, info));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     /// <summary>Another library token for the piece; position, facing and link are kept.</summary>
     [HttpPut("{id:long}/token")]
     [ProducesResponseType(typeof(MapTokenInfo), StatusCodes.Status200OK)]

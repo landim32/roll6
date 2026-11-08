@@ -138,6 +138,18 @@ export interface MapTokenPostureInfo {
   posture: Posture;
 }
 
+/** "Mudar de mapa" (111): the target map of the same campaign. */
+export interface MapTokenMapInfo {
+  mapId: number;
+}
+
+/** The piece on the target map; `adjusted` when its former hex didn't fit there and it went to the nearest free one. */
+export interface MapTokenMapResultInfo {
+  mapToken: MapTokenInfo;
+  fromMapId: number;
+  adjusted: boolean;
+}
+
 export interface MapTokenTokenInfo {
   tokenId: number;
 }

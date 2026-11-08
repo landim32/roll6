@@ -53,6 +53,19 @@ public sealed class MapLayout
     public (int X, int Y) FirstFree(int look, int space) =>
         Occupancy.FirstFree(look, space, Columns, Rows)
             ?? throw new ConflictException("Não há um hex livre para a peça neste mapa.");
+
+    /// <summary>
+    /// Where a piece arriving from another map goes (111): its own hex when the whole shape fits there, else the free hex
+    /// nearest to it (adjusted), or 409 when the map has no room.
+    /// </summary>
+    public (int X, int Y, bool Adjusted) PlaceNear(int x, int y, int look, int space)
+    {
+        if (Occupancy.Fits(HexGrid.Footprint(x, y, look, space), Columns, Rows, null) == FitResult.Ok)
+            return (x, y, false);
+        var found = Occupancy.NearestFree(x, y, look, space, Columns, Rows)
+            ?? throw new ConflictException("Não há um hex livre para a peça neste mapa.");
+        return (found.X, found.Y, true);
+    }
 }
 
 /// <summary>

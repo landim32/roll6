@@ -10,7 +10,7 @@ import { affectsMap, applyTokenEvent } from '../lib/realtimeEvents';
 import { TABLE_EVENT } from '../types/realtime';
 import type { CampaignCharacterInfo } from '../types/campaignCharacter';
 import { MAP_TOKEN_TYPE } from '../types/mapToken';
-import type { MapTokenInfo, Posture } from '../types/mapToken';
+import type { MapTokenInfo, MapTokenMapResultInfo, Posture } from '../types/mapToken';
 import type { TokenInfo } from '../types/token';
 
 interface MapTokenContextType {
@@ -37,6 +37,8 @@ interface MapTokenContextType {
   setPosture: (mapTokenId: number, posture: Posture) => Promise<MapTokenInfo>;
   /** Removes the piece from the map (the library token is kept). */
   deleteToken: (mapTokenId: number) => Promise<void>;
+  /** "Mudar de mapa" (111): the master takes a character/NPC piece to the same place of another campaign map. */
+  changeMap: (piece: MapTokenInfo, mapId: number) => Promise<MapTokenMapResultInfo>;
   clearError: () => void;
 }
 
@@ -151,11 +153,18 @@ export const MapTokenProvider = ({ children }: { children: ReactNode }) => {
   const deleteToken = useCallback((mapTokenId: number) =>
     run(() => mapTokenService.remove(mapTokenId)), [run]);
 
+  const changeMap = useCallback(async (piece: MapTokenInfo, targetMapId: number) => {
+    const result = await run(() => mapTokenService.changeMap(piece.mapTokenId, { mapId: targetMapId }));
+    // The party cards tell which map each character is on (108).
+    if (piece.tokenType === MAP_TOKEN_TYPE.character) void refreshParty();
+    return result;
+  }, [run, refreshParty]);
+
   const clearError = useCallback(() => setError(null), []);
 
   const value: MapTokenContextType = {
     mapTokens, canPlace, canPlaceOwn, loading, error, refresh, addToken, placeCharacter, moveToken, changeToken, setPosture, deleteToken,
-    clearError,
+    changeMap, clearError,
   };
   return <MapTokenContext.Provider value={value}>{children}</MapTokenContext.Provider>;
 };

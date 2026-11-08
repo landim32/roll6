@@ -13,6 +13,9 @@ public interface IMapTokenService
     Task<MapTokenInfo> SetPostureAsync(long userId, long mapTokenId, MapTokenPostureInfo info);
     Task DeleteAsync(long userId, long mapTokenId);
 
+    /// <summary>The master takes a character or NPC piece to the same hex of another map of the campaign (111).</summary>
+    Task<MapTokenMapResultInfo> ChangeMapAsync(long userId, long mapTokenId, MapTokenMapInfo info);
+
     /// <summary>Whether the user may walk the piece now (069): the hub's check before relaying a walk sample.</summary>
     Task<bool> CanWalkAsync(long userId, long mapTokenId, long campaignId);
 
