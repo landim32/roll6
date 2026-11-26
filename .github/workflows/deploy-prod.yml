@@ -60,7 +60,9 @@ jobs:
         run: |
           dotnet restore Roll6.sln
           dotnet build Roll6.sln --configuration Release --no-restore
-          dotnet test Roll6.sln --configuration Release --no-build
+          # Roll6.Console roda só no Windows do usuário (fake-claude.cmd, caminhos com \) e não vai para o
+          # cluster: os testes dele ficam fora do runner Linux.
+          dotnet test Roll6.sln --configuration Release --no-build --filter "FullyQualifiedName!~Roll6.Tests.Console"
 
       - name: Setup Node
         uses: actions/setup-node@v4
