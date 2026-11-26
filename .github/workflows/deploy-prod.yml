@@ -5,7 +5,7 @@ name: Deploy Production
 # Sob demanda (Actions › Deploy Production › Run workflow); pushes não publicam.
 # A entrada pública (Cloudflare Tunnel + ingress-nginx compartilhados) é infra do cluster, aplicada
 # pelo admin; esta pipeline só toca no namespace roll6 (credencial: ServiceAccount roll6-deployer).
-# O SPA sai na imagem roll6-web (frontend/Dockerfile) — não depende mais do emagine-deploy.
+# O SPA sai na imagem roll6-web (frontend/Dockerfile).
 # O job `manifests` valida os manifestos de deploy/k8s/ (roda mesmo com skip_tests).
 #
 # Segurança: secrets entram nos passos só por `env:` (nunca interpolados em `run:`), nenhum passo

@@ -40,8 +40,8 @@ cliente → Cloudflare (HTTPS, Always Use HTTPS, Redirect Rule do www)
   (inclui `/api/meta/head…` por dentro dele), `sw.js`/`manifest.webmanifest`/`version.json` sem cache e
   `/healthz`. Os Services `api` e `mcp` (`roll6/web-upstreams.yaml`) são apelidos para esse nginx resolver
   `proxy_pass http://api:8080`/`http://mcp:8080`.
-- O SPA de produção sai na imagem `roll6-web`; depois da troca o `emagine-deploy` (`build-roll6.ps1`) deixa
-  de ser usado para o Roll6.
+- O SPA de produção sai na imagem `roll6-web`; o `emagine-deploy` (`build-roll6.ps1`) não é mais usado para o
+  Roll6. A troca na Cloudflare foi feita em 2026-11-26.
 
 ## Secrets
 
@@ -138,10 +138,10 @@ registro A/AAAA (proxied) com o IP anotado. O efeito é quase imediato.
 
 ## Desligar o ambiente antigo
 
-Só depois da troca validada: no servidor antigo, `docker compose --env-file .env.prod -f docker-compose-prod.yml down`
-em `/opt/roll6`; tirar o `roll6.site` do nginx compartilhado e do `emagine-deploy` (`builds/roll6`,
-`build-roll6.ps1`); remover do GitHub os secrets `PROD_SSH_*`; apagar `docker-compose-prod.yml` e
-`.env.prod.example` deste repositório.
+`docker-compose-prod.yml` e `.env.prod.example` já saíram deste repositório. Falta, no servidor antigo e depois de
+alguns dias sem precisar reverter: `docker compose --env-file .env.prod -f docker-compose-prod.yml down` em
+`/opt/roll6`; tirar o `roll6.site` do nginx compartilhado e do `emagine-deploy` (`builds/roll6`, `build-roll6.ps1`);
+remover do GitHub os secrets `PROD_SSH_*`.
 
 ## Operação
 
