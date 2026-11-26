@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-The backend (feature `001-backend-core-entities`) is implemented in `backend/`; the frontend does not exist yet. There is no PostgreSQL or Docker on the dev machine, so migrations are generated but must be applied against a reachable database (`dotnet ef database update`, see below). Image URLs need S3 credentials (standard AWS env vars/profile) because reads generate presigned URLs.
+The backend (feature `001-backend-core-entities`) is implemented in `backend/`; the frontend does not exist yet. There is no PostgreSQL on the dev machine (Docker runs only inside WSL2, see the `wsl-docker` skill), so migrations are generated but must be applied against a reachable database (`dotnet ef database update`, see below). Image URLs need S3 credentials (standard AWS env vars/profile) because reads generate presigned URLs.
 
 ## Product intent
 
@@ -25,7 +25,7 @@ Keep it simple — resist adding Roll20 features (dynamic lighting, character sh
 - New entities MUST be built with the `dotnet-architecture` (backend) and `react-architecture` (frontend) skills — don't hand-roll those patterns.
 - Frontend: Bootstrap 5 (not Tailwind/shadcn, even though the `ux-designer` agent defaults to them), Context API only (no Redux/Zustand), Fetch API for new services, `interface` over `type`, `VITE_` env vars.
 - Directory casing is load-bearing: `Contexts/`, `Services/` uppercase; `hooks/`, `types/` lowercase.
-- Never run `docker` / `docker compose` locally.
+- Docker / `docker compose` run locally **only through WSL2** (Docker Engine in Ubuntu; no Docker Desktop, no `docker` on Windows) — follow the `wsl-docker` skill.
 - PostgreSQL via EF Core only; snake_case tables/columns, `ClientSetNull` deletes (never Cascade).
 - Auth token is stored in localStorage (never cookies); sensitive controllers need `[Authorize]`.
 
@@ -386,17 +386,18 @@ The project reached **1.0.0** on 2026-10-22 by the user's request: the productio
 
 | | Development | Homolog (`ASPNETCORE_ENVIRONMENT=Docker`) | Production |
 |---|---|---|---|
-| Runs | `dotnet run` locally | `docker-compose.yml` | `docker-compose-prod.yml` on the server |
-| Config | `appsettings.Development.json` (git-ignored; copy `appsettings.Template.json` and fill it) | `appsettings.Docker.json` (empty) + `.env` | `appsettings.Production.json` (non-secrets) + `.env.prod` (secrets only) |
+| Runs | `dotnet run` locally | `docker-compose.yml` | Kubernetes `do-nyc2-emagine-k8s`, namespace `roll6` (`deploy/k8s/`) |
+| Config | `appsettings.Development.json` (git-ignored; copy `appsettings.Template.json` and fill it) | `appsettings.Docker.json` (empty) + `.env` | `appsettings.Production.json` (non-secrets) + ConfigMap `roll6-api-env` + Secret `roll6-api-secrets` (created by the pipeline) |
 | Migrations | manual `dotnet ef database update` | applied on startup | applied on startup |
-| SSL / Swagger | dev cert / on | none / on | Cloudflare + the server's reverse proxy (shared `emagine-network`) / off |
+| SSL / Swagger | dev cert / on | none / on | Cloudflare → tunnel `emagine-k8s` → shared ingress-nginx / off |
 
 - Settings reach the app only through the default providers with the `__` convention (`Jwt__Secret`, `S3__BucketName`, `ConnectionStrings__Roll6Context`); AWS credentials use the SDK's `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`. Don't add `AddEnvironmentVariables("PREFIX")`.
-- `.env` and `.env.prod` are git-ignored; keep `.env.example` / `.env.prod.example` in sync when adding settings, plus the heredoc in `.github/workflows/deploy-prod.yml` (runs **only on demand** — `workflow_dispatch`, always deploying `main`; pushes don't deploy; SSH deploy to `/opt/roll6`, one at a time). Workflows copied from AvaBot: `version-tag.yml` (GitVersion, `GitVersion.yml`, tags `vX.Y.Z` on `main`; see "Versioning and commit messages") and `create-release.yml` (GitHub release when major/minor changes).
-- Production secrets (GitHub): `PROD_SSH_HOST`/`USER`/`PASSWORD`(/`PORT`), `ROLL6_CONNECTION_STRING` (external PostgreSQL), `ROLL6_JWT_SECRET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`; the S3 folder is fixed (`roll6`) in the compose file.
+- `.env` is git-ignored; keep `.env.example` in sync when adding settings. A new production secret goes into **both** lists of `.github/workflows/deploy-prod.yml` ("Validar secrets" when required, and "Secrets do cluster" as `Key__Name:GITHUB_SECRET`); non-secret settings into `appsettings.Production.json` or `deploy/k8s/roll6/api-configmap.yaml`.
+- Production deploy (`deploy-prod.yml`, **only on demand** — `workflow_dispatch` with `ref` (default `main`) and `skip_tests`, one at a time): tests → images `ghcr.io/landim32/roll6-api|roll6-mcp|roll6-web:sha-<commit>` → `kubectl apply -k deploy/k8s/roll6` + rollout, with the ServiceAccount `roll6-deployer` (`KUBECONFIG` secret). The SPA ships in `roll6-web` (`frontend/Dockerfile` + `nginx.conf`, the same as homolog; the Services `api`/`mcp` in `web-upstreams.yaml` let that nginx resolve its upstreams and the SSI). `roll6-api` must stay at **1 replica** (in-memory SignalR groups, console queue, GM runs). Bootstrap, Cloudflare switch and operations in `deploy/k8s/README.md` (`k8s-deploy` skill). Until the Cloudflare switch is done, `roll6.site` is still served by the old server (`docker-compose-prod.yml`, `.env.prod.example`, shared nginx + `emagine-deploy`) — remove those after the switch. Workflows copied from AvaBot: `version-tag.yml` (GitVersion, `GitVersion.yml`, tags `vX.Y.Z` on `main`; see "Versioning and commit messages") and `create-release.yml` (GitHub release when major/minor changes).
+- Production secrets (GitHub): `KUBECONFIG` (environment `production`), `GHCR_PULL_USER`/`GHCR_PULL_TOKEN`, `ROLL6_CONNECTION_STRING` (external PostgreSQL, reachable from the cluster), `ROLL6_JWT_SECRET` (≥ 32 bytes), `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`; the S3 folder (`roll6`) is in `appsettings.Production.json`. Health: API `/health` (database, outside `/api`, not logged), MCP `/health`, SPA nginx `/healthz`.
 - Startup migrations are toggled by `Database:ApplyMigrationsOnStartup`.
-- Docker must not be run on the dev machine (constitution); compose files are for homolog/prod hosts.
-- Web Push (043): generate the VAPID pair once (`npx web-push generate-vapid-keys`) and set the GitHub secrets `ROLL6_VAPID_PUBLIC_KEY` / `ROLL6_VAPID_PRIVATE_KEY` (the deploy writes them to `.env.prod`); without them notifications stay off.
+- Docker on the dev machine runs only inside WSL2 (`wsl-docker` skill); the compose files target homolog/prod hosts.
+- Web Push (043): generate the VAPID pair once (`npx web-push generate-vapid-keys`) and set the GitHub secrets `ROLL6_VAPID_PUBLIC_KEY` / `ROLL6_VAPID_PRIVATE_KEY` (the deploy writes them to the Secret `roll6-api-secrets`); without them notifications stay off.
 - Installable app (042): the nginx in front of the SPA must serve `/sw.js` with `Cache-Control: no-cache` (+ `Service-Worker-Allowed: /`) and `/manifest.webmanifest` as `application/manifest+json` (no-cache) — `frontend/nginx.conf` does; the production shared nginx needs the same two `location =` blocks (`specs/042-pwa-install/quickstart.md`).
 - The `web` service (`frontend/Dockerfile`: Node build → nginx) serves the SPA built with `VITE_API_URL=""` and proxies `/api` and `/hubs` (WebSocket upgrade, long timeouts) to `api:8080` and `/mcp` (no buffering) to `mcp:8080` (`frontend/nginx.conf`), so homolog/prod are same-origin and need no CORS (CORS stays Development-only). Homolog: SPA on `WEB_PORT` (8080), API/Swagger on `APP_PORT` (5000), MCP on `MCP_PORT` (5100). Production (like AvaBot): no published ports, no database container and no `web` container — only `roll6-api` and `roll6-mcp`, both on the external `emagine-network`. The server's shared nginx (behind Cloudflare; certificate `roll6.site.pem`/`.key` in `/root/emagine-secrets/SSL`) serves the SPA built with `npm run build` and proxies `/api`, `/hubs` (WebSocket) to `roll6-api:8080` and `/mcp` (no buffering) to `roll6-mcp:8080`. Its `location /` needs `try_files $uri $uri/ /index.html;` **and `ssi on;`** (040, link previews; homolog's `frontend/nginx.conf` has both) so `/campaign/:slug` and `/map/:slug` load the SPA (homolog's `frontend/nginx.conf` already does). `frontend/.env.production` (committed, `VITE_API_URL=` empty) wins over `.env`/`.env.local` in `vite build`, so any build machine produces a same-origin bundle. PostgreSQL is external (`ROLL6_CONNECTION_STRING`).
 

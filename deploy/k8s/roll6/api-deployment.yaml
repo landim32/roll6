@@ -1,0 +1,78 @@
+# API do Roll6 (.NET 8, porta 8080). As migrations rodam no startup (Database:ApplyMigrationsOnStartup):
+# a startupProbe dá até 5 min para a porta abrir. Rolling update sem queda: o pod novo só recebe tráfego
+# quando /health responde (inclui o banco); o antigo segue atendendo até lá.
+#
+# replicas: 1 OBRIGATÓRIO. A API guarda estado em memória numa única instância: grupos do SignalR
+# (TableConnections), fila de agentes do console (AnimationConnections), turnos em processamento, execuções
+# do Modo GM e as filas de notificação. Mais de uma réplica quebra o tempo real e o console.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: roll6-api
+  labels:
+    app: roll6-api
+spec:
+  replicas: 1
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: roll6-api
+  template:
+    metadata:
+      labels:
+        app: roll6-api
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: api
+          # Tag definida pela pipeline (kustomization.yaml → images)
+          image: ghcr.io/landim32/roll6-api
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: roll6-api-env
+            - secretRef:
+                name: roll6-api-secrets
+          # TCP: só espera a porta abrir (cobre migrations no startup: 5 s × 60 = 5 min).
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          # HTTP /health (Program.cs): 200 quando o banco responde, 503 quando não.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          # Sem banco na liveness: uma oscilação do banco não deve reiniciar o pod.
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          # Uploads de até 20 MB (modelos .glb), imagens de prévia em SkiaSharp e cache de 32 MB.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            runAsNonRoot: true
+            # UID do usuário `app` das imagens oficiais do .NET 8 (o kubelet exige UID numérico).
+            runAsUser: 1654
+            allowPrivilegeEscalation: false

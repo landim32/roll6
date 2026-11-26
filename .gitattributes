@@ -4,3 +4,6 @@
 *.jpg binary
 *.jpeg binary
 *.webp binary
+
+# Kubernetes (deploy/k8s): scripts always with LF
+*.sh text eol=lf

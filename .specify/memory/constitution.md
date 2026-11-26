@@ -1,8 +1,13 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 3.0.0 → 4.0.0
-Bump rationale: MAJOR — Principle VII redefined: positions are now persisted as column/row
+Version change: 4.0.0 → 4.1.0
+Bump rationale: MINOR — Principle II: Docker may now run on the dev machine, through the
+Docker Engine inside WSL2 (skill `wsl-docker`); there is still no Docker Desktop nor a
+`docker` binary on Windows.
+
+Previous:
+- 3.0.0 → 4.0.0 — Bump rationale: MAJOR — Principle VII redefined: positions are now persisted as column/row
 (`x`, `y`) in the "odd-q" offset layout instead of axial `(q, r)`; axial/cube stays the form
 used for calculations. Flat-top orientation made explicit (feature 002). Driven by feature
 004-maptoken-position-look.
@@ -108,7 +113,8 @@ Regras:
 - Vite é o bundler obrigatório — NÃO usar CRA, Webpack manual ou outros bundlers.
 - EF Core é o único ORM permitido — NÃO introduzir Dapper ou similares.
 - Context API é o padrão de estado — NÃO adicionar Redux, Zustand, MobX ou similares.
-- NÃO executar `docker` ou `docker compose` no ambiente local — Docker não está acessível.
+- Docker roda no ambiente local **somente pelo WSL2** (Docker Engine no Ubuntu do WSL, sem Docker Desktop
+  nem binário `docker` no Windows) — seguir a skill `wsl-docker` para `docker` e `docker compose`.
 - Variáveis de ambiente do frontend usam o prefixo `VITE_`; NÃO usar `REACT_APP_`.
 - Novos serviços HTTP no frontend DEVEM usar Fetch API; Axios fica restrito a código legado.
 
@@ -267,4 +273,4 @@ Antes de submeter qualquer código, verifique:
 - Toda revisão de PR e todo `plan.md` DEVEM verificar conformidade; violações só são aceitas
   com justificativa registrada na tabela "Complexity Tracking" do plano.
 
-**Version**: 4.0.0 | **Ratified**: 2026-04-02 | **Last Amended**: 2026-09-24
+**Version**: 4.1.0 | **Ratified**: 2026-04-02 | **Last Amended**: 2026-11-26

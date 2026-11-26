@@ -1,0 +1,16 @@
+# Template k8s-deploy · placeholders: __APP__ (ver SKILL.md).
+apiVersion: v1
+kind: Service
+metadata:
+  name: __APP__-web
+  labels:
+    app: __APP__-web
+spec:
+  type: ClusterIP
+  selector:
+    app: __APP__-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

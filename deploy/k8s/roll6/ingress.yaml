@@ -1,0 +1,36 @@
+# Roteamento público de roll6.site. Os caminhos chegam aos serviços com o prefixo original (sem rewrite).
+# - Sem TLS: o HTTPS termina na Cloudflare e o túnel chega aqui por HTTP.
+# - Só o host principal. O www NÃO entra aqui nem no túnel: uma Redirect Rule da Cloudflare faz o
+#   301 www → roll6.site na borda. Não use `from-to-www-redirect`: atrás do túnel ele gera
+#   https://roll6.site:80/.
+# - /hubs (SignalR/WebSocket) e /mcp (Streamable HTTP) ficam em ingress-stream.yaml, porque anotações de
+#   buffer/timeout valem por objeto Ingress.
+# - `pathType: Prefix` casa por SEGMENTO (/api casa /api e /api/x, não /apix).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: roll6
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # Maior upload da API: modelos .glb de até 20 MB (POST /api/model); imagens/documentos até 10 MB.
+    nginx.ingress.kubernetes.io/proxy-body-size: "21m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: roll6.site
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: roll6-api
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: roll6-web
+                port:
+                  number: 80

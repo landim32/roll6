@@ -1,0 +1,34 @@
+# Recursos do Roll6 no namespace roll6, aplicados pela pipeline Deploy Production com
+# `kubectl apply -k deploy/k8s/roll6`. Os Secrets (roll6-api-secrets e ghcr-pull) NÃO ficam
+# aqui: a pipeline os cria a partir dos secrets do GitHub.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: roll6
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: roll6
+    includeSelectors: false
+    includeTemplates: true
+
+resources:
+  - api-configmap.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - mcp-deployment.yaml
+  - mcp-service.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - web-upstreams.yaml
+  - ingress.yaml
+  - ingress-stream.yaml
+
+# `latest` é só um marcador: a pipeline troca as tags por `sha-<commit>` antes do apply.
+images:
+  - name: ghcr.io/landim32/roll6-api
+    newTag: latest
+  - name: ghcr.io/landim32/roll6-mcp
+    newTag: latest
+  - name: ghcr.io/landim32/roll6-web
+    newTag: latest

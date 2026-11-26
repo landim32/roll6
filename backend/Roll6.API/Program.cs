@@ -3,6 +3,7 @@ using Microsoft.OpenApi.Models;
 using Roll6.API.Extensions;
 using Roll6.Application;
 using Roll6.Application.Realtime;
+using Roll6.Infra.Context;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,6 +80,14 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+// Kubernetes readiness probe (deploy/k8s/roll6): 200 while the database answers, 503 otherwise. Not under /api, so
+// the ingress never exposes it.
+app.MapGet("/health", async (Roll6Context db, CancellationToken cancellationToken) =>
+        await db.Database.CanConnectAsync(cancellationToken)
+            ? Results.Ok(new { status = "ok" })
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable))
+    .AllowAnonymous()
+    .ExcludeFromDescription();
 app.MapControllers();
 app.MapHub<TableHub>("/hubs/table");
 app.MapHub<AnimationHub>("/hubs/animation");

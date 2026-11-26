@@ -1,0 +1,30 @@
+# Template k8s-deploy · placeholders: __APP__, __DOMAIN__ (ver SKILL.md).
+# Rotas de streaming (SSE / text/event-stream, WebSocket, long polling): respostas sem buffer e
+# conexões longas. Troque /stream pelos caminhos reais; se o projeto não tiver streaming, apague
+# este arquivo e tire-o de kustomization.yaml.
+# A Cloudflare ainda corta requisições sem resposta por mais de ~100 s (erro 524): o servidor
+# precisa mandar dados (ex.: heartbeat do SSE) antes disso.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: __APP__-stream
+  annotations:
+    # Sem TLS no ingress: o HTTPS termina na Cloudflare e o túnel chega aqui por HTTP.
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: __DOMAIN__
+      http:
+        paths:
+          - path: /stream
+            pathType: Prefix
+            backend:
+              service:
+                name: __APP__-api
+                port:
+                  number: 8080

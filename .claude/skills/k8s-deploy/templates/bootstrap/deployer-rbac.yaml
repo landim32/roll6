@@ -1,0 +1,62 @@
+# Template k8s-deploy · placeholders: __APP__ (ver SKILL.md).
+# Credencial da pipeline: ServiceAccount com permissões SÓ no namespace __APP__.
+# O kubeconfig gerado por make-kubeconfig.sh a partir desta conta vai para o secret KUBECONFIG do
+# environment `production` no GitHub. O kubeconfig de admin do cluster nunca sai da máquina do admin.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: __APP__-deployer
+  namespace: __APP__
+  labels:
+    app.kubernetes.io/part-of: __APP__
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: __APP__-deployer
+  namespace: __APP__
+  labels:
+    app.kubernetes.io/part-of: __APP__
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "secrets", "pods", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: __APP__-deployer
+  namespace: __APP__
+  labels:
+    app.kubernetes.io/part-of: __APP__
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: __APP__-deployer
+subjects:
+  - kind: ServiceAccount
+    name: __APP__-deployer
+    namespace: __APP__
+---
+# Token de longa duração da ServiceAccount. Sem `data`: o próprio cluster preenche o token e o
+# ca.crt depois do apply. Para rotacionar: apagar este Secret, aplicar de novo e gerar outro
+# kubeconfig.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: __APP__-deployer-token
+  namespace: __APP__
+  labels:
+    app.kubernetes.io/part-of: __APP__
+  annotations:
+    kubernetes.io/service-account.name: __APP__-deployer
+type: kubernetes.io/service-account-token

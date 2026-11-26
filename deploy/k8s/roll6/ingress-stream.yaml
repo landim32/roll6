@@ -1,0 +1,37 @@
+# Rotas de conexão longa, sem buffer:
+# - /hubs → API: SignalR (/hubs/table e /hubs/animation, WebSocket; o ingress-nginx faz o upgrade sozinho).
+# - /mcp  → MCP: Streamable HTTP; uploads em base64 de até ~16 MB.
+# A Cloudflare corta requisições sem resposta por mais de ~100 s (erro 524); o WebSocket do SignalR mantém
+# o keep-alive (15 s) e não é afetado.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: roll6-stream
+  annotations:
+    # Sem TLS no ingress: o HTTPS termina na Cloudflare e o túnel chega aqui por HTTP.
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: roll6.site
+      http:
+        paths:
+          - path: /hubs
+            pathType: Prefix
+            backend:
+              service:
+                name: roll6-api
+                port:
+                  number: 8080
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: roll6-mcp
+                port:
+                  number: 8080
