@@ -1,0 +1,56 @@
+# Template k8s-deploy · placeholders: __APP__, __GHCR_OWNER__ (ver SKILL.md).
+# Frontend do projeto (SPA servida por nginx na porta 80). Variáveis de build (ex.: VITE_*) são
+# embutidas na imagem, por isso não há env aqui. No cluster as rotas da API chegam direto do
+# ingress à API; um proxy `location /api` no nginx.conf da imagem só serve para o ambiente local.
+# O nginx.conf da imagem precisa responder 200 em /healthz (ex.: `location = /healthz { return 200; }`).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: __APP__-web
+  labels:
+    app: __APP__-web
+spec:
+  replicas: 1
+  progressDeadlineSeconds: 300
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: __APP__-web
+  template:
+    metadata:
+      labels:
+        app: __APP__-web
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: web
+          # Tag definida pela pipeline (kustomization.yaml → images)
+          image: ghcr.io/__GHCR_OWNER__/__APP__-web
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

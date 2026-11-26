@@ -1,0 +1,9 @@
+# Template k8s-deploy · placeholders: __APP__ (ver SKILL.md).
+# Namespace do projeto. Criado uma única vez pelo admin (kubectl apply -f deploy/k8s/bootstrap/);
+# a pipeline não cria nem apaga namespaces.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: __APP__
+  labels:
+    app.kubernetes.io/part-of: __APP__

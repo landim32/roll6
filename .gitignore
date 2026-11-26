@@ -27,3 +27,7 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Kubeconfigs (deploy/k8s/bootstrap/make-kubeconfig.sh output) never go to Git
+*.kubeconfig
+kubeconfig*

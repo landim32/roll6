@@ -128,7 +128,7 @@ frontend/           SPA React (src/Contexts, Services, hooks, types, components,
 database/           roll6.sql (esquema completo) e migrations/ (scripts incrementais)
 bruno/              Coleção de requisições da API (Bruno)
 specs/              Especificações de cada feature (Spec Kit)
-docker-compose.yml  Homologação · docker-compose-prod.yml  Produção
+docker-compose.yml  Homologação · deploy/k8s/  Produção (Kubernetes)
 ```
 
 ## Rodando localmente
@@ -170,14 +170,15 @@ npm test && npm run lint && npm run build
 
 | | Desenvolvimento | Homologação | Produção |
 |---|---|---|---|
-| Execução | `dotnet run` + `npm run dev` | `docker-compose.yml` (api, mcp, web, db) | `docker-compose-prod.yml` (api, mcp) |
+| Execução | `dotnet run` + `npm run dev` | `docker-compose.yml` (api, mcp, web, db) | Kubernetes `do-nyc2-emagine-k8s` (api, mcp, web) — `deploy/k8s/` |
 | Configuração | `appsettings.Development.json` | `.env` (modelo `.env.example`) | `appsettings.Production.json` + secrets do GitHub |
-| HTTPS | certificado de dev | — | Cloudflare + nginx do servidor |
+| HTTPS | certificado de dev | — | Cloudflare → túnel `emagine-k8s` → ingress-nginx |
 
-O workflow `deploy-prod.yml` roda a cada push na `main` (ou manualmente): conecta por SSH, gera o `.env.prod` a partir
-dos secrets e sobe os containers. Secrets necessários: `PROD_SSH_HOST`, `PROD_SSH_USER`, `PROD_SSH_PASSWORD`,
-`PROD_SSH_PORT` (opcional), `ROLL6_CONNECTION_STRING`, `ROLL6_JWT_SECRET`, `AWS_ACCESS_KEY_ID`,
-`AWS_SECRET_ACCESS_KEY`. As tags de versão (`vX.Y.Z`) e as releases são geradas pelo GitVersion.
+O workflow `deploy-prod.yml` roda sob demanda (Actions → Deploy Production, com `ref`): testes, imagens
+`ghcr.io/landim32/roll6-api|roll6-mcp|roll6-web` e `kubectl apply -k deploy/k8s/roll6` no namespace `roll6`.
+Secrets necessários: `KUBECONFIG` (environment `production`), `GHCR_PULL_USER`/`GHCR_PULL_TOKEN`,
+`ROLL6_CONNECTION_STRING`, `ROLL6_JWT_SECRET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (opcionais:
+`ROLL6_VAPID_PUBLIC_KEY`/`ROLL6_VAPID_PRIVATE_KEY`). Detalhes em `deploy/k8s/README.md`. As tags de versão (`vX.Y.Z`) e as releases são geradas pelo GitVersion.
 
 ## Usando o MCP
 

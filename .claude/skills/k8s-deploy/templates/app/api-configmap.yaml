@@ -1,0 +1,13 @@
+# Template k8s-deploy · placeholders: __APP__ (ver SKILL.md).
+# Configuração NÃO secreta da API, injetada como variáveis de ambiente (envFrom). Segredos ficam no
+# Secret __APP__-api-secrets, criado pela pipeline. Configuração que já está no appsettings de
+# produção (ou equivalente da stack) não precisa ser repetida aqui.
+# Outras stacks: troque pelas variáveis delas (ex.: Node → NODE_ENV: production).
+# .NET atrás do ingress: se a aplicação não configura UseForwardedHeaders no código, a variável
+# ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true" faz o Kestrel confiar em X-Forwarded-For/Proto.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: __APP__-api-env
+data:
+  ASPNETCORE_ENVIRONMENT: Production

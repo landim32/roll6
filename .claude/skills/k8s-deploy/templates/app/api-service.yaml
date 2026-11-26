@@ -1,0 +1,17 @@
+# Template k8s-deploy · placeholders: __APP__ (ver SKILL.md).
+# Só o ingress fala com a API (ClusterIP): por isso a API pode confiar em X-Forwarded-For/Proto.
+apiVersion: v1
+kind: Service
+metadata:
+  name: __APP__-api
+  labels:
+    app: __APP__-api
+spec:
+  type: ClusterIP
+  selector:
+    app: __APP__-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

@@ -19,6 +19,13 @@ public class RequestLoggingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        // The Kubernetes readiness probe calls /health every 10 s; one line each would bury the real requests.
+        if (context.Request.Path.Equals("/health", StringComparison.OrdinalIgnoreCase))
+        {
+            await _next(context);
+            return;
+        }
+
         var started = Stopwatch.GetTimestamp();
         try
         {

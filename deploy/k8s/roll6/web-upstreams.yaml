@@ -1,0 +1,38 @@
+# Apelidos `api` e `mcp` para o nginx da imagem do SPA (frontend/nginx.conf, o mesmo da homologação).
+# No cluster o ingress leva /api, /hubs e /mcp direto aos Services roll6-api/roll6-mcp, mas o nginx do SPA
+# ainda precisa resolver os dois nomes:
+# - ao subir (proxy_pass http://api:8080 e http://mcp:8080 — nome que não resolve = nginx não inicia);
+# - no SSI do index.html (040, prévias de link), que inclui /api/meta/head$request_uri por dentro do
+#   próprio nginx, ou seja, pelo `location /api/` dele.
+# Os mesmos pods dos Services principais; nada de fora do namespace roll6 vê esses nomes.
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels:
+    app: roll6-api
+spec:
+  type: ClusterIP
+  selector:
+    app: roll6-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp
+  labels:
+    app: roll6-mcp
+spec:
+  type: ClusterIP
+  selector:
+    app: roll6-mcp
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

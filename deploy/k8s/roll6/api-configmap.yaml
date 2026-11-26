@@ -1,0 +1,11 @@
+# Configuração NÃO secreta da API, injetada como variáveis de ambiente (envFrom). Segredos ficam no
+# Secret roll6-api-secrets, criado pela pipeline. O resto (S3, Site:BaseUrl, Push:Subject, migrations no
+# startup, JWT de 90 dias) já está em backend/Roll6.API/appsettings.Production.json.
+# Forwarded headers: Program.cs já confia em X-Forwarded-For/Proto (só o ingress fala com a API).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: roll6-api-env
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_URLS: http://+:8080

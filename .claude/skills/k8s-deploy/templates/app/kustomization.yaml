@@ -1,0 +1,31 @@
+# Template k8s-deploy · placeholders: __APP__, __GHCR_OWNER__ (ver SKILL.md).
+# Recursos do projeto no namespace __APP__, aplicados pela pipeline Deploy Production com
+# `kubectl apply -k deploy/k8s/__APP__`. Os Secrets (__APP__-api-secrets e ghcr-pull) NÃO ficam
+# aqui: a pipeline os cria a partir dos secrets do GitHub.
+# Projeto sem frontend (ou sem API): remova os arquivos correspondentes de `resources` e de `images`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: __APP__
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: __APP__
+    includeSelectors: false
+    includeTemplates: true
+
+resources:
+  - api-configmap.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - ingress.yaml
+  - ingress-stream.yaml
+
+# `latest` é só um marcador: a pipeline troca as tags por `sha-<commit>` antes do apply.
+images:
+  - name: ghcr.io/__GHCR_OWNER__/__APP__-api
+    newTag: latest
+  - name: ghcr.io/__GHCR_OWNER__/__APP__-web
+    newTag: latest

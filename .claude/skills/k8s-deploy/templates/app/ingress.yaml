@@ -1,0 +1,45 @@
+# Template k8s-deploy · placeholders: __APP__, __DOMAIN__ (ver SKILL.md).
+# Roteamento público de __DOMAIN__. Os caminhos chegam à API com o prefixo original (sem rewrite).
+# - Sem TLS: o HTTPS termina na Cloudflare e o túnel chega aqui por HTTP.
+# - Só o host principal. O www NÃO entra aqui nem no túnel: uma Redirect Rule da Cloudflare faz o
+#   301 www → __DOMAIN__ na borda. Não use `from-to-www-redirect`: atrás do túnel ele gera
+#   https://__DOMAIN__:80/.
+# - Rotas SSE/streaming ficam em ingress-stream.yaml, porque anotações de buffer/timeout valem por
+#   objeto Ingress.
+# - `pathType: Prefix` casa por SEGMENTO (/api casa /api e /api/x, não /apix). Para caminhos que
+#   não são um segmento inteiro, liste cada caminho exato com Prefix, por exemplo:
+#       - path: /.well-known/<documento-1>
+#         pathType: Prefix
+#         backend: { service: { name: __APP__-api, port: { number: 8080 } } }
+#       - path: /.well-known/<documento-2>
+#         pathType: Prefix
+#         backend: { service: { name: __APP__-api, port: { number: 8080 } } }
+#   NÃO use `ImplementationSpecific` para prefixo de texto (ex.: `/.well-known/doc-`): o caminho
+#   cai na rota `/` (SPA) e responde 502/404.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: __APP__
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: __DOMAIN__
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: __APP__-api
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: __APP__-web
+                port:
+                  number: 80
